@@ -1,0 +1,61 @@
+{
+  "common": {
+    "appName": "ProjectOps360°",
+    "appShortName": "POps360"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "projects": "Proyectos",
+    "team": "Equipo",
+    "reports": "Reportes",
+    "language": "Idioma",
+    "settings": "Configuración",
+    "search": "Buscar…",
+    "notifications": "Notificaciones"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "Bienvenido a ProjectOps360° — Fase 0 activa.",
+    "activeProjects": {
+      "title": "Proyectos Activos",
+      "subtitle": "Sin proyectos aún"
+    },
+    "teamMembers": {
+      "title": "Miembros del Equipo",
+      "subtitle": "Fundador solitario",
+      "trend": "Recién comenzando"
+    },
+    "completedTasks": {
+      "title": "Tareas Completadas",
+      "subtitle": "0% de completitud"
+    },
+    "pendingItems": {
+      "title": "Elementos Pendientes",
+      "subtitle": "Configuración Fase 0"
+    }
+  },
+  "phase0": {
+    "title": "Fase 0 — Configuración del Entorno",
+    "description": "El entorno de desarrollo local está listo. Próximos pasos: configurar Supabase, implementar i18n con next-intl y construir los primeros módulos de negocio.",
+    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
+    "pending": ["next-intl", "OpenAI"]
+  },
+  "supabase": {
+    "connectionTest": "Prueba de Conexión Supabase",
+    "envVariables": "Variables de Entorno",
+    "testing": "Probando conexión…",
+    "connected": "Supabase conectado",
+    "failed": "Conexión fallida",
+    "configDetails": "Detalles de Configuración",
+    "connectionError": "Error de Conexión",
+    "connectedMessage": "Tu cliente Supabase está correctamente configurado y puede comunicarse con el proyecto. Listo para construir funcionalidades de autenticación y datos.",
+    "envHint": "Revisa tu archivo .env.local y asegúrate de que los valores no sean marcadores de posición.",
+    "notSet": "(no configurado)",
+    "serverOnly": "(solo servidor — no expuesto)"
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "es": "Español",
+    "label": "Cambiar idioma"
+  }
+}

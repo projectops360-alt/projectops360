@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { sidebarNav, bottomNav, type NavItem } from "@/config/navigation";
 import { Logo } from "@/components/shared/logo";
+import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { Settings, Globe } from "lucide-react";
 
 function NavButton({ item, active }: { item: NavItem; active: boolean }) {
-  const Icon = item.icon;
+  const t = useTranslations("nav");
+  const titleKey = item.title.toLowerCase() as Parameters<typeof t>[0];
+  const displayTitle = t(titleKey);
+
   return (
     <Link
       href={item.href}
@@ -18,8 +24,8 @@ function NavButton({ item, active }: { item: NavItem; active: boolean }) {
           : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
       )}
     >
-      <Icon className="h-5 w-5 shrink-0" />
-      <span>{item.title}</span>
+      <item.icon className="h-5 w-5 shrink-0" />
+      <span>{displayTitle}</span>
       {item.badge && (
         <span className="ml-auto rounded-full bg-sidebar-active px-2 py-0.5 text-xs text-white">
           {item.badge}
@@ -51,14 +57,22 @@ export function Sidebar() {
       </nav>
 
       {/* ── Bottom nav ── */}
-      <div className="border-t border-white/5 px-3 py-4 space-y-1">
-        {bottomNav.map((item) => (
+      <div className="border-t border-white/5 px-3 py-4 space-y-3">
+        {/* ── Language switcher ── */}
+        <div className="px-3">
+          <LanguageSwitcher />
+        </div>
+
+        <div className="space-y-1">
           <NavButton
-            key={item.href}
-            item={item}
-            active={pathname === item.href}
+            item={{ title: "Language", href: "/locale", icon: Globe }}
+            active={pathname === "/locale"}
           />
-        ))}
+          <NavButton
+            item={{ title: "Settings", href: "/settings", icon: Settings }}
+            active={pathname === "/settings"}
+          />
+        </div>
       </div>
     </aside>
   );

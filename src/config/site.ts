@@ -9,8 +9,8 @@ export const siteConfig = {
   description: "Project Operations Management Platform",
   url: "https://projectops360.com",
   locale: {
-    default: "es",
-    supported: ["es", "en"] as const,
+    default: "en",
+    supported: ["en", "es"] as const,
   },
 } as const;
 

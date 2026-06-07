@@ -1,0 +1,61 @@
+{
+  "common": {
+    "appName": "ProjectOps360°",
+    "appShortName": "POps360"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "team": "Team",
+    "reports": "Reports",
+    "language": "Language",
+    "settings": "Settings",
+    "search": "Search…",
+    "notifications": "Notifications"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to ProjectOps360° — Phase 0 active.",
+    "activeProjects": {
+      "title": "Active Projects",
+      "subtitle": "No projects yet"
+    },
+    "teamMembers": {
+      "title": "Team Members",
+      "subtitle": "Solo founder",
+      "trend": "Just getting started"
+    },
+    "completedTasks": {
+      "title": "Completed Tasks",
+      "subtitle": "0% completion rate"
+    },
+    "pendingItems": {
+      "title": "Pending Items",
+      "subtitle": "Phase 0 setup"
+    }
+  },
+  "phase0": {
+    "title": "Phase 0 — Environment Setup",
+    "description": "The local development environment is ready. Next steps: configure Supabase, set up i18n with next-intl, and build the first business modules.",
+    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
+    "pending": ["next-intl", "OpenAI"]
+  },
+  "supabase": {
+    "connectionTest": "Supabase Connection Test",
+    "envVariables": "Environment Variables",
+    "testing": "Testing connection…",
+    "connected": "Supabase connected",
+    "failed": "Connection failed",
+    "configDetails": "Configuration Details",
+    "connectionError": "Connection Error",
+    "connectedMessage": "Your Supabase client is correctly configured and can reach the project. Ready to build auth and data features.",
+    "envHint": "Check your .env.local file and ensure the values are not placeholders.",
+    "notSet": "(not set)",
+    "serverOnly": "(server-only — not exposed)"
+  },
+  "languageSwitcher": {
+    "en": "English",
+    "es": "Español",
+    "label": "Switch language"
+  }
+}

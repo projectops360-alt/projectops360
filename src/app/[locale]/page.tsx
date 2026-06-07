@@ -1,3 +1,4 @@
+import { setRequestLocale, getTranslations } from "next-intl/server";
 import { AppShell } from "@/components/layout/app-shell";
 import { SupabaseStatus } from "@/components/shared/supabase-status";
 import {
@@ -44,44 +45,54 @@ function StatCard({
   );
 }
 
-export default function HomePage() {
+export default async function HomePage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
+  const t = await getTranslations("dashboard");
+  const t0 = await getTranslations("phase0");
+
   return (
     <AppShell>
       {/* ── Page header ── */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Dashboard
+          {t("title")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Welcome to ProjectOps360° — Phase 0 active.
+          {t("welcome")}
         </p>
       </div>
 
       {/* ── Stats grid ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Active Projects"
+          title={t("activeProjects.title")}
           value="0"
-          subtitle="No projects yet"
+          subtitle={t("activeProjects.subtitle")}
           icon={FolderKanban}
         />
         <StatCard
-          title="Team Members"
+          title={t("teamMembers.title")}
           value="1"
-          subtitle="Solo founder"
+          subtitle={t("teamMembers.subtitle")}
           icon={Users}
-          trend="Just getting started"
+          trend={t("teamMembers.trend")}
         />
         <StatCard
-          title="Completed Tasks"
+          title={t("completedTasks.title")}
           value="0"
-          subtitle="0% completion rate"
+          subtitle={t("completedTasks.subtitle")}
           icon={CheckCircle2}
         />
         <StatCard
-          title="Pending Items"
+          title={t("pendingItems.title")}
           value="—"
-          subtitle="Phase 0 setup"
+          subtitle={t("pendingItems.subtitle")}
           icon={Clock}
         />
       </div>
@@ -94,32 +105,21 @@ export default function HomePage() {
           </div>
           <div className="space-y-1">
             <h2 className="text-lg font-semibold text-brand-900 dark:text-brand-100">
-              Phase 0 — Environment Setup
+              {t0("title")}
             </h2>
             <p className="text-sm text-brand-700 dark:text-brand-300">
-              The local development environment is ready. Next steps: configure Supabase,
-              set up i18n with next-intl, and build the first business modules.
+              {t0("description")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {["Next.js ✓", "TypeScript ✓", "Tailwind ✓", "shadcn/ui ✓", "Lucide ✓"].map(
-                (tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800 dark:bg-brand-900 dark:text-brand-200"
-                  >
-                    {tag}
-                  </span>
-                )
-              )}
-              {["Supabase ✓"].map((tag) => (
+              {t0.raw("completed").map((tag: string) => (
                 <span
                   key={tag}
                   className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800 dark:bg-brand-900 dark:text-brand-200"
                 >
-                  {tag}
+                  {tag} ✓
                 </span>
               ))}
-              {["next-intl", "OpenAI"].map((tag) => (
+              {t0.raw("pending").map((tag: string) => (
                 <span
                   key={tag}
                   className="rounded-full border border-brand-300 px-3 py-1 text-xs font-medium text-brand-600 dark:border-brand-700 dark:text-brand-400"

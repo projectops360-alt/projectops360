@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { env, validatePublicEnv } from "@/lib/env";
 import {
@@ -35,6 +36,7 @@ function StatusBadge({
 }
 
 export function SupabaseStatus() {
+  const t = useTranslations("supabase");
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("checking");
   const [envStatus, setEnvStatus] = useState<"ok" | "fail" | "pending">(
@@ -75,17 +77,15 @@ export function SupabaseStatus() {
       const keySet = key.length > 0 && !key.includes("PASTE");
 
       setEnvDetails({
-        url: url ? `${url.substring(0, 30)}...` : "(empty)",
-        key: key ? `${key.substring(0, 8)}...` : "(empty)",
+        url: url ? `${url.substring(0, 30)}...` : t("notSet"),
+        key: key ? `${key.substring(0, 8)}...` : t("notSet"),
         urlSet,
         keySet,
       });
 
       if (!urlSet || !keySet) {
         setEnvStatus("fail");
-        setErrorMessage(
-          "Environment variables contain placeholder values. Replace them in .env.local"
-        );
+        setErrorMessage(t("envHint"));
         setConnectionStatus("error");
         return;
       }
@@ -93,13 +93,15 @@ export function SupabaseStatus() {
       // ── Step 3: Try connecting to Supabase ──
       try {
         const supabase = createClient();
-        // A lightweight call that proves the client can reach Supabase
-        const { error } = await supabase.from("_test_connection").select("*").limit(1);
-        // If the table doesn't exist, that's fine — it still proves we connected
+        const { error } = await supabase
+          .from("_test_connection")
+          .select("*")
+          .limit(1);
         if (error && error.code !== "42P01") {
-          // 42P01 = undefined table, which means connection works
-          // Any other error might indicate auth issues
-          if (error.message.includes("Invalid API key") || error.message.includes("Invalid input")) {
+          if (
+            error.message.includes("Invalid API key") ||
+            error.message.includes("Invalid input")
+          ) {
             throw new Error(`Auth error: ${error.message}`);
           }
         }
@@ -113,22 +115,16 @@ export function SupabaseStatus() {
     }
 
     checkConnection();
-  }, []);
+  }, [t]);
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">
-        Supabase Connection Test
+        {t("connectionTest")}
       </h2>
 
       <div className="grid gap-2 sm:grid-cols-2">
-        {/* ── Env vars status ── */}
-        <StatusBadge
-          status={envStatus}
-          label="Environment Variables"
-        />
-
-        {/* ── Connection status ── */}
+        <StatusBadge status={envStatus} label={t("envVariables")} />
         <StatusBadge
           status={
             connectionStatus === "checking"
@@ -139,10 +135,10 @@ export function SupabaseStatus() {
           }
           label={
             connectionStatus === "checking"
-              ? "Testing connection..."
+              ? t("testing")
               : connectionStatus === "connected"
-                ? "Supabase connected"
-                : "Connection failed"
+                ? t("connected")
+                : t("failed")
           }
         />
       </div>
@@ -150,7 +146,7 @@ export function SupabaseStatus() {
       {/* ── Detailed results ── */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground">
-          Configuration Details
+          {t("configDetails")}
         </h3>
 
         <div className="space-y-2 text-sm">
@@ -160,7 +156,7 @@ export function SupabaseStatus() {
               SUPABASE_URL
             </span>
             <span className={envDetails.urlSet ? "text-brand-600 dark:text-brand-400" : "text-destructive"}>
-              {envDetails.url || "(not set)"}
+              {envDetails.url || t("notSet")}
             </span>
           </div>
 
@@ -170,7 +166,7 @@ export function SupabaseStatus() {
               PUBLISHABLE_KEY
             </span>
             <span className={envDetails.keySet ? "text-brand-600 dark:text-brand-400" : "text-destructive"}>
-              {envDetails.key || "(not set)"}
+              {envDetails.key || t("notSet")}
             </span>
           </div>
 
@@ -180,7 +176,7 @@ export function SupabaseStatus() {
               DATABASE_URL
             </span>
             <span className="text-muted-foreground">
-              (server-only — not exposed)
+              {t("serverOnly")}
             </span>
           </div>
         </div>
@@ -192,12 +188,9 @@ export function SupabaseStatus() {
           <div className="flex items-start gap-3">
             <WifiOff className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
             <div>
-              <p className="font-medium text-destructive">Connection Error</p>
+              <p className="font-medium text-destructive">{t("connectionError")}</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {errorMessage}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Check your <code className="rounded bg-muted px-1 py-0.5">.env.local</code> file and ensure the values are not placeholders.
               </p>
             </div>
           </div>
@@ -211,11 +204,10 @@ export function SupabaseStatus() {
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
             <div>
               <p className="font-medium text-brand-700 dark:text-brand-300">
-                Supabase Connected
+                {t("connected")}
               </p>
               <p className="mt-1 text-sm text-brand-600 dark:text-brand-400">
-                Your Supabase client is correctly configured and can reach the project.
-                Ready to build auth and data features.
+                {t("connectedMessage")}
               </p>
             </div>
           </div>
