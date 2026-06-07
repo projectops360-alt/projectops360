@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Panel",
+    "phase0": "Fase 0",
     "projects": "Proyectos",
     "team": "Equipo",
     "reports": "Reportes",
@@ -39,6 +40,116 @@
     "description": "El entorno de desarrollo local está listo. Próximos pasos: configurar Supabase, implementar i18n con next-intl y construir los primeros módulos de negocio.",
     "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
     "pending": ["next-intl", "OpenAI"]
+  },
+  "phase0Control": {
+    "pageTitle": "Control Fase 0",
+    "pageDescription": "Seguimiento y gestión de los pasos de configuración base del proyecto. Marca tareas como completadas a medida que avanzas.",
+    "progress": {
+      "label": "Progreso",
+      "completed": "{done} de {total} tareas completadas",
+      "percentage": "{percent}% completado",
+      "reset": "Reiniciar todo el progreso",
+      "confirmReset": "¿Estás seguro de que deseas reiniciar todo el progreso? Esta acción no se puede deshacer.",
+      "lastSaved": "Último guardado: {time}"
+    },
+    "task": {
+      "id": "ID",
+      "title": "Título",
+      "goal": "Objetivo",
+      "status": "Estado",
+      "estimate": "Estimado",
+      "dependencies": "Dependencias",
+      "acceptanceCriteria": "Criterios de Aceptación",
+      "prompt": "Prompt",
+      "notes": "Notas",
+      "notesPlaceholder": "Agrega tus notas aquí…",
+      "copyPrompt": "Copiar prompt",
+      "copied": "¡Copiado!",
+      "statusPending": "Pendiente",
+      "statusInProgress": "En Progreso",
+      "statusDone": "Completado",
+      "statusBlocked": "Bloqueado",
+      "noDependencies": "Ninguna",
+      "toggleStatus": "Clic para cambiar estado"
+    },
+    "tasks": {
+      "0_1": {
+        "title": "Scaffolding del Proyecto",
+        "goal": "Inicializar el proyecto Next.js con TypeScript, Tailwind CSS y shadcn/ui.",
+        "criteria": {
+          "0": "El servidor de desarrollo Next.js inicia sin errores",
+          "1": "`pnpm build` se ejecuta sin errores de tipo",
+          "2": "La app se renderiza en localhost:3000 con sidebar y header"
+        },
+        "prompt": "Crea un proyecto Next.js 16 con App Router, TypeScript strict mode y Tailwind CSS v4. Instala shadcn/ui con estilo base-nova y la librería de iconos Lucide."
+      },
+      "0_2": {
+        "title": "Proyecto Supabase y Auth",
+        "goal": "Configurar las librerías cliente de Supabase, middleware de refresh de sesión y validación de variables de entorno.",
+        "criteria": {
+          "0": "El dashboard de Supabase muestra el proyecto enlazado",
+          "1": "Los clientes browser y server de Supabase se conectan exitosamente",
+          "2": "Las variables de entorno se validan al inicio"
+        },
+        "prompt": "Instala @supabase/supabase-js y @supabase/ssr. Crea factorías de cliente browser y server. Configura middleware de Next.js para refresh de sesión de auth. Agrega helpers de validación de env vars."
+      },
+      "0_3": {
+        "title": "Framework i18n",
+        "goal": "Integrar next-intl con la ruta dinámica [locale], archivos de mensajes para en y es, y un selector de idioma en el sidebar.",
+        "criteria": {
+          "0": "Navegar a /en y /es renderiza las traducciones correctas",
+          "1": "El LanguageSwitcher cambia el locale sin recarga completa de página"
+        },
+        "prompt": "Configura next-intl en un proyecto Next.js 16 con App Router. Crea la ruta dinámica [locale], la configuración i18n/request.ts, routing.ts con locales en y es, y los archivos JSON de mensajes. Agrega un componente LanguageSwitcher."
+      },
+      "0_4": {
+        "title": "Shell de Layout y Navegación",
+        "goal": "Construir el AppShell persistente con sidebar, header y área de contenido principal con navegación y resaltado de ruta activa.",
+        "criteria": {
+          "0": "El sidebar renderiza todos los items de navegación desde la configuración",
+          "1": "La ruta activa se resalta en el sidebar"
+        },
+        "prompt": "Crea un componente de layout AppShell con un sidebar fijo y header sticky. El sidebar lee los items desde un archivo de configuración de navegación, renderiza iconos Lucide y resalta la ruta activa. El header contiene una barra de búsqueda y campana de notificaciones."
+      },
+      "0_5": {
+        "title": "Página de Control Fase 0",
+        "goal": "Construir una página de control auto-referenciada que liste todas las tareas de fundación, rastree progreso en localStorage y muestre porcentaje de completitud.",
+        "criteria": {
+          "0": "Navegar a /phase0 muestra todas las tareas de Fase 0 en layout de tarjetas",
+          "1": "Cambiar el estado de una tarea persiste entre recargas de página vía localStorage"
+        },
+        "prompt": "Crea una página de control Fase 0 en /phase0 que lea un array estático de tareas y renderice cada tarea con su estado, estimado, dependencias, criterios de aceptación y un prompt copiable. Guarda el estado y notas de las tareas en localStorage usando un hook personalizado. Muestra una barra de progreso en la parte superior."
+      },
+      "0_6": {
+        "title": "Línea Base de Entorno y CI",
+        "goal": "Configurar validación de .env.local, ESLint y un workflow de GitHub Actions CI para type-check, lint y build.",
+        "criteria": {
+          "0": "validatePublicEnv() lanza un error claro cuando faltan las variables NEXT_PUBLIC_",
+          "1": "`pnpm lint` pasa sin errores",
+          "2": "El workflow de GitHub Actions se ejecuta en push y PR"
+        },
+        "prompt": "Agrega validación de variables de entorno en src/lib/env.ts. Configura ESLint con next/core-web-vitals. Crea .github/workflows/ci.yml que ejecute type-check, lint y build en Node 22."
+      },
+      "0_7": {
+        "title": "Stub de Integración OpenAI",
+        "goal": "Agregar un wrapper server-side del SDK de OpenAI con soporte de streaming y una ruta /api/chat.",
+        "criteria": {
+          "0": "POST /api/chat con { messages } retorna una respuesta en streaming",
+          "1": "La clave API de OpenAI permanece server-side, nunca expuesta al navegador"
+        },
+        "prompt": "Instala el SDK de OpenAI. Crea src/lib/openai.ts con un helper de streaming para chat completion. Agrega src/app/api/chat/route.ts que valide la solicitud y retorne una respuesta en streaming. Nunca expongas la OPENAI_API_KEY al cliente."
+      },
+      "0_8": {
+        "title": "Datos Iniciales del Dashboard",
+        "goal": "Conectar la página del Dashboard a Supabase para mostrar conteos reales de proyectos, miembros activos y métricas de completitud de tareas.",
+        "criteria": {
+          "0": "Las StatCards del Dashboard muestran datos en vivo desde Supabase",
+          "1": "Mensajes de estado vacío aparecen cuando no hay datos",
+          "2": "Esqueletos de carga se muestran durante la obtención de datos"
+        },
+        "prompt": "Reemplaza los valores hardcodeados del Dashboard con datos reales desde Supabase. Crea server actions que consulten conteos de proyectos, miembros del equipo y tareas. Muestra esqueletos de carga durante la obtención de datos. Muestra texto amigable de estado vacío cuando los conteos son cero."
+      }
+    }
   },
   "supabase": {
     "connectionTest": "Prueba de Conexión Supabase",

@@ -2,7 +2,7 @@
  * ProjectOps360° — Navigation Constants
  */
 
-import { LayoutDashboard, FolderKanban, Users, BarChart3, Settings, Globe } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Users, BarChart3, Settings, Globe, ShieldCheck } from "lucide-react";
 
 export type NavItem = {
   title: string;
@@ -13,6 +13,7 @@ export type NavItem = {
 
 export const sidebarNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Phase0", href: "/phase0", icon: ShieldCheck },
   { title: "Projects", href: "/projects", icon: FolderKanban },
   { title: "Team", href: "/team", icon: Users },
   { title: "Reports", href: "/reports", icon: BarChart3 },

@@ -5,6 +5,7 @@
   },
   "nav": {
     "dashboard": "Dashboard",
+    "phase0": "Phase 0",
     "projects": "Projects",
     "team": "Team",
     "reports": "Reports",
@@ -39,6 +40,116 @@
     "description": "The local development environment is ready. Next steps: configure Supabase, set up i18n with next-intl, and build the first business modules.",
     "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
     "pending": ["next-intl", "OpenAI"]
+  },
+  "phase0Control": {
+    "pageTitle": "Phase 0 Control",
+    "pageDescription": "Track and manage your project's foundation setup steps. Mark tasks complete as you progress.",
+    "progress": {
+      "label": "Progress",
+      "completed": "{done} of {total} tasks complete",
+      "percentage": "{percent}% complete",
+      "reset": "Reset all progress",
+      "confirmReset": "Are you sure you want to reset all progress? This cannot be undone.",
+      "lastSaved": "Last saved: {time}"
+    },
+    "task": {
+      "id": "ID",
+      "title": "Title",
+      "goal": "Goal",
+      "status": "Status",
+      "estimate": "Estimate",
+      "dependencies": "Dependencies",
+      "acceptanceCriteria": "Acceptance Criteria",
+      "prompt": "Prompt",
+      "notes": "Notes",
+      "notesPlaceholder": "Add your notes here…",
+      "copyPrompt": "Copy prompt",
+      "copied": "Copied!",
+      "statusPending": "Pending",
+      "statusInProgress": "In Progress",
+      "statusDone": "Done",
+      "statusBlocked": "Blocked",
+      "noDependencies": "None",
+      "toggleStatus": "Click to change status"
+    },
+    "tasks": {
+      "0_1": {
+        "title": "Project Scaffolding",
+        "goal": "Initialize the Next.js project with TypeScript, Tailwind CSS, and shadcn/ui.",
+        "criteria": {
+          "0": "Next.js dev server starts without errors",
+          "1": "`pnpm build` succeeds with no type errors",
+          "2": "App renders at localhost:3000 with sidebar and header"
+        },
+        "prompt": "Scaffold a Next.js 16 project with App Router, TypeScript strict mode, and Tailwind CSS v4. Install shadcn/ui with base-nova style and the Lucide icon library."
+      },
+      "0_2": {
+        "title": "Supabase Project & Auth",
+        "goal": "Configure Supabase client libraries, middleware session refresh, and environment variable validation.",
+        "criteria": {
+          "0": "Supabase dashboard shows the project is linked",
+          "1": "Client and server Supabase clients connect successfully",
+          "2": "Environment variables are validated on startup"
+        },
+        "prompt": "Install @supabase/supabase-js and @supabase/ssr. Create browser and server client factories. Set up Next.js middleware for auth session refresh. Add env validation helpers."
+      },
+      "0_3": {
+        "title": "i18n Framework",
+        "goal": "Integrate next-intl with [locale] dynamic route, message files for en and es, and a language switcher.",
+        "criteria": {
+          "0": "Navigating to /en and /es renders correct translations",
+          "1": "LanguageSwitcher toggles locale without full page reload"
+        },
+        "prompt": "Set up next-intl in a Next.js 16 App Router project. Create the [locale] dynamic route, i18n/request.ts config, routing.ts with locales en and es, and message JSON files. Add a LanguageSwitcher client component."
+      },
+      "0_4": {
+        "title": "Layout Shell & Navigation",
+        "goal": "Build the persistent AppShell with sidebar, header, and main content area with navigation and active-route highlighting.",
+        "criteria": {
+          "0": "Sidebar renders all navigation items from config",
+          "1": "Active route is highlighted in the sidebar"
+        },
+        "prompt": "Create an AppShell layout component with a fixed sidebar and sticky header. The sidebar reads items from a navigation config file, renders Lucide icons, and highlights the active route. The header contains a search bar and notification bell."
+      },
+      "0_5": {
+        "title": "Phase 0 Control Page",
+        "goal": "Build a self-referencing Phase 0 control page that lists all foundation tasks, tracks progress in localStorage, and shows completion percentage.",
+        "criteria": {
+          "0": "Navigating to /phase0 shows all Phase 0 tasks in card layout",
+          "1": "Toggling task status persists across page reloads via localStorage"
+        },
+        "prompt": "Create a Phase 0 control page at /phase0 that reads a static task array and renders each task with its status, estimate, dependencies, acceptance criteria, and a copyable prompt. Store task status and notes in localStorage using a custom hook. Show a progress bar at the top."
+      },
+      "0_6": {
+        "title": "Environment & CI Baseline",
+        "goal": "Set up .env.local validation, ESLint config, and a GitHub Actions CI workflow for type-check, lint, and build.",
+        "criteria": {
+          "0": "validatePublicEnv() throws a clear error when NEXT_PUBLIC_ vars are missing",
+          "1": "`pnpm lint` passes with no errors",
+          "2": "GitHub Actions workflow runs on push and PR"
+        },
+        "prompt": "Add env var validation in src/lib/env.ts. Configure ESLint with next/core-web-vitals. Create .github/workflows/ci.yml that runs type-check, lint, and build on Node 22."
+      },
+      "0_7": {
+        "title": "OpenAI Integration Stub",
+        "goal": "Add a server-side OpenAI SDK wrapper with streaming support and a /api/chat route.",
+        "criteria": {
+          "0": "POST /api/chat with { messages } returns a streamed response",
+          "1": "OpenAI API key stays server-side only, never exposed to the browser"
+        },
+        "prompt": "Install the OpenAI SDK. Create src/lib/openai.ts with a streaming chat completion helper. Add src/app/api/chat/route.ts that validates the request and returns a streaming response. Never expose the OPENAI_API_KEY to the client."
+      },
+      "0_8": {
+        "title": "First Dashboard Data",
+        "goal": "Connect the Dashboard page to Supabase to show real project counts, active members, and task completion metrics.",
+        "criteria": {
+          "0": "Dashboard StatCards display live data from Supabase",
+          "1": "Empty-state messages appear when no data exists",
+          "2": "Loading skeletons show during fetch"
+        },
+        "prompt": "Replace the hardcoded Dashboard stat values with real data from Supabase. Create server actions that query projects, team members, and tasks counts. Show loading skeletons while data fetches. Display friendly empty-state text when counts are zero."
+      }
+    }
   },
   "supabase": {
     "connectionTest": "Supabase Connection Test",
