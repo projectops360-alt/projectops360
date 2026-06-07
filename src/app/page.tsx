@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { SupabaseStatus } from "@/components/shared/supabase-status";
 import {
   FolderKanban,
   Users,
@@ -110,7 +111,15 @@ export default function HomePage() {
                   </span>
                 )
               )}
-              {["Supabase", "next-intl", "OpenAI"].map((tag) => (
+              {["Supabase ✓"].map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-brand-100 px-3 py-1 text-xs font-medium text-brand-800 dark:bg-brand-900 dark:text-brand-200"
+                >
+                  {tag}
+                </span>
+              ))}
+              {["next-intl", "OpenAI"].map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full border border-brand-300 px-3 py-1 text-xs font-medium text-brand-600 dark:border-brand-700 dark:text-brand-400"
@@ -121,6 +130,11 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Supabase connection test ── */}
+      <div className="mt-8">
+        <SupabaseStatus />
       </div>
     </AppShell>
   );
