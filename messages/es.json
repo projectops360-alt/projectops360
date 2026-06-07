@@ -37,9 +37,9 @@
   },
   "phase0": {
     "title": "Fase 0 — Configuración del Entorno",
-    "description": "El entorno de desarrollo local está listo. Próximos pasos: configurar Supabase, implementar i18n con next-intl y construir los primeros módulos de negocio.",
-    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
-    "pending": ["next-intl", "OpenAI"]
+    "description": "El entorno de desarrollo local está listo. Próximos pasos: construir flujos de autenticación, conectar datos al dashboard y agregar la capa de servicio de OpenAI.",
+    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase", "next-intl"],
+    "pending": ["OpenAI"]
   },
   "phase0Control": {
     "pageTitle": "Control Fase 0",

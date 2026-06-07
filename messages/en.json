@@ -37,9 +37,9 @@
   },
   "phase0": {
     "title": "Phase 0 — Environment Setup",
-    "description": "The local development environment is ready. Next steps: configure Supabase, set up i18n with next-intl, and build the first business modules.",
-    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase"],
-    "pending": ["next-intl", "OpenAI"]
+    "description": "The local development environment is ready. Next steps: build auth flows, connect dashboard data, and add the OpenAI service layer.",
+    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase", "next-intl"],
+    "pending": ["OpenAI"]
   },
   "phase0Control": {
     "pageTitle": "Phase 0 Control",
