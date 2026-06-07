@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
-import { env, validatePublicEnv } from "@/lib/env";
+import { checkPublicEnv } from "@/lib/env";
 import {
   CheckCircle2,
   XCircle,
@@ -57,40 +57,32 @@ export function SupabaseStatus() {
 
   useEffect(() => {
     async function checkConnection() {
-      // ── Step 1: Validate env vars exist ──
-      try {
-        validatePublicEnv();
-        setEnvStatus("ok");
-      } catch (err) {
-        setEnvStatus("fail");
-        setErrorMessage(
-          err instanceof Error ? err.message : "Missing env vars"
-        );
-        setConnectionStatus("error");
-        return;
-      }
-
-      // ── Step 2: Check values are not placeholders ──
-      const url = env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-      const urlSet = url.length > 0 && !url.includes("your_");
-      const keySet = key.length > 0 && !key.includes("PASTE");
+      // ── Step 1: Check env vars are set and not placeholders ──
+      const { urlSet, keySet, urlPreview, keyPreview } = checkPublicEnv();
 
       setEnvDetails({
-        url: url ? `${url.substring(0, 30)}...` : t("notSet"),
-        key: key ? `${key.substring(0, 8)}...` : t("notSet"),
+        url: urlPreview || t("notSet"),
+        key: keyPreview || t("notSet"),
         urlSet,
         keySet,
       });
 
       if (!urlSet || !keySet) {
         setEnvStatus("fail");
-        setErrorMessage(t("envHint"));
+        setErrorMessage(
+          urlSet
+            ? "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set. Check your .env.local file."
+            : keySet
+              ? "NEXT_PUBLIC_SUPABASE_URL is not set. Check your .env.local file."
+              : "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY are not set. Check your .env.local file."
+        );
         setConnectionStatus("error");
         return;
       }
 
-      // ── Step 3: Try connecting to Supabase ──
+      setEnvStatus("ok");
+
+      // ── Step 2: Try connecting to Supabase ──
       try {
         const supabase = createClient();
         const { error } = await supabase
