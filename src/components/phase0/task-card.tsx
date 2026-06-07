@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import type { Phase0Task, TaskStatus } from "@/types/phase0";
-import { StatusBadge } from "./status-badge";
+import { StatusBadge, PriorityBadge, CategoryBadge } from "./status-badge";
 import { CopyPromptButton } from "./copy-prompt-button";
 import { TaskDependencies } from "./task-dependencies";
-import { ChevronDown, ChevronRight, Clock, FileText } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, FileText, Gauge } from "lucide-react";
 
 const STATUS_CYCLE: TaskStatus[] = ["pending", "in_progress", "done", "blocked"];
 
@@ -37,20 +37,29 @@ export function TaskCard({
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       {/* ── Header row ── */}
-      <div className="flex items-center gap-4 p-5">
+      <div className="flex items-center gap-3 p-4">
         {/* ── ID badge ── */}
         <span className="shrink-0 rounded-md bg-muted px-2 py-1 font-mono text-xs font-semibold text-muted-foreground">
           {task.id}
         </span>
 
-        {/* ── Title + estimate ── */}
+        {/* ── Title + meta ── */}
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-foreground">
-            {t(task.titleKey)}
-          </h3>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {task.estimate}
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground truncate">
+              {task.title}
+            </h3>
+            <PriorityBadge priority={task.priority} />
+          </div>
+          <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {task.estimateHours}h
+            </span>
+            <span className="flex items-center gap-1">
+              <Gauge className="h-3 w-3" />
+              {task.sprint}
+            </span>
           </div>
         </div>
 
@@ -79,17 +88,15 @@ export function TaskCard({
         </button>
       </div>
 
+      {/* ── Category + goal (always visible) ── */}
+      <div className="px-4 pb-3 flex items-start gap-2">
+        <CategoryBadge category={task.category} />
+        <p className="text-xs text-muted-foreground line-clamp-1">{task.goal}</p>
+      </div>
+
       {/* ── Expandable details ── */}
       {expanded && (
-        <div className="border-t border-border px-5 pb-5 pt-4 space-y-4">
-          {/* ── Goal ── */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("task.goal")}
-            </h4>
-            <p className="mt-1 text-sm text-foreground">{t(task.goalKey)}</p>
-          </div>
-
+        <div className="border-t border-border px-4 pb-4 pt-3 space-y-4">
           {/* ── Dependencies ── */}
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -106,15 +113,28 @@ export function TaskCard({
               {t("task.acceptanceCriteria")}
             </h4>
             <ul className="mt-1 space-y-1">
-              {task.criteriaKeys.map((key) => (
-                <li key={key} className="flex items-start gap-2 text-sm text-foreground">
+              {task.acceptanceCriteria.map((criterion, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground">
                   <span className="mt-0.5 shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
-                    AC-{key.split(".").pop()}
+                    AC-{i + 1}
                   </span>
-                  {t(key)}
+                  {criterion}
                 </li>
               ))}
             </ul>
+          </div>
+
+          {/* ── Deliverable ── */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("task.deliverable")}:
+            </span>
+            <span className="text-foreground">{task.deliverable}</span>
+            {task.needsVerification && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                {t("task.needsVerification")}
+              </span>
+            )}
           </div>
 
           {/* ── Prompt ── */}
@@ -123,10 +143,10 @@ export function TaskCard({
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t("task.prompt")}
               </h4>
-              <CopyPromptButton prompt={t(task.promptKey)} />
+              <CopyPromptButton prompt={task.prompt} />
             </div>
             <div className="mt-1 rounded-lg bg-muted p-3 text-xs text-muted-foreground font-mono leading-relaxed whitespace-pre-wrap">
-              {t(task.promptKey)}
+              {task.prompt}
             </div>
           </div>
 

@@ -70,7 +70,9 @@
       "statusDone": "Done",
       "statusBlocked": "Blocked",
       "noDependencies": "None",
-      "toggleStatus": "Click to change status"
+      "toggleStatus": "Click to change status",
+      "deliverable": "Deliverable",
+      "needsVerification": "Needs verification"
     },
     "tasks": {
       "0_1": {

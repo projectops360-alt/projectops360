@@ -70,7 +70,9 @@
       "statusDone": "Completado",
       "statusBlocked": "Bloqueado",
       "noDependencies": "Ninguna",
-      "toggleStatus": "Clic para cambiar estado"
+      "toggleStatus": "Clic para cambiar estado",
+      "deliverable": "Entregable",
+      "needsVerification": "Requiere verificación"
     },
     "tasks": {
       "0_1": {

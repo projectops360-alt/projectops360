@@ -32,6 +32,9 @@ export function Phase0ControlClient() {
   const completed = tasksWithStatus.filter((t) => t.status === "done").length;
   const total = tasksWithStatus.length;
 
+  // Group tasks by category for visual organization
+  const categories = Array.from(new Set(phase0Tasks.map((t) => t.category)));
+
   return (
     <div className="space-y-6">
       {/* ── Page header ── */}
@@ -52,20 +55,29 @@ export function Phase0ControlClient() {
         onReset={resetProgress}
       />
 
-      {/* ── Task list ── */}
-      <div className="space-y-3">
-        {tasksWithStatus.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            status={task.status}
-            notes={task.notes}
-            allTasks={phase0Tasks}
-            onStatusChange={setTaskStatus}
-            onNotesChange={setTaskNotes}
-          />
-        ))}
-      </div>
+      {/* ── Tasks grouped by category ── */}
+      {categories.map((category) => (
+        <div key={category}>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {category}
+          </h2>
+          <div className="space-y-3">
+            {tasksWithStatus
+              .filter((task) => task.category === category)
+              .map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  status={task.status}
+                  notes={task.notes}
+                  allTasks={phase0Tasks}
+                  onStatusChange={setTaskStatus}
+                  onNotesChange={setTaskNotes}
+                />
+              ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
