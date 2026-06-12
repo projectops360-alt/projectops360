@@ -276,6 +276,8 @@ export default async function ExecutionMapPage({
             executionNotesPlaceholder: t("form.task.executionNotesPlaceholder"),
             blockerReason: t("form.task.blockerReason"),
             blockerReasonPlaceholder: t("form.task.blockerReasonPlaceholder"),
+            sectionDetails: t("form.task.sectionDetails"),
+            sectionTracking: t("form.task.sectionTracking"),
             scheduling: t("form.task.scheduling"),
             startDate: t("form.task.startDate"),
             endDate: t("form.task.endDate"),

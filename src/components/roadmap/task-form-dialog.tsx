@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { X, Loader2, Sparkles, ChevronDown, Calendar } from "lucide-react";
-import { useState } from "react";
+import { X, Loader2, Sparkles, ChevronDown, Calendar, ClipboardList, FileText, Users, Package, Plus } from "lucide-react";
+import { useState, useEffect } from "react";
 import {
   createTaskAction,
   updateTaskAction,
+  getTaskFormOptionsAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 
@@ -73,7 +74,58 @@ export interface TaskFormTranslations {
     implementationNotesPlaceholder: string;
     testNotes: string;
     testNotesPlaceholder: string;
+    sectionDetails?: string;
+    sectionTracking?: string;
+    sectionPlanning?: string;
+    assignee?: string;
+    assigneeNone?: string;
+    predecessors?: string;
+    predecessorsEmpty?: string;
+    requiredMaterials?: string;
+    materialsEmpty?: string;
+    addMaterialPlaceholder?: string;
   };
+}
+
+/** Built-in bilingual fallbacks for the planning labels so existing callers
+ *  that don't pass these translations keep working. */
+const PLANNING_LABELS: Record<Locale, {
+  sectionPlanning: string;
+  assignee: string;
+  assigneeNone: string;
+  predecessors: string;
+  predecessorsEmpty: string;
+  requiredMaterials: string;
+  materialsEmpty: string;
+  addMaterialPlaceholder: string;
+}> = {
+  en: {
+    sectionPlanning: "Assignment & prerequisites",
+    assignee: "Assigned to",
+    assigneeNone: "Unassigned",
+    predecessors: "Predecessor tasks",
+    predecessorsEmpty: "No other tasks in this project yet.",
+    requiredMaterials: "Required materials",
+    materialsEmpty: "No materials registered for this project.",
+    addMaterialPlaceholder: "Add a material and press Enter…",
+  },
+  es: {
+    sectionPlanning: "Asignación y prerrequisitos",
+    assignee: "Asignado a",
+    assigneeNone: "Sin asignar",
+    predecessors: "Tareas predecesoras",
+    predecessorsEmpty: "Aún no hay otras tareas en este proyecto.",
+    requiredMaterials: "Materiales requeridos",
+    materialsEmpty: "No hay materiales registrados en este proyecto.",
+    addMaterialPlaceholder: "Agrega un material y presiona Enter…",
+  },
+};
+
+interface TaskFormOptions {
+  people: { id: string; name: string }[];
+  tasks: { id: string; title: string }[];
+  materials: { id: string; name: string; status: string; required_by_task_id: string | null }[];
+  dependencies: { predecessor_id: string; successor_id: string; dependency_type: string }[];
 }
 
 interface TaskFormDialogProps {
@@ -82,17 +134,65 @@ interface TaskFormDialogProps {
   locale: Locale;
   milestones: Milestone[];
   preselectedMilestoneId?: string;
-  task?: RoadmapTask; // required for edit mode
+  task?: RoadmapTask;
   onClose: () => void;
   onSaved: () => void;
   translations: TaskFormTranslations;
 }
 
-// ── Component ────────────────────────────────────────────────────────────────────
+// ── Collapsible section ─────────────────────────────────────────────────────────
+
+function FormSection({
+  icon,
+  label,
+  open,
+  onToggle,
+  children,
+  badge,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  badge?: number;
+}) {
+  return (
+    <div className="rounded-lg border border-border">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+      >
+        {icon}
+        {label}
+        {badge != null && badge > 0 && (
+          <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-100 px-1.5 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
+            {badge}
+          </span>
+        )}
+        <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-border px-3 pb-4 pt-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Shared input class ──────────────────────────────────────────────────────────
+
+const inputClass = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+const textareaClass = `${inputClass} resize-none`;
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export function TaskFormDialog({
   mode,
   projectId,
+  locale,
   milestones,
   preselectedMilestoneId,
   task,
@@ -101,6 +201,57 @@ export function TaskFormDialog({
   translations: t,
 }: TaskFormDialogProps) {
   const isEdit = mode === "edit";
+  const planningLabels = PLANNING_LABELS[locale] ?? PLANNING_LABELS.en;
+  const tp = {
+    sectionPlanning: t.fields.sectionPlanning ?? planningLabels.sectionPlanning,
+    assignee: t.fields.assignee ?? planningLabels.assignee,
+    assigneeNone: t.fields.assigneeNone ?? planningLabels.assigneeNone,
+    predecessors: t.fields.predecessors ?? planningLabels.predecessors,
+    predecessorsEmpty: t.fields.predecessorsEmpty ?? planningLabels.predecessorsEmpty,
+    requiredMaterials: t.fields.requiredMaterials ?? planningLabels.requiredMaterials,
+    materialsEmpty: t.fields.materialsEmpty ?? planningLabels.materialsEmpty,
+    addMaterialPlaceholder: t.fields.addMaterialPlaceholder ?? planningLabels.addMaterialPlaceholder,
+  };
+
+  // People / tasks / materials for the planning section, loaded on open
+  const [options, setOptions] = useState<TaskFormOptions | null>(null);
+  const [newMaterials, setNewMaterials] = useState<string[]>([]);
+  const [materialDraft, setMaterialDraft] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    getTaskFormOptionsAction({ projectId }).then((res) => {
+      if (!cancelled && !res.error) {
+        setOptions({
+          people: res.people ?? [],
+          tasks: res.tasks ?? [],
+          materials: res.materials ?? [],
+          dependencies: res.dependencies ?? [],
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  const preselectedPredecessors = new Set(
+    isEdit && task && options
+      ? options.dependencies
+          .filter((d) => d.successor_id === task.id && d.dependency_type === "finish_to_start")
+          .map((d) => d.predecessor_id)
+      : [],
+  );
+  const preselectedMaterials = new Set(
+    isEdit && task && options
+      ? options.materials.filter((m) => m.required_by_task_id === task.id).map((m) => m.id)
+      : [],
+  );
+
+  function addMaterialDraft() {
+    const name = materialDraft.trim();
+    if (!name) return;
+    if (!newMaterials.includes(name)) setNewMaterials([...newMaterials, name]);
+    setMaterialDraft("");
+  }
 
   async function handleSubmit(_prevState: FormState, formData: FormData): Promise<FormState> {
     const title = (formData.get("title") as string)?.trim();
@@ -122,6 +273,9 @@ export function TaskFormDialog({
     const startDate = (formData.get("start_date") as string) || "";
     const endDate = (formData.get("end_date") as string) || "";
     const progress = parseInt(formData.get("progress") as string) || 0;
+    const assignedTo = (formData.get("assigned_to") as string) || null;
+    const predecessorIds = formData.getAll("predecessor_ids").map(String);
+    const materialIds = formData.getAll("material_ids").map(String);
 
     if (!title) {
       return { error: t.errors.titleRequired || "Title is required" };
@@ -151,6 +305,10 @@ export function TaskFormDialog({
         test_notes: testNotes,
         execution_notes: executionNotes,
         blocker_reason: blockerReason,
+        assigned_to: assignedTo,
+        predecessor_ids: predecessorIds,
+        material_ids: materialIds,
+        new_materials: newMaterials,
         projectId,
       });
       if (result.error) {
@@ -177,6 +335,10 @@ export function TaskFormDialog({
         test_notes: testNotes,
         execution_notes: executionNotes,
         blocker_reason: blockerReason,
+        assigned_to: assignedTo,
+        predecessor_ids: predecessorIds,
+        material_ids: materialIds,
+        new_materials: newMaterials,
         order_index: 0,
         projectId,
       });
@@ -191,13 +353,32 @@ export function TaskFormDialog({
   }
 
   const [state, formAction, isPending] = useActionState(handleSubmit, null);
-  const [showPrompt, setShowPrompt] = useState(false);
   const [progressValue, setProgressValue] = useState(isEdit ? (task?.progress ?? 0) : 0);
+  const [statusValue, setStatusValue] = useState<string>(isEdit ? (task?.status ?? "not_started") : "not_started");
+
+  // Auto-expand sections in edit mode when they have data
+  const hasDetailsData = isEdit && !!(task?.sprint_name || task?.estimate_hours || task?.acceptance_criteria || task?.dependency_notes);
+  const hasTrackingData = isEdit && !!(task?.execution_notes || task?.blocker_reason || task?.start_date || task?.end_date || (task?.progress && task.progress > 0));
+  const hasPromptData = isEdit && !!((task as RoadmapTask | undefined)?.prompt_body || (task as RoadmapTask | undefined)?.implementation_notes || (task as RoadmapTask | undefined)?.test_notes);
+
+  const [showDetails, setShowDetails] = useState(hasDetailsData);
+  const [showTracking, setShowTracking] = useState(hasTrackingData);
+  const [showPrompt, setShowPrompt] = useState(hasPromptData);
+  const [showPlanning, setShowPlanning] = useState(true);
+
+  // Count filled fields per section for badges
+  const detailsBadge = isEdit
+    ? [task?.sprint_name, task?.estimate_hours, task?.acceptance_criteria, task?.dependency_notes].filter(Boolean).length
+    : 0;
+  const trackingBadge = isEdit
+    ? [task?.execution_notes, task?.blocker_reason, task?.start_date || task?.end_date, task?.progress && task.progress > 0 ? true : null].filter(Boolean).length
+    : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm">
-      <div className="my-8 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <h2 className="text-lg font-semibold text-foreground">
             {isEdit ? t.editTitle : t.createTitle}
           </h2>
@@ -210,219 +391,360 @@ export function TaskFormDialog({
           </button>
         </div>
 
-        {state?.error && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-            {state.error}
-          </div>
-        )}
+        <form action={formAction} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
+            {state?.error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                {state.error}
+              </div>
+            )}
 
-        <form action={formAction} className="mt-4 space-y-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <label htmlFor="task-title" className="block text-sm font-medium text-foreground">
-              {t.fields.title} <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="task-title"
-              name="title"
-              type="text"
-              required
-              maxLength={200}
-              autoFocus
-              defaultValue={isEdit ? task?.title : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              placeholder={t.fields.titlePlaceholder}
-              disabled={isPending}
-            />
-          </div>
+            {/* ── Essential fields (always visible) ── */}
 
-          {/* Milestone + Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="task-milestone" className="block text-sm font-medium text-foreground">
-                {t.fields.milestone}
-              </label>
-              <select
-                id="task-milestone"
-                name="milestone_id"
-                defaultValue={isEdit ? task?.milestone_id ?? "" : preselectedMilestoneId ?? ""}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                disabled={isPending}
-              >
-                <option value="">{t.fields.noMilestone}</option>
-                {milestones.map((m) => (
-                  <option key={m.id} value={m.id}>{m.title}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="task-status" className="block text-sm font-medium text-foreground">
-                {t.fields.status}
-              </label>
-              <select
-                id="task-status"
-                name="status"
-                defaultValue={isEdit ? task?.status : "not_started"}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                disabled={isPending}
-              >
-                {TASK_STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{t.statusLabels[s]}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Priority + Sprint */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="task-priority" className="block text-sm font-medium text-foreground">
-                {t.fields.priority}
-              </label>
-              <select
-                id="task-priority"
-                name="priority"
-                defaultValue={isEdit ? task?.priority : "p2"}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                disabled={isPending}
-              >
-                {TASK_PRIORITY_OPTIONS.map((p) => (
-                  <option key={p} value={p}>{t.priorityLabels[p]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="task-sprint" className="block text-sm font-medium text-foreground">
-                {t.fields.sprintName}
+            {/* Title */}
+            <div className="space-y-1.5">
+              <label htmlFor="task-title" className="block text-sm font-medium text-foreground">
+                {t.fields.title} <span className="text-red-500">*</span>
               </label>
               <input
-                id="task-sprint"
-                name="sprint_name"
+                id="task-title"
+                name="title"
                 type="text"
-                maxLength={100}
-                defaultValue={isEdit ? task?.sprint_name ?? "" : ""}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                placeholder={t.fields.sprintNamePlaceholder}
+                required
+                maxLength={200}
+                autoFocus
+                defaultValue={isEdit ? task?.title : ""}
+                className={inputClass}
+                placeholder={t.fields.titlePlaceholder}
                 disabled={isPending}
               />
             </div>
-          </div>
 
-          {/* Estimate hours */}
-          <div className="space-y-2">
-            <label htmlFor="task-estimate" className="block text-sm font-medium text-foreground">
-              {t.fields.estimateHours}
-            </label>
-            <input
-              id="task-estimate"
-              name="estimate_hours"
-              type="number"
-              step="0.5"
-              min="0"
-              max="9999.99"
-              defaultValue={isEdit ? task?.estimate_hours ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              placeholder={t.fields.estimateHoursPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <label htmlFor="task-description" className="block text-sm font-medium text-foreground">
-              {t.fields.description}
-            </label>
-            <textarea
-              id="task-description"
-              name="description"
-              rows={2}
-              maxLength={2000}
-              defaultValue={isEdit ? task?.description ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
-              placeholder={t.fields.descriptionPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Acceptance criteria */}
-          <div className="space-y-2">
-            <label htmlFor="task-acceptance" className="block text-sm font-medium text-foreground">
-              {t.fields.acceptanceCriteria}
-            </label>
-            <textarea
-              id="task-acceptance"
-              name="acceptance_criteria"
-              rows={2}
-              maxLength={2000}
-              defaultValue={isEdit ? task?.acceptance_criteria ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
-              placeholder={t.fields.acceptanceCriteriaPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Dependency notes */}
-          <div className="space-y-2">
-            <label htmlFor="task-dependencies" className="block text-sm font-medium text-foreground">
-              {t.fields.dependencyNotes}
-            </label>
-            <textarea
-              id="task-dependencies"
-              name="dependency_notes"
-              rows={2}
-              maxLength={2000}
-              defaultValue={isEdit ? task?.dependency_notes ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
-              placeholder={t.fields.dependencyNotesPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Execution notes */}
-          <div className="space-y-2">
-            <label htmlFor="task-execution-notes" className="block text-sm font-medium text-foreground">
-              {t.fields.executionNotes}
-            </label>
-            <textarea
-              id="task-execution-notes"
-              name="execution_notes"
-              rows={3}
-              maxLength={5000}
-              defaultValue={isEdit ? task?.execution_notes ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
-              placeholder={t.fields.executionNotesPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Blocker reason */}
-          <div className="space-y-2">
-            <label htmlFor="task-blocker-reason" className="block text-sm font-medium text-foreground">
-              {t.fields.blockerReason}
-            </label>
-            <textarea
-              id="task-blocker-reason"
-              name="blocker_reason"
-              rows={2}
-              maxLength={2000}
-              defaultValue={isEdit ? task?.blocker_reason ?? "" : ""}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
-              placeholder={t.fields.blockerReasonPlaceholder}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Scheduling section */}
-          <div className="border border-border rounded-lg">
-            <div className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground">
-              <Calendar className="h-4 w-4 text-brand-500" />
-              {t.fields.scheduling}
+            {/* Description (compact) */}
+            <div className="space-y-1.5">
+              <label htmlFor="task-description" className="block text-sm font-medium text-foreground">
+                {t.fields.description}
+              </label>
+              <textarea
+                id="task-description"
+                name="description"
+                rows={2}
+                maxLength={2000}
+                defaultValue={isEdit ? task?.description ?? "" : ""}
+                className={textareaClass}
+                placeholder={t.fields.descriptionPlaceholder}
+                disabled={isPending}
+              />
             </div>
-            <div className="space-y-4 border-t border-border px-3 pb-4 pt-3">
-              {/* Start Date + End Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="task-start-date" className="block text-sm font-medium text-foreground">
+
+            {/* Milestone + Status + Priority (3-col) */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="task-milestone" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.milestone}
+                </label>
+                <select
+                  id="task-milestone"
+                  name="milestone_id"
+                  defaultValue={isEdit ? task?.milestone_id ?? "" : preselectedMilestoneId ?? ""}
+                  className={inputClass}
+                  disabled={isPending}
+                >
+                  <option value="">{t.fields.noMilestone}</option>
+                  {milestones.map((m) => (
+                    <option key={m.id} value={m.id}>{m.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="task-status" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.status}
+                </label>
+                <select
+                  id="task-status"
+                  name="status"
+                  value={statusValue}
+                  onChange={(e) => setStatusValue(e.target.value)}
+                  className={inputClass}
+                  disabled={isPending}
+                >
+                  {TASK_STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{t.statusLabels[s]}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="task-priority" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.priority}
+                </label>
+                <select
+                  id="task-priority"
+                  name="priority"
+                  defaultValue={isEdit ? task?.priority : "p2"}
+                  className={inputClass}
+                  disabled={isPending}
+                >
+                  {TASK_PRIORITY_OPTIONS.map((p) => (
+                    <option key={p} value={p}>{t.priorityLabels[p]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Blocker reason — only when status is blocked */}
+            {statusValue === "blocked" && (
+              <div className="space-y-1.5 rounded-lg border border-red-200 bg-red-50/50 p-3 dark:border-red-800/50 dark:bg-red-950/30">
+                <label htmlFor="task-blocker-reason" className="block text-sm font-medium text-red-700 dark:text-red-400">
+                  {t.fields.blockerReason}
+                </label>
+                <textarea
+                  id="task-blocker-reason"
+                  name="blocker_reason"
+                  rows={2}
+                  maxLength={2000}
+                  defaultValue={isEdit ? task?.blocker_reason ?? "" : ""}
+                  className={`${textareaClass} border-red-200 dark:border-red-800/50`}
+                  placeholder={t.fields.blockerReasonPlaceholder}
+                  disabled={isPending}
+                />
+              </div>
+            )}
+            {statusValue !== "blocked" && (
+              <input type="hidden" name="blocker_reason" value={isEdit ? task?.blocker_reason ?? "" : ""} />
+            )}
+
+            {/* ── Collapsible: Assignment & prerequisites ── */}
+            <FormSection
+              icon={<Users className="h-4 w-4 text-brand-500" />}
+              label={tp.sectionPlanning}
+              open={showPlanning}
+              onToggle={() => setShowPlanning(!showPlanning)}
+              badge={
+                isEdit
+                  ? (task?.assigned_to ? 1 : 0) + preselectedPredecessors.size + preselectedMaterials.size
+                  : newMaterials.length
+              }
+            >
+              {options === null ? (
+                <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Assigned to */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="task-assignee" className="block text-xs font-medium text-muted-foreground">
+                      {tp.assignee}
+                    </label>
+                    <select
+                      id="task-assignee"
+                      name="assigned_to"
+                      defaultValue={isEdit ? task?.assigned_to ?? "" : ""}
+                      className={inputClass}
+                      disabled={isPending}
+                    >
+                      <option value="">{tp.assigneeNone}</option>
+                      {options.people.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Predecessor tasks */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">
+                      {tp.predecessors}
+                    </label>
+                    {options.tasks.filter((tk) => tk.id !== task?.id).length === 0 ? (
+                      <p className="text-xs text-muted-foreground">{tp.predecessorsEmpty}</p>
+                    ) : (
+                      <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                        {options.tasks
+                          .filter((tk) => tk.id !== task?.id)
+                          .map((tk) => (
+                            <label key={tk.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-foreground hover:bg-muted/50">
+                              <input
+                                type="checkbox"
+                                name="predecessor_ids"
+                                value={tk.id}
+                                defaultChecked={preselectedPredecessors.has(tk.id)}
+                                className="h-4 w-4 rounded border-border accent-brand-600"
+                                disabled={isPending}
+                              />
+                              <span className="truncate">{tk.title}</span>
+                            </label>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Required materials */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-medium text-muted-foreground">
+                      <Package className="mr-1 inline h-3 w-3" />
+                      {tp.requiredMaterials}
+                    </label>
+                    {options.materials.length === 0 && newMaterials.length === 0 && (
+                      <p className="text-xs text-muted-foreground">{tp.materialsEmpty}</p>
+                    )}
+                    {options.materials.length > 0 && (
+                      <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                        {options.materials.map((m) => (
+                          <label key={m.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-foreground hover:bg-muted/50">
+                            <input
+                              type="checkbox"
+                              name="material_ids"
+                              value={m.id}
+                              defaultChecked={preselectedMaterials.has(m.id)}
+                              className="h-4 w-4 rounded border-border accent-brand-600"
+                              disabled={isPending}
+                            />
+                            <span className="truncate">{m.name}</span>
+                            <span className="ml-auto shrink-0 text-xs text-muted-foreground">{m.status.replace(/_/g, " ")}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {/* Quick-add new materials */}
+                    {newMaterials.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {newMaterials.map((name) => (
+                          <span key={name} className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
+                            {name}
+                            <button
+                              type="button"
+                              onClick={() => setNewMaterials(newMaterials.filter((n) => n !== name))}
+                              className="hover:text-brand-900 dark:hover:text-brand-200"
+                              disabled={isPending}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={materialDraft}
+                        onChange={(e) => setMaterialDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addMaterialDraft();
+                          }
+                        }}
+                        maxLength={200}
+                        className={inputClass}
+                        placeholder={tp.addMaterialPlaceholder}
+                        disabled={isPending}
+                      />
+                      <button
+                        type="button"
+                        onClick={addMaterialDraft}
+                        disabled={isPending || !materialDraft.trim()}
+                        className="shrink-0 rounded-lg border border-border p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </FormSection>
+
+            {/* ── Collapsible: Details ── */}
+            <FormSection
+              icon={<ClipboardList className="h-4 w-4 text-blue-500" />}
+              label={t.fields.sectionDetails ?? "Details"}
+              open={showDetails}
+              onToggle={() => setShowDetails(!showDetails)}
+              badge={detailsBadge}
+            >
+              {/* Sprint + Estimated hours (side by side) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-sprint" className="block text-xs font-medium text-muted-foreground">
+                    {t.fields.sprintName}
+                  </label>
+                  <input
+                    id="task-sprint"
+                    name="sprint_name"
+                    type="text"
+                    maxLength={100}
+                    defaultValue={isEdit ? task?.sprint_name ?? "" : ""}
+                    className={inputClass}
+                    placeholder={t.fields.sprintNamePlaceholder}
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="task-estimate" className="block text-xs font-medium text-muted-foreground">
+                    {t.fields.estimateHours}
+                  </label>
+                  <input
+                    id="task-estimate"
+                    name="estimate_hours"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="9999.99"
+                    defaultValue={isEdit ? task?.estimate_hours ?? "" : ""}
+                    className={inputClass}
+                    placeholder={t.fields.estimateHoursPlaceholder}
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+
+              {/* Acceptance criteria */}
+              <div className="space-y-1.5">
+                <label htmlFor="task-acceptance" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.acceptanceCriteria}
+                </label>
+                <textarea
+                  id="task-acceptance"
+                  name="acceptance_criteria"
+                  rows={2}
+                  maxLength={2000}
+                  defaultValue={isEdit ? task?.acceptance_criteria ?? "" : ""}
+                  className={textareaClass}
+                  placeholder={t.fields.acceptanceCriteriaPlaceholder}
+                  disabled={isPending}
+                />
+              </div>
+
+              {/* Dependency notes */}
+              <div className="space-y-1.5">
+                <label htmlFor="task-dependencies" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.dependencyNotes}
+                </label>
+                <textarea
+                  id="task-dependencies"
+                  name="dependency_notes"
+                  rows={2}
+                  maxLength={2000}
+                  defaultValue={isEdit ? task?.dependency_notes ?? "" : ""}
+                  className={textareaClass}
+                  placeholder={t.fields.dependencyNotesPlaceholder}
+                  disabled={isPending}
+                />
+              </div>
+            </FormSection>
+
+            {/* ── Collapsible: Tracking & Notes ── */}
+            <FormSection
+              icon={<FileText className="h-4 w-4 text-emerald-500" />}
+              label={t.fields.sectionTracking ?? "Tracking & Notes"}
+              open={showTracking}
+              onToggle={() => setShowTracking(!showTracking)}
+              badge={trackingBadge}
+            >
+              {/* Scheduling: Start + End date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-start-date" className="block text-xs font-medium text-muted-foreground">
+                    <Calendar className="mr-1 inline h-3 w-3" />
                     {t.fields.startDate}
                   </label>
                   <input
@@ -430,12 +752,13 @@ export function TaskFormDialog({
                     name="start_date"
                     type="date"
                     defaultValue={isEdit ? task?.start_date ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    className={inputClass}
                     disabled={isPending}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label htmlFor="task-end-date" className="block text-sm font-medium text-foreground">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-end-date" className="block text-xs font-medium text-muted-foreground">
+                    <Calendar className="mr-1 inline h-3 w-3" />
                     {t.fields.endDate}
                   </label>
                   <input
@@ -443,15 +766,15 @@ export function TaskFormDialog({
                     name="end_date"
                     type="date"
                     defaultValue={isEdit ? task?.end_date ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    className={inputClass}
                     disabled={isPending}
                   />
                 </div>
               </div>
 
               {/* Progress */}
-              <div className="space-y-2">
-                <label htmlFor="task-progress" className="block text-sm font-medium text-foreground">
+              <div className="space-y-1.5">
+                <label htmlFor="task-progress" className="block text-xs font-medium text-muted-foreground">
                   {t.fields.progress}
                 </label>
                 <div className="flex items-center gap-3">
@@ -464,50 +787,61 @@ export function TaskFormDialog({
                     step="5"
                     value={progressValue}
                     onChange={(e) => setProgressValue(Number(e.target.value))}
-                    className="flex-1 h-2 rounded-full appearance-none bg-muted accent-brand-600 cursor-pointer"
+                    className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-brand-600"
                     disabled={isPending}
                   />
-                  <span className="text-sm font-medium text-muted-foreground w-12 text-right">
+                  <span className="w-12 text-right text-sm font-medium text-muted-foreground">
                     {progressValue}%
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* AI Prompt section (collapsible) */}
-          <div className="border border-border rounded-lg">
-            <button
-              type="button"
-              onClick={() => setShowPrompt(!showPrompt)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+              {/* Execution notes */}
+              <div className="space-y-1.5">
+                <label htmlFor="task-execution-notes" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.executionNotes}
+                </label>
+                <textarea
+                  id="task-execution-notes"
+                  name="execution_notes"
+                  rows={2}
+                  maxLength={5000}
+                  defaultValue={isEdit ? task?.execution_notes ?? "" : ""}
+                  className={textareaClass}
+                  placeholder={t.fields.executionNotesPlaceholder}
+                  disabled={isPending}
+                />
+              </div>
+            </FormSection>
+
+            {/* ── Collapsible: AI Prompt ── */}
+            <FormSection
+              icon={<Sparkles className="h-4 w-4 text-purple-500" />}
+              label={t.fields.promptSection}
+              open={showPrompt}
+              onToggle={() => setShowPrompt(!showPrompt)}
             >
-              <Sparkles className="h-4 w-4 text-purple-500" />
-              {t.fields.promptSection}
-              <ChevronDown className={`h-4 w-4 ml-auto text-muted-foreground transition-transform ${showPrompt ? "rotate-180" : ""}`} />
-            </button>
-            {showPrompt && (
-              <div className="space-y-4 border-t border-border px-3 pb-4 pt-3">
-                {/* Prompt body */}
-                <div className="space-y-2">
-                  <label htmlFor="task-prompt-body" className="block text-sm font-medium text-foreground">
-                    {t.fields.promptBody}
-                  </label>
-                  <textarea
-                    id="task-prompt-body"
-                    name="prompt_body"
-                    rows={4}
-                    maxLength={10000}
-                    defaultValue={isEdit ? (task as RoadmapTask | undefined)?.prompt_body ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none font-mono"
-                    placeholder={t.fields.promptBodyPlaceholder}
-                    disabled={isPending}
-                  />
-                </div>
+              {/* Prompt body */}
+              <div className="space-y-1.5">
+                <label htmlFor="task-prompt-body" className="block text-xs font-medium text-muted-foreground">
+                  {t.fields.promptBody}
+                </label>
+                <textarea
+                  id="task-prompt-body"
+                  name="prompt_body"
+                  rows={4}
+                  maxLength={10000}
+                  defaultValue={isEdit ? (task as RoadmapTask | undefined)?.prompt_body ?? "" : ""}
+                  className={`${textareaClass} font-mono`}
+                  placeholder={t.fields.promptBodyPlaceholder}
+                  disabled={isPending}
+                />
+              </div>
 
-                {/* Prompt context */}
-                <div className="space-y-2">
-                  <label htmlFor="task-prompt-context" className="block text-sm font-medium text-foreground">
+              {/* Prompt context + AI tool (side by side) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-prompt-context" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.promptContext}
                   </label>
                   <input
@@ -516,22 +850,20 @@ export function TaskFormDialog({
                     type="text"
                     maxLength={2000}
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.prompt_context ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    className={inputClass}
                     placeholder={t.fields.promptContextPlaceholder}
                     disabled={isPending}
                   />
                 </div>
-
-                {/* AI tool target */}
-                <div className="space-y-2">
-                  <label htmlFor="task-ai-tool" className="block text-sm font-medium text-foreground">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-ai-tool" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.aiToolTarget}
                   </label>
                   <select
                     id="task-ai-tool"
                     name="ai_tool_target"
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.ai_tool_target ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    className={inputClass}
                     disabled={isPending}
                   >
                     <option value="">—</option>
@@ -542,10 +874,12 @@ export function TaskFormDialog({
                     <option value="other">Other</option>
                   </select>
                 </div>
+              </div>
 
-                {/* Implementation notes */}
-                <div className="space-y-2">
-                  <label htmlFor="task-implementation-notes" className="block text-sm font-medium text-foreground">
+              {/* Implementation + Test notes (side by side) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-implementation-notes" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.implementationNotes}
                   </label>
                   <textarea
@@ -554,15 +888,13 @@ export function TaskFormDialog({
                     rows={2}
                     maxLength={5000}
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.implementation_notes ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
+                    className={textareaClass}
                     placeholder={t.fields.implementationNotesPlaceholder}
                     disabled={isPending}
                   />
                 </div>
-
-                {/* Test notes */}
-                <div className="space-y-2">
-                  <label htmlFor="task-test-notes" className="block text-sm font-medium text-foreground">
+                <div className="space-y-1.5">
+                  <label htmlFor="task-test-notes" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.testNotes}
                   </label>
                   <textarea
@@ -571,17 +903,17 @@ export function TaskFormDialog({
                     rows={2}
                     maxLength={5000}
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.test_notes ?? "" : ""}
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"
+                    className={textareaClass}
                     placeholder={t.fields.testNotesPlaceholder}
                     disabled={isPending}
                   />
                 </div>
               </div>
-            )}
+            </FormSection>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-2">
+          {/* Actions — fixed footer */}
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-4">
             <button
               type="button"
               onClick={onClose}

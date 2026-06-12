@@ -117,8 +117,8 @@ export function EditCommunicationDialog({
   const selectedStakeholderIds = communication.related_stakeholder_ids ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm">
-      <div className="my-8 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex overflow-y-auto bg-black/50 p-4 backdrop-blur-sm">
+      <div className="m-auto w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">{t("editTitle")}</h2>
           <button

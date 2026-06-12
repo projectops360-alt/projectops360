@@ -68,6 +68,10 @@ const createTaskSchema = z.object({
   start_date: z.string().optional().default(""),
   end_date: z.string().optional().default(""),
   progress: z.coerce.number().int().min(0).max(100).default(0),
+  assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
+  predecessor_ids: z.array(z.string().uuid()).max(50).optional().default([]),
+  material_ids: z.array(z.string().uuid()).max(200).optional().default([]),
+  new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional().default([]),
   projectId: z.string().uuid("invalid_project_id"),
 });
 
@@ -94,8 +98,201 @@ const updateTaskSchema = z.object({
   start_date: z.string().optional().default(""),
   end_date: z.string().optional().default(""),
   progress: z.coerce.number().int().min(0).max(100).default(0),
+  assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
+  predecessor_ids: z.array(z.string().uuid()).max(50).optional(),
+  material_ids: z.array(z.string().uuid()).max(200).optional(),
+  new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional(),
   projectId: z.string().uuid("invalid_project_id"),
 });
+
+// ── Task planning sync (predecessors + required materials) ────────────────────────
+
+/** Returns true if adding predecessor → successor would create a cycle. */
+function wouldCreateDependencyCycle(
+  existingDeps: { predecessor_id: string; successor_id: string }[],
+  newPredecessor: string,
+  newSuccessor: string,
+): boolean {
+  const predecessorsOf = new Map<string, Set<string>>();
+  for (const dep of existingDeps) {
+    if (!predecessorsOf.has(dep.successor_id)) predecessorsOf.set(dep.successor_id, new Set());
+    predecessorsOf.get(dep.successor_id)!.add(dep.predecessor_id);
+  }
+  // DFS upward from the new predecessor: reaching the successor means a cycle.
+  const visited = new Set<string>();
+  const stack = [newPredecessor];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current === newSuccessor) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const pred of predecessorsOf.get(current) ?? []) stack.push(pred);
+  }
+  return false;
+}
+
+/**
+ * Sync the form-managed planning of a task: finish_to_start predecessors and
+ * required materials. Only finish_to_start dependencies are managed here so
+ * manually created SS/FF/SF links are never touched.
+ */
+async function syncTaskPlanning(
+  supabase: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  projectId: string,
+  taskId: string,
+  planning: {
+    predecessorIds?: string[];
+    materialIds?: string[];
+    newMaterials?: string[];
+  },
+): Promise<void> {
+  // ── Predecessors (finish_to_start) ────────────────────────────────────────
+  if (planning.predecessorIds) {
+    const wanted = new Set(planning.predecessorIds.filter((id) => id !== taskId));
+
+    const { data: allDeps } = await supabase
+      .from("task_dependencies")
+      .select("id, predecessor_id, successor_id, dependency_type")
+      .eq("project_id", projectId)
+      .eq("organization_id", organizationId);
+
+    const currentFs = (allDeps ?? []).filter(
+      (d) => d.successor_id === taskId && d.dependency_type === "finish_to_start",
+    );
+
+    // Remove deselected
+    const toRemove = currentFs.filter((d) => !wanted.has(d.predecessor_id));
+    if (toRemove.length > 0) {
+      await supabase
+        .from("task_dependencies")
+        .delete()
+        .in("id", toRemove.map((d) => d.id));
+    }
+
+    // Add new ones, skipping anything that would create a cycle
+    const currentSet = new Set(currentFs.map((d) => d.predecessor_id));
+    const graph = (allDeps ?? []).map((d) => ({
+      predecessor_id: d.predecessor_id,
+      successor_id: d.successor_id,
+    }));
+    for (const predecessorId of wanted) {
+      if (currentSet.has(predecessorId)) continue;
+      if (wouldCreateDependencyCycle(graph, predecessorId, taskId)) continue;
+      const { error } = await supabase.from("task_dependencies").insert({
+        organization_id: organizationId,
+        project_id: projectId,
+        predecessor_id: predecessorId,
+        successor_id: taskId,
+        dependency_type: "finish_to_start",
+        lag_days: 0,
+      });
+      if (!error) graph.push({ predecessor_id: predecessorId, successor_id: taskId });
+    }
+  }
+
+  // ── Required materials ────────────────────────────────────────────────────
+  if (planning.materialIds) {
+    const wanted = new Set(planning.materialIds);
+
+    const { data: currentMaterials } = await supabase
+      .from("material_requirements")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("required_by_task_id", taskId)
+      .is("deleted_at", null);
+
+    const toUnlink = (currentMaterials ?? []).filter((m) => !wanted.has(m.id));
+    if (toUnlink.length > 0) {
+      await supabase
+        .from("material_requirements")
+        .update({ required_by_task_id: null })
+        .in("id", toUnlink.map((m) => m.id));
+    }
+    if (wanted.size > 0) {
+      await supabase
+        .from("material_requirements")
+        .update({ required_by_task_id: taskId })
+        .in("id", [...wanted])
+        .eq("project_id", projectId)
+        .eq("organization_id", organizationId);
+    }
+  }
+
+  // ── Quick-added materials ─────────────────────────────────────────────────
+  const newNames = (planning.newMaterials ?? []).filter((n) => n.length > 0);
+  if (newNames.length > 0) {
+    await supabase.from("material_requirements").insert(
+      newNames.map((name) => ({
+        organization_id: organizationId,
+        project_id: projectId,
+        name,
+        status: "required",
+        required_by_task_id: taskId,
+        origin: "manual",
+      })),
+    );
+  }
+}
+
+// ── Task form options (people, tasks, materials) ──────────────────────────────────
+
+export async function getTaskFormOptionsAction(input: {
+  projectId: string;
+}): Promise<{
+  error?: string;
+  people?: { id: string; name: string }[];
+  tasks?: { id: string; title: string }[];
+  materials?: { id: string; name: string; status: string; required_by_task_id: string | null }[];
+  dependencies?: { predecessor_id: string; successor_id: string; dependency_type: string }[];
+}> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  if (!z.string().uuid().safeParse(input.projectId).success) {
+    return { error: "invalid_project_id" };
+  }
+
+  const supabase = createAdminClient();
+  const [peopleRes, tasksRes, materialsRes, depsRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name")
+      .eq("organization_id", org.organizationId),
+    supabase
+      .from("roadmap_tasks")
+      .select("id, title")
+      .eq("project_id", input.projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("order_index", { ascending: true }),
+    supabase
+      .from("material_requirements")
+      .select("id, name, status, required_by_task_id")
+      .eq("project_id", input.projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("name", { ascending: true }),
+    supabase
+      .from("task_dependencies")
+      .select("predecessor_id, successor_id, dependency_type")
+      .eq("project_id", input.projectId)
+      .eq("organization_id", org.organizationId),
+  ]);
+
+  return {
+    people: (peopleRes.data ?? []).map((p) => ({
+      id: p.id,
+      name: p.display_name || "—",
+    })),
+    tasks: tasksRes.data ?? [],
+    materials: materialsRes.data ?? [],
+    dependencies: depsRes.data ?? [],
+  };
+}
 
 // ── Create Milestone ──────────────────────────────────────────────────────────────
 
@@ -277,6 +474,10 @@ export async function createTaskAction(input: {
   start_date?: string;
   end_date?: string;
   progress?: number;
+  assigned_to?: string | null;
+  predecessor_ids?: string[];
+  material_ids?: string[];
+  new_materials?: string[];
   projectId: string;
 }): Promise<{ error?: string; taskId?: string }> {
   let org;
@@ -344,6 +545,7 @@ export async function createTaskAction(input: {
       start_date: data.start_date || null,
       end_date: data.end_date || null,
       progress: data.progress,
+      assigned_to: data.assigned_to ?? null,
       project_id: data.projectId,
       organization_id: org.organizationId,
     })
@@ -354,6 +556,13 @@ export async function createTaskAction(input: {
     console.error("Failed to create roadmap task:", insertError);
     return { error: "unexpected" };
   }
+
+  // Predecessors + required materials chosen in the form
+  await syncTaskPlanning(supabase, org.organizationId, data.projectId, task.id, {
+    predecessorIds: data.predecessor_ids,
+    materialIds: data.material_ids,
+    newMaterials: data.new_materials,
+  });
 
   await logAudit({
     org,
@@ -411,6 +620,10 @@ export async function updateTaskAction(input: {
   start_date?: string;
   end_date?: string;
   progress?: number;
+  assigned_to?: string | null;
+  predecessor_ids?: string[];
+  material_ids?: string[];
+  new_materials?: string[];
   projectId: string;
 }): Promise<{ error?: string }> {
   let org;
@@ -452,6 +665,7 @@ export async function updateTaskAction(input: {
     progress: data.progress,
   };
   if (data.order_index !== undefined) updateData.order_index = data.order_index;
+  if (data.assigned_to !== undefined) updateData.assigned_to = data.assigned_to;
 
   const { error: updateError } = await supabase
     .from("roadmap_tasks")
@@ -465,6 +679,13 @@ export async function updateTaskAction(input: {
     console.error("Failed to update roadmap task:", updateError);
     return { error: "unexpected" };
   }
+
+  // Predecessors + required materials chosen in the form
+  await syncTaskPlanning(supabase, org.organizationId, data.projectId, data.taskId, {
+    predecessorIds: data.predecessor_ids,
+    materialIds: data.material_ids,
+    newMaterials: data.new_materials,
+  });
 
   await logAudit({
     org,

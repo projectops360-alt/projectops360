@@ -193,6 +193,8 @@ interface TaskFormTranslations {
     implementationNotesPlaceholder: string;
     testNotes: string;
     testNotesPlaceholder: string;
+    sectionDetails?: string;
+    sectionTracking?: string;
   };
 }
 
@@ -278,6 +280,8 @@ interface Translations {
       implementationNotesPlaceholder: string;
       testNotes: string;
       testNotesPlaceholder: string;
+      sectionDetails?: string;
+      sectionTracking?: string;
     };
   };
 }
