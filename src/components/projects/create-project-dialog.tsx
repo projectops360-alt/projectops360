@@ -188,6 +188,14 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
             </select>
           </div>
 
+          {/* Import from file */}
+          <a
+            href={`/${locale}/import`}
+            className="block text-sm text-brand-600 hover:underline dark:text-brand-400"
+          >
+            {t("importFromFile")}
+          </a>
+
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-2">
             <button

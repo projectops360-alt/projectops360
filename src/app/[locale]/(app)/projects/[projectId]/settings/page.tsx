@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
-import { Settings, Users, Shield, Calendar, Clock, Globe } from "lucide-react";
+import { Settings, Users, Shield, Calendar, Clock, Globe, UploadCloud } from "lucide-react";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 
@@ -93,6 +93,27 @@ export default async function ProjectSettingsPage({
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {t("audit.viewAudit")}
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          href={`/${locale}/import?projectId=${projectId}`}
+          className="group rounded-xl border border-border bg-card p-6 transition-all hover:border-brand-500/40 hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">
+              <UploadCloud className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                {isEs ? "Importar / Fusionar datos" : "Import / Merge Project Data"}
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {isEs
+                  ? "Sube un archivo (Excel, CSV, PDF…) y fusiónalo con este proyecto"
+                  : "Upload a file (Excel, CSV, PDF…) and merge it into this project"}
               </p>
             </div>
           </div>

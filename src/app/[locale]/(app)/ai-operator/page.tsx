@@ -1,7 +1,7 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
-import { Bot, DraftingCompass, ArrowRight } from "lucide-react";
+import { Bot, DraftingCompass, ArrowRight, UploadCloud } from "lucide-react";
 
 export default async function AiOperatorPage({
   params,
@@ -28,7 +28,26 @@ export default async function AiOperatorPage({
       </div>
 
       {/* AI modules */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md space-y-3">
+        <Link
+          href={`/${locale}/import`}
+          className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-brand-500/40 hover:shadow-md"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">
+            <UploadCloud className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-foreground">
+              {locale === "es" ? "Importación Inteligente de Proyectos" : "Project Import Intelligence"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {locale === "es"
+                ? "Sube Excel, CSV, JSON, Word o PDF y conviértelo en un proyecto completo"
+                : "Upload Excel, CSV, JSON, Word, or PDF and turn it into a full project"}
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />
+        </Link>
         <Link
           href={`/${locale}/drawing-intelligence`}
           className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-brand-500/40 hover:shadow-md"

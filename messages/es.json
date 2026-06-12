@@ -15,7 +15,8 @@
     "team": "Equipo",
     "settings": "Configuración",
     "search": "Buscar…",
-    "notifications": "Notificaciones"
+    "notifications": "Notificaciones",
+    "importProject": "Importar Proyecto"
   },
   "projectTabs": {
     "commandCenter": "Centro de Mando",
@@ -735,7 +736,8 @@
         "infrastructure": "Infraestructura",
         "industrial": "Industrial",
         "general": "General"
-      }
+      },
+      "importFromFile": "O importa un archivo de proyecto existente…"
     },
     "status": {
       "planning": "Planificación",
@@ -1393,7 +1395,9 @@
         "executionNotes": "Notas de ejecución",
         "executionNotesPlaceholder": "Qué se hizo, decisiones, observaciones durante la ejecución...",
         "blockerReason": "Razón del bloqueo",
-        "blockerReasonPlaceholder": "Por qué está bloqueada esta tarea..."
+        "blockerReasonPlaceholder": "Por qué está bloqueada esta tarea...",
+        "sectionDetails": "Detalles",
+        "sectionTracking": "Seguimiento y Notas"
       }
     },
     "executionDashboard": {
@@ -1557,7 +1561,20 @@
       "document_link": "Documento",
       "milestone_gate": "Compuerta de hito",
       "blocker_event": "Bloqueo",
-      "labor_risk": "Riesgo laboral"
+      "labor_risk": "Riesgo laboral",
+      "drawing_event": "Plano",
+      "drawing_insight": "Insight de Plano",
+      "resource_event": "Recurso",
+      "material_event": "Material",
+      "procurement_event": "Compras",
+      "budget_event": "Presupuesto",
+      "risk_event": "Riesgo",
+      "rfi_event": "RFI",
+      "submittal_event": "Submittal",
+      "inspection_event": "Inspección",
+      "permit_event": "Permiso",
+      "critical_path_event": "Ruta Crítica",
+      "import_event": "Archivo Importado"
     },
     "edgeTypes": {
       "caused": "Causó",
@@ -1566,7 +1583,20 @@
       "delayed": "Retrasó",
       "accelerated": "Aceleró",
       "informed": "Informó",
-      "labor_constrained": "Restricción laboral"
+      "labor_constrained": "Restricción laboral",
+      "generated_insight": "Generó insight",
+      "affects": "Afecta a",
+      "requires_material": "Requiere material",
+      "requires_resource": "Requiere recurso",
+      "requires_approval": "Requiere aprobación",
+      "assigned_to": "Asignado a",
+      "impacts_cost": "Impacta el costo",
+      "impacts_procurement": "Impacta compras",
+      "creates_risk": "Genera riesgo",
+      "mitigates_risk": "Mitiga riesgo",
+      "supplied_by": "Suministrado por",
+      "contains": "Contiene",
+      "imported_from": "Importado de archivo"
     },
     "edgeMeanings": {
       "caused": "Esta actividad disparó directamente la siguiente — una dependencia causal en el flujo de ejecución.",

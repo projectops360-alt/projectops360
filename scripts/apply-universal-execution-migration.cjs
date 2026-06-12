@@ -1,4 +1,6 @@
-// Applies 20260708000000_universal_execution_model.sql to the remote database.
+// Applies a migration file to the remote database.
+//   node scripts/apply-universal-execution-migration.cjs [migration-file.sql]
+// Defaults to 20260708000000_universal_execution_model.sql.
 // Uses the Supavisor session pooler (IPv4) because the direct db.<ref> host
 // only publishes an IPv6 address.
 require('dotenv').config({ path: '.env.local' });
@@ -22,12 +24,18 @@ async function main() {
   await client.connect();
   console.log('Connected via session pooler');
 
+  const migrationFile = process.argv[2] || '20260708000000_universal_execution_model.sql';
   const sql = fs.readFileSync(
-    path.resolve(__dirname, '..', 'supabase', 'migrations', '20260708000000_universal_execution_model.sql'),
+    path.resolve(__dirname, '..', 'supabase', 'migrations', migrationFile),
     'utf8'
   );
   await client.query(sql);
-  console.log('Migration applied');
+  console.log(`Migration applied: ${migrationFile}`);
+
+  if (migrationFile !== '20260708000000_universal_execution_model.sql') {
+    await client.end();
+    return;
+  }
 
   // Verify new tables
   const { rows } = await client.query(`

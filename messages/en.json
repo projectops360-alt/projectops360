@@ -15,7 +15,8 @@
     "team": "Team",
     "settings": "Settings",
     "search": "Search…",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "importProject": "Import Project"
   },
   "projectTabs": {
     "commandCenter": "Command Center",
@@ -735,7 +736,8 @@
         "infrastructure": "Infrastructure",
         "industrial": "Industrial",
         "general": "General"
-      }
+      },
+      "importFromFile": "Or import an existing project file…"
     },
     "status": {
       "planning": "Planning",
@@ -1393,7 +1395,9 @@
         "executionNotes": "Execution notes",
         "executionNotesPlaceholder": "What was done, decisions, observations during execution...",
         "blockerReason": "Blocker reason",
-        "blockerReasonPlaceholder": "Why is this task blocked..."
+        "blockerReasonPlaceholder": "Why is this task blocked...",
+        "sectionDetails": "Details",
+        "sectionTracking": "Tracking & Notes"
       }
     },
     "executionDashboard": {
@@ -1557,7 +1561,20 @@
       "document_link": "Document",
       "milestone_gate": "Milestone gate",
       "blocker_event": "Blocker",
-      "labor_risk": "Labor risk"
+      "labor_risk": "Labor risk",
+      "drawing_event": "Drawing",
+      "drawing_insight": "Drawing Insight",
+      "resource_event": "Resource",
+      "material_event": "Material",
+      "procurement_event": "Procurement",
+      "budget_event": "Budget",
+      "risk_event": "Risk",
+      "rfi_event": "RFI",
+      "submittal_event": "Submittal",
+      "inspection_event": "Inspection",
+      "permit_event": "Permit",
+      "critical_path_event": "Critical Path",
+      "import_event": "Imported File"
     },
     "edgeTypes": {
       "caused": "Caused",
@@ -1566,7 +1583,20 @@
       "delayed": "Delayed",
       "accelerated": "Accelerated",
       "informed": "Informed",
-      "labor_constrained": "Labor constrained"
+      "labor_constrained": "Labor constrained",
+      "generated_insight": "Generated insight",
+      "affects": "Affects",
+      "requires_material": "Requires material",
+      "requires_resource": "Requires resource",
+      "requires_approval": "Requires approval",
+      "assigned_to": "Assigned to",
+      "impacts_cost": "Impacts cost",
+      "impacts_procurement": "Impacts procurement",
+      "creates_risk": "Creates risk",
+      "mitigates_risk": "Mitigates risk",
+      "supplied_by": "Supplied by",
+      "contains": "Contains",
+      "imported_from": "Imported from file"
     },
     "edgeMeanings": {
       "caused": "This activity directly triggered the next one — a causal dependency in the execution flow.",

@@ -413,7 +413,19 @@ export type ProcessNodeType =
   | "blocker_event"
   | "labor_risk"
   | "drawing_event"
-  | "drawing_insight";
+  | "drawing_insight"
+  // Universal execution model (20260708) + import intelligence (20260710)
+  | "resource_event"
+  | "material_event"
+  | "procurement_event"
+  | "budget_event"
+  | "risk_event"
+  | "rfi_event"
+  | "submittal_event"
+  | "inspection_event"
+  | "permit_event"
+  | "critical_path_event"
+  | "import_event";
 
 export type ProcessEdgeType =
   | "caused"
@@ -424,7 +436,19 @@ export type ProcessEdgeType =
   | "informed"
   | "labor_constrained"
   | "generated_insight"
-  | "affects";
+  | "affects"
+  // Universal execution model (20260708) + import intelligence (20260710)
+  | "requires_material"
+  | "requires_resource"
+  | "requires_approval"
+  | "assigned_to"
+  | "impacts_cost"
+  | "impacts_procurement"
+  | "creates_risk"
+  | "mitigates_risk"
+  | "supplied_by"
+  | "contains"
+  | "imported_from";
 
 export type ProcessNodeSourceType =
   | "roadmap_tasks"
@@ -435,7 +459,19 @@ export type ProcessNodeSourceType =
   | "milestones"
   | "construction_activities"
   | "drawing_files"
-  | "drawing_insights";
+  | "drawing_insights"
+  // Universal execution model (20260708) + import intelligence (20260710)
+  | "resources"
+  | "material_requirements"
+  | "procurement_items"
+  | "budget_items"
+  | "risks"
+  | "rfis"
+  | "submittals"
+  | "inspections"
+  | "permits"
+  | "critical_path_snapshots"
+  | "project_import_jobs";
 
 export interface ProcessNode {
   id: string;
