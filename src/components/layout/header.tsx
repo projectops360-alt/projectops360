@@ -1,17 +1,38 @@
 "use client";
 
 import { Bell, Search } from "lucide-react";
+import { UserMenu } from "@/components/layout/user-menu";
+import type { OrgData, UserData } from "@/components/layout/app-shell";
+import type { Locale } from "@/types/database";
+import { getI18nValue } from "@/types/database";
+import { useLocale } from "next-intl";
 
-export function Header() {
+interface HeaderProps {
+  user?: UserData;
+  org?: OrgData;
+}
+
+export function Header({ user, org }: HeaderProps) {
+  const locale = useLocale() as Locale;
+  const orgName = org ? getI18nValue(org.name, locale, org.slug) : null;
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
-      {/* ── Search ── */}
-      <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-        <Search className="h-4 w-4" />
-        <span>Search…</span>
-        <kbd className="ml-8 hidden rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline">
-          ⌘K
-        </kbd>
+      {/* ── Left: Org name ── */}
+      <div className="flex items-center gap-4">
+        {orgName && (
+          <span className="text-sm font-medium text-foreground">
+            {orgName}
+          </span>
+        )}
+        {/* ── Search ── */}
+        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+          <Search className="h-4 w-4" />
+          <span>Search…</span>
+          <kbd className="ml-8 hidden rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline">
+            ⌘K
+          </kbd>
+        </div>
       </div>
 
       {/* ── Right actions ── */}
@@ -25,10 +46,18 @@ export function Header() {
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-brand-500" />
         </button>
 
-        {/* ── Avatar placeholder ── */}
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white">
-          PO
-        </div>
+        {/* ── User menu or placeholder ── */}
+        {user ? (
+          <UserMenu
+            displayName={user.displayName}
+            email={user.email}
+            orgName={orgName}
+          />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white">
+            PO
+          </div>
+        )}
       </div>
     </header>
   );

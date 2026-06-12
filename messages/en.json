@@ -4,15 +4,356 @@
     "appShortName": "POps360"
   },
   "nav": {
-    "dashboard": "Dashboard",
-    "phase0": "Phase 0",
+    "commandCenter": "Command Center",
     "projects": "Projects",
-    "team": "Team",
+    "executionMap": "Execution Map",
+    "workboard": "Workboard",
+    "projectMemory": "Project Memory",
+    "aiOperator": "AI Operator",
+    "drawingIntelligence": "Drawing Intelligence",
     "reports": "Reports",
-    "language": "Language",
+    "team": "Team",
     "settings": "Settings",
     "search": "Search…",
     "notifications": "Notifications"
+  },
+  "projectTabs": {
+    "commandCenter": "Command Center",
+    "executionMap": "Execution Map",
+    "workboard": "Workboard",
+    "projectMemory": "Project Memory",
+    "settings": "Settings",
+    "laborCapacity": "Labor Capacity",
+    "drawingIntelligence": "Drawing Intelligence"
+  },
+  "drawingIntelligence": {
+    "title": "Drawing Intelligence",
+    "subtitle": "AI engine that reads construction drawings and turns them into structured project knowledge — risks, RFIs, submittals, quantities, schedule and cost impacts — with full evidence traceability.",
+    "notStorageNote": "This is an intelligence engine, not a document storage area. Files live in Documents; understanding lives here.",
+    "emptyTitle": "No drawings connected yet",
+    "emptyDescription": "Upload or connect construction drawings to extract project intelligence, detect risks, generate RFIs, identify submittal requirements, and connect drawing data to the Living Graph.",
+    "comingSoon": "This section will activate once the extraction pipeline processes your first drawings.",
+    "tabs": {
+      "upload": "Upload / Connect",
+      "library": "Drawing Library",
+      "extractions": "AI Extraction Results",
+      "risks": "Detected Risks",
+      "rfis": "Generated RFIs",
+      "submittals": "Submittal Requirements",
+      "takeoff": "Quantity Takeoff",
+      "versions": "Version Changes",
+      "schedule": "Schedule Impact",
+      "cost": "Cost Impact",
+      "actions": "Recommended Actions",
+      "evidence": "Evidence Viewer",
+      "logs": "Processing Logs"
+    },
+    "library": {
+      "drawingNumber": "Drawing #",
+      "drawingTitle": "Title",
+      "discipline": "Discipline",
+      "revision": "Rev",
+      "source": "Source",
+      "fileStatus": "Status",
+      "processingStatus": "Processing",
+      "added": "Added",
+      "empty": "No drawings in the library yet."
+    },
+    "processingStatus": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "needs_review": "Needs review",
+      "cancelled": "Cancelled"
+    },
+    "fileStatus": {
+      "active": "Active",
+      "superseded": "Superseded",
+      "archived": "Archived"
+    },
+    "upload": {
+      "title": "Upload or connect drawings",
+      "description": "Connectors arrive with the ingestion pipeline (Prompt 2). The data model already supports every source below — no vendor lock-in.",
+      "manual": "Manual upload",
+      "manualDescription": "PDF, DWG, RVT or IFC files from your computer.",
+      "autodesk": "Autodesk Construction Cloud",
+      "autodeskDescription": "Connect via Autodesk Platform Services (APS).",
+      "procore": "Procore",
+      "procoreDescription": "Sync drawings from Procore projects.",
+      "googleDrive": "Google Drive",
+      "googleDriveDescription": "Import drawing sets from shared folders.",
+      "comingSoonBadge": "Coming soon"
+    },
+    "global": {
+      "selectProject": "Select a project to open its Drawing Intelligence workspace.",
+      "drawingsCount": "{count} drawings",
+      "noDrawings": "No drawings",
+      "open": "Open",
+      "noProjects": "Create a project first to start using Drawing Intelligence."
+    },
+    "aiOperatorCard": {
+      "title": "Drawing Intelligence",
+      "description": "Read construction drawings, extract structured knowledge, detect risks and generate RFIs with evidence.",
+      "open": "Open Drawing Intelligence"
+    },
+    "uploadZone": {
+      "dropHere": "Drag and drop drawings here",
+      "browse": "or click to browse files",
+      "supportedFormats": "Supported",
+      "maxSize": "Max",
+      "stageValidating": "Validating…",
+      "stageUploading": "Uploading to secure storage…",
+      "stageRegistering": "Registering for intelligence processing…",
+      "stageQueued": "Queued for intelligence processing",
+      "processingMode": "Processing depth",
+      "modes": {
+        "quick_scan": "Quick scan",
+        "standard_analysis": "Standard analysis",
+        "deep_analysis": "Deep analysis"
+      },
+      "modeDescriptions": {
+        "quick_scan": "Metadata, title block, revision, discipline and notes. No AI cost.",
+        "standard_analysis": "Quick scan plus deterministic risks, RFIs, submittals and schedule/cost candidates. No AI cost.",
+        "deep_analysis": "Standard analysis plus AI enhancement and version deltas. Uses AI tokens — the expensive step."
+      },
+      "costNote": "Duplicates and drawings without extractable text never trigger AI processing."
+    },
+    "versionsTab": {
+      "drawing": "Drawing",
+      "fromRevision": "From rev",
+      "toRevision": "To rev",
+      "summary": "Detected changes",
+      "date": "Date",
+      "empty": "No version changes yet — upload a new revision of an existing drawing number to track deltas."
+    },
+    "connector": {
+      "notConfigured": "Not configured",
+      "notConfiguredHint": "Set APS_CLIENT_ID and APS_CLIENT_SECRET to connect Autodesk Construction Cloud and sync drawings and models into ProjectOps360° for AI-powered interpretation, impact analysis, and Living Graph reasoning.",
+      "configured": "Configured"
+    },
+    "sourceBadges": {
+      "manual_upload": "Manual upload",
+      "autodesk_aps": "Autodesk",
+      "procore": "Procore",
+      "google_drive": "Google Drive",
+      "local": "Local"
+    },
+    "progress": {
+      "title": "Intelligence pipeline activity",
+      "done": "Processing complete — results are in the tabs above.",
+      "failed": "Processing failed — open the drawing to retry.",
+      "needsReview": "Processed with items needing review — open the drawing for details."
+    },
+    "errors": {
+      "unsupported_file_type": "Unsupported file type",
+      "file_too_large": "File too large",
+      "empty_file": "Empty file",
+      "duplicate_file": "This drawing already exists in the project",
+      "upload_failed": "Upload failed",
+      "missing_project_context": "Missing project context",
+      "processing_job_failed": "Processing job failed",
+      "storage_error": "Storage error",
+      "permission_error": "Permission denied",
+      "not_authenticated": "Not authenticated",
+      "job_not_retryable": "Only failed jobs can be retried",
+      "validation_error": "Invalid request"
+    },
+    "actionsMenu": {
+      "view": "View",
+      "retry": "Retry",
+      "archive": "Archive",
+      "confirmArchive": "Archive this drawing? It will be hidden from the library (the stored file is kept)."
+    },
+    "pipelineHints": {
+      "pending": "Queued for intelligence processing",
+      "processing": "Analyzing drawing structure",
+      "completed": "Processed — ready for AI interpretation",
+      "failed": "Processing failed — retry from the pipeline below",
+      "needs_review": "Needs review before continuing",
+      "cancelled": "Processing cancelled"
+    },
+    "jobTypes": {
+      "ingest": "Ingestion",
+      "page_split": "Page extraction",
+      "ocr_extraction": "OCR / text extraction",
+      "ai_interpretation": "AI interpretation"
+    },
+    "extractionsTable": {
+      "file": "Drawing",
+      "type": "Extraction type",
+      "confidence": "Confidence"
+    },
+    "takeoffTab": {
+      "category": "Category",
+      "item": "Item",
+      "specification": "Specification",
+      "quantity": "Qty",
+      "unit": "Unit",
+      "location": "Location",
+      "sheetRef": "Sheet",
+      "status": "Status",
+      "drawing": "Drawing",
+      "confidence": "Confidence",
+      "empty": "No material takeoff yet — rows are generated when a drawing finishes AI interpretation.",
+      "statusLabels": {
+        "new": "New",
+        "existing": "Existing",
+        "demo": "Demolition",
+        "relocated": "Relocated"
+      }
+    },
+    "insights": {
+      "empty": "No insights yet — they are generated when a drawing finishes extraction.",
+      "confidence": "Confidence",
+      "evidence": "Evidence",
+      "recommendedAction": "Recommended action",
+      "linkedTask": "Linked task",
+      "accept": "Accept",
+      "dismiss": "Dismiss",
+      "markReviewed": "Mark reviewed",
+      "linkToTask": "Link to task",
+      "cancel": "Cancel",
+      "needsReviewNote": "This insight needs human review (low confidence or high impact).",
+      "typeLabels": {
+        "risk": "Risk",
+        "rfi_candidate": "RFI candidate",
+        "submittal_requirement": "Submittal requirement",
+        "inspection_requirement": "Inspection requirement",
+        "schedule_impact": "Schedule impact",
+        "cost_impact": "Cost impact",
+        "missing_information": "Missing information",
+        "contradiction": "Contradiction",
+        "scope_gap": "Scope gap",
+        "coordination_issue": "Coordination issue",
+        "version_change": "Version change",
+        "decision_required": "Decision required"
+      },
+      "severityLabels": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "statusLabels": {
+        "open": "Suggested",
+        "in_review": "Needs review",
+        "accepted": "Accepted",
+        "dismissed": "Dismissed",
+        "converted": "Converted",
+        "linked": "Linked",
+        "actioned": "Actioned",
+        "resolved": "Resolved"
+      },
+      "actionLabels": {
+        "create_draft_rfi": "Create draft RFI",
+        "create_submittal_requirement": "Create submittal requirement",
+        "create_inspection_requirement": "Create inspection requirement",
+        "add_schedule_constraint": "Add schedule constraint",
+        "add_cost_impact_candidate": "Add cost impact candidate",
+        "request_human_review": "Request human review",
+        "notify_project_owner": "Notify project owner",
+        "compare_against_previous_revision": "Compare against previous revision"
+      }
+    },
+    "detail": {
+      "title": "Drawing detail",
+      "metadata": "Metadata",
+      "pipeline": "Intelligence pipeline",
+      "pages": "Pages",
+      "extractionsPlaceholder": "No title block extracted yet — run the extraction to analyze this drawing.",
+      "evidencePlaceholder": "Evidence viewer — exact drawing locations backing each insight will appear here.",
+      "retry": "Retry",
+      "noJobs": "No processing jobs yet.",
+      "titleBlock": "Title block",
+      "revisions": "Revisions",
+      "notes": "Notes",
+      "evidence": "Evidence",
+      "rawJson": "Raw extracted JSON",
+      "confidence": "Confidence",
+      "needsReviewBanner": "AI extraction needs review because confidence is low.",
+      "runExtraction": "Run extraction",
+      "running": "Analyzing drawing structure…",
+      "fields": {
+        "fileName": "File name",
+        "fileType": "Type",
+        "fileSize": "Size",
+        "source": "Source",
+        "drawingNumber": "Drawing #",
+        "revision": "Revision",
+        "discipline": "Discipline",
+        "uploaded": "Uploaded"
+      }
+    }
+  },
+  "workboard": {
+    "title": "Workboard",
+    "description": "Drag and drop tasks between columns to update their status.",
+    "empty": "No tasks",
+    "dragHint": "Drag a task card to another column to change its status.",
+    "columns": {
+      "not_started": "Not Started",
+      "prompt_ready": "Prompt Ready",
+      "sent_to_ai": "Sent to AI",
+      "in_progress": "In Progress",
+      "implemented": "Implemented",
+      "tested": "Tested",
+      "done": "Done",
+      "blocked": "Blocked",
+      "deferred": "Deferred"
+    },
+    "priorityLabels": {
+      "p1": "Critical",
+      "p2": "High",
+      "p3": "Medium"
+    },
+    "filterBySprint": "Filter by sprint",
+    "allSprints": "All sprints",
+    "noSprint": "No sprint",
+    "dependsOn": "Depends on",
+    "errors": {
+      "not_authenticated": "Not authenticated",
+      "unexpected": "An unexpected error occurred",
+      "dependency_not_met": "\"{task}\" cannot start yet — it depends on \"{predecessor}\", which is not done"
+    },
+    "groupLabels": {
+      "backlog": "Backlog",
+      "active": "Active",
+      "complete": "Complete"
+    },
+    "columnVisibility": "Column visibility",
+    "showAll": "Show all",
+    "collapseColumn": "Collapse column",
+    "expandColumn": "Expand column",
+    "resetWidth": "Reset width",
+    "statusChange": {
+      "title": "Move Task",
+      "movingTo": "Moving to",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": {
+        "done": "What was done to complete this task?",
+        "blocked": "Why is this task blocked?",
+        "in_progress": "What are you working on?",
+        "implemented": "What was implemented?",
+        "tested": "What was tested?",
+        "deferred": "Why is this task deferred?",
+        "default": "Note about this change"
+      },
+      "moveWithout": "Move without note",
+      "moveWith": "Move with note",
+      "cancel": "Cancel",
+      "statusLabels": {
+        "not_started": "Not Started",
+        "prompt_ready": "Prompt Ready",
+        "sent_to_ai": "Sent to AI",
+        "in_progress": "In Progress",
+        "implemented": "Implemented",
+        "tested": "Tested",
+        "done": "Done",
+        "blocked": "Blocked",
+        "deferred": "Deferred"
+      }
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -26,9 +367,9 @@
       "subtitle": "Solo founder",
       "trend": "Just getting started"
     },
-    "completedTasks": {
-      "title": "Completed Tasks",
-      "subtitle": "0% completion rate"
+    "decisions": {
+      "title": "Decisions",
+      "subtitle": "Decisions logged"
     },
     "pendingItems": {
       "title": "Pending Items",
@@ -38,8 +379,18 @@
   "phase0": {
     "title": "Phase 0 — Environment Setup",
     "description": "The local development environment is ready. Next steps: build auth flows, connect dashboard data, and add the OpenAI service layer.",
-    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase", "next-intl"],
-    "pending": ["OpenAI"]
+    "completed": [
+      "Next.js",
+      "TypeScript",
+      "Tailwind",
+      "shadcn/ui",
+      "Lucide",
+      "Supabase",
+      "next-intl"
+    ],
+    "pending": [
+      "OpenAI"
+    ]
   },
   "phase0Control": {
     "pageTitle": "Phase 0 Control",
@@ -166,9 +517,1480 @@
     "notSet": "(not set)",
     "serverOnly": "(server-only — not exposed)"
   },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Welcome back to ProjectOps360°",
+      "email": "Email address",
+      "password": "Password",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign in",
+      "noAccount": "Don't have an account?",
+      "signupLink": "Create one",
+      "errors": {
+        "invalidCredentials": "Invalid email or password.",
+        "emailNotConfirmed": "Please check your email and confirm your account before signing in.",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    },
+    "signup": {
+      "title": "Create account",
+      "subtitle": "Get started with ProjectOps360°",
+      "displayName": "Display name",
+      "email": "Email address",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "submit": "Create account",
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "errors": {
+        "emailTaken": "An account with this email already exists.",
+        "passwordMismatch": "Passwords do not match.",
+        "weakPassword": "Password must be at least 6 characters.",
+        "unexpected": "Something went wrong. Please try again."
+      },
+      "success": {
+        "title": "Check your email",
+        "message": "We sent a confirmation link to {email}. Click the link to verify your account.",
+        "backToLogin": "Back to sign in"
+      }
+    },
+    "logout": {
+      "label": "Sign out"
+    },
+    "userMenu": {
+      "profile": "Profile",
+      "settings": "Settings",
+      "signOut": "Sign out"
+    },
+    "callback": {
+      "title": "Confirming your email…",
+      "success": "Email confirmed! Redirecting to dashboard…",
+      "error": "Confirmation failed. The link may have expired.",
+      "tryAgain": "Try signing in again"
+    }
+  },
   "languageSwitcher": {
     "en": "English",
     "es": "Español",
     "label": "Switch language"
+  },
+  "projects": {
+    "title": "Projects",
+    "description": "Manage your projects",
+    "create": "New Project",
+    "empty": "No projects yet",
+    "emptyDescription": "Create your first project to get started",
+    "detail": {
+      "back": "Back to projects",
+      "overview": "Overview",
+      "edit": "Edit",
+      "archive": "Archive",
+      "archiveConfirm": "Are you sure you want to archive this project? It will be hidden from all views.",
+      "stakeholders": "Stakeholders",
+      "viewStakeholders": "View and manage stakeholders",
+      "decisions": "Decisions",
+      "viewDecisions": "View and manage decisions",
+      "meetings": "Meetings",
+      "viewMeetings": "View and manage meetings",
+      "communications": "Communications",
+      "viewCommunications": "View and manage communications",
+      "documents": "Documents",
+      "viewDocuments": "View and manage documents",
+      "roadmap": "Roadmap",
+      "viewRoadmap": "View and manage project milestones"
+    },
+    "aiCommSummary": {
+      "button": "Summarize Communications",
+      "buttonTooltip": "Use AI to summarize this project's communication and decision history",
+      "title": "Communication History Summary",
+      "empty": "No communications or decisions to summarize.",
+      "summary": "Overview",
+      "keyPoints": "Key Points",
+      "sourceRecords": "Source records",
+      "openItems": "Open Items",
+      "none": "None",
+      "recordCount": "Based on [commCount] communication(s) and [decCount] decision(s)",
+      "generating": "Generating summary…",
+      "communicationLabel": "Communication",
+      "decisionLabel": "Decision",
+      "errors": {
+        "noRecords": "No communications or decisions found for this project.",
+        "aiFailed": "AI summary failed. Please try again.",
+        "noApiKey": "AI is not configured. Contact your administrator.",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    },
+    "search": {
+      "title": "Search",
+      "placeholder": "Search by keyword…",
+      "button": "Search",
+      "filters": {
+        "all": "All",
+        "communication": "Communications",
+        "meeting": "Meetings",
+        "decision": "Decisions",
+        "document": "Documents",
+        "task": "Tasks"
+      },
+      "noResults": "No results found",
+      "noResultsDescription": "Try a different keyword or change the filter.",
+      "typeToSearch": "Type a keyword to search across communications, meetings, decisions, documents, and tasks.",
+      "resultCount": "[count] result(s) found",
+      "communication": "Communication",
+      "meeting": "Meeting",
+      "decision": "Decision",
+      "document": "Document",
+      "task": "Task",
+      "semanticMatch": "AI match",
+      "viewDetail": "View detail",
+      "viewSearch": "Search across project records"
+    },
+    "dashboard": {
+      "statCards": {
+        "communications": "Communications",
+        "meetings": "Meetings",
+        "decisions": "Decisions",
+        "documents": "Documents",
+        "actionItems": "Open Actions",
+        "links": "Links"
+      },
+      "recentCommunications": "Recent Communications",
+      "recentMeetings": "Recent Meetings",
+      "recentDecisions": "Recent Decisions",
+      "recentDocuments": "Evidence & Documents",
+      "unresolvedActionItems": "Unresolved Action Items",
+      "missingLinks": "Missing Traceability Links",
+      "missingLinksDescription": "These records have no traceability links. Consider linking them to decisions or evidence.",
+      "missingLinksCount": "[count] [type] without links",
+      "noData": "No records yet",
+      "viewAll": "View all",
+      "traceabilityHealth": "Traceability Health",
+      "linkedEntities": "[linked] of [total] records linked",
+      "none": "None",
+      "requiresFollowUp": "Follow-up required",
+      "overdue": "Overdue",
+      "noDueDate": "No due date",
+      "roadmapSnapshot": {
+        "title": "Roadmap",
+        "viewFull": "View Full Roadmap",
+        "overallProgress": "Overall Progress",
+        "currentMilestone": "Current Milestone",
+        "nextMilestone": "Next",
+        "blockedTasks": "{count} blocked",
+        "noBlockedTasks": "No blockers",
+        "upcomingTasks": "Upcoming Tasks",
+        "noUpcomingTasks": "All tasks completed!",
+        "tasksDone": "{done}/{total} tasks done",
+        "noMilestones": "No milestones yet",
+        "noMilestonesDescription": "Create your first milestone to start tracking progress."
+      }
+    },
+    "audit": {
+      "title": "Audit Log",
+      "description": "History of changes to critical project records",
+      "viewAudit": "View audit trail",
+      "action_create": "Created",
+      "action_update": "Updated",
+      "action_delete": "Deleted",
+      "entity_decisions": "Decision",
+      "entity_documents": "Document",
+      "entity_traceability_links": "Link",
+      "entity_communication_items": "Communication",
+      "entity_action_items": "Action Item",
+      "by": "by",
+      "noRecords": "No audit records yet",
+      "unknownActor": "Unknown user"
+    },
+    "form": {
+      "title": "Create Project",
+      "editTitle": "Edit Project",
+      "name": "Project name",
+      "namePlaceholder": "Enter project name",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe your project…",
+      "status": "Status",
+      "startDate": "Start date",
+      "targetEndDate": "Target end date",
+      "language": "Default language",
+      "submit": "Create project",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "nameRequired": "Project name is required",
+        "nameTooLong": "Project name must be 200 characters or less",
+        "descriptionTooLong": "Description must be 2000 characters or less",
+        "invalidStatus": "Invalid status",
+        "invalidLanguage": "Invalid language",
+        "slugExists": "A project with this name already exists",
+        "unexpected": "Something went wrong. Please try again."
+      },
+      "projectType": "Project type",
+      "useTemplate": "Start from a template (phases, tasks, dependencies, resources, budget and risk placeholders)",
+      "types": {
+        "software_development": "Software Development",
+        "data_center_construction": "Data Center Construction",
+        "residential_construction": "Residential Construction",
+        "commercial_construction": "Commercial Construction",
+        "infrastructure": "Infrastructure",
+        "industrial": "Industrial",
+        "general": "General"
+      }
+    },
+    "status": {
+      "planning": "Planning",
+      "active": "Active",
+      "on_hold": "On Hold",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "stakeholders": {
+    "title": "Stakeholders",
+    "description": "Manage project stakeholders",
+    "create": "Add Stakeholder",
+    "empty": "No stakeholders yet",
+    "emptyDescription": "Add your first stakeholder to this project",
+    "edit": "Edit",
+    "archive": "Archive",
+    "archiveConfirm": "Are you sure you want to archive this stakeholder?",
+    "form": {
+      "title": "Add Stakeholder",
+      "editTitle": "Edit Stakeholder",
+      "name": "Name",
+      "namePlaceholder": "Full name or organization",
+      "role": "Role",
+      "rolePlaceholder": "e.g. Project Sponsor, Team Lead",
+      "email": "Email",
+      "emailPlaceholder": "email@example.com",
+      "influence": "Influence",
+      "interest": "Interest",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes…",
+      "language": "Preferred language",
+      "submit": "Add stakeholder",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "nameRequired": "Name is required",
+        "nameTooLong": "Name must be 200 characters or less",
+        "roleTooLong": "Role must be 200 characters or less",
+        "invalidEmail": "Please enter a valid email",
+        "notesTooLong": "Notes must be 2000 characters or less",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    },
+    "influence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "interest": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    }
+  },
+  "communications": {
+    "title": "Communication Log",
+    "description": "Track project communications",
+    "create": "Log Communication",
+    "empty": "No communications yet",
+    "emptyDescription": "Log your first communication for this project",
+    "edit": "Edit",
+    "archive": "Archive",
+    "archiveConfirm": "Are you sure you want to archive this communication?",
+    "filters": {
+      "sourceType": "Source type",
+      "status": "Status",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "followUp": "Needs follow-up",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "sourceType": {
+      "email": "Email",
+      "meeting": "Meeting",
+      "phone": "Phone",
+      "teams": "Teams",
+      "slack": "Slack",
+      "in_person": "In Person",
+      "document": "Document",
+      "manual_note": "Manual Note",
+      "other": "Other"
+    },
+    "status": {
+      "draft": "Draft",
+      "logged": "Logged"
+    },
+    "followUp": {
+      "yes": "Follow-up needed",
+      "no": "No follow-up"
+    },
+    "form": {
+      "title": "Log Communication",
+      "editTitle": "Edit Communication",
+      "titleField": "Title",
+      "titlePlaceholder": "Brief subject of the communication",
+      "summary": "Summary",
+      "summaryPlaceholder": "Brief summary of what was communicated…",
+      "content": "Notes",
+      "contentPlaceholder": "Full notes or details…",
+      "sourceType": "Source type",
+      "date": "Date",
+      "sender": "Sender",
+      "senderPlaceholder": "Who sent this communication",
+      "recipients": "Recipients",
+      "recipientsPlaceholder": "Who received this communication",
+      "status": "Status",
+      "requiresFollowUp": "Requires follow-up",
+      "relatedStakeholders": "Related stakeholders",
+      "language": "Language",
+      "submit": "Log communication",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "titleRequired": "Title is required",
+        "titleTooLong": "Title must be 200 characters or less",
+        "summaryTooLong": "Summary must be 2000 characters or less",
+        "contentTooLong": "Content must be 5000 characters or less",
+        "senderTooLong": "Sender must be 200 characters or less",
+        "recipientsTooLong": "Recipients must be 500 characters or less",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    }
+  },
+  "meetings": {
+    "title": "Meetings",
+    "description": "Track project meetings",
+    "create": "Log Meeting",
+    "empty": "No meetings yet",
+    "emptyDescription": "Log your first meeting for this project",
+    "edit": "Edit",
+    "archive": "Archive",
+    "archiveConfirm": "Are you sure you want to archive this meeting?",
+    "detail": {
+      "back": "Back to meetings",
+      "date": "Date",
+      "duration": "Duration",
+      "durationValue": "[minutes] min",
+      "location": "Location",
+      "attendees": "Attendees",
+      "agenda": "Agenda",
+      "summary": "Summary",
+      "notes": "Meeting Notes",
+      "noNotes": "No notes recorded",
+      "linkedStakeholders": "Linked Stakeholders",
+      "noStakeholders": "No stakeholders linked",
+      "linkedRecords": "Linked Records",
+      "extractDecisions": "Extract Decisions",
+      "extractDecisionsTooltip": "Use AI to find decisions in meeting notes",
+      "extractActionItems": "Extract Action Items",
+      "extractActionItemsTooltip": "Use AI to find action items in meeting notes"
+    },
+    "aiExtraction": {
+      "title": "AI-Extracted Decisions",
+      "description": "The AI found [count] potential decision(s) in the meeting notes. Review each one and approve or reject.",
+      "empty": "No decisions found in the meeting notes.",
+      "confidence": "Confidence",
+      "sourceExcerpt": "Source excerpt",
+      "impactArea": "Impact area",
+      "decisionDate": "Decision date",
+      "decisionMaker": "Decision maker",
+      "approve": "Approve",
+      "approved": "Approved",
+      "reject": "Reject",
+      "rejected": "Rejected",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "extracting": "Analyzing meeting notes…",
+      "extractedOn": "Extracted on",
+      "aiRunId": "AI Run",
+      "allReviewed": "All suggestions reviewed",
+      "errors": {
+        "noNotes": "Meeting has no notes to analyze.",
+        "noContent": "Meeting has no content (notes, summary, or agenda) to analyze.",
+        "aiFailed": "AI analysis failed. Please try again.",
+        "noApiKey": "AI is not configured. Contact your administrator.",
+        "approvalFailed": "Failed to save decision. Please try again.",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    },
+    "aiActionExtraction": {
+      "title": "AI-Extracted Action Items",
+      "description": "The AI found [count] potential action item(s) in the meeting notes. Review each one and approve or reject.",
+      "empty": "No action items found in the meeting notes.",
+      "confidence": "Confidence",
+      "sourceExcerpt": "Source excerpt",
+      "priority": "Priority",
+      "dueDate": "Due date",
+      "ownerName": "Owner",
+      "approve": "Approve",
+      "approved": "Approved",
+      "reject": "Reject",
+      "rejected": "Rejected",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "extracting": "Analyzing meeting notes…",
+      "extractedOn": "Extracted on",
+      "aiRunId": "AI Run",
+      "allReviewed": "All suggestions reviewed",
+      "priorityLabels": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "errors": {
+        "noContent": "Meeting has no content (notes, summary, or agenda) to analyze.",
+        "aiFailed": "AI analysis failed. Please try again.",
+        "noApiKey": "AI is not configured. Contact your administrator.",
+        "approvalFailed": "Failed to save action item. Please try again.",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    },
+    "filters": {
+      "status": "Status",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "status": {
+      "scheduled": "Scheduled",
+      "in_progress": "In Progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "form": {
+      "title": "Log Meeting",
+      "editTitle": "Edit Meeting",
+      "titleField": "Title",
+      "titlePlaceholder": "Meeting subject or title",
+      "meetingDate": "Date",
+      "duration": "Duration (min)",
+      "durationPlaceholder": "e.g. 60",
+      "location": "Location",
+      "locationPlaceholder": "Room, link, or address",
+      "attendees": "Attendees",
+      "attendeesPlaceholder": "Names separated by commas",
+      "status": "Status",
+      "agenda": "Agenda",
+      "agendaPlaceholder": "Meeting agenda items…",
+      "summary": "Summary",
+      "summaryPlaceholder": "Brief summary of the meeting…",
+      "notes": "Notes",
+      "notesPlaceholder": "Full meeting notes…",
+      "linkedStakeholders": "Linked stakeholders",
+      "language": "Language",
+      "submit": "Log meeting",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "titleRequired": "Title is required",
+        "titleTooLong": "Title must be 200 characters or less",
+        "agendaTooLong": "Agenda must be 2000 characters or less",
+        "summaryTooLong": "Summary must be 2000 characters or less",
+        "notesTooLong": "Notes must be 5000 characters or less",
+        "attendeesTooLong": "Attendees must be 500 characters or less",
+        "locationTooLong": "Location must be 200 characters or less",
+        "durationInvalid": "Duration must be a positive number",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    }
+  },
+  "decisions": {
+    "title": "Decision Log",
+    "description": "Track project decisions",
+    "create": "Log Decision",
+    "empty": "No decisions yet",
+    "emptyDescription": "Log your first decision for this project",
+    "edit": "Edit",
+    "archive": "Archive",
+    "archiveConfirm": "Are you sure you want to archive this decision?",
+    "detail": {
+      "back": "Back to decisions",
+      "date": "Decision date",
+      "decisionMaker": "Decided by",
+      "source": "Source",
+      "noSource": "No source linked",
+      "evidence": "Evidence",
+      "description": "Description",
+      "noDescription": "No description provided",
+      "rationale": "Rationale",
+      "noRationale": "No rationale recorded",
+      "linkedStakeholders": "Linked Stakeholders",
+      "noStakeholders": "No stakeholders linked",
+      "linkedRecords": "Linked Records"
+    },
+    "filters": {
+      "status": "Status",
+      "impactArea": "Impact area",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "status": {
+      "proposed": "Proposed",
+      "accepted": "Accepted",
+      "rejected": "Rejected",
+      "deferred": "Deferred",
+      "revoked": "Revoked"
+    },
+    "impactArea": {
+      "scope": "Scope",
+      "schedule": "Schedule",
+      "budget": "Budget",
+      "risk": "Risk",
+      "quality": "Quality",
+      "communication": "Communication",
+      "document": "Document",
+      "other": "Other"
+    },
+    "sourceType": {
+      "meeting": "Meeting",
+      "communication": "Communication",
+      "document": "Document",
+      "manual": "Manual",
+      "other": "Other"
+    },
+    "form": {
+      "title": "Log Decision",
+      "editTitle": "Edit Decision",
+      "titleField": "Title",
+      "titlePlaceholder": "What was decided?",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe the decision in detail…",
+      "rationale": "Rationale",
+      "rationalePlaceholder": "Why was this decision made…",
+      "decisionDate": "Decision date",
+      "decisionMaker": "Decided by",
+      "decisionMakerPlaceholder": "Who made this decision",
+      "sourceType": "Source type",
+      "impactArea": "Impact area",
+      "evidenceUrl": "Evidence URL",
+      "evidenceUrlPlaceholder": "https://example.com/evidence",
+      "status": "Status",
+      "linkedStakeholders": "Linked stakeholders",
+      "language": "Language",
+      "submit": "Log decision",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "titleRequired": "Title is required",
+        "titleTooLong": "Title must be 200 characters or less",
+        "descriptionTooLong": "Description must be 2000 characters or less",
+        "rationaleTooLong": "Rationale must be 5000 characters or less",
+        "decisionMakerTooLong": "Decision maker must be 200 characters or less",
+        "evidenceUrlTooLong": "Evidence URL must be 500 characters or less",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    }
+  },
+  "documents": {
+    "title": "Document Repository",
+    "description": "Manage project documents and evidence",
+    "create": "Add Document",
+    "empty": "No documents yet",
+    "emptyDescription": "Add your first document or evidence to this project",
+    "edit": "Edit",
+    "archive": "Archive",
+    "archiveConfirm": "Are you sure you want to archive this document?",
+    "detail": {
+      "back": "Back to documents",
+      "owner": "Owner",
+      "noOwner": "No owner assigned",
+      "storageType": "Storage",
+      "documentType": "Type",
+      "file": "File",
+      "externalLink": "External link",
+      "description": "Notes",
+      "noDescription": "No notes provided",
+      "version": "Version",
+      "openFile": "Open file",
+      "openLink": "Open link"
+    },
+    "filters": {
+      "status": "Status",
+      "documentType": "Document type",
+      "storageType": "Storage type",
+      "all": "All",
+      "clear": "Clear filters"
+    },
+    "status": {
+      "draft": "Draft",
+      "review": "Review",
+      "approved": "Approved",
+      "archived": "Archived"
+    },
+    "documentType": {
+      "evidence": "Evidence",
+      "contract": "Contract",
+      "specification": "Specification",
+      "report": "Report",
+      "presentation": "Presentation",
+      "other": "Other"
+    },
+    "storageType": {
+      "upload": "File upload",
+      "external_url": "External URL"
+    },
+    "form": {
+      "title": "Add Document",
+      "editTitle": "Edit Document",
+      "titleField": "Title",
+      "titlePlaceholder": "Document title",
+      "description": "Notes",
+      "descriptionPlaceholder": "Additional notes or context…",
+      "documentType": "Document type",
+      "storageType": "Storage type",
+      "owner": "Owner",
+      "ownerPlaceholder": "Who owns this document",
+      "externalUrl": "External URL",
+      "externalUrlPlaceholder": "https://example.com/document.pdf",
+      "fileUpload": "Upload file",
+      "fileChoose": "Choose file",
+      "fileSelected": "File selected",
+      "status": "Status",
+      "language": "Language",
+      "submit": "Add document",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "errors": {
+        "titleRequired": "Title is required",
+        "titleTooLong": "Title must be 200 characters or less",
+        "descriptionTooLong": "Notes must be 2000 characters or less",
+        "ownerTooLong": "Owner must be 200 characters or less",
+        "externalUrlTooLong": "External URL must be 500 characters or less",
+        "externalUrlInvalid": "Please provide an external URL or upload a file",
+        "fileRequired": "Please upload a file or provide an external URL",
+        "uploadFailed": "File upload failed. Please try again.",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    }
+  },
+  "links": {
+    "title": "Linked Records",
+    "empty": "No linked records yet",
+    "emptyDescription": "Link related decisions, meetings, communications, or documents",
+    "addLink": "Link Record",
+    "removeLink": "Remove link",
+    "removeConfirm": "Are you sure you want to remove this link?",
+    "context": "Context",
+    "createdAt": "Linked on",
+    "entityType": {
+      "decision": "Decision",
+      "meeting": "Meeting",
+      "communication": "Communication",
+      "document": "Document",
+      "action_item": "Action Item",
+      "stakeholder": "Stakeholder",
+      "project": "Project"
+    },
+    "linkType": {
+      "related_to": "Related to",
+      "caused_by": "Caused by",
+      "depends_on": "Depends on",
+      "supersedes": "Supersedes",
+      "derived_from": "Derived from",
+      "contradicts": "Contradicts"
+    },
+    "dialog": {
+      "title": "Link Record",
+      "targetType": "Record type",
+      "targetRecord": "Select record",
+      "linkType": "Link type",
+      "contextNotes": "Context notes",
+      "contextNotesPlaceholder": "Why is this link relevant?",
+      "submit": "Create link",
+      "cancel": "Cancel",
+      "errors": {
+        "targetRequired": "Please select a record to link",
+        "linkTypeRequired": "Please select a relationship type",
+        "contextTooLong": "Context must be 2000 characters or less",
+        "duplicate": "This link already exists",
+        "unexpected": "Something went wrong. Please try again."
+      }
+    }
+  },
+  "roadmap": {
+    "title": "Roadmap",
+    "description": "Project milestones and tasks",
+    "milestones": "Milestones",
+    "tasks": "Tasks",
+    "empty": "No milestones yet",
+    "emptyDescription": "Create your first milestone to start planning your project roadmap.",
+    "progress": "{done} of {total} completed",
+    "taskCount": "{done}/{total} tasks done",
+    "noTasks": "No tasks",
+    "status": {
+      "planned": "Planned",
+      "in_progress": "In Progress",
+      "completed": "Completed",
+      "blocked": "Blocked",
+      "deferred": "Deferred",
+      "not_started": "Not Started",
+      "prompt_ready": "Prompt Ready",
+      "sent_to_ai": "Sent to AI",
+      "implemented": "Implemented",
+      "tested": "Tested",
+      "done": "Done"
+    },
+    "priority": {
+      "p1": "P1 — Critical",
+      "p2": "P2 — Important",
+      "p3": "P3 — Nice to have"
+    },
+    "dateRange": "{start} → {end}",
+    "noDate": "No date set",
+    "hours": "{hours}h",
+    "sprint": "Sprint {name}",
+    "taskList": {
+      "title": "Tasks",
+      "filterByStatus": "Filter by status",
+      "allStatuses": "All",
+      "selectMilestone": "Select a milestone to view its tasks",
+      "noTasksForMilestone": "No tasks in this milestone",
+      "progressCount": "{done} of {total} done",
+      "remaining": "Remaining",
+      "dependencyNotes": "Dependencies",
+      "executionNotes": "Execution notes",
+      "blockerReason": "Blocker reason",
+      "acceptanceCriteria": "Acceptance criteria",
+      "updateStatus": "Update status",
+      "statusUpdated": "Status updated",
+      "statusUpdateFailed": "Failed to update status",
+      "estimate": "Estimate",
+      "actual": "Actual",
+      "noEstimate": "—",
+      "unassigned": "Unassigned",
+      "copyPrompt": "Copy prompt",
+      "copiedPrompt": "Copied!",
+      "markAsSentToAi": "Copy & mark sent",
+      "promptWarning": "Never include secrets, API keys, or passwords in prompts.",
+      "promptLabel": "AI Prompt",
+      "promptContextLabel": "Context",
+      "aiToolLabel": "AI tool",
+      "lastSentLabel": "Last sent",
+      "implementationNotesLabel": "Implementation notes",
+      "testNotesLabel": "Test notes",
+      "dependencyWarning": "blocked dep.",
+      "dependencyComplete": "Done",
+      "dependencyIncomplete": "Pending",
+      "auditTrail": "Audit trail",
+      "auditTrailEmpty": "No status changes recorded.",
+      "statusChanged": "Status changed",
+      "promptCopied": "Prompt copied",
+      "promptSent": "Prompt sent to AI",
+      "taskBlocked": "Task blocked",
+      "taskCompleted": "Task completed",
+      "taskUnblocked": "Task unblocked",
+      "editTask": "Edit task",
+      "archiveTask": "Archive task",
+      "confirmArchiveTask": "Are you sure you want to archive this task? It will be hidden from all views.",
+      "editMilestone": "Edit milestone",
+      "archiveMilestone": "Archive milestone",
+      "confirmArchiveMilestone": "Are you sure you want to archive this milestone? All its tasks will also be archived.",
+      "addPredecessor": "Add predecessor",
+      "addPredecessorPlaceholder": "Search tasks…",
+      "predecessorAdded": "Predecessor added",
+      "predecessorExists": "This dependency already exists",
+      "cancel": "Cancel",
+      "noMatchingTasks": "No matching tasks",
+      "circularDependencyError": "This would create a circular dependency.",
+      "dependencyAddError": "Failed to add dependency.",
+      "dependsOn": "Depends on",
+      "showPrompt": "Show prompt",
+      "hidePrompt": "Hide prompt"
+    },
+    "form": {
+      "createMilestone": "Create milestone",
+      "editMilestone": "Edit milestone",
+      "createTask": "Create task",
+      "editTask": "Edit task",
+      "cancel": "Cancel",
+      "save": "Save",
+      "creating": "Creating...",
+      "saving": "Saving...",
+      "milestoneCreated": "Milestone created",
+      "milestoneUpdated": "Milestone updated",
+      "taskCreated": "Task created",
+      "taskUpdated": "Task updated",
+      "errors": {
+        "not_authenticated": "You must be logged in",
+        "validation_error": "Please check the form for errors",
+        "unexpected": "Something went wrong. Please try again.",
+        "titleRequired": "Title is required",
+        "titleTooLong": "Title is too long",
+        "descriptionTooLong": "Description is too long",
+        "invalid_milestone_id": "Invalid milestone",
+        "invalid_project_id": "Invalid project"
+      },
+      "milestone": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. M3 — Core Features",
+        "description": "Description",
+        "descriptionPlaceholder": "What this milestone covers...",
+        "status": "Status",
+        "startDate": "Start date",
+        "targetDate": "Target date",
+        "iconKey": "Icon",
+        "iconKeys": {
+          "setup": "Setup",
+          "shield_database": "Security & Data",
+          "users": "Users",
+          "notebook": "Notebook",
+          "link": "Links",
+          "sparkles": "AI & Automation",
+          "chart": "Analytics",
+          "loop": "Iteration",
+          "check_circle": "Completion",
+          "rocket": "Launch"
+        },
+        "lockStatus": "Lock status override",
+        "lockStatusDescription": "When locked, the milestone status won't be auto-calculated from task completion.",
+        "computedStatusNote": "Status is auto-computed from task completion."
+      },
+      "task": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. Implement user authentication",
+        "description": "Description",
+        "descriptionPlaceholder": "What this task involves...",
+        "milestone": "Milestone",
+        "milestonePlaceholder": "Select a milestone",
+        "noMilestone": "No milestone",
+        "status": "Status",
+        "priority": "Priority",
+        "sprintName": "Sprint",
+        "sprintNamePlaceholder": "e.g. Sprint 3",
+        "estimateHours": "Estimated hours",
+        "estimateHoursPlaceholder": "0",
+        "acceptanceCriteria": "Acceptance criteria",
+        "acceptanceCriteriaPlaceholder": "What must be true for this task to be done...",
+        "dependencyNotes": "Dependency notes",
+        "dependencyNotesPlaceholder": "What this task depends on...",
+        "scheduling": "Scheduling",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "progress": "Progress",
+        "progressUnit": "%",
+        "durationDays": "days",
+        "promptSection": "AI Prompt",
+        "promptBody": "Prompt",
+        "promptBodyPlaceholder": "Write the prompt you will send to the AI tool...",
+        "promptContext": "Context",
+        "promptContextPlaceholder": "Brief context for this prompt (e.g. Sprint 3 auth middleware)",
+        "aiToolTarget": "AI tool",
+        "aiToolTargetPlaceholder": "Select target tool",
+        "implementationNotes": "Implementation notes",
+        "implementationNotesPlaceholder": "What was implemented, decisions made...",
+        "testNotes": "Test notes",
+        "testNotesPlaceholder": "Verification results, edge cases tested...",
+        "executionNotes": "Execution notes",
+        "executionNotesPlaceholder": "What was done, decisions, observations during execution...",
+        "blockerReason": "Blocker reason",
+        "blockerReasonPlaceholder": "Why is this task blocked..."
+      }
+    },
+    "executionDashboard": {
+      "title": "Execution status",
+      "promptReady": "Prompt ready",
+      "sentToAi": "Sent to AI",
+      "implemented": "Implemented",
+      "tested": "Tested",
+      "blocked": "Blocked",
+      "completed": "Completed",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "deferred": "Deferred",
+      "currentSprint": "Sprint",
+      "noSprint": "No sprint",
+      "recentChanges": "Recent changes",
+      "noRecentChanges": "No recent status changes."
+    },
+    "nextStep": {
+      "title": "Recommended next step",
+      "onTrack": "Roadmap is on track. No blockers or pending actions.",
+      "viewTask": "View task",
+      "resolveBlocker": "Resolve blocker",
+      "runPrompt": "Run prompt",
+      "markCompleted": "Mark completed",
+      "actions": {
+        "resolve_blocker": "Resolve blocker",
+        "run_prompt": "Run prompt",
+        "implement_output": "Implement output",
+        "test_implementation": "Test implementation",
+        "mark_completed": "Mark completed",
+        "start_next": "Start next task",
+        "on_track": "On track"
+      }
+    }
+  },
+  "livingGraph": {
+    "title": "Living Graph",
+    "subtitle": "Process intelligence map — explore what happened, what depends on what, and what happens if something slips.",
+    "backToExecutionMap": "Execution Map",
+    "summary": "{nodes} nodes · {edges} edges · {blocked} blocked",
+    "noSelection": "Select a node or edge to inspect it.",
+    "selectedNode": "Node details",
+    "selectedEdge": "Relationship details",
+    "emptyState": {
+      "title": "No process activity yet",
+      "description": "The Living Graph builds itself as tasks transition, decisions are made and documents are linked. Work on the project and come back — the process will draw itself."
+    },
+    "errorState": {
+      "title": "Could not load the Living Graph",
+      "description": "The graph data could not be fetched. Please try again in a moment."
+    },
+    "search": {
+      "placeholder": "Search by label, ID or entity…",
+      "results": "{count} found — center",
+      "noResults": "No results"
+    },
+    "overlays": {
+      "label": "Overlay",
+      "normal": "Normal View",
+      "bottleneck": "Bottleneck View",
+      "criticalPath": "Critical Path View",
+      "rework": "Rework View",
+      "traceabilityGap": "Traceability Gap View",
+      "risk": "Risk View",
+      "sopCandidate": "SOP Candidate View",
+      "blocker": "Blocker View",
+      "laborCapacity": "Labor Capacity View",
+      "readiness": "Workface Readiness",
+      "variance": "Variance View",
+      "timeline": "Timeline Playback",
+      "simulation": "What-if Simulation"
+    },
+    "layoutModes": {
+      "label": "Layout",
+      "hierarchical": "Executive Flow",
+      "timeline": "Timeline",
+      "force": "Process Mining"
+    },
+    "metrics": {
+      "title": "Process intelligence summary",
+      "graphHealthScore": "Health Score",
+      "criticalPathRisk": "Critical Path Risk",
+      "activeBottlenecks": "Bottlenecks",
+      "traceabilityGaps": "Trace Gaps",
+      "sopCandidates": "SOP Candidates",
+      "reworkSignals": "Rework Signals",
+      "processConfidence": "Confidence",
+      "hints": {
+        "graphHealthScore": "Composite 0–100 score: blockers, bottlenecks, rework, traceability gaps and cycles lower it.",
+        "criticalPathRisk": "High when a blocked node sits on the critical chain; medium when blockers or cycles exist elsewhere.",
+        "activeBottlenecks": "Nodes concentrating flow: high degree, long duration or blocker pressure.",
+        "traceabilityGaps": "Nodes with little or no linked evidence (documents, decisions).",
+        "sopCandidates": "Completed, stable, well-evidenced segments worth turning into SOPs.",
+        "reworkSignals": "Nodes involved in delay edges or loop-like paths.",
+        "processConfidence": "How much signal the graph has: evidence density and graph size."
+      }
+    },
+    "legend": {
+      "title": "Legend",
+      "nodeTypes": "Node types",
+      "edgeTypes": "Edge types",
+      "riskLevels": "Risk levels",
+      "indicators": "Indicators",
+      "criticalPath": "Critical path",
+      "bottleneck": "Bottleneck",
+      "rework": "Rework",
+      "traceabilityGap": "Traceability gap",
+      "simulationImpact": "Simulation impact",
+      "searchHit": "Search result"
+    },
+    "simulationPanel": {
+      "title": "What-if simulation",
+      "reset": "Reset",
+      "currentPlan": "Current plan",
+      "simulatedPlan": "Simulated plan"
+    },
+    "demo": {
+      "cta": "Explore with demo data",
+      "badge": "Demo data — not your project"
+    },
+    "level": {
+      "label": "Level",
+      "milestones": "Milestones",
+      "activities": "Activities",
+      "events": "Events"
+    },
+    "drill": {
+      "selected": "Selected milestones: {names}",
+      "viewFlow": "View flow",
+      "hint": "Tip: drag one milestone onto another (or click two) to connect them and view the flow between them. Drag cards freely to rearrange the layout."
+    },
+    "milestoneCard": {
+      "tasks": "tasks",
+      "currentPhase": "Current phase"
+    },
+    "pathNarrative": {
+      "title": "Path found — {steps} steps · ~{days}d accumulated",
+      "blocked": "Blocked on the path: {labels}",
+      "delays": "Delay signals at: {segments}",
+      "weakest": "Weakest link: {from} → {to} (weight {weight})",
+      "aiSoon": "Deterministic analysis — AI narrative arrives with the interpretation engine."
+    },
+    "filters": {
+      "label": "Filters",
+      "nodeTypes": "Node types",
+      "edgeTypes": "Edge types",
+      "status": "Status",
+      "riskLevel": "Risk level",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "blockedOnly": "Blocked only",
+      "criticalOnly": "Critical path only",
+      "all": "All",
+      "reset": "Reset filters"
+    },
+    "nodeTypes": {
+      "task_transition": "Task transition",
+      "decision_cascade": "Decision",
+      "communication_flow": "Communication",
+      "document_link": "Document",
+      "milestone_gate": "Milestone gate",
+      "blocker_event": "Blocker",
+      "labor_risk": "Labor risk"
+    },
+    "edgeTypes": {
+      "caused": "Caused",
+      "enabled": "Enabled",
+      "blocked": "Blocked",
+      "delayed": "Delayed",
+      "accelerated": "Accelerated",
+      "informed": "Informed",
+      "labor_constrained": "Labor constrained"
+    },
+    "edgeMeanings": {
+      "caused": "This activity directly triggered the next one — a causal dependency in the execution flow.",
+      "enabled": "Completing the source made the target possible — a sequence/enablement link.",
+      "blocked": "The source is preventing the target from progressing. Treat as a high-risk dependency.",
+      "delayed": "The source pushed the target's schedule back — a rework or delay signal.",
+      "accelerated": "The source sped up the target — an efficient handoff worth repeating.",
+      "informed": "An informational/evidence link — context flowed, but no hard dependency.",
+      "labor_constrained": "A labor capacity shortage is constraining this activity or milestone — the required crew is not fully available, creating a downstream schedule risk."
+    },
+    "actions": {
+      "clusterMode": "Group by entity",
+      "clearFocus": "Clear focus",
+      "fitView": "Fit view",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit fullscreen",
+      "close": "Close panel",
+      "findPath": "Find path from this node",
+      "findPathPending": "Now click the target node…",
+      "findPathHint": "Path mode: click another node to trace the shortest path to it. Press Esc to cancel.",
+      "simplify": "Simplified edges",
+      "edit": "Edit task / milestone",
+      "extractSubgraph": "Extract subgraph",
+      "showDownstream": "Show downstream impact",
+      "focusNode": "Focus on this node"
+    },
+    "warnings": {
+      "largeGraph": "This graph is large. Consider Focus mode, filters or Group by entity to keep it readable and fast.",
+      "mobileNotice": "Living Graph is optimized for desktop and tablet."
+    },
+    "performance": {
+      "hint": "Use subgraph extraction or entity grouping for very large graphs."
+    },
+    "timeline": {
+      "noEvents": "No process events recorded yet — the timeline will populate as the project moves.",
+      "play": "Play",
+      "pause": "Pause",
+      "stepBack": "Step back",
+      "stepForward": "Step forward",
+      "reset": "Reset",
+      "speed": "Playback speed",
+      "scrub": "Scrub timeline",
+      "start": "Start of process"
+    },
+    "detailPanel": {
+      "title": "Details",
+      "type": "Type",
+      "sourceEntity": "Source entity",
+      "sourceEntityId": "Entity ID",
+      "status": "Status",
+      "progress": "Progress",
+      "occurredAt": "Occurred",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "duration": "Duration",
+      "riskLevel": "Risk level",
+      "blockerState": "Blocker state",
+      "blocked": "Blocked",
+      "notBlocked": "Not blocked",
+      "completed": "Completed",
+      "evidenceGap": "Evidence gap",
+      "traceability": "Traceability",
+      "neighbors": "Neighbors",
+      "inDegree": "Incoming edges",
+      "outDegree": "Outgoing edges",
+      "downstream": "Downstream nodes",
+      "upstream": "Upstream nodes",
+      "downstreamShort": "down",
+      "criticalShort": "CRITICAL",
+      "criticalPath": "On critical path",
+      "yes": "Yes",
+      "no": "No",
+      "incoming": "Incoming dependencies",
+      "outgoing": "Outgoing dependencies",
+      "aiExplanation": "AI explanation (preview)",
+      "edgeType": "Edge type",
+      "weight": "Weight",
+      "lag": "Lag",
+      "reworkLike": "Looks like rework",
+      "lacksEvidence": "Lacks evidence",
+      "edgeRecommendation": "Recommended action: review whether this dependency is still accurate and attach evidence if it represents a real handoff.",
+      "laborRisk": "Labor risk",
+      "laborCapacitySection": "Labor Capacity Risk",
+      "laborTrade": "Trade",
+      "laborWeek": "Week",
+      "laborRequiredHC": "Required",
+      "laborAvailableHC": "Available",
+      "laborGapHC": "Gap",
+      "laborUtilization": "Utilization",
+      "laborZone": "Zone",
+      "laborCriticalPath": "Critical path impact",
+      "laborAffectedActivities": "Affected activities",
+      "laborAffectedMilestones": "Affected milestones",
+      "laborInsightKind": "Root cause",
+      "readinessSection": "Workface Readiness",
+      "readinessLevel": "Readiness",
+      "readinessPct": "Readiness %",
+      "readinessMissing": "Missing",
+      "readinessSummary": "Summary",
+      "readinessAction": "Action",
+      "risk": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "variance": {
+        "title": "Variance Analysis",
+        "varianceSeverity": "Variance Severity",
+        "scheduleRisk": "Schedule Risk",
+        "likelyCause": "Likely Cause",
+        "trend": "Trend"
+      }
+    },
+    "insights": {
+      "bottleneck": "This node concentrates flow: {inDegree} incoming and {outDegree} outgoing links with {downstream} downstream nodes. Delays here ripple widely.",
+      "rework": "This node participates in a delay or loop pattern — work likely came back to it after moving forward.",
+      "traceabilityGap": "This node has little or no linked evidence (documents, decisions). Its history may be hard to audit later.",
+      "risk": "This node carries elevated risk and affects {downstream} downstream nodes. Watch it closely.",
+      "sopCandidate": "This segment completed cleanly and is well-evidenced — a strong candidate to become a standard operating procedure.",
+      "blocker": "This node is blocked and is holding back {downstream} downstream nodes.",
+      "laborCapacityGap": "{trade} shows a labor capacity gap of {gap} headcount in week {week}. Required: {requiredHC}, Available: {availableHC}. This affects {downstream} downstream nodes and is {criticalPath, select, 1 {on} other {off}} the critical path.",
+      "healthy": "No process anomalies detected. {downstream} nodes depend on this one downstream."
+    },
+    "recommendations": {
+      "bottleneck": "Recommended: split responsibilities or parallelize work feeding through this node.",
+      "rework": "Recommended: review what caused the loop and add an acceptance gate before this step.",
+      "traceabilityGap": "Recommended: link the relevant document, decision or evidence to this node.",
+      "risk": "Recommended: define a mitigation plan and monitor downstream milestones.",
+      "sopCandidate": "Recommended: document this flow as a reusable SOP.",
+      "blocker": "Recommended: resolve the blocker first — it has the highest downstream leverage.",
+      "laborCapacityGap": "Recommended: confirm resource scheduling, evaluate reallocation from adjacent trades, or activate reinforcement hiring with adequate lead time.",
+      "healthy": "Recommended: no action needed."
+    },
+    "simulation": {
+      "title": "What-if scenarios",
+      "selectNode": "Select a node to run a what-if simulation on it.",
+      "scenarios": {
+        "delay1d": "Delay 1 day",
+        "delay3d": "Delay 3 days",
+        "delay1w": "Delay 1 week",
+        "markBlocked": "Mark as blocked",
+        "removeBlocker": "Remove blocker",
+        "increaseDuration": "Duration +50%"
+      },
+      "result": "This scenario may affect {affected} downstream nodes with an estimated propagation of {delay} days. {critical} of them are on the critical path.",
+      "milestonesAffected": "Milestones at risk: {milestones}",
+      "strongestDependency": "Strongest downstream dependency: {label}",
+      "riskDelta": "Risk impact",
+      "mitigation": "Suggested mitigation: re-sequence parallel work, resolve blockers upstream, or re-baseline the affected milestone dates."
+    }
+  },
+  "placeholders": {
+    "team": {
+      "title": "Team",
+      "description": "Team management coming soon."
+    },
+    "reports": {
+      "title": "Reports",
+      "description": "Reports dashboard coming soon."
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Application settings coming soon."
+    },
+    "aiOperator": {
+      "title": "AI Operator",
+      "description": "AI-powered project assistance coming soon."
+    },
+    "projectMemory": {
+      "title": "Project Memory",
+      "description": "Project knowledge base coming soon."
+    },
+    "projectSettings": {
+      "title": "Project Settings",
+      "description": "Project configuration coming soon."
+    },
+    "laborCapacity": {
+      "title": "Labor Capacity & Skills Matrix",
+      "description": "Monitor labor gaps, utilization, and crew readiness across trades and weeks.",
+      "summary": {
+        "totalTrades": "Total Trades",
+        "shortageWeeks": "Shortage Weeks",
+        "criticalTrades": "Critical Trades",
+        "maxUtilization": "Max Utilization"
+      },
+      "filters": {
+        "trade": "Trade",
+        "week": "Week",
+        "milestone": "Milestone",
+        "location": "Location",
+        "criticalOnly": "Critical Only",
+        "all": "All",
+        "clear": "Clear Filters"
+      },
+      "table": {
+        "trade": "Trade",
+        "week": "Week",
+        "zone": "Zone",
+        "requiredHC": "Required",
+        "availableHC": "Available",
+        "gapHC": "Gap",
+        "requiredHrs": "Req. Hours",
+        "availableHrs": "Avail. Hours",
+        "gapHrs": "Gap Hours",
+        "utilization": "Utilization",
+        "risk": "Risk",
+        "criticalPath": "Critical Path",
+        "activities": "Activities",
+        "resources": "Resources"
+      },
+      "skills": {
+        "title": "Skills & Resources",
+        "type": "Type",
+        "skillLevel": "Skill Level",
+        "constraint": "Constraint",
+        "availability": "Availability"
+      },
+      "risk": {
+        "none": "None",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "empty": "No capacity data for this project.",
+      "explanation": {
+        "narrativeTitle": "Labor Capacity Analysis",
+        "overallRisk": "The project shows {severity} labor capacity risk across {tradeCount} trades during {weekCount} weeks.",
+        "mostCriticalTrade": "The most affected trade is {trade}.",
+        "cascadeRiskNotice": "Cascade risk: {trade} gaps in week {week} could impact {milestoneCount} downstream milestones.",
+        "mitigationsLabel": "Priority mitigations",
+        "noGaps": "No labor capacity gaps detected. All trades have adequate coverage."
+      }
+    },
+    "lookahead": {
+      "title": "Labor Lookahead",
+      "description": "Are the next weeks of work executable with available labor?",
+      "horizon3Week": "3-Week",
+      "horizon6Week": "6-Week",
+      "summary": {
+        "totalActivities": "Total Activities",
+        "readyActivities": "Ready",
+        "atRiskActivities": "At Risk",
+        "blockedActivities": "Blocked",
+        "overallReadiness": "Overall Readiness"
+      },
+      "readiness": {
+        "ready": "Ready",
+        "at_risk": "At Risk",
+        "not_ready": "Not Ready",
+        "blocked": "Blocked"
+      },
+      "grid": {
+        "trade": "Trade",
+        "week": "Week",
+        "required": "Req",
+        "available": "Avail",
+        "gap": "Gap",
+        "activities": "Activities",
+        "criticalPath": "CP",
+        "noActivities": "No upcoming activities in this window.",
+        "noTrades": "No trades with demand in this window."
+      },
+      "activity": {
+        "readiness": "Readiness",
+        "blockers": "Blockers",
+        "assignedResources": "Assigned",
+        "noBlockers": "No blockers",
+        "onCriticalPath": "On Critical Path",
+        "offCriticalPath": "Off Critical Path",
+        "progress": "Progress"
+      },
+      "checklist": {
+        "title": "Readiness"
+      },
+      "blockers": {
+        "title": "Blockers",
+        "unmet_dependency": "Unmet dependency",
+        "labor_shortage": "Labor shortage",
+        "vendor_unconfirmed": "Vendor unconfirmed",
+        "over_allocated": "Over-allocated resource",
+        "blocked_status": "Activity is blocked",
+        "checklist_incomplete": "Checklist incomplete"
+      },
+      "narrative": {
+        "allReady": "All activities in the lookahead window are ready to execute.",
+        "someAtRisk": "{atRiskCount} activity(ies) are at risk in the next {horizon} weeks.",
+        "someBlocked": "{blockedCount} activity(ies) are blocked and require attention.",
+        "mostCriticalTrade": "The most affected trade is {trade}.",
+        "criticalPathWarning": "{count} critical path activities have labor gaps.",
+        "vendorUnconfirmed": "{count} vendor(s) have unconfirmed availability."
+      },
+      "idleRisk": {
+        "title": "Workface Readiness Risk",
+        "description": "Crews assigned to work that is not ready — workface readiness risk, not crew availability.",
+        "crewsAtRisk": "Crews at Risk",
+        "totalIdleDays": "Total Days at Risk",
+        "criticalPathIdleDays": "Critical Path Days at Risk",
+        "resource": "Resource",
+        "trade": "Trade",
+        "constraint": "Constraint",
+        "assignedActivities": "Activities",
+        "idleWeeks": "Idle Weeks",
+        "worstRisk": "Worst Risk",
+        "downstreamImpact": "Downstream",
+        "daysAtRisk": "Days at Risk",
+        "recommendedAction": "Recommended Actions",
+        "readiness": "Readiness",
+        "missingPrerequisites": "Missing Prerequisites",
+        "noRisk": "All crews are assigned to ready work — no workface readiness risk detected.",
+        "severity": {
+          "none": "No Risk",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "critical": "Critical"
+        },
+        "actionType": {
+          "reassign": "Reassign",
+          "stagger": "Stagger",
+          "expedite_prerequisite": "Expedite Prerequisite",
+          "confirm_vendor": "Confirm Vendor",
+          "monitor": "Monitor"
+        }
+      },
+      "readinessExplanation": {
+        "title": "AI Insight",
+        "whatIsMissing": "What's Missing",
+        "whyItMatters": "Why It Matters",
+        "crewAffected": "Crew Affected",
+        "downstreamAtRisk": "Downstream Impact",
+        "recommendedAction": "Recommended Action",
+        "showInsight": "Show AI Insight",
+        "hideInsight": "Hide AI Insight"
+      },
+      "nav": {
+        "matrix": "Capacity Matrix",
+        "lookahead": "Lookahead"
+      },
+      "empty": "No upcoming activities in the lookahead window."
+    },
+    "workface": {
+      "title": "Workface Readiness Board",
+      "description": "Are upcoming activities ready to execute? See readiness, blockers, and risk at a glance.",
+      "horizon3Week": "3-Week",
+      "horizon6Week": "6-Week",
+      "summary": {
+        "totalActivities": "Total Activities",
+        "readyActivities": "Ready",
+        "atRiskActivities": "At Risk",
+        "blockedActivities": "Blocked",
+        "overallReadiness": "Overall Readiness"
+      },
+      "readiness": {
+        "ready": "Ready",
+        "at_risk": "At Risk",
+        "not_ready": "Not Ready",
+        "blocked": "Blocked"
+      },
+      "filters": {
+        "trade": "Trade",
+        "week": "Week",
+        "readiness": "Readiness",
+        "all": "All",
+        "criticalPathOnly": "Critical path only",
+        "blockedOnly": "Blocked only",
+        "clear": "Clear"
+      },
+      "table": {
+        "activity": "Activity",
+        "trade": "Trade",
+        "weeks": "Weeks",
+        "readinessPct": "Readiness",
+        "status": "Status",
+        "missingPrerequisites": "Missing",
+        "blockerTypes": "Blockers",
+        "idleRisk": "Idle Risk",
+        "daysAtRisk": "Days at Risk",
+        "downstream": "Downstream",
+        "criticalPath": "CP",
+        "noActivities": "No upcoming activities in the lookahead window."
+      },
+      "detail": {
+        "checklist": "Workface Checklist",
+        "assignedResources": "Assigned Resources",
+        "recommendedAction": "Recommended Action",
+        "downstreamImpact": "Downstream Impact",
+        "blockers": "Blockers",
+        "none": "None",
+        "completed": "Completed",
+        "incomplete": "Incomplete"
+      },
+      "severity": {
+        "none": "No Risk",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "actionType": {
+        "reassign": "Reassign",
+        "stagger": "Stagger",
+        "expedite_prerequisite": "Expedite Prerequisite",
+        "confirm_vendor": "Confirm Vendor",
+        "monitor": "Monitor"
+      },
+      "readinessExplanation": {
+        "title": "AI Insight",
+        "whatIsMissing": "What's Missing",
+        "whyItMatters": "Why It Matters",
+        "crewAffected": "Crew Affected",
+        "downstreamAtRisk": "Downstream Impact",
+        "recommendedAction": "Recommended Action",
+        "showInsight": "Show AI Insight",
+        "hideInsight": "Hide AI Insight"
+      },
+      "nav": {
+        "matrix": "Capacity Matrix",
+        "lookahead": "Lookahead",
+        "workface": "Workface Board"
+      },
+      "empty": "No upcoming activities match the current filters."
+    }
   }
 }

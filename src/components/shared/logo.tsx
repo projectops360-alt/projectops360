@@ -1,12 +1,18 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {/* Brand icon — soft green circle */}
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500">
-        <span className="text-sm font-bold text-white">P</span>
-      </div>
+      {/* Brand logo image */}
+      <Image
+        src="/logo.png"
+        alt="ProjectOps360°"
+        width={32}
+        height={32}
+        className="h-8 w-8 shrink-0 rounded"
+        priority
+      />
       <div className="flex flex-col">
         <span className="text-sm font-semibold leading-tight text-white">
           ProjectOps

@@ -4,15 +4,356 @@
     "appShortName": "POps360"
   },
   "nav": {
-    "dashboard": "Panel",
-    "phase0": "Fase 0",
+    "commandCenter": "Centro de Mando",
     "projects": "Proyectos",
-    "team": "Equipo",
+    "executionMap": "Mapa de Ejecución",
+    "workboard": "Tablero de Trabajo",
+    "projectMemory": "Memoria del Proyecto",
+    "aiOperator": "Operador IA",
+    "drawingIntelligence": "Drawing Intelligence",
     "reports": "Reportes",
-    "language": "Idioma",
+    "team": "Equipo",
     "settings": "Configuración",
     "search": "Buscar…",
     "notifications": "Notificaciones"
+  },
+  "projectTabs": {
+    "commandCenter": "Centro de Mando",
+    "executionMap": "Mapa de Ejecución",
+    "workboard": "Tablero de Trabajo",
+    "projectMemory": "Memoria del Proyecto",
+    "settings": "Configuración",
+    "laborCapacity": "Capacidad Laboral",
+    "drawingIntelligence": "Drawing Intelligence"
+  },
+  "drawingIntelligence": {
+    "title": "Drawing Intelligence",
+    "subtitle": "Motor de IA que lee planos de construcción y los convierte en conocimiento estructurado del proyecto — riesgos, RFIs, submittals, cantidades, impactos de cronograma y costo — con trazabilidad de evidencia completa.",
+    "notStorageNote": "Esto es un motor de inteligencia, no un almacén de documentos. Los archivos viven en Documentos; el entendimiento vive aquí.",
+    "emptyTitle": "Aún no hay planos conectados",
+    "emptyDescription": "Sube o conecta planos de construcción para extraer inteligencia del proyecto, detectar riesgos, generar RFIs, identificar requisitos de submittals y conectar los datos de planos al Living Graph.",
+    "comingSoon": "Esta sección se activará cuando el pipeline de extracción procese tus primeros planos.",
+    "tabs": {
+      "upload": "Subir / Conectar",
+      "library": "Biblioteca de Planos",
+      "extractions": "Resultados de Extracción IA",
+      "risks": "Riesgos Detectados",
+      "rfis": "RFIs Generados",
+      "submittals": "Requisitos de Submittals",
+      "takeoff": "Cómputo de Cantidades",
+      "versions": "Cambios de Versión",
+      "schedule": "Impacto en Cronograma",
+      "cost": "Impacto en Costo",
+      "actions": "Acciones Recomendadas",
+      "evidence": "Visor de Evidencia",
+      "logs": "Registros de Procesamiento"
+    },
+    "library": {
+      "drawingNumber": "Plano #",
+      "drawingTitle": "Título",
+      "discipline": "Disciplina",
+      "revision": "Rev",
+      "source": "Origen",
+      "fileStatus": "Estado",
+      "processingStatus": "Procesamiento",
+      "added": "Agregado",
+      "empty": "Aún no hay planos en la biblioteca."
+    },
+    "processingStatus": {
+      "pending": "Pendiente",
+      "processing": "Procesando",
+      "completed": "Completado",
+      "failed": "Fallido",
+      "needs_review": "Requiere revisión",
+      "cancelled": "Cancelado"
+    },
+    "fileStatus": {
+      "active": "Activo",
+      "superseded": "Reemplazado",
+      "archived": "Archivado"
+    },
+    "upload": {
+      "title": "Sube o conecta planos",
+      "description": "Los conectores llegan con el pipeline de ingesta (Prompt 2). El modelo de datos ya soporta todas las fuentes siguientes — sin dependencia de un proveedor.",
+      "manual": "Subida manual",
+      "manualDescription": "Archivos PDF, DWG, RVT o IFC desde tu computadora.",
+      "autodesk": "Autodesk Construction Cloud",
+      "autodeskDescription": "Conexión vía Autodesk Platform Services (APS).",
+      "procore": "Procore",
+      "procoreDescription": "Sincroniza planos desde proyectos de Procore.",
+      "googleDrive": "Google Drive",
+      "googleDriveDescription": "Importa conjuntos de planos desde carpetas compartidas.",
+      "comingSoonBadge": "Próximamente"
+    },
+    "global": {
+      "selectProject": "Selecciona un proyecto para abrir su espacio de Drawing Intelligence.",
+      "drawingsCount": "{count} planos",
+      "noDrawings": "Sin planos",
+      "open": "Abrir",
+      "noProjects": "Crea un proyecto primero para empezar a usar Drawing Intelligence."
+    },
+    "aiOperatorCard": {
+      "title": "Drawing Intelligence",
+      "description": "Lee planos de construcción, extrae conocimiento estructurado, detecta riesgos y genera RFIs con evidencia.",
+      "open": "Abrir Drawing Intelligence"
+    },
+    "uploadZone": {
+      "dropHere": "Arrastra y suelta planos aquí",
+      "browse": "o haz clic para buscar archivos",
+      "supportedFormats": "Soportados",
+      "maxSize": "Máx",
+      "stageValidating": "Validando…",
+      "stageUploading": "Subiendo a almacenamiento seguro…",
+      "stageRegistering": "Registrando para procesamiento de inteligencia…",
+      "stageQueued": "En cola para procesamiento de inteligencia",
+      "processingMode": "Profundidad de procesamiento",
+      "modes": {
+        "quick_scan": "Escaneo rápido",
+        "standard_analysis": "Análisis estándar",
+        "deep_analysis": "Análisis profundo"
+      },
+      "modeDescriptions": {
+        "quick_scan": "Metadatos, title block, revisión, disciplina y notas. Sin costo de IA.",
+        "standard_analysis": "Escaneo rápido más riesgos, RFIs, submittals y candidatos de cronograma/costo deterministas. Sin costo de IA.",
+        "deep_analysis": "Análisis estándar más mejora con IA y deltas de versión. Consume tokens de IA — el paso costoso."
+      },
+      "costNote": "Los duplicados y planos sin texto extraíble nunca disparan procesamiento de IA."
+    },
+    "versionsTab": {
+      "drawing": "Plano",
+      "fromRevision": "De rev",
+      "toRevision": "A rev",
+      "summary": "Cambios detectados",
+      "date": "Fecha",
+      "empty": "Aún no hay cambios de versión — sube una nueva revisión de un número de plano existente para rastrear deltas."
+    },
+    "connector": {
+      "notConfigured": "No configurado",
+      "notConfiguredHint": "Configura APS_CLIENT_ID y APS_CLIENT_SECRET para conectar Autodesk Construction Cloud y sincronizar planos y modelos en ProjectOps360° para interpretación con IA, análisis de impacto y razonamiento del Living Graph.",
+      "configured": "Configurado"
+    },
+    "sourceBadges": {
+      "manual_upload": "Subida manual",
+      "autodesk_aps": "Autodesk",
+      "procore": "Procore",
+      "google_drive": "Google Drive",
+      "local": "Local"
+    },
+    "progress": {
+      "title": "Actividad del pipeline de inteligencia",
+      "done": "Procesamiento completo — los resultados están en las pestañas de arriba.",
+      "failed": "Procesamiento fallido — abre el plano para reintentar.",
+      "needsReview": "Procesado con elementos que requieren revisión — abre el plano para ver detalles."
+    },
+    "errors": {
+      "unsupported_file_type": "Tipo de archivo no soportado",
+      "file_too_large": "Archivo demasiado grande",
+      "empty_file": "Archivo vacío",
+      "duplicate_file": "Este plano ya existe en el proyecto",
+      "upload_failed": "Error al subir",
+      "missing_project_context": "Falta el contexto del proyecto",
+      "processing_job_failed": "Falló el trabajo de procesamiento",
+      "storage_error": "Error de almacenamiento",
+      "permission_error": "Permiso denegado",
+      "not_authenticated": "No autenticado",
+      "job_not_retryable": "Solo se pueden reintentar trabajos fallidos",
+      "validation_error": "Solicitud inválida"
+    },
+    "actionsMenu": {
+      "view": "Ver",
+      "retry": "Reintentar",
+      "archive": "Archivar",
+      "confirmArchive": "¿Archivar este plano? Se ocultará de la biblioteca (el archivo almacenado se conserva)."
+    },
+    "pipelineHints": {
+      "pending": "En cola para procesamiento de inteligencia",
+      "processing": "Analizando estructura del plano",
+      "completed": "Procesado — listo para interpretación IA",
+      "failed": "Procesamiento fallido — reintenta desde el pipeline",
+      "needs_review": "Requiere revisión antes de continuar",
+      "cancelled": "Procesamiento cancelado"
+    },
+    "jobTypes": {
+      "ingest": "Ingesta",
+      "page_split": "Extracción de páginas",
+      "ocr_extraction": "OCR / extracción de texto",
+      "ai_interpretation": "Interpretación IA"
+    },
+    "extractionsTable": {
+      "file": "Plano",
+      "type": "Tipo de extracción",
+      "confidence": "Confianza"
+    },
+    "takeoffTab": {
+      "category": "Categoría",
+      "item": "Ítem",
+      "specification": "Especificación",
+      "quantity": "Cant.",
+      "unit": "Unidad",
+      "location": "Ubicación",
+      "sheetRef": "Hoja",
+      "status": "Estado",
+      "drawing": "Plano",
+      "confidence": "Confianza",
+      "empty": "Aún no hay cómputo de materiales — las filas se generan cuando un plano termina la interpretación con IA.",
+      "statusLabels": {
+        "new": "Nuevo",
+        "existing": "Existente",
+        "demo": "Demolición",
+        "relocated": "Reubicado"
+      }
+    },
+    "insights": {
+      "empty": "Aún no hay hallazgos — se generan cuando un plano termina su extracción.",
+      "confidence": "Confianza",
+      "evidence": "Evidencia",
+      "recommendedAction": "Acción recomendada",
+      "linkedTask": "Tarea vinculada",
+      "accept": "Aceptar",
+      "dismiss": "Descartar",
+      "markReviewed": "Marcar revisado",
+      "linkToTask": "Vincular a tarea",
+      "cancel": "Cancelar",
+      "needsReviewNote": "Este hallazgo requiere revisión humana (confianza baja o impacto alto).",
+      "typeLabels": {
+        "risk": "Riesgo",
+        "rfi_candidate": "Candidato a RFI",
+        "submittal_requirement": "Requisito de submittal",
+        "inspection_requirement": "Requisito de inspección",
+        "schedule_impact": "Impacto en cronograma",
+        "cost_impact": "Impacto en costo",
+        "missing_information": "Información faltante",
+        "contradiction": "Contradicción",
+        "scope_gap": "Brecha de alcance",
+        "coordination_issue": "Problema de coordinación",
+        "version_change": "Cambio de versión",
+        "decision_required": "Decisión requerida"
+      },
+      "severityLabels": {
+        "low": "Baja",
+        "medium": "Media",
+        "high": "Alta",
+        "critical": "Crítica"
+      },
+      "statusLabels": {
+        "open": "Sugerido",
+        "in_review": "Requiere revisión",
+        "accepted": "Aceptado",
+        "dismissed": "Descartado",
+        "converted": "Convertido",
+        "linked": "Vinculado",
+        "actioned": "Accionado",
+        "resolved": "Resuelto"
+      },
+      "actionLabels": {
+        "create_draft_rfi": "Crear borrador de RFI",
+        "create_submittal_requirement": "Crear requisito de submittal",
+        "create_inspection_requirement": "Crear requisito de inspección",
+        "add_schedule_constraint": "Agregar restricción de cronograma",
+        "add_cost_impact_candidate": "Agregar candidato de impacto en costo",
+        "request_human_review": "Solicitar revisión humana",
+        "notify_project_owner": "Notificar al dueño del proyecto",
+        "compare_against_previous_revision": "Comparar contra la revisión anterior"
+      }
+    },
+    "detail": {
+      "title": "Detalle del plano",
+      "metadata": "Metadatos",
+      "pipeline": "Pipeline de inteligencia",
+      "pages": "Páginas",
+      "extractionsPlaceholder": "Aún no hay title block extraído — ejecuta la extracción para analizar este plano.",
+      "evidencePlaceholder": "Visor de evidencia — aquí aparecerán las ubicaciones exactas del plano que respaldan cada hallazgo.",
+      "retry": "Reintentar",
+      "noJobs": "Aún no hay trabajos de procesamiento.",
+      "titleBlock": "Title block",
+      "revisions": "Revisiones",
+      "notes": "Notas",
+      "evidence": "Evidencia",
+      "rawJson": "JSON extraído (crudo)",
+      "confidence": "Confianza",
+      "needsReviewBanner": "La extracción IA requiere revisión porque la confianza es baja.",
+      "runExtraction": "Ejecutar extracción",
+      "running": "Analizando estructura del plano…",
+      "fields": {
+        "fileName": "Nombre de archivo",
+        "fileType": "Tipo",
+        "fileSize": "Tamaño",
+        "source": "Origen",
+        "drawingNumber": "Plano #",
+        "revision": "Revisión",
+        "discipline": "Disciplina",
+        "uploaded": "Subido"
+      }
+    }
+  },
+  "workboard": {
+    "title": "Tablero de Trabajo",
+    "description": "Arrastra y suelta tareas entre columnas para actualizar su estado.",
+    "empty": "Sin tareas",
+    "dragHint": "Arrastra una tarjeta a otra columna para cambiar su estado.",
+    "columns": {
+      "not_started": "Sin iniciar",
+      "prompt_ready": "Prompt listo",
+      "sent_to_ai": "Enviado a IA",
+      "in_progress": "En progreso",
+      "implemented": "Implementado",
+      "tested": "Probado",
+      "done": "Hecho",
+      "blocked": "Bloqueado",
+      "deferred": "Aplazado"
+    },
+    "priorityLabels": {
+      "p1": "Crítico",
+      "p2": "Alto",
+      "p3": "Medio"
+    },
+    "filterBySprint": "Filtrar por sprint",
+    "allSprints": "Todos los sprints",
+    "noSprint": "Sin sprint",
+    "dependsOn": "Depende de",
+    "errors": {
+      "not_authenticated": "No autenticado",
+      "unexpected": "Ocurrió un error inesperado",
+      "dependency_not_met": "\"{task}\" no puede comenzar todavía — depende de \"{predecessor}\", que aún no está terminada"
+    },
+    "groupLabels": {
+      "backlog": "Pendientes",
+      "active": "Activas",
+      "complete": "Completadas"
+    },
+    "columnVisibility": "Visibilidad de columnas",
+    "showAll": "Mostrar todo",
+    "collapseColumn": "Colapsar columna",
+    "expandColumn": "Expandir columna",
+    "resetWidth": "Restablecer ancho",
+    "statusChange": {
+      "title": "Mover Tarea",
+      "movingTo": "Moviendo a",
+      "noteLabel": "Nota (opcional)",
+      "notePlaceholder": {
+        "done": "¿Qué se hizo para completar esta tarea?",
+        "blocked": "¿Por qué está bloqueada esta tarea?",
+        "in_progress": "¿Qué estás trabajando?",
+        "implemented": "¿Qué se implementó?",
+        "tested": "¿Qué se probó?",
+        "deferred": "¿Por qué se aplazó esta tarea?",
+        "default": "Nota sobre este cambio"
+      },
+      "moveWithout": "Mover sin nota",
+      "moveWith": "Mover con nota",
+      "cancel": "Cancelar",
+      "statusLabels": {
+        "not_started": "Sin iniciar",
+        "prompt_ready": "Prompt listo",
+        "sent_to_ai": "Enviado a IA",
+        "in_progress": "En progreso",
+        "implemented": "Implementado",
+        "tested": "Probado",
+        "done": "Hecho",
+        "blocked": "Bloqueado",
+        "deferred": "Aplazado"
+      }
+    }
   },
   "dashboard": {
     "title": "Panel",
@@ -26,9 +367,9 @@
       "subtitle": "Fundador solitario",
       "trend": "Recién comenzando"
     },
-    "completedTasks": {
-      "title": "Tareas Completadas",
-      "subtitle": "0% de completitud"
+    "decisions": {
+      "title": "Decisiones",
+      "subtitle": "Decisiones registradas"
     },
     "pendingItems": {
       "title": "Elementos Pendientes",
@@ -38,8 +379,18 @@
   "phase0": {
     "title": "Fase 0 — Configuración del Entorno",
     "description": "El entorno de desarrollo local está listo. Próximos pasos: construir flujos de autenticación, conectar datos al dashboard y agregar la capa de servicio de OpenAI.",
-    "completed": ["Next.js", "TypeScript", "Tailwind", "shadcn/ui", "Lucide", "Supabase", "next-intl"],
-    "pending": ["OpenAI"]
+    "completed": [
+      "Next.js",
+      "TypeScript",
+      "Tailwind",
+      "shadcn/ui",
+      "Lucide",
+      "Supabase",
+      "next-intl"
+    ],
+    "pending": [
+      "OpenAI"
+    ]
   },
   "phase0Control": {
     "pageTitle": "Control Fase 0",
@@ -166,9 +517,1480 @@
     "notSet": "(no configurado)",
     "serverOnly": "(solo servidor — no expuesto)"
   },
+  "auth": {
+    "login": {
+      "title": "Iniciar sesión",
+      "subtitle": "Bienvenido de vuelta a ProjectOps360°",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "submit": "Iniciar sesión",
+      "noAccount": "¿No tienes una cuenta?",
+      "signupLink": "Crea una",
+      "errors": {
+        "invalidCredentials": "Correo o contraseña incorrectos.",
+        "emailNotConfirmed": "Revisa tu correo y confirma tu cuenta antes de iniciar sesión.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    },
+    "signup": {
+      "title": "Crear cuenta",
+      "subtitle": "Comienza con ProjectOps360°",
+      "displayName": "Nombre para mostrar",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar contraseña",
+      "submit": "Crear cuenta",
+      "hasAccount": "¿Ya tienes una cuenta?",
+      "loginLink": "Iniciar sesión",
+      "errors": {
+        "emailTaken": "Ya existe una cuenta con este correo.",
+        "passwordMismatch": "Las contraseñas no coinciden.",
+        "weakPassword": "La contraseña debe tener al menos 6 caracteres.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      },
+      "success": {
+        "title": "Revisa tu correo",
+        "message": "Enviamos un enlace de confirmación a {email}. Haz clic en el enlace para verificar tu cuenta.",
+        "backToLogin": "Volver a iniciar sesión"
+      }
+    },
+    "logout": {
+      "label": "Cerrar sesión"
+    },
+    "userMenu": {
+      "profile": "Perfil",
+      "settings": "Configuración",
+      "signOut": "Cerrar sesión"
+    },
+    "callback": {
+      "title": "Confirmando tu correo…",
+      "success": "¡Correo confirmado! Redirigiendo al panel…",
+      "error": "La confirmación falló. El enlace puede haber expirado.",
+      "tryAgain": "Intenta iniciar sesión de nuevo"
+    }
+  },
   "languageSwitcher": {
     "en": "English",
     "es": "Español",
     "label": "Cambiar idioma"
+  },
+  "projects": {
+    "title": "Proyectos",
+    "description": "Gestiona tus proyectos",
+    "create": "Nuevo Proyecto",
+    "empty": "Sin proyectos aún",
+    "emptyDescription": "Crea tu primer proyecto para comenzar",
+    "detail": {
+      "back": "Volver a proyectos",
+      "overview": "Vista General",
+      "edit": "Editar",
+      "archive": "Archivar",
+      "archiveConfirm": "¿Estás seguro de que deseas archivar este proyecto? Se ocultará de todas las vistas.",
+      "stakeholders": "Interesados",
+      "viewStakeholders": "Ver y gestionar interesados",
+      "decisions": "Decisiones",
+      "viewDecisions": "Ver y gestionar decisiones",
+      "meetings": "Reuniones",
+      "viewMeetings": "Ver y gestionar reuniones",
+      "communications": "Comunicaciones",
+      "viewCommunications": "Ver y gestionar comunicaciones",
+      "documents": "Documentos",
+      "viewDocuments": "Ver y gestionar documentos",
+      "roadmap": "Hoja de ruta",
+      "viewRoadmap": "Ver y gestionar los hitos del proyecto"
+    },
+    "aiCommSummary": {
+      "button": "Resumir Comunicaciones",
+      "buttonTooltip": "Usar IA para resumir el historial de comunicaciones y decisiones del proyecto",
+      "title": "Resumen del Historial de Comunicaciones",
+      "empty": "No hay comunicaciones ni decisiones para resumir.",
+      "summary": "Resumen general",
+      "keyPoints": "Puntos clave",
+      "sourceRecords": "Registros de origen",
+      "openItems": "Items pendientes",
+      "none": "Ninguno",
+      "recordCount": "Basado en [commCount] comunicación(es) y [decCount] decisión(es)",
+      "generating": "Generando resumen…",
+      "communicationLabel": "Comunicación",
+      "decisionLabel": "Decisión",
+      "errors": {
+        "noRecords": "No se encontraron comunicaciones ni decisiones para este proyecto.",
+        "aiFailed": "El resumen de IA falló. Por favor intenta de nuevo.",
+        "noApiKey": "La IA no está configurada. Contacta al administrador.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    },
+    "search": {
+      "title": "Buscar",
+      "placeholder": "Buscar por palabra clave…",
+      "button": "Buscar",
+      "filters": {
+        "all": "Todos",
+        "communication": "Comunicaciones",
+        "meeting": "Reuniones",
+        "decision": "Decisiones",
+        "document": "Documentos",
+        "task": "Tareas"
+      },
+      "noResults": "No se encontraron resultados",
+      "noResultsDescription": "Intenta con otra palabra clave o cambia el filtro.",
+      "typeToSearch": "Escribe una palabra clave para buscar en comunicaciones, reuniones, decisiones, documentos y tareas.",
+      "resultCount": "[count] resultado(s) encontrado(s)",
+      "communication": "Comunicación",
+      "meeting": "Reunión",
+      "decision": "Decisión",
+      "document": "Documento",
+      "task": "Tarea",
+      "semanticMatch": "Coincidencia IA",
+      "viewDetail": "Ver detalle",
+      "viewSearch": "Buscar en los registros del proyecto"
+    },
+    "dashboard": {
+      "statCards": {
+        "communications": "Comunicaciones",
+        "meetings": "Reuniones",
+        "decisions": "Decisiones",
+        "documents": "Documentos",
+        "actionItems": "Acciones abiertas",
+        "links": "Vínculos"
+      },
+      "recentCommunications": "Comunicaciones recientes",
+      "recentMeetings": "Reuniones recientes",
+      "recentDecisions": "Decisiones recientes",
+      "recentDocuments": "Evidencia y Documentos",
+      "unresolvedActionItems": "Acciones sin resolver",
+      "missingLinks": "Vínculos de trazabilidad faltantes",
+      "missingLinksDescription": "Estos registros no tienen vínculos de trazabilidad. Considera vincularlos a decisiones o evidencia.",
+      "missingLinksCount": "[count] [type] sin vínculos",
+      "noData": "Sin registros aún",
+      "viewAll": "Ver todo",
+      "traceabilityHealth": "Salud de trazabilidad",
+      "linkedEntities": "[linked] de [total] registros vinculados",
+      "none": "Ninguno",
+      "requiresFollowUp": "Requiere seguimiento",
+      "overdue": "Vencido",
+      "noDueDate": "Sin fecha límite",
+      "roadmapSnapshot": {
+        "title": "Hoja de ruta",
+        "viewFull": "Ver hoja de ruta completa",
+        "overallProgress": "Progreso general",
+        "currentMilestone": "Hito actual",
+        "nextMilestone": "Siguiente",
+        "blockedTasks": "{count} bloqueados",
+        "noBlockedTasks": "Sin bloqueos",
+        "upcomingTasks": "Próximas tareas",
+        "noUpcomingTasks": "¡Todas las tareas completadas!",
+        "tasksDone": "{done}/{total} tareas completadas",
+        "noMilestones": "Sin hitos aún",
+        "noMilestonesDescription": "Cree su primer hito para comenzar a rastrear el progreso."
+      }
+    },
+    "audit": {
+      "title": "Registro de Auditoría",
+      "description": "Historial de cambios en registros críticos del proyecto",
+      "viewAudit": "Ver registro de auditoría",
+      "action_create": "Creado",
+      "action_update": "Actualizado",
+      "action_delete": "Eliminado",
+      "entity_decisions": "Decisión",
+      "entity_documents": "Documento",
+      "entity_traceability_links": "Vínculo",
+      "entity_communication_items": "Comunicación",
+      "entity_action_items": "Acción",
+      "by": "por",
+      "noRecords": "Sin registros de auditoría aún",
+      "unknownActor": "Usuario desconocido"
+    },
+    "form": {
+      "title": "Crear Proyecto",
+      "editTitle": "Editar Proyecto",
+      "name": "Nombre del proyecto",
+      "namePlaceholder": "Ingresa el nombre del proyecto",
+      "description": "Descripción",
+      "descriptionPlaceholder": "Describe tu proyecto…",
+      "status": "Estado",
+      "startDate": "Fecha de inicio",
+      "targetEndDate": "Fecha objetivo",
+      "language": "Idioma predeterminado",
+      "submit": "Crear proyecto",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "nameRequired": "El nombre del proyecto es obligatorio",
+        "nameTooLong": "El nombre debe tener 200 caracteres o menos",
+        "descriptionTooLong": "La descripción debe tener 2000 caracteres o menos",
+        "invalidStatus": "Estado inválido",
+        "invalidLanguage": "Idioma inválido",
+        "slugExists": "Ya existe un proyecto con este nombre",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      },
+      "projectType": "Tipo de proyecto",
+      "useTemplate": "Crear desde plantilla (fases, tareas, dependencias, recursos, presupuesto y riesgos iniciales)",
+      "types": {
+        "software_development": "Desarrollo de Software",
+        "data_center_construction": "Construcción de Centro de Datos",
+        "residential_construction": "Construcción Residencial",
+        "commercial_construction": "Construcción Comercial",
+        "infrastructure": "Infraestructura",
+        "industrial": "Industrial",
+        "general": "General"
+      }
+    },
+    "status": {
+      "planning": "Planificación",
+      "active": "Activo",
+      "on_hold": "En Pausa",
+      "completed": "Completado",
+      "cancelled": "Cancelado"
+    }
+  },
+  "stakeholders": {
+    "title": "Interesados",
+    "description": "Gestiona los interesados del proyecto",
+    "create": "Agregar Interesado",
+    "empty": "Sin interesados aún",
+    "emptyDescription": "Agrega el primer interesado a este proyecto",
+    "edit": "Editar",
+    "archive": "Archivar",
+    "archiveConfirm": "¿Estás seguro de que deseas archivar este interesado?",
+    "form": {
+      "title": "Agregar Interesado",
+      "editTitle": "Editar Interesado",
+      "name": "Nombre",
+      "namePlaceholder": "Nombre completo u organización",
+      "role": "Rol",
+      "rolePlaceholder": "Ej. Patrocinador del Proyecto, Líder de Equipo",
+      "email": "Correo electrónico",
+      "emailPlaceholder": "correo@ejemplo.com",
+      "influence": "Influencia",
+      "interest": "Interés",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas adicionales…",
+      "language": "Idioma preferido",
+      "submit": "Agregar interesado",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "nameRequired": "El nombre es obligatorio",
+        "nameTooLong": "El nombre debe tener 200 caracteres o menos",
+        "roleTooLong": "El rol debe tener 200 caracteres o menos",
+        "invalidEmail": "Ingresa un correo electrónico válido",
+        "notesTooLong": "Las notas deben tener 2000 caracteres o menos",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    },
+    "influence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja"
+    },
+    "interest": {
+      "high": "Alto",
+      "medium": "Medio",
+      "low": "Bajo"
+    }
+  },
+  "communications": {
+    "title": "Registro de Comunicaciones",
+    "description": "Seguimiento de comunicaciones del proyecto",
+    "create": "Registrar Comunicación",
+    "empty": "Sin comunicaciones aún",
+    "emptyDescription": "Registra tu primera comunicación para este proyecto",
+    "edit": "Editar",
+    "archive": "Archivar",
+    "archiveConfirm": "¿Estás seguro de que deseas archivar esta comunicación?",
+    "filters": {
+      "sourceType": "Tipo de origen",
+      "status": "Estado",
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "followUp": "Requiere seguimiento",
+      "all": "Todos",
+      "clear": "Limpiar filtros"
+    },
+    "sourceType": {
+      "email": "Correo",
+      "meeting": "Reunión",
+      "phone": "Teléfono",
+      "teams": "Teams",
+      "slack": "Slack",
+      "in_person": "En Persona",
+      "document": "Documento",
+      "manual_note": "Nota Manual",
+      "other": "Otro"
+    },
+    "status": {
+      "draft": "Borrador",
+      "logged": "Registrado"
+    },
+    "followUp": {
+      "yes": "Requiere seguimiento",
+      "no": "Sin seguimiento"
+    },
+    "form": {
+      "title": "Registrar Comunicación",
+      "editTitle": "Editar Comunicación",
+      "titleField": "Título",
+      "titlePlaceholder": "Asunto breve de la comunicación",
+      "summary": "Resumen",
+      "summaryPlaceholder": "Resumen breve de lo comunicado…",
+      "content": "Notas",
+      "contentPlaceholder": "Notas completas o detalles…",
+      "sourceType": "Tipo de origen",
+      "date": "Fecha",
+      "sender": "Remitente",
+      "senderPlaceholder": "Quién envió esta comunicación",
+      "recipients": "Destinatarios",
+      "recipientsPlaceholder": "Quién recibió esta comunicación",
+      "status": "Estado",
+      "requiresFollowUp": "Requiere seguimiento",
+      "relatedStakeholders": "Interesados relacionados",
+      "language": "Idioma",
+      "submit": "Registrar comunicación",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "titleRequired": "El título es obligatorio",
+        "titleTooLong": "El título debe tener 200 caracteres o menos",
+        "summaryTooLong": "El resumen debe tener 2000 caracteres o menos",
+        "contentTooLong": "El contenido debe tener 5000 caracteres o menos",
+        "senderTooLong": "El remitente debe tener 200 caracteres o menos",
+        "recipientsTooLong": "Los destinatarios deben tener 500 caracteres o menos",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    }
+  },
+  "meetings": {
+    "title": "Reuniones",
+    "description": "Seguimiento de reuniones del proyecto",
+    "create": "Registrar Reunión",
+    "empty": "Sin reuniones aún",
+    "emptyDescription": "Registra tu primera reunión para este proyecto",
+    "edit": "Editar",
+    "archive": "Archivar",
+    "archiveConfirm": "¿Estás seguro de que deseas archivar esta reunión?",
+    "detail": {
+      "back": "Volver a reuniones",
+      "date": "Fecha",
+      "duration": "Duración",
+      "durationValue": "[minutes] min",
+      "location": "Ubicación",
+      "attendees": "Asistentes",
+      "agenda": "Agenda",
+      "summary": "Resumen",
+      "notes": "Notas de la Reunión",
+      "noNotes": "Sin notas registradas",
+      "linkedStakeholders": "Interesados Vinculados",
+      "noStakeholders": "Sin interesados vinculados",
+      "linkedRecords": "Registros Vinculados",
+      "extractDecisions": "Extraer Decisiones",
+      "extractDecisionsTooltip": "Usar IA para encontrar decisiones en las notas de la reunión",
+      "extractActionItems": "Extraer Items de Acción",
+      "extractActionItemsTooltip": "Usar IA para encontrar items de acción en las notas de la reunión"
+    },
+    "aiExtraction": {
+      "title": "Decisiones Extraídas por IA",
+      "description": "La IA encontró [count] posible(s) decisión(es) en las notas de la reunión. Revisa cada una y aprueba o rechaza.",
+      "empty": "No se encontraron decisiones en las notas de la reunión.",
+      "confidence": "Confianza",
+      "sourceExcerpt": "Extracto de origen",
+      "impactArea": "Área de impacto",
+      "decisionDate": "Fecha de decisión",
+      "decisionMaker": "Decisor",
+      "approve": "Aprobar",
+      "approved": "Aprobada",
+      "reject": "Rechazar",
+      "rejected": "Rechazada",
+      "edit": "Editar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "extracting": "Analizando notas de la reunión…",
+      "extractedOn": "Extraído el",
+      "aiRunId": "Ejecución IA",
+      "allReviewed": "Todas las sugerencias revisadas",
+      "errors": {
+        "noNotes": "La reunión no tiene notas para analizar.",
+        "noContent": "La reunión no tiene contenido (notas, resumen o agenda) para analizar.",
+        "aiFailed": "El análisis de IA falló. Por favor intenta de nuevo.",
+        "noApiKey": "La IA no está configurada. Contacta al administrador.",
+        "approvalFailed": "Error al guardar la decisión. Por favor intenta de nuevo.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    },
+    "aiActionExtraction": {
+      "title": "Items de Acción Extraídos por IA",
+      "description": "La IA encontró [count] posible(s) item(s) de acción en las notas de la reunión. Revisa cada uno y aprueba o rechaza.",
+      "empty": "No se encontraron items de acción en las notas de la reunión.",
+      "confidence": "Confianza",
+      "sourceExcerpt": "Extracto de origen",
+      "priority": "Prioridad",
+      "dueDate": "Fecha límite",
+      "ownerName": "Responsable",
+      "approve": "Aprobar",
+      "approved": "Aprobado",
+      "reject": "Rechazar",
+      "rejected": "Rechazado",
+      "edit": "Editar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "extracting": "Analizando notas de la reunión…",
+      "extractedOn": "Extraído el",
+      "aiRunId": "Ejecución IA",
+      "allReviewed": "Todas las sugerencias revisadas",
+      "priorityLabels": {
+        "low": "Baja",
+        "medium": "Media",
+        "high": "Alta",
+        "critical": "Crítica"
+      },
+      "errors": {
+        "noContent": "La reunión no tiene contenido (notas, resumen o agenda) para analizar.",
+        "aiFailed": "El análisis de IA falló. Por favor intenta de nuevo.",
+        "noApiKey": "La IA no está configurada. Contacta al administrador.",
+        "approvalFailed": "Error al guardar el item de acción. Por favor intenta de nuevo.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    },
+    "filters": {
+      "status": "Estado",
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "all": "Todos",
+      "clear": "Limpiar filtros"
+    },
+    "status": {
+      "scheduled": "Programada",
+      "in_progress": "En Progreso",
+      "completed": "Completada",
+      "cancelled": "Cancelada"
+    },
+    "form": {
+      "title": "Registrar Reunión",
+      "editTitle": "Editar Reunión",
+      "titleField": "Título",
+      "titlePlaceholder": "Asunto o título de la reunión",
+      "meetingDate": "Fecha",
+      "duration": "Duración (min)",
+      "durationPlaceholder": "ej. 60",
+      "location": "Ubicación",
+      "locationPlaceholder": "Sala, enlace o dirección",
+      "attendees": "Asistentes",
+      "attendeesPlaceholder": "Nombres separados por comas",
+      "status": "Estado",
+      "agenda": "Agenda",
+      "agendaPlaceholder": "Puntos de la agenda…",
+      "summary": "Resumen",
+      "summaryPlaceholder": "Resumen breve de la reunión…",
+      "notes": "Notas",
+      "notesPlaceholder": "Notas completas de la reunión…",
+      "linkedStakeholders": "Interesados vinculados",
+      "language": "Idioma",
+      "submit": "Registrar reunión",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "titleRequired": "El título es obligatorio",
+        "titleTooLong": "El título debe tener 200 caracteres o menos",
+        "agendaTooLong": "La agenda debe tener 2000 caracteres o menos",
+        "summaryTooLong": "El resumen debe tener 2000 caracteres o menos",
+        "notesTooLong": "Las notas deben tener 5000 caracteres o menos",
+        "attendeesTooLong": "Los asistentes deben tener 500 caracteres o menos",
+        "locationTooLong": "La ubicación debe tener 200 caracteres o menos",
+        "durationInvalid": "La duración debe ser un número positivo",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    }
+  },
+  "decisions": {
+    "title": "Registro de Decisiones",
+    "description": "Seguimiento de decisiones del proyecto",
+    "create": "Registrar Decisión",
+    "empty": "Sin decisiones aún",
+    "emptyDescription": "Registra tu primera decisión para este proyecto",
+    "edit": "Editar",
+    "archive": "Archivar",
+    "archiveConfirm": "¿Estás seguro de que deseas archivar esta decisión?",
+    "detail": {
+      "back": "Volver a decisiones",
+      "date": "Fecha de decisión",
+      "decisionMaker": "Decidido por",
+      "source": "Origen",
+      "noSource": "Sin origen vinculado",
+      "evidence": "Evidencia",
+      "description": "Descripción",
+      "noDescription": "Sin descripción proporcionada",
+      "rationale": "Fundamentación",
+      "noRationale": "Sin fundamentación registrada",
+      "linkedStakeholders": "Interesados Vinculados",
+      "noStakeholders": "Sin interesados vinculados",
+      "linkedRecords": "Registros Vinculados"
+    },
+    "filters": {
+      "status": "Estado",
+      "impactArea": "Área de impacto",
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "all": "Todos",
+      "clear": "Limpiar filtros"
+    },
+    "status": {
+      "proposed": "Propuesta",
+      "accepted": "Aceptada",
+      "rejected": "Rechazada",
+      "deferred": "Pospuesta",
+      "revoked": "Revocada"
+    },
+    "impactArea": {
+      "scope": "Alcance",
+      "schedule": "Cronograma",
+      "budget": "Presupuesto",
+      "risk": "Riesgo",
+      "quality": "Calidad",
+      "communication": "Comunicación",
+      "document": "Documento",
+      "other": "Otro"
+    },
+    "sourceType": {
+      "meeting": "Reunión",
+      "communication": "Comunicación",
+      "document": "Documento",
+      "manual": "Manual",
+      "other": "Otro"
+    },
+    "form": {
+      "title": "Registrar Decisión",
+      "editTitle": "Editar Decisión",
+      "titleField": "Título",
+      "titlePlaceholder": "¿Qué se decidió?",
+      "description": "Descripción",
+      "descriptionPlaceholder": "Describe la decisión en detalle…",
+      "rationale": "Fundamentación",
+      "rationalePlaceholder": "¿Por qué se tomó esta decisión…",
+      "decisionDate": "Fecha de decisión",
+      "decisionMaker": "Decidido por",
+      "decisionMakerPlaceholder": "Quién tomó esta decisión",
+      "sourceType": "Tipo de origen",
+      "impactArea": "Área de impacto",
+      "evidenceUrl": "URL de evidencia",
+      "evidenceUrlPlaceholder": "https://ejemplo.com/evidencia",
+      "status": "Estado",
+      "linkedStakeholders": "Interesados vinculados",
+      "language": "Idioma",
+      "submit": "Registrar decisión",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "titleRequired": "El título es obligatorio",
+        "titleTooLong": "El título debe tener 200 caracteres o menos",
+        "descriptionTooLong": "La descripción debe tener 2000 caracteres o menos",
+        "rationaleTooLong": "La fundamentación debe tener 5000 caracteres o menos",
+        "decisionMakerTooLong": "El decisor debe tener 200 caracteres o menos",
+        "evidenceUrlTooLong": "La URL de evidencia debe tener 500 caracteres o menos",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    }
+  },
+  "documents": {
+    "title": "Repositorio de Documentos",
+    "description": "Gestionar documentos y evidencias del proyecto",
+    "create": "Agregar Documento",
+    "empty": "Sin documentos aún",
+    "emptyDescription": "Agrega tu primer documento o evidencia a este proyecto",
+    "edit": "Editar",
+    "archive": "Archivar",
+    "archiveConfirm": "¿Estás seguro de que deseas archivar este documento?",
+    "detail": {
+      "back": "Volver a documentos",
+      "owner": "Propietario",
+      "noOwner": "Sin propietario asignado",
+      "storageType": "Almacenamiento",
+      "documentType": "Tipo",
+      "file": "Archivo",
+      "externalLink": "Enlace externo",
+      "description": "Notas",
+      "noDescription": "Sin notas proporcionadas",
+      "version": "Versión",
+      "openFile": "Abrir archivo",
+      "openLink": "Abrir enlace"
+    },
+    "filters": {
+      "status": "Estado",
+      "documentType": "Tipo de documento",
+      "storageType": "Tipo de almacenamiento",
+      "all": "Todos",
+      "clear": "Limpiar filtros"
+    },
+    "status": {
+      "draft": "Borrador",
+      "review": "Revisión",
+      "approved": "Aprobado",
+      "archived": "Archivado"
+    },
+    "documentType": {
+      "evidence": "Evidencia",
+      "contract": "Contrato",
+      "specification": "Especificación",
+      "report": "Reporte",
+      "presentation": "Presentación",
+      "other": "Otro"
+    },
+    "storageType": {
+      "upload": "Archivo subido",
+      "external_url": "URL externa"
+    },
+    "form": {
+      "title": "Agregar Documento",
+      "editTitle": "Editar Documento",
+      "titleField": "Título",
+      "titlePlaceholder": "Título del documento",
+      "description": "Notas",
+      "descriptionPlaceholder": "Notas adicionales o contexto…",
+      "documentType": "Tipo de documento",
+      "storageType": "Tipo de almacenamiento",
+      "owner": "Propietario",
+      "ownerPlaceholder": "Quién es propietario de este documento",
+      "externalUrl": "URL externa",
+      "externalUrlPlaceholder": "https://ejemplo.com/documento.pdf",
+      "fileUpload": "Subir archivo",
+      "fileChoose": "Elegir archivo",
+      "fileSelected": "Archivo seleccionado",
+      "status": "Estado",
+      "language": "Idioma",
+      "submit": "Agregar documento",
+      "save": "Guardar cambios",
+      "cancel": "Cancelar",
+      "errors": {
+        "titleRequired": "El título es obligatorio",
+        "titleTooLong": "El título debe tener 200 caracteres o menos",
+        "descriptionTooLong": "Las notas deben tener 2000 caracteres o menos",
+        "ownerTooLong": "El propietario debe tener 200 caracteres o menos",
+        "externalUrlTooLong": "La URL externa debe tener 500 caracteres o menos",
+        "externalUrlInvalid": "Proporciona una URL externa o sube un archivo",
+        "fileRequired": "Sube un archivo o proporciona una URL externa",
+        "uploadFailed": "Error al subir el archivo. Por favor intenta de nuevo.",
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+      }
+    }
+  },
+  "links": {
+    "title": "Registros Vinculados",
+    "empty": "No hay registros vinculados",
+    "emptyDescription": "Vincule decisiones, reuniones, comunicaciones o documentos relacionados",
+    "addLink": "Vincular Registro",
+    "removeLink": "Eliminar vínculo",
+    "removeConfirm": "¿Estás seguro de que deseas eliminar este vínculo?",
+    "context": "Contexto",
+    "createdAt": "Vinculado el",
+    "entityType": {
+      "decision": "Decisión",
+      "meeting": "Reunión",
+      "communication": "Comunicación",
+      "document": "Documento",
+      "action_item": "Item de Acción",
+      "stakeholder": "Interesado",
+      "project": "Proyecto"
+    },
+    "linkType": {
+      "related_to": "Relacionado con",
+      "caused_by": "Causado por",
+      "depends_on": "Depende de",
+      "supersedes": "Reemplaza a",
+      "derived_from": "Derivado de",
+      "contradicts": "Contradice"
+    },
+    "dialog": {
+      "title": "Vincular Registro",
+      "targetType": "Tipo de registro",
+      "targetRecord": "Seleccionar registro",
+      "linkType": "Tipo de vínculo",
+      "contextNotes": "Notas de contexto",
+      "contextNotesPlaceholder": "¿Por qué es relevante este vínculo?",
+      "submit": "Crear vínculo",
+      "cancel": "Cancelar",
+      "errors": {
+        "targetRequired": "Seleccione un registro para vincular",
+        "linkTypeRequired": "Seleccione un tipo de relación",
+        "contextTooLong": "El contexto debe tener 2000 caracteres o menos",
+        "duplicate": "Este vínculo ya existe",
+        "unexpected": "Algo salió mal. Por favor intente de nuevo."
+      }
+    }
+  },
+  "roadmap": {
+    "title": "Hoja de ruta",
+    "description": "Hitos y tareas del proyecto",
+    "milestones": "Hitos",
+    "tasks": "Tareas",
+    "empty": "Sin hitos aún",
+    "emptyDescription": "Cree su primer hito para comenzar a planificar la hoja de ruta del proyecto.",
+    "progress": "{done} de {total} completados",
+    "taskCount": "{done}/{total} tareas completadas",
+    "noTasks": "Sin tareas",
+    "status": {
+      "planned": "Planificado",
+      "in_progress": "En progreso",
+      "completed": "Completado",
+      "blocked": "Bloqueado",
+      "deferred": "Diferido",
+      "not_started": "Sin iniciar",
+      "prompt_ready": "Prompt listo",
+      "sent_to_ai": "Enviado a IA",
+      "implemented": "Implementado",
+      "tested": "Probado",
+      "done": "Hecho"
+    },
+    "priority": {
+      "p1": "P1 — Crítico",
+      "p2": "P2 — Importante",
+      "p3": "P3 — Deseable"
+    },
+    "dateRange": "{start} → {end}",
+    "noDate": "Sin fecha",
+    "hours": "{hours}h",
+    "sprint": "Sprint {name}",
+    "taskList": {
+      "title": "Tareas",
+      "filterByStatus": "Filtrar por estado",
+      "allStatuses": "Todos",
+      "selectMilestone": "Seleccione un hito para ver sus tareas",
+      "noTasksForMilestone": "Sin tareas en este hito",
+      "progressCount": "{done} de {total} completadas",
+      "remaining": "Pendientes",
+      "dependencyNotes": "Dependencias",
+      "executionNotes": "Notas de ejecución",
+      "blockerReason": "Razón del bloqueo",
+      "acceptanceCriteria": "Criterios de aceptación",
+      "updateStatus": "Actualizar estado",
+      "statusUpdated": "Estado actualizado",
+      "statusUpdateFailed": "Error al actualizar estado",
+      "estimate": "Estimado",
+      "actual": "Real",
+      "noEstimate": "—",
+      "unassigned": "Sin asignar",
+      "copyPrompt": "Copiar prompt",
+      "copiedPrompt": "¡Copiado!",
+      "markAsSentToAi": "Copiar y marcar enviado",
+      "promptWarning": "Nunca incluyas secretos, claves API o contraseñas en los prompts.",
+      "promptLabel": "Prompt de IA",
+      "promptContextLabel": "Contexto",
+      "aiToolLabel": "Herramienta IA",
+      "lastSentLabel": "Último envío",
+      "implementationNotesLabel": "Notas de implementación",
+      "testNotesLabel": "Notas de prueba",
+      "dependencyWarning": "dep. bloqueada",
+      "dependencyComplete": "Hecha",
+      "dependencyIncomplete": "Pendiente",
+      "auditTrail": "Historial de cambios",
+      "auditTrailEmpty": "Sin cambios de estado registrados.",
+      "statusChanged": "Estado cambiado",
+      "promptCopied": "Prompt copiado",
+      "promptSent": "Prompt enviado a IA",
+      "taskBlocked": "Tarea bloqueada",
+      "taskCompleted": "Tarea completada",
+      "taskUnblocked": "Tarea desbloqueada",
+      "editTask": "Editar tarea",
+      "archiveTask": "Archivar tarea",
+      "confirmArchiveTask": "¿Estás seguro de que deseas archivar esta tarea? Se ocultará de todas las vistas.",
+      "editMilestone": "Editar hito",
+      "archiveMilestone": "Archivar hito",
+      "confirmArchiveMilestone": "¿Estás seguro de que deseas archivar este hito? Todas sus tareas también serán archivadas.",
+      "addPredecessor": "Agregar predecesor",
+      "addPredecessorPlaceholder": "Buscar tareas…",
+      "predecessorAdded": "Predecesor agregado",
+      "predecessorExists": "Esta dependencia ya existe",
+      "cancel": "Cancelar",
+      "noMatchingTasks": "No hay tareas coincidentes",
+      "circularDependencyError": "Esto crearía una dependencia circular.",
+      "dependencyAddError": "Error al agregar dependencia.",
+      "dependsOn": "Depende de",
+      "showPrompt": "Ver prompt",
+      "hidePrompt": "Ocultar prompt"
+    },
+    "form": {
+      "createMilestone": "Crear hito",
+      "editMilestone": "Editar hito",
+      "createTask": "Crear tarea",
+      "editTask": "Editar tarea",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "creating": "Creando...",
+      "saving": "Guardando...",
+      "milestoneCreated": "Hito creado",
+      "milestoneUpdated": "Hito actualizado",
+      "taskCreated": "Tarea creada",
+      "taskUpdated": "Tarea actualizada",
+      "errors": {
+        "not_authenticated": "Debe iniciar sesión",
+        "validation_error": "Revise los errores en el formulario",
+        "unexpected": "Algo salió mal. Intente de nuevo.",
+        "titleRequired": "El título es obligatorio",
+        "titleTooLong": "El título es demasiado largo",
+        "descriptionTooLong": "La descripción es demasiado larga",
+        "invalid_milestone_id": "Hito inválido",
+        "invalid_project_id": "Proyecto inválido"
+      },
+      "milestone": {
+        "title": "Título",
+        "titlePlaceholder": "Ej: M3 — Funcionalidades principales",
+        "description": "Descripción",
+        "descriptionPlaceholder": "Qué abarca este hito...",
+        "status": "Estado",
+        "startDate": "Fecha de inicio",
+        "targetDate": "Fecha objetivo",
+        "iconKey": "Icono",
+        "iconKeys": {
+          "setup": "Configuración",
+          "shield_database": "Seguridad y datos",
+          "users": "Usuarios",
+          "notebook": "Cuaderno",
+          "link": "Enlaces",
+          "sparkles": "IA y automatización",
+          "chart": "Analítica",
+          "loop": "Iteración",
+          "check_circle": "Completado",
+          "rocket": "Lanzamiento"
+        },
+        "lockStatus": "Bloquear estado",
+        "lockStatusDescription": "Al bloquear, el estado del hito no se recalculará automáticamente según la completitud de las tareas.",
+        "computedStatusNote": "El estado se calcula automáticamente según la completitud de las tareas."
+      },
+      "task": {
+        "title": "Título",
+        "titlePlaceholder": "Ej: Implementar autenticación de usuarios",
+        "description": "Descripción",
+        "descriptionPlaceholder": "Qué implica esta tarea...",
+        "milestone": "Hito",
+        "milestonePlaceholder": "Seleccione un hito",
+        "noMilestone": "Sin hito",
+        "status": "Estado",
+        "priority": "Prioridad",
+        "sprintName": "Sprint",
+        "sprintNamePlaceholder": "Ej: Sprint 3",
+        "estimateHours": "Horas estimadas",
+        "estimateHoursPlaceholder": "0",
+        "acceptanceCriteria": "Criterios de aceptación",
+        "acceptanceCriteriaPlaceholder": "Qué debe cumplirse para considerar esta tarea terminada...",
+        "dependencyNotes": "Notas de dependencia",
+        "dependencyNotesPlaceholder": "De qué depende esta tarea...",
+        "scheduling": "Programación",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de fin",
+        "progress": "Progreso",
+        "progressUnit": "%",
+        "durationDays": "días",
+        "promptSection": "Prompt de IA",
+        "promptBody": "Prompt",
+        "promptBodyPlaceholder": "Escribe el prompt que enviarás a la herramienta de IA...",
+        "promptContext": "Contexto",
+        "promptContextPlaceholder": "Contexto breve para este prompt (ej: Sprint 3 middleware de auth)",
+        "aiToolTarget": "Herramienta de IA",
+        "aiToolTargetPlaceholder": "Selecciona la herramienta destino",
+        "implementationNotes": "Notas de implementación",
+        "implementationNotesPlaceholder": "Qué se implementó, decisiones tomadas...",
+        "testNotes": "Notas de prueba",
+        "testNotesPlaceholder": "Resultados de verificación, casos extremos probados...",
+        "executionNotes": "Notas de ejecución",
+        "executionNotesPlaceholder": "Qué se hizo, decisiones, observaciones durante la ejecución...",
+        "blockerReason": "Razón del bloqueo",
+        "blockerReasonPlaceholder": "Por qué está bloqueada esta tarea..."
+      }
+    },
+    "executionDashboard": {
+      "title": "Estado de ejecución",
+      "promptReady": "Prompt listo",
+      "sentToAi": "Enviado a IA",
+      "implemented": "Implementado",
+      "tested": "Probado",
+      "blocked": "Bloqueado",
+      "completed": "Completado",
+      "notStarted": "Sin iniciar",
+      "inProgress": "En progreso",
+      "deferred": "Aplazado",
+      "currentSprint": "Sprint",
+      "noSprint": "Sin sprint",
+      "recentChanges": "Cambios recientes",
+      "noRecentChanges": "Sin cambios de estado recientes."
+    },
+    "nextStep": {
+      "title": "Siguiente paso recomendado",
+      "onTrack": "El roadmap está en buen camino. Sin bloqueos ni acciones pendientes.",
+      "viewTask": "Ver tarea",
+      "resolveBlocker": "Resolver bloqueo",
+      "runPrompt": "Ejecutar prompt",
+      "markCompleted": "Marcar completada",
+      "actions": {
+        "resolve_blocker": "Resolver bloqueo",
+        "run_prompt": "Ejecutar prompt",
+        "implement_output": "Implementar resultado",
+        "test_implementation": "Probar implementación",
+        "mark_completed": "Marcar completada",
+        "start_next": "Iniciar siguiente tarea",
+        "on_track": "En buen camino"
+      }
+    }
+  },
+  "livingGraph": {
+    "title": "Grafo Vivo",
+    "subtitle": "Mapa de inteligencia del proceso — explora qué pasó, qué depende de qué y qué sucede si algo se retrasa.",
+    "backToExecutionMap": "Execution Map",
+    "summary": "{nodes} nodos · {edges} aristas · {blocked} bloqueados",
+    "noSelection": "Selecciona un nodo o una arista para inspeccionarla.",
+    "selectedNode": "Detalle del nodo",
+    "selectedEdge": "Detalles de la relación",
+    "emptyState": {
+      "title": "Aún no hay actividad de proceso",
+      "description": "El Grafo Vivo se construye solo a medida que las tareas cambian de estado, se toman decisiones y se vinculan documentos. Trabaja en el proyecto y vuelve — el proceso se dibujará solo."
+    },
+    "errorState": {
+      "title": "No se pudo cargar el Grafo Vivo",
+      "description": "No fue posible obtener los datos del grafo. Inténtalo de nuevo en un momento."
+    },
+    "search": {
+      "placeholder": "Buscar por etiqueta, ID o entidad…",
+      "results": "{count} encontrados — centrar",
+      "noResults": "Sin resultados"
+    },
+    "overlays": {
+      "label": "Capa",
+      "normal": "Vista normal",
+      "bottleneck": "Vista de cuellos de botella",
+      "criticalPath": "Vista de ruta crítica",
+      "rework": "Vista de retrabajo",
+      "traceabilityGap": "Vista de brechas de trazabilidad",
+      "risk": "Vista de riesgo",
+      "sopCandidate": "Vista de candidatos a SOP",
+      "blocker": "Vista de bloqueos",
+      "laborCapacity": "Vista de capacidad laboral",
+      "readiness": "Preparación de Frente de Obra",
+      "variance": "Vista de Varianza",
+      "timeline": "Reproducción temporal",
+      "simulation": "Simulación what-if"
+    },
+    "layoutModes": {
+      "label": "Disposición",
+      "hierarchical": "Flujo Ejecutivo",
+      "timeline": "Línea de tiempo",
+      "force": "Minería de Procesos"
+    },
+    "metrics": {
+      "title": "Resumen de inteligencia del proceso",
+      "graphHealthScore": "Salud",
+      "criticalPathRisk": "Riesgo Ruta Crítica",
+      "activeBottlenecks": "Cuellos de Botella",
+      "traceabilityGaps": "Brechas de Traza",
+      "sopCandidates": "Candidatos SOP",
+      "reworkSignals": "Señales de Retrabajo",
+      "processConfidence": "Confianza",
+      "hints": {
+        "graphHealthScore": "Puntaje compuesto 0–100: bloqueos, cuellos de botella, retrabajo, brechas de trazabilidad y ciclos lo reducen.",
+        "criticalPathRisk": "Alto cuando un nodo bloqueado está en la cadena crítica; medio cuando hay bloqueos o ciclos en otra parte.",
+        "activeBottlenecks": "Nodos que concentran el flujo: alto grado, larga duración o presión de bloqueos.",
+        "traceabilityGaps": "Nodos con poca o ninguna evidencia vinculada (documentos, decisiones).",
+        "sopCandidates": "Segmentos completados, estables y bien documentados que merecen volverse SOP.",
+        "reworkSignals": "Nodos involucrados en aristas de demora o rutas en bucle.",
+        "processConfidence": "Cuánta señal tiene el grafo: densidad de evidencia y tamaño del grafo."
+      }
+    },
+    "legend": {
+      "title": "Leyenda",
+      "nodeTypes": "Tipos de nodo",
+      "edgeTypes": "Tipos de arista",
+      "riskLevels": "Niveles de riesgo",
+      "indicators": "Indicadores",
+      "criticalPath": "Ruta crítica",
+      "bottleneck": "Cuello de botella",
+      "rework": "Retrabajo",
+      "traceabilityGap": "Brecha de trazabilidad",
+      "simulationImpact": "Impacto de simulación",
+      "searchHit": "Resultado de búsqueda"
+    },
+    "simulationPanel": {
+      "title": "Simulación what-if",
+      "reset": "Restablecer",
+      "currentPlan": "Plan actual",
+      "simulatedPlan": "Plan simulado"
+    },
+    "demo": {
+      "cta": "Explorar con datos de demostración",
+      "badge": "Datos de demostración — no es tu proyecto"
+    },
+    "level": {
+      "label": "Nivel",
+      "milestones": "Hitos",
+      "activities": "Actividades",
+      "events": "Eventos"
+    },
+    "drill": {
+      "selected": "Hitos seleccionados: {names}",
+      "viewFlow": "Ver flujo",
+      "hint": "Consejo: arrastra un hito sobre otro (o haz clic en dos) para conectarlos y ver el flujo entre ambos. Arrastra las tarjetas libremente para reacomodar el lienzo."
+    },
+    "milestoneCard": {
+      "tasks": "tareas",
+      "currentPhase": "Fase actual"
+    },
+    "pathNarrative": {
+      "title": "Ruta encontrada — {steps} pasos · ~{days}d acumulados",
+      "blocked": "Bloqueados en la ruta: {labels}",
+      "delays": "Señales de demora en: {segments}",
+      "weakest": "Eslabón más débil: {from} → {to} (peso {weight})",
+      "aiSoon": "Análisis determinista — la narrativa con IA llega con el motor de interpretación."
+    },
+    "filters": {
+      "label": "Filtros",
+      "nodeTypes": "Tipos de nodo",
+      "edgeTypes": "Tipos de arista",
+      "status": "Estado",
+      "riskLevel": "Nivel de riesgo",
+      "dateFrom": "Desde",
+      "dateTo": "Hasta",
+      "blockedOnly": "Solo bloqueados",
+      "criticalOnly": "Solo ruta crítica",
+      "all": "Todos",
+      "reset": "Restablecer filtros"
+    },
+    "nodeTypes": {
+      "task_transition": "Transición de tarea",
+      "decision_cascade": "Decisión",
+      "communication_flow": "Comunicación",
+      "document_link": "Documento",
+      "milestone_gate": "Compuerta de hito",
+      "blocker_event": "Bloqueo",
+      "labor_risk": "Riesgo laboral"
+    },
+    "edgeTypes": {
+      "caused": "Causó",
+      "enabled": "Habilitó",
+      "blocked": "Bloqueó",
+      "delayed": "Retrasó",
+      "accelerated": "Aceleró",
+      "informed": "Informó",
+      "labor_constrained": "Restricción laboral"
+    },
+    "edgeMeanings": {
+      "caused": "Esta actividad disparó directamente la siguiente — una dependencia causal en el flujo de ejecución.",
+      "enabled": "Completar el origen hizo posible el destino — un enlace de secuencia/habilitación.",
+      "blocked": "El origen está impidiendo que el destino avance. Trátalo como una dependencia de alto riesgo.",
+      "delayed": "El origen retrasó el cronograma del destino — una señal de retrabajo o demora.",
+      "accelerated": "El origen aceleró el destino — un traspaso eficiente que vale la pena repetir.",
+      "informed": "Un enlace informativo/de evidencia — fluyó contexto, pero sin dependencia dura.",
+      "labor_constrained": "Una escasez de capacidad laboral está restringiendo esta actividad o hito — la cuadrilla requerida no está disponible completamente, creando un riesgo de retraso aguas abajo."
+    },
+    "actions": {
+      "clusterMode": "Agrupar por entidad",
+      "clearFocus": "Quitar foco",
+      "fitView": "Ajustar vista",
+      "fullscreen": "Pantalla completa",
+      "exitFullscreen": "Salir de pantalla completa",
+      "close": "Cerrar panel",
+      "findPath": "Buscar ruta desde este nodo",
+      "findPathPending": "Ahora haz clic en el nodo destino…",
+      "findPathHint": "Modo ruta: haz clic en otro nodo para trazar la ruta más corta hacia él. Pulsa Esc para cancelar.",
+      "simplify": "Aristas simplificadas",
+      "edit": "Editar tarea / hito",
+      "extractSubgraph": "Extraer subgrafo",
+      "showDownstream": "Mostrar impacto aguas abajo",
+      "focusNode": "Enfocar este nodo"
+    },
+    "warnings": {
+      "largeGraph": "Este grafo es grande. Usa el modo foco, los filtros o la agrupación por entidad para mantenerlo legible y rápido.",
+      "mobileNotice": "El Grafo Vivo está optimizado para escritorio y tableta."
+    },
+    "performance": {
+      "hint": "Usa la extracción de subgrafos o la agrupación por entidad para grafos muy grandes."
+    },
+    "timeline": {
+      "noEvents": "Aún no hay eventos de proceso registrados — la línea de tiempo se poblará a medida que el proyecto avance.",
+      "play": "Reproducir",
+      "pause": "Pausar",
+      "stepBack": "Paso atrás",
+      "stepForward": "Paso adelante",
+      "reset": "Reiniciar",
+      "speed": "Velocidad de reproducción",
+      "scrub": "Recorrer línea de tiempo",
+      "start": "Inicio del proceso"
+    },
+    "detailPanel": {
+      "title": "Detalles",
+      "type": "Tipo",
+      "sourceEntity": "Entidad origen",
+      "sourceEntityId": "ID de entidad",
+      "status": "Estado",
+      "progress": "Progreso",
+      "occurredAt": "Ocurrió",
+      "createdAt": "Creado",
+      "updatedAt": "Actualizado",
+      "startDate": "Fecha de inicio",
+      "endDate": "Fecha de fin",
+      "duration": "Duración",
+      "riskLevel": "Nivel de riesgo",
+      "blockerState": "Estado de bloqueo",
+      "blocked": "Bloqueado",
+      "notBlocked": "Sin bloqueo",
+      "completed": "Completado",
+      "evidenceGap": "Brecha de evidencia",
+      "traceability": "Trazabilidad",
+      "neighbors": "Vecinos",
+      "inDegree": "Aristas entrantes",
+      "outDegree": "Aristas salientes",
+      "downstream": "Nodos aguas abajo",
+      "upstream": "Nodos aguas arriba",
+      "downstreamShort": "abajo",
+      "criticalShort": "CRÍTICO",
+      "criticalPath": "En ruta crítica",
+      "yes": "Sí",
+      "no": "No",
+      "incoming": "Dependencias entrantes",
+      "outgoing": "Dependencias salientes",
+      "aiExplanation": "Explicación IA (vista previa)",
+      "edgeType": "Tipo de arista",
+      "weight": "Peso",
+      "lag": "Retardo",
+      "reworkLike": "Parece retrabajo",
+      "lacksEvidence": "Sin evidencia",
+      "edgeRecommendation": "Acción recomendada: revisa si esta dependencia sigue siendo correcta y adjunta evidencia si representa un traspaso real.",
+      "laborRisk": "Riesgo laboral",
+      "laborCapacitySection": "Riesgo de Capacidad Laboral",
+      "laborTrade": "Oficio",
+      "laborWeek": "Semana",
+      "laborRequiredHC": "Requerido",
+      "laborAvailableHC": "Disponible",
+      "laborGapHC": "Brecha",
+      "laborUtilization": "Utilización",
+      "laborZone": "Zona",
+      "laborCriticalPath": "Impacto en ruta crítica",
+      "laborAffectedActivities": "Actividades afectadas",
+      "laborAffectedMilestones": "Hitos afectados",
+      "laborInsightKind": "Causa raíz",
+      "readinessSection": "Preparación de Frente de Trabajo",
+      "readinessLevel": "Preparación",
+      "readinessPct": "% Preparación",
+      "readinessMissing": "Faltantes",
+      "readinessSummary": "Resumen",
+      "readinessAction": "Acción",
+      "risk": {
+        "low": "Bajo",
+        "medium": "Medio",
+        "high": "Alto"
+      },
+      "variance": {
+        "title": "Análisis de Varianza",
+        "varianceSeverity": "Severidad de Varianza",
+        "scheduleRisk": "Riesgo de Cronograma",
+        "likelyCause": "Causa Probable",
+        "trend": "Tendencia"
+      }
+    },
+    "insights": {
+      "bottleneck": "Este nodo concentra el flujo: {inDegree} enlaces entrantes y {outDegree} salientes con {downstream} nodos aguas abajo. Los retrasos aquí se propagan ampliamente.",
+      "rework": "Este nodo participa en un patrón de demora o bucle — el trabajo probablemente volvió a él después de avanzar.",
+      "traceabilityGap": "Este nodo tiene poca o ninguna evidencia vinculada (documentos, decisiones). Su historia puede ser difícil de auditar después.",
+      "risk": "Este nodo conlleva un riesgo elevado y afecta a {downstream} nodos aguas abajo. Vigílalo de cerca.",
+      "sopCandidate": "Este segmento se completó limpiamente y está bien documentado — un candidato fuerte para convertirse en procedimiento operativo estándar.",
+      "blocker": "Este nodo está bloqueado y está frenando {downstream} nodos aguas abajo.",
+      "laborCapacityGap": "{trade} presenta una brecha de capacidad laboral de {gap} headcount en la semana {week}. Requerido: {requiredHC}, Disponible: {availableHC}. Afecta a {downstream} nodos aguas abajo y está {criticalPath, select, 1 {en} other {fuera de}} la ruta crítica.",
+      "healthy": "No se detectaron anomalías de proceso. {downstream} nodos dependen de este aguas abajo."
+    },
+    "recommendations": {
+      "bottleneck": "Recomendado: divide responsabilidades o paraleliza el trabajo que pasa por este nodo.",
+      "rework": "Recomendado: revisa qué causó el bucle y agrega una compuerta de aceptación antes de este paso.",
+      "traceabilityGap": "Recomendado: vincula el documento, decisión o evidencia relevante a este nodo.",
+      "risk": "Recomendado: define un plan de mitigación y monitorea los hitos aguas abajo.",
+      "sopCandidate": "Recomendado: documenta este flujo como un SOP reutilizable.",
+      "blocker": "Recomendado: resuelve el bloqueo primero — tiene el mayor apalancamiento aguas abajo.",
+      "laborCapacityGap": "Recomendado: confirmar la programación de recursos, evaluar reasignación de oficios adyacentes o activar contratación de refuerzo con anticipación adecuada.",
+      "healthy": "Recomendado: no se requiere acción."
+    },
+    "simulation": {
+      "title": "Escenarios what-if",
+      "selectNode": "Selecciona un nodo para ejecutar una simulación what-if sobre él.",
+      "scenarios": {
+        "delay1d": "Retrasar 1 día",
+        "delay3d": "Retrasar 3 días",
+        "delay1w": "Retrasar 1 semana",
+        "markBlocked": "Marcar como bloqueado",
+        "removeBlocker": "Quitar bloqueo",
+        "increaseDuration": "Duración +50%"
+      },
+      "result": "Este escenario puede afectar {affected} nodos aguas abajo con una propagación estimada de {delay} días. {critical} de ellos están en la ruta crítica.",
+      "milestonesAffected": "Hitos en riesgo: {milestones}",
+      "strongestDependency": "Dependencia aguas abajo más fuerte: {label}",
+      "riskDelta": "Impacto en riesgo",
+      "mitigation": "Mitigación sugerida: re-secuencia el trabajo paralelo, resuelve bloqueos aguas arriba o re-planifica las fechas del hito afectado."
+    }
+  },
+  "placeholders": {
+    "team": {
+      "title": "Equipo",
+      "description": "Gestión de equipo próximamente."
+    },
+    "reports": {
+      "title": "Reportes",
+      "description": "Panel de reportes próximamente."
+    },
+    "settings": {
+      "title": "Configuración",
+      "description": "Configuración de la aplicación próximamente."
+    },
+    "aiOperator": {
+      "title": "Operador IA",
+      "description": "Asistencia de IA para proyectos próximamente."
+    },
+    "projectMemory": {
+      "title": "Memoria del Proyecto",
+      "description": "Base de conocimiento del proyecto próximamente."
+    },
+    "projectSettings": {
+      "title": "Configuración del Proyecto",
+      "description": "Configuración del proyecto próximamente."
+    },
+    "laborCapacity": {
+      "title": "Capacidad Laboral y Matriz de Habilidades",
+      "description": "Monitorea brechas de mano de obra, utilización y disponibilidad de cuadrillas por oficio y semana.",
+      "summary": {
+        "totalTrades": "Oficios Totales",
+        "shortageWeeks": "Semanas con Déficit",
+        "criticalTrades": "Oficios Críticos",
+        "maxUtilization": "Utilización Máxima"
+      },
+      "filters": {
+        "trade": "Oficio",
+        "week": "Semana",
+        "milestone": "Hito",
+        "location": "Ubicación",
+        "criticalOnly": "Solo Críticos",
+        "all": "Todos",
+        "clear": "Limpiar Filtros"
+      },
+      "table": {
+        "trade": "Oficio",
+        "week": "Semana",
+        "zone": "Zona",
+        "requiredHC": "Requerido",
+        "availableHC": "Disponible",
+        "gapHC": "Brecha",
+        "requiredHrs": "Hrs Req.",
+        "availableHrs": "Hrs Disp.",
+        "gapHrs": "Hrs Brecha",
+        "utilization": "Utilización",
+        "risk": "Riesgo",
+        "criticalPath": "Ruta Crítica",
+        "activities": "Actividades",
+        "resources": "Recursos"
+      },
+      "skills": {
+        "title": "Habilidades y Recursos",
+        "type": "Tipo",
+        "skillLevel": "Nivel de Habilidad",
+        "constraint": "Restricción",
+        "availability": "Disponibilidad"
+      },
+      "risk": {
+        "none": "Ninguno",
+        "low": "Bajo",
+        "medium": "Medio",
+        "high": "Alto",
+        "critical": "Crítico"
+      },
+      "empty": "Sin datos de capacidad para este proyecto.",
+      "explanation": {
+        "narrativeTitle": "Análisis de Capacidad Laboral",
+        "overallRisk": "El proyecto presenta riesgo de capacidad laboral {severity} en {tradeCount} oficios durante {weekCount} semanas.",
+        "mostCriticalTrade": "El oficio más afectado es {trade}.",
+        "cascadeRiskNotice": "Riesgo en cascada: las brechas de {trade} en la semana {week} podrían impactar {milestoneCount} hitos aguas abajo.",
+        "mitigationsLabel": "Mitigaciones prioritarias",
+        "noGaps": "No se detectaron brechas de capacidad laboral. Todos los oficios tienen cobertura adecuada."
+      }
+    },
+    "lookahead": {
+      "title": "Lookahead Laboral",
+      "description": "Son ejecutables las próximas semanas de trabajo con la mano de obra disponible?",
+      "horizon3Week": "3 Semanas",
+      "horizon6Week": "6 Semanas",
+      "summary": {
+        "totalActivities": "Actividades Totales",
+        "readyActivities": "Listas",
+        "atRiskActivities": "En Riesgo",
+        "blockedActivities": "Bloqueadas",
+        "overallReadiness": "Disponibilidad General"
+      },
+      "readiness": {
+        "ready": "Lista",
+        "at_risk": "En Riesgo",
+        "not_ready": "No Lista",
+        "blocked": "Bloqueada"
+      },
+      "grid": {
+        "trade": "Oficio",
+        "week": "Semana",
+        "required": "Req",
+        "available": "Disp",
+        "gap": "Brecha",
+        "activities": "Actividades",
+        "criticalPath": "RC",
+        "noActivities": "Sin actividades próximas en este período.",
+        "noTrades": "Sin oficios con demanda en este período."
+      },
+      "activity": {
+        "readiness": "Disponibilidad",
+        "blockers": "Bloqueadores",
+        "assignedResources": "Asignados",
+        "noBlockers": "Sin bloqueadores",
+        "onCriticalPath": "En Ruta Crítica",
+        "offCriticalPath": "Fuera de Ruta Crítica",
+        "progress": "Progreso"
+      },
+      "checklist": {
+        "title": "Disponibilidad"
+      },
+      "blockers": {
+        "title": "Bloqueadores",
+        "unmet_dependency": "Dependencia no cumplida",
+        "labor_shortage": "Déficit de mano de obra",
+        "vendor_unconfirmed": "Proveedor sin confirmar",
+        "over_allocated": "Recurso sobre-asignado",
+        "blocked_status": "Actividad bloqueada",
+        "checklist_incomplete": "Lista de verificación incompleta"
+      },
+      "narrative": {
+        "allReady": "Todas las actividades en la ventana lookahead están listas para ejecutar.",
+        "someAtRisk": "{atRiskCount} actividad(es) están en riesgo en las próximas {horizon} semanas.",
+        "someBlocked": "{blockedCount} actividad(es) están bloqueadas y requieren atención.",
+        "mostCriticalTrade": "El oficio más afectado es {trade}.",
+        "criticalPathWarning": "{count} actividades en ruta crítica tienen brechas de mano de obra.",
+        "vendorUnconfirmed": "{count} proveedor(es) tienen disponibilidad sin confirmar."
+      },
+      "idleRisk": {
+        "title": "Riesgo de Preparación de Frente de Trabajo",
+        "description": "Cuadrillas asignadas a trabajo que no está listo — riesgo de preparación de frente de trabajo, no de disponibilidad de cuadrilla.",
+        "crewsAtRisk": "Cuadrillas en Riesgo",
+        "totalIdleDays": "Días Totales en Riesgo",
+        "criticalPathIdleDays": "Días en Ruta Crítica en Riesgo",
+        "resource": "Recurso",
+        "trade": "Oficio",
+        "constraint": "Restricción",
+        "assignedActivities": "Actividades",
+        "idleWeeks": "Semanas Inactivas",
+        "worstRisk": "Peor Riesgo",
+        "downstreamImpact": "Impacto Aguas Abajo",
+        "daysAtRisk": "Días en Riesgo",
+        "recommendedAction": "Acciones Recomendadas",
+        "readiness": "Preparación",
+        "missingPrerequisites": "Prerrequisitos Faltantes",
+        "noRisk": "Todas las cuadrillas están asignadas a trabajo listo — sin riesgo de preparación de frente de trabajo detectado.",
+        "severity": {
+          "none": "Sin Riesgo",
+          "low": "Bajo",
+          "medium": "Medio",
+          "high": "Alto",
+          "critical": "Crítico"
+        },
+        "actionType": {
+          "reassign": "Reasignar",
+          "stagger": "Escalonar",
+          "expedite_prerequisite": "Acelerar Prerrequisito",
+          "confirm_vendor": "Confirmar Proveedor",
+          "monitor": "Monitorear"
+        }
+      },
+      "readinessExplanation": {
+        "title": "Análisis IA",
+        "whatIsMissing": "Qué Falta",
+        "whyItMatters": "Por Qué Importa",
+        "crewAffected": "Cuadrilla Afectada",
+        "downstreamAtRisk": "Impacto Aguas Abajo",
+        "recommendedAction": "Acción Recomendada",
+        "showInsight": "Ver Análisis IA",
+        "hideInsight": "Ocultar Análisis IA"
+      },
+      "nav": {
+        "matrix": "Matriz de Capacidad",
+        "lookahead": "Lookahead"
+      },
+      "empty": "Sin actividades próximas en la ventana lookahead."
+    },
+    "workface": {
+      "title": "Tablero de Preparación de Frente de Trabajo",
+      "description": "Están las actividades próximas listas para ejecutar? Ve preparación, bloqueadores y riesgo de un vistazo.",
+      "horizon3Week": "3 Semanas",
+      "horizon6Week": "6 Semanas",
+      "summary": {
+        "totalActivities": "Actividades Totales",
+        "readyActivities": "Listas",
+        "atRiskActivities": "En Riesgo",
+        "blockedActivities": "Bloqueadas",
+        "overallReadiness": "Disponibilidad General"
+      },
+      "readiness": {
+        "ready": "Lista",
+        "at_risk": "En Riesgo",
+        "not_ready": "No Lista",
+        "blocked": "Bloqueada"
+      },
+      "filters": {
+        "trade": "Oficio",
+        "week": "Semana",
+        "readiness": "Disponibilidad",
+        "all": "Todas",
+        "criticalPathOnly": "Solo ruta crítica",
+        "blockedOnly": "Solo bloqueadas",
+        "clear": "Limpiar"
+      },
+      "table": {
+        "activity": "Actividad",
+        "trade": "Oficio",
+        "weeks": "Semanas",
+        "readinessPct": "Preparación",
+        "status": "Estado",
+        "missingPrerequisites": "Faltantes",
+        "blockerTypes": "Bloqueadores",
+        "idleRisk": "Riesgo Inactividad",
+        "daysAtRisk": "Días en Riesgo",
+        "downstream": "Aguas Abajo",
+        "criticalPath": "RC",
+        "noActivities": "Sin actividades próximas en la ventana lookahead."
+      },
+      "detail": {
+        "checklist": "Lista de Verificación",
+        "assignedResources": "Recursos Asignados",
+        "recommendedAction": "Acción Recomendada",
+        "downstreamImpact": "Impacto Aguas Abajo",
+        "blockers": "Bloqueadores",
+        "none": "Ninguno",
+        "completed": "Completado",
+        "incomplete": "Incompleto"
+      },
+      "severity": {
+        "none": "Sin Riesgo",
+        "low": "Bajo",
+        "medium": "Medio",
+        "high": "Alto",
+        "critical": "Crítico"
+      },
+      "actionType": {
+        "reassign": "Reasignar",
+        "stagger": "Escalonar",
+        "expedite_prerequisite": "Acelerar Prerrequisito",
+        "confirm_vendor": "Confirmar Proveedor",
+        "monitor": "Monitorear"
+      },
+      "readinessExplanation": {
+        "title": "Análisis IA",
+        "whatIsMissing": "Qué Falta",
+        "whyItMatters": "Por Qué Importa",
+        "crewAffected": "Cuadrilla Afectada",
+        "downstreamAtRisk": "Impacto Aguas Abajo",
+        "recommendedAction": "Acción Recomendada",
+        "showInsight": "Ver Análisis IA",
+        "hideInsight": "Ocultar Análisis IA"
+      },
+      "nav": {
+        "matrix": "Matriz de Capacidad",
+        "lookahead": "Lookahead",
+        "workface": "Tablero de Frente"
+      },
+      "empty": "Sin actividades próximas que coincidan con los filtros actuales."
+    }
   }
 }

@@ -22,6 +22,8 @@ export const env = {
   // ── PRIVATE — server-side only, NEVER expose to browser ──
   /** Database connection string (server-side only — contains password) */
   DATABASE_URL: process.env.DATABASE_URL ?? "",
+  /** Supabase service role key (server-side only — bypasses RLS) */
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   /** OpenAI API key (server-side only) */
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
   /** Anthropic API key (server-side only) */

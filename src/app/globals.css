@@ -140,3 +140,19 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
+
+/* Workboard horizontal scrollbar — always visible */
+.workboard-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.workboard-scroll::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+.workboard-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+.workboard-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-500);
+}

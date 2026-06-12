@@ -54,3 +54,7 @@ next-env.d.ts
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea
+# local-only
+.claude/
+dev_out.log
+olla.bat
