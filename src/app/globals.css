@@ -156,3 +156,25 @@ body {
 .workboard-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--brand-500);
 }
+/* ── Print isolation for the Project Status Report ─────────────────────────── */
+/* When printing, hide everything except the report card so the browser's
+   "Save as PDF" produces a clean, full-page document (no sidebar/header). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #status-report-print,
+  #status-report-print * {
+    visibility: visible;
+  }
+  #status-report-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}

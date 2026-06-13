@@ -12,6 +12,7 @@ import {
   Settings,
   HardHat,
   DraftingCompass,
+  FileBarChart,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -76,6 +77,12 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]/memory",
     icon: BookOpen,
     matchPattern: "/projects/[projectId]/memory",
+  },
+  {
+    titleKey: "statusReport",
+    href: "/projects/[projectId]/status",
+    icon: FileBarChart,
+    matchPattern: "/projects/[projectId]/status",
   },
   {
     titleKey: "settings",

@@ -27,7 +27,8 @@
     "projectMemory": "Memoria del Proyecto",
     "settings": "Configuración",
     "laborCapacity": "Capacidad Laboral",
-    "drawingIntelligence": "Drawing Intelligence"
+    "drawingIntelligence": "Drawing Intelligence",
+    "statusReport": "Estado"
   },
   "drawingIntelligence": {
     "title": "Drawing Intelligence",
