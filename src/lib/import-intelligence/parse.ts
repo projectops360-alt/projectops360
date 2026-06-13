@@ -218,31 +218,39 @@ export async function parseImportFile(
     }
 
     case "xlsx": {
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
+      // SheetJS reads real-world workbooks (openpyxl, ClosedXML, Google
+      // Sheets exports with namespace-prefixed XML) that stricter parsers
+      // reject. Cell values only — formulas are read as computed results.
+      const XLSX = await import("xlsx");
+      let workbook: import("xlsx").WorkBook;
       try {
-        await workbook.xlsx.load(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
-      } catch {
-        throw new ImportParseError("corrupted_file", "Could not read the Excel file. It may be corrupted or password-protected.");
+        workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      } catch (e) {
+        const msg = e instanceof Error && /password/i.test(e.message)
+          ? "The Excel file is password-protected."
+          : "Could not read the Excel file. It may be corrupted or password-protected.";
+        throw new ImportParseError("corrupted_file", msg);
       }
+      const cellToString = (v: unknown): string => {
+        if (v == null) return "";
+        if (v instanceof Date) return v.toISOString().slice(0, 10);
+        return String(v).trim();
+      };
       const tables: ParsedTable[] = [];
       const textParts: string[] = [];
-      workbook.eachSheet((sheet) => {
-        const rows: string[][] = [];
-        sheet.eachRow({ includeEmpty: false }, (row) => {
-          const cells: string[] = [];
-          // row.values is 1-based; cell.text resolves formula results, never formulas
-          for (let c = 1; c <= row.cellCount; c++) {
-            cells.push(String(row.getCell(c).text ?? "").trim());
-          }
-          rows.push(cells);
-        });
-        const table = rowsToTable(sheet.name, rows);
+      for (const sheetName of workbook.SheetNames) {
+        const ws = workbook.Sheets[sheetName];
+        if (!ws) continue;
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: "" });
+        const rows = matrix
+          .map((r) => r.map(cellToString))
+          .filter((r) => r.some((c) => c !== ""));
+        const table = rowsToTable(sheetName, rows);
         if (table && table.rows.length > 0) {
           tables.push(table);
-          textParts.push(`## ${sheet.name}\n${table.headers.join(" | ")}\n${table.rows.map((r) => r.join(" | ")).join("\n")}`);
+          textParts.push(`## ${sheetName}\n${table.headers.join(" | ")}\n${table.rows.map((r) => r.join(" | ")).join("\n")}`);
         }
-      });
+      }
       if (tables.length === 0) throw new ImportParseError("no_extractable_content", "The Excel file has no rows to import.");
       return { fileType, rawText: textParts.join("\n\n").slice(0, 200_000), rawJson: null, tables, metadata: { sheetCount: tables.length } };
     }

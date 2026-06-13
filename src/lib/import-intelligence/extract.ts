@@ -33,7 +33,7 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   hours: ["hours", "estimated hours", "effort", "labor hours", "horas", "horas estimadas", "esfuerzo"],
   assignee: ["assigned to", "assignee", "owner", "responsible", "resource", "who", "asignado", "asignado a", "responsable", "encargado", "dueño", "dueno"],
   predecessor: ["predecessor", "predecessors", "depends on", "dependency", "dependencies", "after", "blocked by", "predecesor", "predecesores", "predecesora", "depende de", "dependencia", "dependencias"],
-  wbs: ["wbs", "id", "no", "no.", "#", "code", "edt", "código", "codigo", "item no"],
+  wbs: ["wbs", "id", "no", "no.", "#", "code", "edt", "código", "codigo", "item no", "task id", "task no", "activity id", "id tarea", "id de tarea", "código tarea"],
   quantity: ["quantity", "qty", "amount", "cantidad", "cant", "cant."],
   unit: ["unit", "uom", "unit of measure", "unidad", "u.m.", "um"],
   unit_cost: ["unit cost", "unit price", "rate", "price", "costo unitario", "precio unitario", "tarifa"],
@@ -129,6 +129,13 @@ function toIsoDate(v: string | undefined): string {
   const t = v.trim();
   // ISO already
   if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  // Excel serial date (days since 1899-12-30); 30000≈1982, 60000≈2064
+  if (/^\d{5}$/.test(t)) {
+    const serial = parseInt(t, 10);
+    if (serial >= 30000 && serial <= 60000) {
+      return new Date((serial - 25569) * 86_400_000).toISOString().slice(0, 10);
+    }
+  }
   // dd/mm/yyyy or mm/dd/yyyy — ambiguous; treat first segment >12 as day-first
   const m = t.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (m) {
@@ -347,6 +354,9 @@ function extractMaterialsFromTable(table: ParsedTable, ctx: ExtractionContext): 
     nameCol = table.headers.findIndex((h) => /material|insumo|item|art[íi]culo|articulo/i.test(h));
   }
   if (nameCol === -1 && table.headers.length > 0) nameCol = 0;
+  const requiredForCol = table.headers.findIndex((h) =>
+    /required for|required by|for task|para tarea|requerido para/i.test(h),
+  );
   const col = {
     name: nameCol,
     quantity: findColumn(table.headers, "quantity"),
@@ -362,6 +372,8 @@ function extractMaterialsFromTable(table: ParsedTable, ctx: ExtractionContext): 
     const name = cell(row, col.name);
     if (!name) continue;
     const qty = toNumber(cell(row, col.quantity));
+    // "Required For Tasks: T2.1; T4.1" → link the first task reference
+    const requiredFor = cell(row, requiredForCol).split(/[;,/]+/)[0]?.trim() ?? "";
     ctx.result.materials.push({
       source_id: `mat-${ctx.result.materials.length + 1}`,
       name,
@@ -371,7 +383,7 @@ function extractMaterialsFromTable(table: ParsedTable, ctx: ExtractionContext): 
       total_cost: toNumber(cell(row, col.total_cost)),
       supplier: cell(row, col.supplier),
       lead_time_days: toNumber(cell(row, col.lead_time)),
-      required_by_task_source_id: "",
+      required_by_task_source_id: requiredFor,
       required_by_date: toIsoDate(cell(row, col.finish)),
       confidence_score: qty != null && cell(row, col.unit) ? 0.85 : 0.6,
       source_reference: `${table.name} · row ${rowIdx + 2}`,
@@ -592,13 +604,56 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
     dispatchTable(table, type, ctx);
   }
 
+  // Deduplicate tasks across sheets (e.g. a "Critical Path" sheet repeating
+  // the WBS): same source_id or same name = one task; later occurrences only
+  // fill fields the first one left empty.
+  const taskByKey = new Map<string, CanonicalTask>();
+  for (const task of ctx.result.tasks) {
+    const k = (task.source_id || task.name).toLowerCase();
+    const nameKey = `name:${task.name.toLowerCase().trim()}`;
+    const existing = taskByKey.get(k) ?? taskByKey.get(nameKey);
+    if (!existing) {
+      taskByKey.set(k, task);
+      taskByKey.set(nameKey, task);
+      continue;
+    }
+    if (!existing.planned_start && task.planned_start) existing.planned_start = task.planned_start;
+    if (!existing.planned_finish && task.planned_finish) existing.planned_finish = task.planned_finish;
+    if (existing.duration_days == null && task.duration_days != null) existing.duration_days = task.duration_days;
+    if (!existing.assigned_to && task.assigned_to) existing.assigned_to = task.assigned_to;
+    if (!existing.description && task.description) existing.description = task.description;
+    if (!existing.milestone && task.milestone) existing.milestone = task.milestone;
+    // Redirect dependency references from the duplicate to the kept task
+    for (const dep of ctx.result.dependencies) {
+      if (dep.successor_source_id === task.source_id) dep.successor_source_id = existing.source_id;
+      if (dep.predecessor_source_id === task.source_id) dep.predecessor_source_id = existing.source_id;
+    }
+  }
+  ctx.result.tasks = [...new Set(taskByKey.values())];
+
+  // Project name: a summary/dashboard sheet whose only header is a long
+  // title. Summary-like sheets win over dashboards.
+  if (!ctx.result.project.name) {
+    for (const pattern of [/summary|resumen|portada|overview/i, /dashboard/i]) {
+      for (const table of parsed.tables) {
+        if (!pattern.test(table.name)) continue;
+        const nonEmpty = table.headers.filter((h) => h.trim() !== "");
+        if (nonEmpty.length === 1 && nonEmpty[0].length > 8) {
+          ctx.result.project.name = nonEmpty[0].trim();
+          break;
+        }
+      }
+      if (ctx.result.project.name) break;
+    }
+  }
+
   // Project name fallbacks: first markdown H1, else file name without extension
   if (!ctx.result.project.name) {
     const h1 = parsed.rawText.match(/^#\s+(.+)$/m);
     ctx.result.project.name = h1 ? h1[1].trim() : fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
   }
 
-  const detected = detectProjectType(parsed.rawText);
+  const detected = detectProjectType(`${ctx.result.project.name}\n${parsed.rawText}`);
   ctx.result.project.project_type = detected.type;
 
   // Resolve dependency references: predecessor refs may be WBS ids or task names
