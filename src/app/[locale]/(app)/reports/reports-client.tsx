@@ -8,7 +8,7 @@
 // datasets (semantic layer) and runs through server actions — never raw SQL.
 // ============================================================================
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   BarChart3, LayoutGrid, Wrench, Bookmark, Compass, BookOpen, Play, Save, Download,
   Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle,
@@ -96,7 +96,7 @@ function emptyConfig(datasetId: string): ReportConfig {
   return { datasetId, columns: ds?.defaultColumns ?? [], filters: [], grouping: null, sort: [], visualization: "table" };
 }
 
-export function ReportsClient({ locale, initialSavedReports }: { locale: Locale; initialSavedReports: SavedReportRow[] }) {
+export function ReportsClient({ locale, initialSavedReports, initialReportId }: { locale: Locale; initialSavedReports: SavedReportRow[]; initialReportId?: string | null }) {
   const t = T[locale] ?? T.en;
   const [tab, setTab] = useState<Tab>("overview");
   const [config, setConfig] = useState<ReportConfig | null>(null);
@@ -129,6 +129,18 @@ export function ReportsClient({ locale, initialSavedReports }: { locale: Locale;
     }
     setResult(res.result);
   }, [t]);
+
+  // Deep-link: /reports?report=<id> opens the prebuilt report in the builder and runs it.
+  useEffect(() => {
+    if (!initialReportId) return;
+    const prebuilt = listPrebuiltReports().find((r) => r.id === initialReportId);
+    if (!prebuilt) return;
+    const cfg: ReportConfig = { datasetId: prebuilt.datasetId, ...prebuilt.config };
+    // Defer past the mount commit so this isn't a synchronous in-effect setState.
+    const id = setTimeout(() => { openBuilder(cfg); run(cfg); }, 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for the incoming deep link
+  }, [initialReportId]);
 
   async function exportCsv() {
     if (!config) return;

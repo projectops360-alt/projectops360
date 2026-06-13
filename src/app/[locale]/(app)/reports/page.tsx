@@ -6,14 +6,17 @@ import type { Locale } from "@/types/database";
 
 export default async function ReportsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ report?: string }>;
 }) {
   const { locale } = await params;
+  const { report } = await searchParams;
   setRequestLocale(locale);
   await getOrgContext();
 
   const saved = await listSavedReportsAction();
 
-  return <ReportsClient locale={locale as Locale} initialSavedReports={saved.reports ?? []} />;
+  return <ReportsClient locale={locale as Locale} initialSavedReports={saved.reports ?? []} initialReportId={report ?? null} />;
 }
