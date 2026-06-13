@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
   CheckCircle2, Loader2, Circle, Ban, Pause,
@@ -319,6 +319,7 @@ export function WorkboardClient({
   translations: t,
 }: WorkboardClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<RoadmapTask[]>(initialTasks);
   const [isDragging, setIsDragging] = useState(false);
   const [dependencyWarning, setDependencyWarning] = useState<string | null>(null);
@@ -332,6 +333,19 @@ export function WorkboardClient({
     fromStatus: TaskStatus;
     toStatus: TaskStatus;
   } | null>(null);
+
+  // ── Deep-link: open a specific task from ?task=<id> ────────────────────────
+  // Lets the dashboard / search / reports link straight to the exact record.
+  const deepLinkedTask = useRef<string | null>(null);
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId || deepLinkedTask.current === taskId) return;
+    const target = tasks.find((tk) => tk.id === taskId);
+    if (!target) return;
+    deepLinkedTask.current = taskId;
+    const id = setTimeout(() => setEditingTask(target), 0);
+    return () => clearTimeout(id);
+  }, [searchParams, tasks]);
 
   // ── Resize global state (disables DnD while resizing) ──────────────────────
   const [anyResizing, setAnyResizing] = useState(false);

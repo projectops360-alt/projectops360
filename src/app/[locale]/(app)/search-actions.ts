@@ -72,7 +72,7 @@ export async function globalSearchAction(input: { query: string; locale?: string
   for (const p of (projectRows ?? []).filter((p) => (projectName.get(p.id) ?? "").toLowerCase().includes(qlower)).slice(0, LIMIT_PER_TYPE)) {
     results.push({ type: "project", title: projectName.get(p.id) ?? p.slug, subtitle: String(p.status), href: `${P}/${p.id}`, projectId: p.id });
   }
-  for (const t of tasksRes.data ?? []) if (aliveChild(t.project_id)) results.push({ type: "task", title: t.title, subtitle: `${proj(t.project_id)} · ${t.status}`, href: `${P}/${t.project_id}/workboard`, projectId: t.project_id });
+  for (const t of tasksRes.data ?? []) if (aliveChild(t.project_id)) results.push({ type: "task", title: t.title, subtitle: `${proj(t.project_id)} · ${t.status}`, href: `${P}/${t.project_id}/workboard?task=${t.id}`, projectId: t.project_id });
   for (const m of milestonesRes.data ?? []) if (aliveChild(m.project_id)) results.push({ type: "milestone", title: m.title, subtitle: proj(m.project_id), href: `${P}/${m.project_id}/execution-map`, projectId: m.project_id });
   for (const r of risksRes.data ?? []) if (aliveChild(r.project_id)) results.push({ type: "risk", title: r.title, subtitle: `${proj(r.project_id)} · ${r.severity}`, href: `${P}/${r.project_id}`, projectId: r.project_id });
   for (const m of materialsRes.data ?? []) if (aliveChild(m.project_id)) results.push({ type: "material", title: m.name, subtitle: `${proj(m.project_id)} · ${m.status}`, href: `${P}/${m.project_id}`, projectId: m.project_id });

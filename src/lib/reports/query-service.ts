@@ -110,6 +110,7 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext): Promise<R
   return (tasks ?? []).filter((t) => t.project_id != null && projects.has(t.project_id)).map((t) => ({
     project_name: projects.get(t.project_id) ?? "—",
     _projectId: t.project_id ?? null,
+    _recordId: t.id,
     milestone: t.milestone_id ? msName.get(t.milestone_id) ?? "—" : "—",
     task_name: t.title,
     status: t.status,

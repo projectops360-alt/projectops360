@@ -223,10 +223,10 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
 }
 
 /** Where a report row drills into: the project page that owns the problem. */
-function entityHref(locale: string, datasetId: string, projectId: string | null): string | null {
+function entityHref(locale: string, datasetId: string, projectId: string | null, recordId?: string | null): string | null {
   if (!projectId) return null;
   switch (datasetId) {
-    case "task_execution": return localizedHref(locale, `/projects/${projectId}/workboard`);
+    case "task_execution": return localizedHref(locale, `/projects/${projectId}/workboard${recordId ? `?task=${recordId}` : ""}`);
     case "project_health": return localizedHref(locale, `/projects/${projectId}/status`);
     default: return localizedHref(locale, `/projects/${projectId}`); // budget, risks, materials, rfis
   }
@@ -634,7 +634,7 @@ function PreviewPane({ t, locale, config, result }: { t: Labels; locale: Locale;
             </thead>
             <tbody>
               {result.rows.map((row, i) => {
-                const href = entityHref(locale, config.datasetId, (row._projectId as string) ?? null);
+                const href = entityHref(locale, config.datasetId, (row._projectId as string) ?? null, (row._recordId as string) ?? null);
                 return (
                   <tr
                     key={i}
