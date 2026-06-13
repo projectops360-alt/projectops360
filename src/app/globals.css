@@ -43,7 +43,7 @@
   --radius: 0.5rem;
 
   /* Sidebar */
-  --sidebar-bg: #0f172a;
+  --sidebar-bg: #0b0c0e; /* matches the 3D logo backdrop so it blends seamlessly */
   --sidebar-text: #cbd5e1;
   --sidebar-active: var(--brand-500);
   --sidebar-hover: #1e293b;
@@ -75,7 +75,7 @@
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --ring: var(--brand-400);
-  --sidebar-bg: #020617;
+  --sidebar-bg: #0b0c0e;
   --sidebar-text: #94a3b8;
   --sidebar-active: var(--brand-400);
   --sidebar-hover: #0f172a;
@@ -100,7 +100,7 @@
     --destructive: #dc2626;
     --destructive-foreground: #ffffff;
     --ring: var(--brand-400);
-    --sidebar-bg: #020617;
+    --sidebar-bg: #0b0c0e;
     --sidebar-text: #94a3b8;
     --sidebar-active: var(--brand-400);
     --sidebar-hover: #0f172a;
