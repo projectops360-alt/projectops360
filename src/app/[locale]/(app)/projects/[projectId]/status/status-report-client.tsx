@@ -9,9 +9,9 @@
 // (print CSS in globals.css isolates #status-report-print).
 // ============================================================================
 
-import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, OctagonAlert, Package, CalendarDays } from "lucide-react";
+import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, OctagonAlert, Package, CalendarDays, ListChecks, User, Users, UserPlus, Play, ArrowUpRight } from "lucide-react";
 import type { Locale } from "@/types/database";
-import type { ProjectStatusReport, PhaseState, PhaseStatus } from "@/lib/execution/status-report";
+import type { ProjectStatusReport, PhaseState, PhaseStatus, DailyActionType } from "@/lib/execution/status-report";
 
 const L = {
   en: {
@@ -32,6 +32,12 @@ const L = {
     focusSubtitle: "These are blocking progress — resolve them first.",
     inPhase: "in",
     onHold: "On hold",
+    todoTitle: "What to do now",
+    todoSubtitle: "The work that can move forward today, and who does it.",
+    todoEmpty: "Nothing is actionable right now.",
+    unassigned: "Unassigned — who does this?",
+    waiting: (n: number) => `${n} more task(s) are waiting on a predecessor to finish.`,
+    actions: { unblock: "Unblock", do_now: "Continue", start: "Start", assign: "Assign someone" } as Record<DailyActionType, string>,
     attention: "Other things to review",
     allGood: "Nothing needs your attention right now. 🎉",
     materials: "What it's being built with",
@@ -66,6 +72,12 @@ const L = {
     focusSubtitle: "Esto está frenando el avance — resuélvelo primero.",
     inPhase: "en",
     onHold: "En pausa",
+    todoTitle: "Qué hacer ahora",
+    todoSubtitle: "El trabajo que puede avanzar hoy, y quién lo hace.",
+    todoEmpty: "No hay nada accionable en este momento.",
+    unassigned: "Sin asignar — ¿quién lo hace?",
+    waiting: (n: number) => `${n} tarea(s) más están esperando a que termine una predecesora.`,
+    actions: { unblock: "Desbloquear", do_now: "Continuar", start: "Empezar", assign: "Asignar a alguien" } as Record<DailyActionType, string>,
     attention: "Otros puntos por revisar",
     allGood: "Nada necesita tu atención ahora mismo. 🎉",
     materials: "Con qué se está construyendo",
@@ -211,6 +223,60 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
           </div>
         </section>
 
+        {/* What to do now — daily action list, grouped by who does it */}
+        <section>
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <ListChecks className="h-4 w-4" />
+            {t.todoTitle}
+          </h2>
+          <p className="mb-3 mt-0.5 text-xs text-muted-foreground">{t.todoSubtitle}</p>
+          {report.dailyPlan.owners.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t.todoEmpty}</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {report.dailyPlan.owners.map((owner) => {
+                const isUnassigned = owner.ownerKind === "unassigned";
+                const OwnerIcon = owner.ownerKind === "resource" ? Users : isUnassigned ? UserPlus : User;
+                return (
+                  <div
+                    key={owner.ownerKey}
+                    className={`rounded-xl border p-3 ${isUnassigned ? "border-dashed border-amber-300 dark:border-amber-700" : "border-border"}`}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isUnassigned ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-300"}`}>
+                        <OwnerIcon className="h-4 w-4" />
+                      </span>
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {isUnassigned ? t.unassigned : owner.ownerName}
+                      </span>
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{owner.actions.length}</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {owner.actions.map((a) => (
+                        <li key={a.taskId} className="flex items-start gap-2 text-sm">
+                          <ActionBadge action={a.action} label={t.actions[a.action]} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-foreground">{a.taskTitle}</span>
+                            {a.action === "unblock" && a.reason && (
+                              <span className="block text-xs text-red-600 dark:text-red-400">{a.reason}</span>
+                            )}
+                            {a.phaseTitle && (
+                              <span className="block text-xs text-muted-foreground">{t.inPhase} {a.phaseTitle}</span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {report.dailyPlan.waitingCount > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">{t.waiting(report.dailyPlan.waitingCount)}</p>
+          )}
+        </section>
+
         {/* Journey */}
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t.journey}</h2>
@@ -312,6 +378,22 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
         </section>
       </div>
     </div>
+  );
+}
+
+function ActionBadge({ action, label }: { action: DailyActionType; label: string }) {
+  const cfg: Record<DailyActionType, { cls: string; Icon: typeof Play }> = {
+    unblock: { cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300", Icon: OctagonAlert },
+    do_now: { cls: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300", Icon: Play },
+    start: { cls: "bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300", Icon: ArrowUpRight },
+    assign: { cls: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300", Icon: UserPlus },
+  };
+  const { cls, Icon } = cfg[action];
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
   );
 }
 

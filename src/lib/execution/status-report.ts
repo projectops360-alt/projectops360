@@ -8,7 +8,7 @@
 // status-report-client and exportable to PDF via the browser print dialog.
 // ============================================================================
 
-import type { Milestone, RoadmapTask, MaterialRequirement, I18nField } from "@/types/database";
+import type { Milestone, RoadmapTask, TaskDependency, MaterialRequirement, I18nField } from "@/types/database";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,34 @@ export interface BlockerDetail {
   phaseTitle: string | null;
 }
 
+// ── Daily action plan ─────────────────────────────────────────────────────────
+
+/** What kind of action a task needs today. */
+export type DailyActionType = "unblock" | "do_now" | "start" | "assign";
+
+export interface DailyAction {
+  taskId: string;
+  taskTitle: string;
+  phaseTitle: string | null;
+  action: DailyActionType;
+  /** Blocker reason when action is "unblock". */
+  reason: string | null;
+}
+
+export interface DailyOwner {
+  ownerKey: string;
+  ownerName: string;
+  ownerKind: "person" | "resource" | "unassigned";
+  actions: DailyAction[];
+}
+
+export interface DailyPlan {
+  owners: DailyOwner[];
+  totalActions: number;
+  /** Actionable tasks waiting only because a predecessor isn't finished. */
+  waitingCount: number;
+}
+
 export interface ProjectStatusReport {
   projectTitle: string;
   projectType: string;
@@ -70,6 +98,9 @@ export interface ProjectStatusReport {
 
   /** Blocked work, surfaced first so the report focuses on problems. */
   blockers: BlockerDetail[];
+
+  /** What to do now and who does it. */
+  dailyPlan: DailyPlan;
 
   phases: PhaseStatus[];
   donePhases: PhaseStatus[];
@@ -95,6 +126,11 @@ export interface StatusReportInput {
     RoadmapTask,
     "id" | "title" | "status" | "milestone_id" | "start_date" | "end_date" | "assigned_to" | "assigned_resource_id" | "blocker_reason"
   >[];
+  dependencies: Pick<TaskDependency, "predecessor_id" | "successor_id" | "dependency_type">[];
+  /** Display names for assignees: auth user id → name. */
+  peopleNames: Record<string, string>;
+  /** Display names for assigned resources: resource id → name. */
+  resourceNames: Record<string, string>;
   materials: Pick<MaterialRequirement, "name" | "status" | "quantity">[];
   budgetItemCount: number;
 }
@@ -223,6 +259,9 @@ export function buildStatusReport(input: StatusReportInput): ProjectStatusReport
     });
   }
 
+  // ── Daily action plan ───────────────────────────────────────────────────────
+  const dailyPlan = buildDailyPlan(input, phases);
+
   // ── Headline ──────────────────────────────────────────────────────────────
   const headline_i18n = buildHeadline(done, total, blocked, completionPct);
 
@@ -241,6 +280,7 @@ export function buildStatusReport(input: StatusReportInput): ProjectStatusReport
     assignedPct,
     headline_i18n,
     blockers,
+    dailyPlan,
     phases,
     donePhases,
     currentPhase,
@@ -249,6 +289,97 @@ export function buildStatusReport(input: StatusReportInput): ProjectStatusReport
     materials: input.materials.map((m) => ({ name: m.name, status: m.status })),
     hasDates,
     hasBudget,
+  };
+}
+
+// ── Daily plan builder ────────────────────────────────────────────────────────
+
+const TERMINAL_STATUSES = new Set(["done", "tested", "cancelled", "deferred"]);
+// Ordering deps where the predecessor must finish/start before the successor.
+const ORDERING_DEP_TYPES = new Set(["finish_to_start", "start_to_start"]);
+const ACTION_RANK: Record<DailyActionType, number> = { unblock: 0, do_now: 1, start: 2, assign: 3 };
+
+/**
+ * "What to do now and who does it." Without task dates, today's plan is the
+ * actionable frontier: blocked work to resolve + tasks whose predecessors are
+ * already complete. Tasks still waiting on a predecessor are counted but not
+ * listed (they aren't actionable yet). Grouped by the person/crew responsible.
+ */
+function buildDailyPlan(input: StatusReportInput, phases: PhaseStatus[]): DailyPlan {
+  const phaseTitleById = new Map(phases.map((p) => [p.id, p.title]));
+  const doneIds = new Set(
+    input.tasks.filter((t) => DONE_STATUSES.has(t.status)).map((t) => t.id),
+  );
+
+  // Incomplete ordering predecessors per successor task.
+  const incompletePredecessors = new Map<string, number>();
+  for (const dep of input.dependencies) {
+    if (!ORDERING_DEP_TYPES.has(dep.dependency_type)) continue;
+    if (!doneIds.has(dep.predecessor_id)) {
+      incompletePredecessors.set(dep.successor_id, (incompletePredecessors.get(dep.successor_id) ?? 0) + 1);
+    }
+  }
+
+  const ownerMap = new Map<string, DailyOwner>();
+  let waitingCount = 0;
+
+  const ownerFor = (task: StatusReportInput["tasks"][number]): { key: string; name: string; kind: DailyOwner["ownerKind"] } => {
+    if (task.assigned_to && input.peopleNames[task.assigned_to]) {
+      return { key: `u:${task.assigned_to}`, name: input.peopleNames[task.assigned_to], kind: "person" };
+    }
+    if (task.assigned_resource_id && input.resourceNames[task.assigned_resource_id]) {
+      return { key: `r:${task.assigned_resource_id}`, name: input.resourceNames[task.assigned_resource_id], kind: "resource" };
+    }
+    return { key: "__unassigned__", name: "", kind: "unassigned" };
+  };
+
+  for (const task of input.tasks) {
+    if (TERMINAL_STATUSES.has(task.status)) continue;
+
+    let action: DailyActionType;
+    if (task.status === "blocked") {
+      action = "unblock";
+    } else if ((incompletePredecessors.get(task.id) ?? 0) > 0) {
+      // Waiting on a predecessor — not actionable today.
+      waitingCount++;
+      continue;
+    } else if (STARTED_STATUSES.has(task.status)) {
+      action = "do_now";
+    } else {
+      action = "start";
+    }
+
+    const owner = ownerFor(task);
+    // Unassigned actionable work becomes an "assign someone" item.
+    const finalAction: DailyActionType = owner.kind === "unassigned" && action !== "unblock" ? "assign" : action;
+
+    if (!ownerMap.has(owner.key)) {
+      ownerMap.set(owner.key, { ownerKey: owner.key, ownerName: owner.name, ownerKind: owner.kind, actions: [] });
+    }
+    ownerMap.get(owner.key)!.actions.push({
+      taskId: task.id,
+      taskTitle: task.title,
+      phaseTitle: task.milestone_id ? phaseTitleById.get(task.milestone_id) ?? null : null,
+      action: finalAction,
+      reason: action === "unblock" ? task.blocker_reason : null,
+    });
+  }
+
+  // Sort actions within each owner, and owners (unassigned last).
+  const owners = [...ownerMap.values()];
+  for (const o of owners) {
+    o.actions.sort((a, b) => ACTION_RANK[a.action] - ACTION_RANK[b.action]);
+  }
+  owners.sort((a, b) => {
+    if (a.ownerKind === "unassigned") return 1;
+    if (b.ownerKind === "unassigned") return -1;
+    return a.ownerName.localeCompare(b.ownerName);
+  });
+
+  return {
+    owners,
+    totalActions: owners.reduce((s, o) => s + o.actions.length, 0),
+    waitingCount,
   };
 }
 

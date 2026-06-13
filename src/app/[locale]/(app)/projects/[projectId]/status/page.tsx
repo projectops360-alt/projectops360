@@ -27,7 +27,7 @@ export default async function ProjectStatusPage({
     .single();
   if (!project) notFound();
 
-  const [milestonesRes, tasksRes, materialsRes, budgetRes] = await Promise.all([
+  const [milestonesRes, tasksRes, depsRes, materialsRes, budgetRes, peopleRes, resourcesRes] = await Promise.all([
     supabase
       .from("milestones")
       .select("id, title, order_index")
@@ -41,6 +41,10 @@ export default async function ProjectStatusPage({
       .is("deleted_at", null)
       .order("order_index"),
     supabase
+      .from("task_dependencies")
+      .select("predecessor_id, successor_id, dependency_type")
+      .eq("project_id", projectId),
+    supabase
       .from("material_requirements")
       .select("name, status, quantity")
       .eq("project_id", projectId)
@@ -51,7 +55,22 @@ export default async function ProjectStatusPage({
       .select("id", { count: "exact", head: true })
       .eq("project_id", projectId)
       .is("deleted_at", null),
+    supabase
+      .from("profiles")
+      .select("id, display_name")
+      .eq("organization_id", org.organizationId),
+    supabase
+      .from("resources")
+      .select("id, name")
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", projectId)
+      .is("deleted_at", null),
   ]);
+
+  const peopleNames: Record<string, string> = {};
+  for (const p of peopleRes.data ?? []) peopleNames[p.id] = p.display_name || "—";
+  const resourceNames: Record<string, string> = {};
+  for (const r of resourcesRes.data ?? []) resourceNames[r.id] = r.name;
 
   const report = buildStatusReport({
     project: {
@@ -62,6 +81,9 @@ export default async function ProjectStatusPage({
     },
     milestones: milestonesRes.data ?? [],
     tasks: (tasksRes.data ?? []) as Parameters<typeof buildStatusReport>[0]["tasks"],
+    dependencies: depsRes.data ?? [],
+    peopleNames,
+    resourceNames,
     materials: materialsRes.data ?? [],
     budgetItemCount: budgetRes.count ?? 0,
   });

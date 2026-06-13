@@ -43,6 +43,9 @@ function fenceInput(): StatusReportInput {
     project: { title: "Residential Perimeter Fence -Manual", project_type: "general", start_date: "2026-06-12", target_end_date: "2026-06-30" },
     milestones,
     tasks,
+    dependencies: [],
+    peopleNames: {},
+    resourceNames: {},
     materials: [
       { name: "Red masonry blocks", status: "required", quantity: null },
       { name: "Electric metal gates", status: "required", quantity: null },
@@ -124,11 +127,64 @@ describe("buildStatusReport", () => {
       project: { title: "Empty", project_type: "general", start_date: null, target_end_date: null },
       milestones: [],
       tasks: [],
+      dependencies: [],
+      peopleNames: {},
+      resourceNames: {},
       materials: [],
       budgetItemCount: 0,
     });
     expect(r.completionPct).toBe(0);
     expect(r.headline_i18n.es).toContain("todavía no tiene tareas");
     expect(r.currentPhase).toBeNull();
+    expect(r.dailyPlan.owners).toHaveLength(0);
+  });
+});
+
+describe("buildStatusReport — daily plan", () => {
+  it("groups actionable work by owner with the right action verbs", () => {
+    const input = fenceInput();
+    input.peopleNames = { "user-ana": "Ana", "user-luis": "Luis" };
+    input.resourceNames = { "crew-mason": "Masonry Crew" };
+    // assign owners + set statuses to exercise unblock/do_now/start/assign
+    input.tasks = [
+      { id: "t-block", title: "Pour footing", status: "blocked", milestone_id: "m3", start_date: null, end_date: null, assigned_to: "user-ana", assigned_resource_id: null, blocker_reason: "lack of resources" },
+      { id: "t-prog", title: "Set rebar", status: "in_progress", milestone_id: "m3", start_date: null, end_date: null, assigned_to: "user-ana", assigned_resource_id: null, blocker_reason: null },
+      { id: "t-ready", title: "Lay first course", status: "not_started", milestone_id: "m4", start_date: null, end_date: null, assigned_to: null, assigned_resource_id: "crew-mason", blocker_reason: null },
+      { id: "t-unassigned", title: "Order gate", status: "not_started", milestone_id: "m5", start_date: null, end_date: null, assigned_to: null, assigned_resource_id: null, blocker_reason: null },
+      { id: "t-waiting", title: "Install gate", status: "not_started", milestone_id: "m5", start_date: null, end_date: null, assigned_to: "user-luis", assigned_resource_id: null, blocker_reason: null },
+    ] as typeof input.tasks;
+    // t-waiting depends on t-unassigned which is not done → waiting, not listed
+    input.dependencies = [
+      { predecessor_id: "t-unassigned", successor_id: "t-waiting", dependency_type: "finish_to_start" },
+    ];
+
+    const plan = buildStatusReport(input).dailyPlan;
+    const byOwner = Object.fromEntries(plan.owners.map((o) => [o.ownerName || o.ownerKind, o]));
+
+    // Ana: unblock first, then continue
+    expect(byOwner["Ana"].actions.map((a) => a.action)).toEqual(["unblock", "do_now"]);
+    expect(byOwner["Ana"].actions[0].reason).toBe("lack of resources");
+    // Crew (resource): start
+    expect(byOwner["Masonry Crew"].ownerKind).toBe("resource");
+    expect(byOwner["Masonry Crew"].actions[0].action).toBe("start");
+    // Unassigned actionable task → "assign", bucket last
+    expect(byOwner["unassigned"].actions[0].action).toBe("assign");
+    expect(plan.owners[plan.owners.length - 1].ownerKind).toBe("unassigned");
+    // t-waiting is counted as waiting, not listed for Luis
+    expect(byOwner["Luis"]).toBeUndefined();
+    expect(plan.waitingCount).toBe(1);
+  });
+
+  it("treats a finished predecessor as unblocking the successor", () => {
+    const input = fenceInput();
+    input.peopleNames = { "user-ana": "Ana" };
+    input.tasks = [
+      { id: "p", title: "Prep", status: "done", milestone_id: "m1", start_date: null, end_date: null, assigned_to: "user-ana", assigned_resource_id: null, blocker_reason: null },
+      { id: "s", title: "Build", status: "not_started", milestone_id: "m1", start_date: null, end_date: null, assigned_to: "user-ana", assigned_resource_id: null, blocker_reason: null },
+    ] as typeof input.tasks;
+    input.dependencies = [{ predecessor_id: "p", successor_id: "s", dependency_type: "finish_to_start" }];
+    const plan = buildStatusReport(input).dailyPlan;
+    expect(plan.waitingCount).toBe(0);
+    expect(plan.owners[0].actions[0].action).toBe("start");
   });
 });
