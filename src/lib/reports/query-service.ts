@@ -107,7 +107,7 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext): Promise<R
   const personName = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "—"]));
   const resName = new Map((resources ?? []).map((r) => [r.id, r.name]));
 
-  return (tasks ?? []).map((t) => ({
+  return (tasks ?? []).filter((t) => t.project_id != null && projects.has(t.project_id)).map((t) => ({
     project_name: projects.get(t.project_id) ?? "—",
     _projectId: t.project_id ?? null,
     milestone: t.milestone_id ? msName.get(t.milestone_id) ?? "—" : "—",
@@ -135,7 +135,7 @@ async function fetchBudget(supabase: Admin, ctx: QueryContext): Promise<ReportRo
     supabase.from("budget_items").select("name, category, cost_code, estimated_cost, committed_cost, actual_cost, forecast_cost, status, project_id").is("deleted_at", null).limit(ROW_CAP),
     ctx.organizationId, ctx.projectId,
   );
-  return (data ?? []).map((b) => {
+  return (data ?? []).filter((b) => b.project_id != null && projects.has(b.project_id)).map((b) => {
     const est = Number(b.estimated_cost ?? 0);
     const fc = b.forecast_cost != null ? Number(b.forecast_cost) : Number(b.actual_cost ?? 0);
     const variance = Math.round((fc - est) * 100) / 100;
@@ -162,7 +162,7 @@ async function fetchRisks(supabase: Admin, ctx: QueryContext): Promise<ReportRow
     supabase.from("risks").select("title, category, probability, impact, severity, status, mitigation_plan, origin, confidence_score, needs_review, project_id").is("deleted_at", null).limit(ROW_CAP),
     ctx.organizationId, ctx.projectId,
   );
-  return (data ?? []).map((r) => ({
+  return (data ?? []).filter((r) => r.project_id != null && projects.has(r.project_id)).map((r) => ({
     project_name: projects.get(r.project_id) ?? "—",
     _projectId: r.project_id ?? null,
     risk_title: r.title,
@@ -184,7 +184,7 @@ async function fetchMaterials(supabase: Admin, ctx: QueryContext): Promise<Repor
     supabase.from("material_requirements").select("name, quantity, unit_of_measure, estimated_total_cost, status, lead_time_days, required_by_date, origin, confidence_score, needs_review, project_id").is("deleted_at", null).limit(ROW_CAP),
     ctx.organizationId, ctx.projectId,
   );
-  return (data ?? []).map((m) => ({
+  return (data ?? []).filter((m) => m.project_id != null && projects.has(m.project_id)).map((m) => ({
     project_name: projects.get(m.project_id) ?? "—",
     _projectId: m.project_id ?? null,
     material_name: m.name,
@@ -206,7 +206,7 @@ async function fetchRfis(supabase: Admin, ctx: QueryContext): Promise<ReportRow[
     supabase.from("rfis").select("rfi_number, subject, status, priority, due_date, blocks_task_id, origin, needs_review, project_id").is("deleted_at", null).limit(ROW_CAP),
     ctx.organizationId, ctx.projectId,
   );
-  return (data ?? []).map((r) => ({
+  return (data ?? []).filter((r) => r.project_id != null && projects.has(r.project_id)).map((r) => ({
     project_name: projects.get(r.project_id) ?? "—",
     _projectId: r.project_id ?? null,
     rfi_number: r.rfi_number ?? "",

@@ -89,14 +89,22 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
   ]);
 
   const projects = projectsRes.data ?? [];
-  const tasks = tasksRes.data ?? [];
-  const milestones = milestonesRes.data ?? [];
-  const risks = risksRes.data ?? [];
-  const materials = materialsRes.data ?? [];
-  const rfis = rfisRes.data ?? [];
-  const budget = budgetRes.data ?? [];
-  const resources = resourcesRes.data ?? [];
-  const decisions = decisionsRes.data ?? [];
+  // Only surface records whose parent project is still alive (not archived /
+  // soft-deleted). Child rows (tasks, risks, materials, …) are NOT cascade
+  // soft-deleted when a project is archived, so without this gate the PMO
+  // views would list orphaned records that 404 when opened (their project row
+  // is gone). Resources can be org-level (null project_id) — keep those.
+  const aliveIds = new Set(projects.map((p) => p.id));
+  const alive = <T extends { project_id?: string | null }>(rows: T[] | null) =>
+    (rows ?? []).filter((r) => r.project_id != null && aliveIds.has(r.project_id));
+  const tasks = alive(tasksRes.data);
+  const milestones = alive(milestonesRes.data);
+  const risks = alive(risksRes.data);
+  const materials = alive(materialsRes.data);
+  const rfis = alive(rfisRes.data);
+  const budget = alive(budgetRes.data);
+  const resources = (resourcesRes.data ?? []).filter((r) => r.project_id == null || aliveIds.has(r.project_id));
+  const decisions = alive(decisionsRes.data);
   const projectName = new Map(projects.map((p) => [p.id, i18n(p.title_i18n as I18nField, p.slug)]));
 
   // ── Aggregates ──────────────────────────────────────────────────────────

@@ -284,6 +284,25 @@ export async function archiveProjectAction(
     return { error: "unexpected" };
   }
 
+  // Cascade the soft-delete to child records. Without this they stay alive and
+  // keep surfacing in the PMO dashboard / search / reports, where clicking them
+  // 404s because the parent project page is gone.
+  const now = new Date().toISOString();
+  const childTables = [
+    "roadmap_tasks", "milestones", "risks", "material_requirements",
+    "rfis", "budget_items", "decisions", "resources",
+  ] as const;
+  await Promise.all(
+    childTables.map((table) =>
+      supabase
+        .from(table)
+        .update({ deleted_at: now })
+        .eq("project_id", projectId)
+        .eq("organization_id", org.organizationId)
+        .is("deleted_at", null),
+    ),
+  );
+
   await logAudit({
     org,
     projectId,
