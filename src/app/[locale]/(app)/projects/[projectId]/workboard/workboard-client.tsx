@@ -30,6 +30,10 @@ interface WorkboardTranslations {
   filterBySprint: string;
   allSprints: string;
   noSprint: string;
+  bySprint: string;
+  byMilestone: string;
+  allMilestones: string;
+  noMilestone: string;
   dependsOn: string;
   groupLabels: Record<string, string>;
   columnVisibility: string;
@@ -363,9 +367,13 @@ export function WorkboardClient({
     return () => document.removeEventListener("mousedown", handler);
   }, [visOpen]);
 
-  // ── Sprint Filter ────────────────────────────────────────────────────────────
-  const NO_SPRINT = "__none__" as const;
-  const [sprintFilter, setSprintFilter] = useState<string | null>(null);
+  // ── Filter (by sprint or milestone) ───────────────────────────────────────────
+  const NONE_VALUE = "__none__" as const;
+  const [filterDimension, setFilterDimension] = useState<"sprint" | "milestone">("sprint");
+  const [filterValue, setFilterValue] = useState<string | null>(null);
+
+  // Milestone lookup (declared early so filter options can use it)
+  const milestoneMap = new Map(milestones.map((m) => [m.id, m.title]));
 
   const sprintOptions = useMemo(() => {
     const names = new Set<string>();
@@ -375,13 +383,32 @@ export function WorkboardClient({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [tasks]);
 
+  // Milestones that actually have tasks, in milestone order
+  const milestoneOptions = useMemo(() => {
+    const used = new Set<string>();
+    for (const task of tasks) {
+      if (task.milestone_id) used.add(task.milestone_id);
+    }
+    return milestones.filter((m) => used.has(m.id)).map((m) => ({ id: m.id, title: m.title }));
+  }, [tasks, milestones]);
+
   const hasUnsprinted = useMemo(() => tasks.some((t) => !t.sprint_name), [tasks]);
+  const hasNoMilestone = useMemo(() => tasks.some((t) => !t.milestone_id), [tasks]);
+
+  function setDimension(dim: "sprint" | "milestone") {
+    setFilterDimension(dim);
+    setFilterValue(null);
+  }
 
   const filteredTasks = useMemo(() => {
-    if (sprintFilter === null) return tasks;
-    if (sprintFilter === NO_SPRINT) return tasks.filter((t) => !t.sprint_name);
-    return tasks.filter((t) => t.sprint_name === sprintFilter);
-  }, [tasks, sprintFilter]);
+    if (filterValue === null) return tasks;
+    if (filterDimension === "sprint") {
+      if (filterValue === NONE_VALUE) return tasks.filter((t) => !t.sprint_name);
+      return tasks.filter((t) => t.sprint_name === filterValue);
+    }
+    if (filterValue === NONE_VALUE) return tasks.filter((t) => !t.milestone_id);
+    return tasks.filter((t) => t.milestone_id === filterValue);
+  }, [tasks, filterDimension, filterValue]);
 
   // Group filtered tasks by status
   const tasksByStatus: Record<TaskStatus, RoadmapTask[]> = {
@@ -391,9 +418,6 @@ export function WorkboardClient({
   for (const task of filteredTasks) {
     tasksByStatus[task.status].push(task);
   }
-
-  // Milestone lookup
-  const milestoneMap = new Map(milestones.map((m) => [m.id, m.title]));
 
   // Predecessor lookup per task (ordering dependencies only), with met/unmet state
   const predecessorsByTask = useMemo(() => {
@@ -564,24 +588,61 @@ export function WorkboardClient({
 
       {/* Toolbar */}
       <div className={`flex items-center gap-3 flex-wrap transition-opacity ${isDragging || anyResizing ? "pointer-events-none opacity-50" : ""}`}>
-        {/* Sprint Filter */}
-        {sprintOptions.length > 0 && (
+        {/* Filter by sprint or milestone */}
+        {(sprintOptions.length > 0 || milestoneOptions.length > 0) && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <button type="button" onClick={() => setSprintFilter(null)}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${sprintFilter === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-              {t.allSprints}
+
+            {/* Dimension switch (only when both dimensions exist) */}
+            {sprintOptions.length > 0 && milestoneOptions.length > 0 && (
+              <div className="mr-1 inline-flex overflow-hidden rounded-full border border-border">
+                <button
+                  type="button"
+                  onClick={() => setDimension("sprint")}
+                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterDimension === "sprint" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                >
+                  {t.bySprint}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDimension("milestone")}
+                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterDimension === "milestone" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                >
+                  {t.byMilestone}
+                </button>
+              </div>
+            )}
+
+            <button type="button" onClick={() => setFilterValue(null)}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+              {filterDimension === "sprint" ? t.allSprints : t.allMilestones}
             </button>
-            {sprintOptions.map((name) => (
-              <button key={name} type="button" onClick={() => setSprintFilter(sprintFilter === name ? null : name)}
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${sprintFilter === name ? "bg-brand-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-                {name}
-              </button>
-            ))}
-            {hasUnsprinted && (
-              <button type="button" onClick={() => setSprintFilter(sprintFilter === NO_SPRINT ? null : NO_SPRINT)}
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium italic transition-colors ${sprintFilter === NO_SPRINT ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+
+            {filterDimension === "sprint"
+              ? sprintOptions.map((name) => (
+                  <button key={name} type="button" onClick={() => setFilterValue(filterValue === name ? null : name)}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === name ? "bg-brand-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                    {name}
+                  </button>
+                ))
+              : milestoneOptions.map((m) => (
+                  <button key={m.id} type="button" onClick={() => setFilterValue(filterValue === m.id ? null : m.id)}
+                    className={`max-w-[160px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === m.id ? "bg-brand-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                    title={m.title}>
+                    {m.title}
+                  </button>
+                ))}
+
+            {filterDimension === "sprint" && hasUnsprinted && (
+              <button type="button" onClick={() => setFilterValue(filterValue === NONE_VALUE ? null : NONE_VALUE)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium italic transition-colors ${filterValue === NONE_VALUE ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
                 {t.noSprint}
+              </button>
+            )}
+            {filterDimension === "milestone" && hasNoMilestone && (
+              <button type="button" onClick={() => setFilterValue(filterValue === NONE_VALUE ? null : NONE_VALUE)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium italic transition-colors ${filterValue === NONE_VALUE ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                {t.noMilestone}
               </button>
             )}
           </div>

@@ -120,6 +120,10 @@ export default async function WorkboardPage({
         filterBySprint: t("filterBySprint"),
         allSprints: t("allSprints"),
         noSprint: t("noSprint"),
+        bySprint: t("bySprint"),
+        byMilestone: t("byMilestone"),
+        allMilestones: t("allMilestones"),
+        noMilestone: t("noMilestone"),
         dependsOn: t("dependsOn"),
         errors: {
           not_authenticated: t("errors.not_authenticated"),

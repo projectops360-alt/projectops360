@@ -3,6 +3,7 @@
 import { usePathname } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sidebarNav, bottomNav, type NavItem } from "@/config/navigation";
 import { Logo } from "@/components/shared/logo";
@@ -32,7 +33,7 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 // ── NavButton component ──────────────────────────────────────────────────────────
-function NavButton({ item, active, resolvedHref }: { item: NavItem; active: boolean; resolvedHref: string }) {
+function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; active: boolean; resolvedHref: string; collapsed: boolean }) {
   const t = useTranslations("nav");
   const titleKey = item.title as Parameters<typeof t>[0];
   const displayTitle = t(titleKey);
@@ -40,16 +41,19 @@ function NavButton({ item, active, resolvedHref }: { item: NavItem; active: bool
   return (
     <Link
       href={resolvedHref}
+      title={collapsed ? displayTitle : undefined}
+      aria-label={collapsed ? displayTitle : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+        "flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors",
+        collapsed ? "justify-center px-2" : "px-3",
         active
           ? "bg-sidebar-active/10 text-sidebar-active"
           : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
       )}
     >
       <item.icon className="h-5 w-5 shrink-0" />
-      <span>{displayTitle}</span>
-      {item.badge && (
+      {!collapsed && <span>{displayTitle}</span>}
+      {!collapsed && item.badge && (
         <span className="ml-auto rounded-full bg-sidebar-active px-2 py-0.5 text-xs text-white">
           {item.badge}
         </span>
@@ -59,8 +63,9 @@ function NavButton({ item, active, resolvedHref }: { item: NavItem; active: bool
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar() {
+export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
   const projectId = extractProjectId(pathname);
 
   // Separate global and project-scoped items
@@ -75,21 +80,44 @@ export function Sidebar() {
     return item.href;
   }
 
+  const collapseLabel = tNav("collapseSidebar");
+  const expandLabel = tNav("expandSidebar");
+
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-sidebar-bg text-sidebar-text">
-      {/* ── Logo ── */}
-      <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
-        <Logo />
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-30 flex flex-col bg-sidebar-bg text-sidebar-text transition-[width] duration-200",
+        collapsed ? "w-16" : "w-64",
+      )}
+    >
+      {/* ── Logo + collapse toggle ── */}
+      <div className={cn("flex h-16 items-center border-b border-white/5", collapsed ? "justify-center px-2" : "gap-3 px-6")}>
+        {!collapsed && <Logo />}
+        {onToggle && (
+          <button
+            type="button"
+            onClick={onToggle}
+            title={collapsed ? expandLabel : collapseLabel}
+            aria-label={collapsed ? expandLabel : collapseLabel}
+            className={cn(
+              "rounded-lg p-1.5 text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-white",
+              !collapsed && "ml-auto",
+            )}
+          >
+            {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
+        )}
       </div>
 
       {/* ── Main nav ── */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {globalItems.map((item) => (
           <NavButton
             key={item.href}
             item={item}
             active={isActive(pathname, resolveHref(item))}
             resolvedHref={resolveHref(item)}
+            collapsed={collapsed}
           />
         ))}
 
@@ -103,6 +131,7 @@ export function Sidebar() {
                 item={item}
                 active={isActive(pathname, resolveHref(item))}
                 resolvedHref={resolveHref(item)}
+                collapsed={collapsed}
               />
             ))}
           </>
@@ -117,14 +146,17 @@ export function Sidebar() {
             item={item}
             active={isActive(pathname, resolveHref(item))}
             resolvedHref={resolveHref(item)}
+            collapsed={collapsed}
           />
         ))}
       </nav>
 
-      {/* ── Language switcher ── */}
-      <div className="border-t border-white/5 px-3 py-4">
-        <LanguageSwitcher />
-      </div>
+      {/* ── Language switcher (hidden when collapsed) ── */}
+      {!collapsed && (
+        <div className="border-t border-white/5 px-3 py-4">
+          <LanguageSwitcher />
+        </div>
+      )}
     </aside>
   );
 }

@@ -16,7 +16,9 @@
     "settings": "Configuración",
     "search": "Buscar…",
     "notifications": "Notificaciones",
-    "importProject": "Importar Proyecto"
+    "importProject": "Importar Proyecto",
+    "collapseSidebar": "Colapsar barra lateral",
+    "expandSidebar": "Expandir barra lateral"
   },
   "projectTabs": {
     "commandCenter": "Centro de Mando",
@@ -354,7 +356,11 @@
         "blocked": "Bloqueado",
         "deferred": "Aplazado"
       }
-    }
+    },
+    "bySprint": "Por sprint",
+    "byMilestone": "Por milestone",
+    "allMilestones": "Todos los milestones",
+    "noMilestone": "Sin milestone"
   },
   "dashboard": {
     "title": "Panel",

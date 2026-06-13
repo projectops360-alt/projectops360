@@ -1,4 +1,4 @@
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppFrame } from "@/components/layout/app-frame";
 import { Header } from "@/components/layout/header";
 import type { I18nField } from "@/types/database";
 
@@ -23,12 +23,8 @@ export interface AppShellProps {
 
 export function AppShell({ children, user, org }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <div className="pl-64">
-        <Header user={user} org={org} />
-        <main className="p-6">{children}</main>
-      </div>
-    </div>
+    <AppFrame header={<Header user={user} org={org} />}>
+      {children}
+    </AppFrame>
   );
 }

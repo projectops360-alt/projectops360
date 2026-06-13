@@ -16,7 +16,9 @@
     "settings": "Settings",
     "search": "Search…",
     "notifications": "Notifications",
-    "importProject": "Import Project"
+    "importProject": "Import Project",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "projectTabs": {
     "commandCenter": "Command Center",
@@ -354,7 +356,11 @@
         "blocked": "Blocked",
         "deferred": "Deferred"
       }
-    }
+    },
+    "bySprint": "By sprint",
+    "byMilestone": "By milestone",
+    "allMilestones": "All milestones",
+    "noMilestone": "No milestone"
   },
   "dashboard": {
     "title": "Dashboard",
