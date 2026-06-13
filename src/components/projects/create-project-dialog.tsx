@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { X, Loader2 } from "lucide-react";
@@ -57,7 +58,7 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
     // Close dialog and navigate to the Execution Map with onboarding
     onClose();
     if (result.projectId) {
-      router.push(`/${locale}/projects/${result.projectId}/execution-map?onboard=true`);
+      router.push(localizedHref(locale, `/projects/${result.projectId}/execution-map?onboard=true`));
     }
     return { success: true as const, projectId: result.projectId ?? "" };
   }

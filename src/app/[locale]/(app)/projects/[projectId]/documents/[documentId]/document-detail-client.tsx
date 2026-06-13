@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, User, FileText, Upload, Link2, Hash, Pencil, Trash2, ExternalLink } from "lucide-react";
@@ -61,7 +62,7 @@ export function DocumentDetailClient({
     if (!confirm(t.archiveConfirm)) return;
     const result = await archiveDocumentAction(document.id);
     if (!result.error) {
-      router.push(`/${locale}/projects/${projectId}/documents`);
+      router.push(localizedHref(locale, `/projects/${projectId}/documents`));
     }
   }, [document.id, t.archiveConfirm, router, locale, projectId]);
 

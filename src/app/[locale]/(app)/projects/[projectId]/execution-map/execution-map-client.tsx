@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   Map, LayoutList, Columns3, ListTodo, Network, Calendar,
@@ -571,7 +572,7 @@ export function ExecutionMapClient({
         {/* Living Graph lives on its own route (server-fetched graph data) */}
         <button
           type="button"
-          onClick={() => router.push(`/${locale}/projects/${projectId}/execution-map/living-graph`)}
+          onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/living-graph`))}
           className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <Share2 className="h-3.5 w-3.5" />

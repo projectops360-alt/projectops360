@@ -1,6 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
+import { localizedHref } from "@/i18n/href";
 import { getCommandCenterSummary, band, type CommandCenterData, type HealthBand } from "@/lib/command-center/service";
 import {
   UploadCloud, Sparkles, BarChart3, Gauge, FolderKanban, Ban, Route, Wallet, Scale,
@@ -30,7 +31,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   const org = await getOrgContext();
   const data = await getCommandCenterSummary(org.organizationId, locale);
-  const base = `/${locale}`;
+  const base = localizedHref(locale, ""); // "" for default locale, "/es" otherwise
 
   const KPI_LABEL: Record<string, string> = {
     portfolio_health: tt("Portfolio Health", "Salud del Portafolio"),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Clock, MapPin, Users, Pencil, Trash2, Sparkles, Zap } from "lucide-react";
@@ -143,7 +144,7 @@ export function MeetingDetailClient({
     if (!confirm(t.archiveConfirm)) return;
     const result = await archiveMeetingAction(meeting.id);
     if (!result.error) {
-      router.push(`/${locale}/projects/${projectId}/meetings`);
+      router.push(localizedHref(locale, `/projects/${projectId}/meetings`));
     }
   }, [meeting.id, t.archiveConfirm, router, locale, projectId]);
 

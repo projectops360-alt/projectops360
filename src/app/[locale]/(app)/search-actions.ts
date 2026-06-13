@@ -12,6 +12,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue, type I18nField } from "@/types/database";
+import { localizedHref } from "@/i18n/href";
 
 export type SearchEntityType =
   | "project" | "task" | "milestone" | "risk" | "material" | "rfi" | "resource" | "decision" | "budget";
@@ -40,7 +41,7 @@ export async function globalSearchAction(input: { query: string; locale?: string
   const like = `%${q.replace(/[%_]/g, "")}%`;
   const supabase = createAdminClient();
   const orgId = org.organizationId;
-  const P = `/${locale}/projects`;
+  const P = localizedHref(locale, "/projects");
 
   // Project name map (for sublabels/links)
   const { data: projectRows } = await supabase
@@ -71,7 +72,7 @@ export async function globalSearchAction(input: { query: string; locale?: string
   for (const r of risksRes.data ?? []) results.push({ type: "risk", title: r.title, subtitle: `${proj(r.project_id)} · ${r.severity}`, href: `${P}/${r.project_id}`, projectId: r.project_id });
   for (const m of materialsRes.data ?? []) results.push({ type: "material", title: m.name, subtitle: `${proj(m.project_id)} · ${m.status}`, href: `${P}/${m.project_id}`, projectId: m.project_id });
   for (const r of rfisRes.data ?? []) results.push({ type: "rfi", title: r.subject, subtitle: `${proj(r.project_id)} · ${r.status}`, href: `${P}/${r.project_id}`, projectId: r.project_id });
-  for (const r of resourcesRes.data ?? []) results.push({ type: "resource", title: r.name, subtitle: r.resource_type, href: `/${locale}/team`, projectId: r.project_id });
+  for (const r of resourcesRes.data ?? []) results.push({ type: "resource", title: r.name, subtitle: r.resource_type, href: localizedHref(locale, "/team"), projectId: r.project_id });
   for (const d of (decisionsRes.data ?? [])) {
     const title = getI18nValue(d.title_i18n as I18nField, locale as "en" | "es");
     if (title.toLowerCase().includes(qlower)) results.push({ type: "decision", title, subtitle: `${proj(d.project_id)} · ${d.status}`, href: `${P}/${d.project_id}/decisions`, projectId: d.project_id });

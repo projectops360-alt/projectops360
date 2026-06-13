@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, User, Link2, ExternalLink, Pencil, Trash2 } from "lucide-react";
@@ -123,7 +124,7 @@ export function DecisionDetailClient({
     if (!confirm(t.archiveConfirm)) return;
     const result = await archiveDecisionAction(decision.id);
     if (!result.error) {
-      router.push(`/${locale}/projects/${projectId}/decisions`);
+      router.push(localizedHref(locale, `/projects/${projectId}/decisions`));
     }
   }, [decision.id, t.archiveConfirm, router, locale, projectId]);
 

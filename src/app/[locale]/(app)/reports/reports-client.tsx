@@ -15,6 +15,7 @@ import {
   Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle, Calculator, Sparkles,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
+import { localizedHref } from "@/i18n/href";
 import { listDatasets, getDataset } from "@/lib/reports/registry";
 import { listPrebuiltReports } from "@/lib/reports/report-library";
 import { listKpis } from "@/lib/reports/kpi-dictionary";
@@ -224,11 +225,10 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
 /** Where a report row drills into: the project page that owns the problem. */
 function entityHref(locale: string, datasetId: string, projectId: string | null): string | null {
   if (!projectId) return null;
-  const baseP = `/${locale}/projects/${projectId}`;
   switch (datasetId) {
-    case "task_execution": return `${baseP}/workboard`;
-    case "project_health": return `${baseP}/status`;
-    default: return baseP; // budget, risks, materials, rfis → project overview
+    case "task_execution": return localizedHref(locale, `/projects/${projectId}/workboard`);
+    case "project_health": return localizedHref(locale, `/projects/${projectId}/status`);
+    default: return localizedHref(locale, `/projects/${projectId}`); // budget, risks, materials, rfis
   }
 }
 

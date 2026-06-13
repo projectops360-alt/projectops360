@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { useState, useEffect, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle,
@@ -540,7 +541,7 @@ export function ImportClient({
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => router.push(`/${locale}/projects/${result.projectId}/execution-map`)}
+              onClick={() => router.push(localizedHref(locale, `/projects/${result.projectId}/execution-map`))}
               className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
             >
               {t.openProject}

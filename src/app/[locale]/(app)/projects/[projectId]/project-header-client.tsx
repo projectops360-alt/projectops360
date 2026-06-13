@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { ProjectStatusBadge } from "@/components/projects/status-badge";
@@ -47,7 +48,7 @@ export function ProjectHeaderClient({
       return;
     }
 
-    router.push(`/${locale}/projects`);
+    router.push(localizedHref(locale, `/projects`));
     router.refresh();
   };
 
