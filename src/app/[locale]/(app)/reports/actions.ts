@@ -18,6 +18,7 @@ import { rowsToCsv } from "@/lib/reports/filter-engine";
 import { validateFormula } from "@/lib/reports/formula";
 import { runAi } from "@/lib/ai";
 import type { ReportConfig, ReportResult, VisualizationType } from "@/lib/reports/types";
+import { getI18nValue, type I18nField } from "@/types/database";
 
 // ── Config validation ─────────────────────────────────────────────────────────
 
@@ -58,6 +59,48 @@ function sanitizeConfig(input: unknown): ReportConfig | null {
 async function assertProjectInOrg(supabase: ReturnType<typeof createAdminClient>, orgId: string, projectId: string): Promise<boolean> {
   const { data } = await supabase.from("projects").select("id").eq("id", projectId).eq("organization_id", orgId).is("deleted_at", null).maybeSingle();
   return !!data;
+}
+
+// ── Project scope selector data ───────────────────────────────────────────────
+
+export interface ReportProject {
+  id: string;
+  name: string;
+  status: string;
+  code: string;          // human-facing identifier (slug)
+  projectType: string | null;
+}
+
+/**
+ * Projects the current user can run reports against. Org-scoped via
+ * getOrgContext, so only the caller's organization is ever returned — no
+ * unauthorized projects are exposed.
+ */
+export async function listProjectsForReportsAction(
+  locale = "en",
+): Promise<{ error?: string; projects?: ReportProject[] }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, title_i18n, slug, status, project_type")
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  if (error) return { error: "unexpected" };
+  const projects: ReportProject[] = (data ?? []).map((p) => ({
+    id: p.id,
+    name: getI18nValue(p.title_i18n as I18nField, locale as "en" | "es") || p.slug,
+    status: p.status,
+    code: p.slug,
+    projectType: p.project_type ?? null,
+  }));
+  return { projects };
 }
 
 // ── Run a report config ─────────────────────────────────────────────────────

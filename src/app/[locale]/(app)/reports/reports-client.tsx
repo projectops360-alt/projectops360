@@ -8,11 +8,12 @@
 // datasets (semantic layer) and runs through server actions — never raw SQL.
 // ============================================================================
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3, LayoutGrid, Wrench, Bookmark, Compass, BookOpen, Play, Save, Download,
   Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle, Calculator, Sparkles,
+  FolderKanban, ChevronDown, Check, Globe,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import { localizedHref } from "@/i18n/href";
@@ -24,7 +25,7 @@ import type {
 } from "@/lib/reports/types";
 import {
   runReportAction, exportReportCsvAction, saveReportAction, deleteSavedReportAction,
-  duplicateSavedReportAction, suggestCalculatedFieldAction, type SavedReportRow,
+  duplicateSavedReportAction, suggestCalculatedFieldAction, type SavedReportRow, type ReportProject,
 } from "./actions";
 
 type Tab = "overview" | "library" | "builder" | "saved" | "explorer" | "kpi";
@@ -42,6 +43,9 @@ const T = {
     addFilter: "Add filter", none: "None", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
     selectDataset: "Select a dataset to start building.", noColumns: "Pick at least one column, then Run.",
     runFirst: "Run the report to preview results.", noData: "No rows match this report.",
+    scope: { label: "Scope", all: "All Projects", allHint: "Portfolio-wide", choose: "Choose a project", runningFor: "Running report for", noProjects: "No projects available yet.", search: "Search projects…" },
+    noDataProject: "No report data was found for this project using the current filters.",
+    projStatus: { planning: "Planning", active: "Active", on_hold: "On hold", completed: "Completed", cancelled: "Cancelled" } as Record<string, string>,
     saveTitle: "Save report", reportName: "Report name", description: "Description", visibility: "Visibility",
     vis: { private: "Private", project: "Project", organization: "Organization" } as Record<string, string>,
     cancel: "Cancel", saved: "Saved", deleteConfirm: "Delete this report?", duplicate: "Duplicate", delete: "Delete",
@@ -69,6 +73,9 @@ const T = {
     addFilter: "Agregar filtro", none: "Ninguno", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
     selectDataset: "Elige un dataset para empezar.", noColumns: "Elige al menos una columna y ejecuta.",
     runFirst: "Ejecuta el reporte para ver resultados.", noData: "Ninguna fila coincide con este reporte.",
+    scope: { label: "Alcance", all: "Todos los Proyectos", allHint: "Todo el portafolio", choose: "Elige un proyecto", runningFor: "Ejecutando reporte para", noProjects: "Aún no hay proyectos disponibles.", search: "Buscar proyectos…" },
+    noDataProject: "No se encontraron datos para este proyecto con los filtros actuales.",
+    projStatus: { planning: "Planeación", active: "Activo", on_hold: "En pausa", completed: "Completado", cancelled: "Cancelado" } as Record<string, string>,
     saveTitle: "Guardar reporte", reportName: "Nombre del reporte", description: "Descripción", visibility: "Visibilidad",
     vis: { private: "Privado", project: "Proyecto", organization: "Organización" } as Record<string, string>,
     cancel: "Cancelar", saved: "Guardado", deleteConfirm: "¿Eliminar este reporte?", duplicate: "Duplicar", delete: "Eliminar",
@@ -110,7 +117,7 @@ function emptyConfig(datasetId: string): ReportConfig {
   return { datasetId, columns: ds?.defaultColumns ?? [], filters: [], grouping: null, sort: [], visualization: "table" };
 }
 
-export function ReportsClient({ locale, initialSavedReports, initialReportId }: { locale: Locale; initialSavedReports: SavedReportRow[]; initialReportId?: string | null }) {
+export function ReportsClient({ locale, initialSavedReports, initialReportId, initialProjects, initialProjectId }: { locale: Locale; initialSavedReports: SavedReportRow[]; initialReportId?: string | null; initialProjects: ReportProject[]; initialProjectId?: string | null }) {
   const t = T[locale] ?? T.en;
   const [tab, setTab] = useState<Tab>("overview");
   const [config, setConfig] = useState<ReportConfig | null>(null);
@@ -120,9 +127,14 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
   const [saved, setSaved] = useState<SavedReportRow[]>(initialSavedReports);
   const [showSave, setShowSave] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  // Project scope: null = All Projects (portfolio); else a specific project id.
+  const validInitial = initialProjectId && initialProjects.some((p) => p.id === initialProjectId) ? initialProjectId : null;
+  const [projectScope, setProjectScope] = useState<string | null>(validInitial);
 
   const datasets = listDatasets();
   const dataset = config ? getDataset(config.datasetId) : null;
+  const activeProject = projectScope ? initialProjects.find((p) => p.id === projectScope) ?? null : null;
+  const scopeName = activeProject ? activeProject.name : t.scope.all;
 
   const openBuilder = useCallback((cfg: ReportConfig) => {
     setConfig(cfg);
@@ -134,7 +146,7 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
   const run = useCallback(async (cfg: ReportConfig) => {
     setRunning(true);
     setError(null);
-    const res = await runReportAction({ config: cfg, page: 1, pageSize: 100 });
+    const res = await runReportAction({ config: cfg, projectId: projectScope, page: 1, pageSize: 100 });
     setRunning(false);
     if (res.error || !res.result) {
       setError(t.errors[res.error ?? "unexpected"] ?? res.details?.join(" ") ?? t.errors.unexpected);
@@ -142,7 +154,17 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
       return;
     }
     setResult(res.result);
-  }, [t]);
+  }, [t, projectScope]);
+
+  // Re-run the active report when the project scope changes, so the preview
+  // always reflects the selected scope (handles "user switches project after
+  // a report is generated"). Deferred to avoid a synchronous in-effect setState.
+  useEffect(() => {
+    if (!config || !result) return;
+    const id = setTimeout(() => run(config), 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run only on scope change
+  }, [projectScope]);
 
   // Deep-link: /reports?report=<id> opens the prebuilt report in the builder and runs it.
   useEffect(() => {
@@ -158,7 +180,10 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
 
   async function exportCsv() {
     if (!config) return;
-    const res = await exportReportCsvAction({ config, reportName: dataset?.displayName });
+    // Include the project scope in the export name/metadata.
+    const baseName = dataset?.displayName ?? "report";
+    const reportName = activeProject ? `${baseName} - ${activeProject.name}` : baseName;
+    const res = await exportReportCsvAction({ config, projectId: projectScope, reportName });
     if (res.csv != null && res.fileName) {
       const blob = new Blob([res.csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -171,12 +196,15 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-          <BarChart3 className="h-6 w-6 text-brand-500" />
-          {t.title}
-        </h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t.subtitle}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+            <BarChart3 className="h-6 w-6 text-brand-500" />
+            {t.title}
+          </h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t.subtitle}</p>
+        </div>
+        <ProjectScopePicker t={t} projects={initialProjects} value={projectScope} onChange={setProjectScope} />
       </div>
 
       {/* Tabs */}
@@ -198,19 +226,20 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
       {tab === "builder" && (
         <Builder
           t={t} locale={locale} datasets={datasets} config={config} setConfig={setConfig} dataset={dataset}
-          result={result} running={running} error={error}
+          result={result} running={running} error={error} scopeName={scopeName} scoped={!!activeProject}
+          emptyText={activeProject ? t.noDataProject : t.noData}
           onRun={() => config && run(config)} onSave={() => setShowSave(true)} onExport={exportCsv}
         />
       )}
       {tab === "saved" && (
-        <Saved t={t} saved={saved} onOpen={(r) => { openBuilder(savedToConfig(r)); }} onDelete={async (id) => { await deleteSavedReportAction({ reportId: id }); setSaved((s) => s.filter((x) => x.id !== id)); }} onDuplicate={async (id) => { const r = await duplicateSavedReportAction({ reportId: id }); if (r.reportId) { const src = saved.find((x) => x.id === id); if (src) setSaved((s) => [{ ...src, id: r.reportId!, report_name: `${src.report_name} (copy)` }, ...s]); } }} />
+        <Saved t={t} saved={saved} onOpen={(r) => { openBuilder(savedToConfig(r)); setProjectScope(r.project_id && initialProjects.some((p) => p.id === r.project_id) ? r.project_id : null); }} onDelete={async (id) => { await deleteSavedReportAction({ reportId: id }); setSaved((s) => s.filter((x) => x.id !== id)); }} onDuplicate={async (id) => { const r = await duplicateSavedReportAction({ reportId: id }); if (r.reportId) { const src = saved.find((x) => x.id === id); if (src) setSaved((s) => [{ ...src, id: r.reportId!, report_name: `${src.report_name} (copy)` }, ...s]); } }} />
       )}
       {tab === "explorer" && <Explorer t={t} datasets={datasets} onBuild={(id) => openBuilder(emptyConfig(id))} />}
       {tab === "kpi" && <KpiDictionary t={t} />}
 
       {showSave && config && (
         <SaveDialog t={t} onClose={() => setShowSave(false)} onSave={async (meta) => {
-          const res = await saveReportAction({ config, ...meta });
+          const res = await saveReportAction({ config, projectId: projectScope, ...meta });
           setShowSave(false);
           if (!res.error) { setSavedToast(true); setTimeout(() => setSavedToast(false), 2500); }
         }} />
@@ -247,6 +276,114 @@ function savedToConfig(r: SavedReportRow): ReportConfig {
 // ── Overview ──────────────────────────────────────────────────────────────────
 
 type Labels = (typeof T)["en"];
+
+// ── Project scope selector ────────────────────────────────────────────────────
+
+function ProjectScopePicker({ t, projects, value, onChange }: {
+  t: Labels; projects: ReportProject[]; value: string | null; onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const selected = value ? projects.find((p) => p.id === value) ?? null : null;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? projects.filter((p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))
+    : projects;
+
+  const StatusDot = ({ status }: { status: string }) => {
+    const tone = status === "active" ? "bg-green-500" : status === "completed" ? "bg-blue-500" : status === "on_hold" ? "bg-amber-500" : status === "cancelled" ? "bg-red-500" : "bg-slate-400";
+    return <span className={`inline-block h-1.5 w-1.5 rounded-full ${tone}`} />;
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-brand-400"
+      >
+        {selected ? <FolderKanban className="h-4 w-4 text-brand-500" /> : <Globe className="h-4 w-4 text-muted-foreground" />}
+        <span className="text-muted-foreground">{t.scope.label}:</span>
+        <span className="max-w-[12rem] truncate font-semibold text-foreground">{selected ? selected.name : t.scope.all}</span>
+        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          {projects.length > 6 && (
+            <div className="border-b border-border p-2">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.scope.search}
+                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:border-brand-400 focus:outline-none"
+              />
+            </div>
+          )}
+          <ul role="listbox" className="max-h-72 overflow-auto p-1">
+            {/* All Projects (portfolio) */}
+            <li>
+              <button
+                type="button"
+                onClick={() => { onChange(null); setOpen(false); }}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60 ${value === null ? "bg-brand-50 dark:bg-brand-950/30" : ""}`}
+              >
+                <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-foreground">{t.scope.all}</div>
+                  <div className="text-[11px] text-muted-foreground">{t.scope.allHint}</div>
+                </div>
+                {value === null && <Check className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />}
+              </button>
+            </li>
+
+            {projects.length === 0 ? (
+              <li className="px-3 py-6 text-center text-xs text-muted-foreground">{t.scope.noProjects}</li>
+            ) : filtered.length === 0 ? (
+              <li className="px-3 py-6 text-center text-xs text-muted-foreground">{t.scope.choose}</li>
+            ) : (
+              filtered.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => { onChange(p.id); setOpen(false); }}
+                    className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/60 ${value === p.id ? "bg-brand-50 dark:bg-brand-950/30" : ""}`}
+                  >
+                    <FolderKanban className="h-4 w-4 shrink-0 text-brand-500" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-foreground">{p.name}</div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <StatusDot status={p.status} />
+                        <span>{t.projStatus[p.status] ?? p.status}</span>
+                        <span className="opacity-50">·</span>
+                        <span className="truncate">{p.code}</span>
+                      </div>
+                    </div>
+                    {value === p.id && <Check className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Overview({ t, datasets, saved, onBuild, onLibrary, onExplore, onOpenSaved }: {
   t: Labels; datasets: ReturnType<typeof listDatasets>; saved: SavedReportRow[];
@@ -325,10 +462,11 @@ function Library({ t, onRun }: { t: Labels; onRun: (cfg: ReportConfig) => void }
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
-function Builder({ t, locale, datasets, config, setConfig, dataset, result, running, error, onRun, onSave, onExport }: {
+function Builder({ t, locale, datasets, config, setConfig, dataset, result, running, error, scopeName, scoped, emptyText, onRun, onSave, onExport }: {
   t: Labels; locale: Locale; datasets: ReturnType<typeof listDatasets>; config: ReportConfig | null;
   setConfig: (c: ReportConfig) => void; dataset: ReturnType<typeof getDataset>;
   result: ReportResult | null; running: boolean; error: string | null;
+  scopeName: string; scoped: boolean; emptyText: string;
   onRun: () => void; onSave: () => void; onExport: () => void;
 }) {
   if (!config || !dataset) {
@@ -428,13 +566,20 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
           </div>
         )}
 
+        {/* Active scope banner */}
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+          {scoped ? <FolderKanban className="h-3.5 w-3.5 text-brand-500" /> : <Globe className="h-3.5 w-3.5 text-muted-foreground" />}
+          <span className="text-muted-foreground">{t.scope.runningFor}:</span>
+          <span className="font-semibold text-foreground">{scopeName}</span>
+        </div>
+
         {/* Preview */}
         {config.columns.length === 0 ? (
           <Empty icon={<TableIcon className="h-8 w-8" />} text={t.noColumns} />
         ) : !result ? (
           <Empty icon={<Play className="h-8 w-8" />} text={t.runFirst} />
         ) : (
-          <PreviewPane t={t} locale={locale} config={config} result={result} />
+          <PreviewPane t={t} locale={locale} config={config} result={result} emptyText={emptyText} />
         )}
       </div>
     </div>
@@ -581,7 +726,7 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
   );
 }
 
-function PreviewPane({ t, locale, config, result }: { t: Labels; locale: Locale; config: ReportConfig; result: ReportResult }) {
+function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; locale: Locale; config: ReportConfig; result: ReportResult; emptyText: string }) {
   const router = useRouter();
   const grouped = config.grouping && result.grouped ? result.grouped : null;
 
@@ -623,7 +768,7 @@ function PreviewPane({ t, locale, config, result }: { t: Labels; locale: Locale;
     <div className="space-y-3">
       <ResultMeta t={t} result={result} />
       {result.rows.length === 0 ? (
-        <Empty icon={<TableIcon className="h-8 w-8" />} text={t.noData} />
+        <Empty icon={<TableIcon className="h-8 w-8" />} text={emptyText} />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-sm">
