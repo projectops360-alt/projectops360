@@ -100,6 +100,15 @@ export interface ReportSort {
   direction: "asc" | "desc";
 }
 
+/** A user- or AI-defined column computed from a formula over numeric columns. */
+export interface CalculatedField {
+  key: string;        // generated, e.g. "calc_margin"
+  label: string;      // human label
+  expression: string; // formula text over dataset column keys
+  /** "manual" or "ai" — provenance, shown in the UI. */
+  source?: "manual" | "ai";
+}
+
 /** A complete report configuration — saved, run, and exported. */
 export interface ReportConfig {
   datasetId: string;
@@ -108,6 +117,8 @@ export interface ReportConfig {
   grouping: ReportGrouping | null;
   sort: ReportSort[];
   visualization: VisualizationType;
+  /** Calculated columns added on top of the dataset's curated columns. */
+  calculatedFields?: CalculatedField[];
 }
 
 /** A prebuilt report definition (configuration-driven, not page logic). */

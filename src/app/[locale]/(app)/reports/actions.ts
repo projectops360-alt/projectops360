@@ -15,6 +15,8 @@ import { logAudit } from "@/lib/audit";
 import { getDataset } from "@/lib/reports/registry";
 import { runReport, runReportForExport } from "@/lib/reports/query-service";
 import { rowsToCsv } from "@/lib/reports/filter-engine";
+import { validateFormula } from "@/lib/reports/formula";
+import { runAi } from "@/lib/ai";
 import type { ReportConfig, ReportResult, VisualizationType } from "@/lib/reports/types";
 
 // ── Config validation ─────────────────────────────────────────────────────────
@@ -23,6 +25,13 @@ const filterSchema = z.object({
   column: z.string().min(1).max(64),
   operator: z.string().min(1).max(32),
   value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()])), z.null()]).optional(),
+});
+
+const calcFieldSchema = z.object({
+  key: z.string().min(1).max(64).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+  label: z.string().min(1).max(80),
+  expression: z.string().min(1).max(500),
+  source: z.enum(["manual", "ai"]).optional(),
 });
 
 const configSchema = z.object({
@@ -37,6 +46,7 @@ const configSchema = z.object({
     .nullable(),
   sort: z.array(z.object({ column: z.string().max(64), direction: z.enum(["asc", "desc"]) })).max(10),
   visualization: z.enum(["table", "kpi_cards", "bar", "line", "donut", "pivot"]),
+  calculatedFields: z.array(calcFieldSchema).max(10).optional(),
 });
 
 function sanitizeConfig(input: unknown): ReportConfig | null {
@@ -134,6 +144,52 @@ export async function exportReportCsvAction(input: {
   return { csv, fileName, rowCount: out.rows.length };
 }
 
+// ── AI-suggested calculated field ─────────────────────────────────────────────
+
+/**
+ * Ask the AI to turn a plain-language description into a calculated-field
+ * formula over the dataset's numeric columns. The AI only produces the formula
+ * text — it is validated and evaluated by the deterministic engine, never run
+ * as code. Degrades gracefully when no AI provider is configured.
+ */
+export async function suggestCalculatedFieldAction(input: {
+  datasetId: string;
+  prompt: string;
+}): Promise<{ error?: string; label?: string; expression?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const dataset = getDataset(input.datasetId);
+  if (!dataset) return { error: "unknown_dataset" };
+  if (!input.prompt || input.prompt.length > 500) return { error: "invalid_prompt" };
+  if (!process.env.OPENAI_API_KEY) return { error: "ai_not_configured" };
+
+  const numericCols = dataset.columns.filter((c) => c.type === "number");
+  const numericKeys = new Set(numericCols.map((c) => c.key));
+  const colList = numericCols.map((c) => `${c.key} (${c.label})`).join(", ");
+
+  const aiPrompt = `You define a calculated field for a project report. Available NUMERIC columns (use these exact keys): ${colList}.
+Allowed syntax: + - * / %, parentheses, and functions round(x[,n]), abs(x), min(...), max(...), coalesce(...), if(cond,a,b) with comparisons > < >= <= == !=. Only reference the column keys above. Do NOT invent columns.
+Return strict JSON: { "label": "<short human label>", "expression": "<formula>" }.
+Request: ${input.prompt}`;
+
+  try {
+    const res = await runAi(org, { promptType: "custom", templateVars: { prompt: aiPrompt }, temperature: 0.1 });
+    if (res.status !== "completed" || !res.parsedJson) return { error: "ai_failed" };
+    const label = typeof res.parsedJson.label === "string" ? res.parsedJson.label.slice(0, 80) : "";
+    const expression = typeof res.parsedJson.expression === "string" ? res.parsedJson.expression.slice(0, 500) : "";
+    if (!expression) return { error: "ai_failed" };
+    const v = validateFormula(expression, numericKeys);
+    if (!v.ok) return { error: "ai_invalid_formula" };
+    return { label: label || "AI field", expression };
+  } catch {
+    return { error: "ai_failed" };
+  }
+}
+
 // ── Saved reports ──────────────────────────────────────────────────────────
 
 const saveSchema = z.object({
@@ -155,6 +211,7 @@ export interface SavedReportRow {
   filters_json: ReportConfig["filters"];
   grouping_json: ReportConfig["grouping"];
   sorting_json: ReportConfig["sort"];
+  calculated_fields_json: NonNullable<ReportConfig["calculatedFields"]>;
   visibility: "private" | "project" | "organization";
   project_id: string | null;
   created_by: string | null;
@@ -202,6 +259,7 @@ export async function saveReportAction(input: {
       filters_json: config.filters,
       grouping_json: config.grouping,
       sorting_json: config.sort,
+      calculated_fields_json: config.calculatedFields ?? [],
       visibility: d.visibility,
       created_by: org.userId,
     })
@@ -277,6 +335,7 @@ export async function duplicateSavedReportAction(input: { reportId: string }): P
       filters_json: src.filters_json,
       grouping_json: src.grouping_json,
       sorting_json: src.sorting_json,
+      calculated_fields_json: src.calculated_fields_json ?? [],
       visibility: src.visibility,
       created_by: org.userId,
     })

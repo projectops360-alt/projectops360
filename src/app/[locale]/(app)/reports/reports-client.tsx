@@ -11,7 +11,7 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   BarChart3, LayoutGrid, Wrench, Bookmark, Compass, BookOpen, Play, Save, Download,
-  Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle,
+  Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle, Calculator, Sparkles,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import { listDatasets, getDataset } from "@/lib/reports/registry";
@@ -22,7 +22,7 @@ import type {
 } from "@/lib/reports/types";
 import {
   runReportAction, exportReportCsvAction, saveReportAction, deleteSavedReportAction,
-  duplicateSavedReportAction, type SavedReportRow,
+  duplicateSavedReportAction, suggestCalculatedFieldAction, type SavedReportRow,
 } from "./actions";
 
 type Tab = "overview" | "library" | "builder" | "saved" | "explorer" | "kpi";
@@ -47,7 +47,13 @@ const T = {
     explorerHint: "Curated, business-friendly datasets you can report from — no raw tables.",
     kpiHint: "What each metric means and how it's computed.",
     formula: "Formula", interpretation: "How to read it", caution: "Caution", source: "Source",
-    errors: { invalid_config: "The report configuration is invalid.", invalid_filters: "One or more filters are invalid.", not_authenticated: "Session expired.", unexpected: "Something went wrong.", project_not_found: "Project not found." } as Record<string, string>,
+    calc: {
+      title: "Calculated fields", add: "Add field", label: "Label", expression: "Formula",
+      exprHint: "Use column keys, + - * / %, and round/abs/min/max/if(). e.g. forecast_cost - estimated_cost",
+      aiTitle: "Describe it and let AI write the formula", aiPlaceholder: "e.g. budget overrun percent",
+      aiBtn: "AI", generating: "Writing…", none: "No calculated fields yet.",
+    },
+    errors: { invalid_config: "The report configuration is invalid.", invalid_filters: "One or more filters are invalid.", invalid_formula: "A calculated field formula is invalid.", ai_not_configured: "AI isn't configured. Add an AI provider to use this.", ai_failed: "AI couldn't generate a formula. Try rephrasing.", ai_invalid_formula: "The AI formula referenced unknown columns.", not_authenticated: "Session expired.", unexpected: "Something went wrong.", project_not_found: "Project not found." } as Record<string, string>,
   },
   es: {
     title: "Reportes e Inteligencia",
@@ -68,7 +74,13 @@ const T = {
     explorerHint: "Datasets curados y fáciles de entender para tus reportes — sin tablas técnicas.",
     kpiHint: "Qué significa cada métrica y cómo se calcula.",
     formula: "Fórmula", interpretation: "Cómo leerlo", caution: "Precaución", source: "Fuente",
-    errors: { invalid_config: "La configuración del reporte no es válida.", invalid_filters: "Uno o más filtros no son válidos.", not_authenticated: "La sesión expiró.", unexpected: "Algo salió mal.", project_not_found: "Proyecto no encontrado." } as Record<string, string>,
+    calc: {
+      title: "Campos calculados", add: "Agregar campo", label: "Etiqueta", expression: "Fórmula",
+      exprHint: "Usa claves de columnas, + - * / % y round/abs/min/max/if(). Ej: forecast_cost - estimated_cost",
+      aiTitle: "Descríbelo y deja que la IA escriba la fórmula", aiPlaceholder: "ej. porcentaje de sobrecosto",
+      aiBtn: "IA", generating: "Escribiendo…", none: "Aún no hay campos calculados.",
+    },
+    errors: { invalid_config: "La configuración del reporte no es válida.", invalid_filters: "Uno o más filtros no son válidos.", invalid_formula: "La fórmula de un campo calculado no es válida.", ai_not_configured: "La IA no está configurada. Agrega un proveedor de IA para usar esto.", ai_failed: "La IA no pudo generar una fórmula. Reformula la descripción.", ai_invalid_formula: "La fórmula de la IA usó columnas desconocidas.", not_authenticated: "La sesión expiró.", unexpected: "Algo salió mal.", project_not_found: "Proyecto no encontrado." } as Record<string, string>,
   },
 };
 
@@ -216,6 +228,7 @@ function savedToConfig(r: SavedReportRow): ReportConfig {
     grouping: r.grouping_json ?? null,
     sort: r.sorting_json ?? [],
     visualization: r.visualization_type,
+    calculatedFields: r.calculated_fields_json ?? [],
   };
 }
 
@@ -319,8 +332,15 @@ function Builder({ t, datasets, config, setConfig, dataset, result, running, err
     );
   }
 
+  // Calculated fields appear as selectable numeric columns in a "Calculated" group.
+  const calcCols: DatasetColumn[] = (config.calculatedFields ?? []).map((f) => ({
+    key: f.key, label: f.label, group: "Calculated", type: "number" as const,
+    filterable: true, sortable: true, aggregatable: true, description: f.expression,
+  }));
+  const effectiveCols: DatasetColumn[] = [...dataset.columns, ...calcCols];
+
   const colByGroup = new Map<string, DatasetColumn[]>();
-  for (const c of dataset.columns) {
+  for (const c of effectiveCols) {
     if (!colByGroup.has(c.group)) colByGroup.set(c.group, []);
     colByGroup.get(c.group)!.push(c);
   }
@@ -329,8 +349,8 @@ function Builder({ t, datasets, config, setConfig, dataset, result, running, err
     const next = selectedSet.has(key) ? config.columns.filter((c) => c !== key) : [...config.columns, key];
     setConfig({ ...config, columns: next });
   };
-  const filterableCols = dataset.columns.filter((c) => c.filterable !== false);
-  const groupableCols = dataset.columns.filter((c) => c.groupable);
+  const filterableCols = effectiveCols.filter((c) => c.filterable !== false);
+  const groupableCols = effectiveCols.filter((c) => c.groupable);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
@@ -359,6 +379,9 @@ function Builder({ t, datasets, config, setConfig, dataset, result, running, err
             ))}
           </div>
         </div>
+
+        {/* Calculated fields */}
+        <CalcFieldsPanel t={t} config={config} setConfig={setConfig} />
       </div>
 
       {/* Right: controls + preview */}
@@ -401,6 +424,86 @@ function Builder({ t, datasets, config, setConfig, dataset, result, running, err
         ) : (
           <PreviewPane t={t} config={config} result={result} />
         )}
+      </div>
+    </div>
+  );
+}
+
+function CalcFieldsPanel({ t, config, setConfig }: { t: Labels; config: ReportConfig; setConfig: (c: ReportConfig) => void }) {
+  const fields = config.calculatedFields ?? [];
+  const [label, setLabel] = useState("");
+  const [expr, setExpr] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  function addField(lbl: string, expression: string, source: "manual" | "ai") {
+    const trimmedLabel = lbl.trim() || "Calculated";
+    const key = `calc_${Date.now().toString(36)}_${fields.length}`;
+    setConfig({
+      ...config,
+      calculatedFields: [...fields, { key, label: trimmedLabel, expression: expression.trim(), source }],
+      columns: [...config.columns, key], // auto-select the new field
+    });
+  }
+  function removeField(key: string) {
+    setConfig({ ...config, calculatedFields: fields.filter((f) => f.key !== key), columns: config.columns.filter((c) => c !== key) });
+  }
+  async function generateAi() {
+    if (!aiPrompt.trim() || aiBusy) return;
+    setAiBusy(true); setAiError(null);
+    const res = await suggestCalculatedFieldAction({ datasetId: config.datasetId, prompt: aiPrompt });
+    setAiBusy(false);
+    if (res.error || !res.expression) { setAiError(t.errors[res.error ?? "ai_failed"] ?? t.errors.ai_failed); return; }
+    addField(res.label ?? aiPrompt, res.expression, "ai");
+    setAiPrompt("");
+  }
+
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <Calculator className="h-3.5 w-3.5" />{t.calc.title}
+      </p>
+
+      {fields.length > 0 && (
+        <ul className="mb-2 space-y-1">
+          {fields.map((f) => (
+            <li key={f.key} className="flex items-center gap-2 rounded bg-muted/40 px-2 py-1 text-xs">
+              <span className="shrink-0 font-medium text-foreground">{f.label}</span>
+              {f.source === "ai" && <Sparkles className="h-3 w-3 shrink-0 text-purple-500" />}
+              <code className="min-w-0 flex-1 truncate text-muted-foreground" title={f.expression}>{f.expression}</code>
+              <button type="button" onClick={() => removeField(f.key)} className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Manual add */}
+      <div className="space-y-1.5">
+        <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} placeholder={t.calc.label}
+          className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs" />
+        <div className="flex gap-1.5">
+          <input value={expr} onChange={(e) => setExpr(e.target.value)} maxLength={500} placeholder={t.calc.expression}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 font-mono text-xs" />
+          <button type="button" disabled={!expr.trim()} onClick={() => { addField(label, expr, "manual"); setLabel(""); setExpr(""); }}
+            className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"><Plus className="h-3.5 w-3.5" /></button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">{t.calc.exprHint}</p>
+      </div>
+
+      {/* AI add */}
+      <div className="mt-2 border-t border-border pt-2">
+        <p className="mb-1 flex items-center gap-1 text-[11px] font-medium text-purple-600 dark:text-purple-400"><Sparkles className="h-3 w-3" />{t.calc.aiTitle}</p>
+        <div className="flex gap-1.5">
+          <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} maxLength={300} placeholder={t.calc.aiPlaceholder}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); generateAi(); } }}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs" />
+          <button type="button" disabled={!aiPrompt.trim() || aiBusy} onClick={generateAi}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-purple-600 px-2 py-1 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50">
+            {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{aiBusy ? t.calc.generating : t.calc.aiBtn}
+          </button>
+        </div>
+        {aiError && <p className="mt-1 text-[11px] text-red-600 dark:text-red-400">{aiError}</p>}
       </div>
     </div>
   );

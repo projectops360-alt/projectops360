@@ -10,7 +10,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getDataset } from "./registry";
 import { applyFilters, applySort, applyGrouping, validateFilters } from "./filter-engine";
-import type { ReportConfig, ReportResult, ReportRow, DatasetColumn } from "./types";
+import { evaluateFormula, validateFormula } from "./formula";
+import type { ReportConfig, ReportResult, ReportRow, DatasetColumn, CalculatedField } from "./types";
 
 const ROW_CAP = 5000;
 const DONE = new Set(["done", "tested"]);
@@ -222,6 +223,33 @@ const FETCHERS: Record<string, (s: Admin, c: QueryContext) => Promise<ReportRow[
   rfi_log: fetchRfis,
 };
 
+// ── Calculated fields ─────────────────────────────────────────────────────────
+
+/** Turn calculated-field definitions into number columns + validate them. */
+function buildCalcColumns(dataset: ReturnType<typeof getDataset>, fields: CalculatedField[]): { calcCols: DatasetColumn[]; error?: string } {
+  if (!dataset || fields.length === 0) return { calcCols: [] };
+  // Identifiers may reference numeric dataset columns OR earlier calculated fields.
+  const numericKeys = new Set(dataset.columns.filter((c) => c.type === "number").map((c) => c.key));
+  const calcCols: DatasetColumn[] = [];
+  for (const f of fields) {
+    const v = validateFormula(f.expression, numericKeys);
+    if (!v.ok) return { calcCols: [], error: `"${f.label}": ${v.error}` };
+    numericKeys.add(f.key); // allow chaining
+    calcCols.push({ key: f.key, label: f.label, group: "Calculated", type: "number", filterable: true, sortable: true, aggregatable: true, description: f.expression });
+  }
+  return { calcCols };
+}
+
+/** Add computed values to each row, in field order (supports chaining). */
+function applyCalculated(rows: ReportRow[], fields: CalculatedField[]): ReportRow[] {
+  if (fields.length === 0) return rows;
+  return rows.map((row) => {
+    const r: ReportRow = { ...row };
+    for (const f of fields) r[f.key] = evaluateFormula(f.expression, r);
+    return r;
+  });
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface RunReportError {
@@ -239,53 +267,51 @@ export async function runReport(
   const dataset = getDataset(config.datasetId);
   if (!dataset) return { error: "unknown_dataset" };
 
-  const colErrors = validateFilters(config.filters, dataset.columns);
+  const calcFields = config.calculatedFields ?? [];
+  const { calcCols, error: calcError } = buildCalcColumns(dataset, calcFields);
+  if (calcError) return { error: "invalid_formula", details: [calcError] };
+  const effectiveColumns = [...dataset.columns, ...calcCols];
+
+  const colErrors = validateFilters(config.filters, effectiveColumns);
   if (colErrors.length > 0) return { error: "invalid_filters", details: colErrors.map((e) => e.message) };
 
   const fetcher = FETCHERS[config.datasetId];
   if (!fetcher) return { error: "dataset_not_implemented" };
 
   const supabase = createAdminClient();
-  const allRows = await fetcher(supabase, ctx);
-  const truncated = allRows.length >= ROW_CAP;
+  const rawRows = await fetcher(supabase, ctx);
+  const truncated = rawRows.length >= ROW_CAP;
+  const allRows = applyCalculated(rawRows, calcFields);
 
-  // Filter → sort
-  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, dataset.columns);
+  // Filter → sort (calculated columns participate)
+  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, effectiveColumns);
 
-  // Selected columns metadata (preserve dataset order, fall back to all)
+  // Selected columns metadata (preserve order, fall back to defaults)
   const selected = config.columns.length > 0
-    ? (config.columns.map((k) => dataset.columns.find((c) => c.key === k)).filter(Boolean) as DatasetColumn[])
+    ? (config.columns.map((k) => effectiveColumns.find((c) => c.key === k)).filter(Boolean) as DatasetColumn[])
     : dataset.columns.filter((c) => dataset.defaultColumns.includes(c.key));
 
-  // Grouping → aggregated rows
   let grouped: ReportRow[] | undefined;
-  if (config.grouping) {
-    grouped = applyGrouping(filtered, config.grouping);
-  }
+  if (config.grouping) grouped = applyGrouping(filtered, config.grouping);
 
   const totalRows = filtered.length;
   const start = (pagination.page - 1) * pagination.pageSize;
   const pageRows = filtered.slice(start, start + pagination.pageSize);
 
-  return {
-    columns: selected,
-    rows: pageRows,
-    totalRows,
-    grouped,
-    durationMs: Date.now() - started,
-    truncated,
-  };
+  return { columns: selected, rows: pageRows, totalRows, grouped, durationMs: Date.now() - started, truncated };
 }
 
 /** Run and return ALL filtered rows (for CSV export, capped at ROW_CAP). */
 export async function runReportForExport(config: ReportConfig, ctx: QueryContext): Promise<{ rows: ReportRow[]; columns: DatasetColumn[] } | RunReportError> {
   const result = await runReport(config, ctx, { page: 1, pageSize: ROW_CAP });
   if ("error" in result) return result;
-  // Re-run without pagination slice
   const dataset = getDataset(config.datasetId)!;
   const fetcher = FETCHERS[config.datasetId]!;
+  const calcFields = config.calculatedFields ?? [];
+  const { calcCols } = buildCalcColumns(dataset, calcFields);
+  const effectiveColumns = [...dataset.columns, ...calcCols];
   const supabase = createAdminClient();
-  const allRows = await fetcher(supabase, ctx);
-  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, dataset.columns);
+  const allRows = applyCalculated(await fetcher(supabase, ctx), calcFields);
+  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, effectiveColumns);
   return { rows: filtered, columns: result.columns };
 }
