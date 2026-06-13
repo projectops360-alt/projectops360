@@ -11,8 +11,8 @@ export function Logo({ className, onDark = false }: { className?: string; onDark
   return (
     <div
       className={cn(
-        "flex items-center",
-        onDark && "rounded-lg bg-white/95 px-2 py-1 shadow-sm",
+        "flex items-center justify-center",
+        onDark && "rounded-xl bg-white px-3 py-2 shadow-sm",
         className,
       )}
     >
@@ -21,7 +21,9 @@ export function Logo({ className, onDark = false }: { className?: string; onDark
         alt="Project Ops 360°"
         width={2953}
         height={1024}
-        className="h-8 w-auto shrink-0"
+        // Fill the available width so the wide wordmark stays legible in the
+        // narrow sidebar; height follows the aspect ratio.
+        className={onDark ? "h-auto w-full" : "h-8 w-auto shrink-0"}
         priority
       />
     </div>
