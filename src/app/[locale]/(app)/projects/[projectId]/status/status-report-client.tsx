@@ -9,6 +9,7 @@
 // (print CSS in globals.css isolates #status-report-print).
 // ============================================================================
 
+import Image from "next/image";
 import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, OctagonAlert, Package, CalendarDays, ListChecks, User, Users, UserPlus, Play, ArrowUpRight } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { ProjectStatusReport, PhaseState, PhaseStatus, DailyActionType } from "@/lib/execution/status-report";
@@ -158,6 +159,15 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
       <div id="status-report-print" className="space-y-8 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         {/* Header */}
         <header className="border-b border-border pb-5">
+          {/* Brand mark — full-color logo on the light report surface */}
+          <Image
+            src="/logo-full.png"
+            alt="Project Ops 360°"
+            width={2953}
+            height={1024}
+            className="mb-5 h-10 w-auto"
+            priority
+          />
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">{t.title}</p>
