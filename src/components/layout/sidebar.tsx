@@ -91,8 +91,8 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
       )}
     >
       {/* ── Logo + collapse toggle ── */}
-      <div className={cn("flex h-20 items-center border-b border-white/5", collapsed ? "justify-center px-2" : "gap-2 px-3")}>
-        {!collapsed && <Logo />}
+      <div className={cn("relative border-b border-white/5", collapsed && "flex h-20 items-center justify-center px-2")}>
+        {!collapsed && <Logo fullWidth />}
         {onToggle && (
           <button
             type="button"
@@ -100,8 +100,10 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
             title={collapsed ? expandLabel : collapseLabel}
             aria-label={collapsed ? expandLabel : collapseLabel}
             className={cn(
-              "rounded-lg p-1.5 text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-white",
-              !collapsed && "ml-auto",
+              "rounded-lg p-1.5 transition-colors",
+              collapsed
+                ? "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
+                : "absolute right-2 top-2 bg-black/30 text-white/70 backdrop-blur-sm hover:bg-black/50 hover:text-white",
             )}
           >
             {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}

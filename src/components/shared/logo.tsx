@@ -9,15 +9,15 @@ import { cn } from "@/lib/utils";
  */
 export function Logo({ className, fullWidth = false }: { className?: string; fullWidth?: boolean }) {
   return (
-    <div className={cn("flex items-center justify-center overflow-hidden rounded-lg", className)}>
-      {/* 3D render already sits on a dark backdrop, so it blends into the dark
-          sidebar (rounded corners hide the seam). */}
+    <div className={cn("flex items-center justify-center", !fullWidth && "overflow-hidden rounded-lg", className)}>
+      {/* 3D render sits on a dark backdrop that matches the sidebar, so it
+          blends seamlessly even when bled full-width. */}
       <Image
         src="/logo-3d.png"
         alt="Project Ops 360°"
         width={1344}
         height={768}
-        className={fullWidth ? "h-auto w-full" : "h-14 w-auto shrink-0"}
+        className={fullWidth ? "block h-auto w-full" : "h-14 w-auto shrink-0"}
         priority
       />
     </div>
