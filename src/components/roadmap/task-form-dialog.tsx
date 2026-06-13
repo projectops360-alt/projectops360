@@ -7,6 +7,7 @@ import {
   createTaskAction,
   updateTaskAction,
   getTaskFormOptionsAction,
+  createPersonResourceAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 
@@ -93,6 +94,12 @@ const PLANNING_LABELS: Record<Locale, {
   sectionPlanning: string;
   assignee: string;
   assigneeNone: string;
+  assigneeUsers: string;
+  assigneeResources: string;
+  addPerson: string;
+  addPersonPlaceholder: string;
+  addPersonConfirm: string;
+  personTypes: Record<string, string>;
   predecessors: string;
   predecessorsEmpty: string;
   requiredMaterials: string;
@@ -103,6 +110,12 @@ const PLANNING_LABELS: Record<Locale, {
     sectionPlanning: "Assignment & prerequisites",
     assignee: "Assigned to",
     assigneeNone: "Unassigned",
+    assigneeUsers: "Workspace users",
+    assigneeResources: "Project people & crews",
+    addPerson: "+ Add new person…",
+    addPersonPlaceholder: "Name (e.g. Electrician Crew A, María López)",
+    addPersonConfirm: "Add",
+    personTypes: { person: "Person", crew: "Crew", team: "Team", role: "Role", vendor: "Vendor", subcontractor: "Subcontractor" },
     predecessors: "Predecessor tasks",
     predecessorsEmpty: "No other tasks in this project yet.",
     requiredMaterials: "Required materials",
@@ -113,6 +126,12 @@ const PLANNING_LABELS: Record<Locale, {
     sectionPlanning: "Asignación y prerrequisitos",
     assignee: "Asignado a",
     assigneeNone: "Sin asignar",
+    assigneeUsers: "Usuarios del workspace",
+    assigneeResources: "Personas y cuadrillas del proyecto",
+    addPerson: "+ Agregar persona…",
+    addPersonPlaceholder: "Nombre (ej. Cuadrilla Eléctrica A, María López)",
+    addPersonConfirm: "Agregar",
+    personTypes: { person: "Persona", crew: "Cuadrilla", team: "Equipo", role: "Rol", vendor: "Proveedor", subcontractor: "Subcontratista" },
     predecessors: "Tareas predecesoras",
     predecessorsEmpty: "Aún no hay otras tareas en este proyecto.",
     requiredMaterials: "Materiales requeridos",
@@ -123,10 +142,13 @@ const PLANNING_LABELS: Record<Locale, {
 
 interface TaskFormOptions {
   people: { id: string; name: string }[];
+  resources: { id: string; name: string; resource_type: string }[];
   tasks: { id: string; title: string }[];
   materials: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies: { predecessor_id: string; successor_id: string; dependency_type: string }[];
 }
+
+const ADD_PERSON_VALUE = "__add_person__";
 
 interface TaskFormDialogProps {
   mode: TaskFormMode;
@@ -206,6 +228,12 @@ export function TaskFormDialog({
     sectionPlanning: t.fields.sectionPlanning ?? planningLabels.sectionPlanning,
     assignee: t.fields.assignee ?? planningLabels.assignee,
     assigneeNone: t.fields.assigneeNone ?? planningLabels.assigneeNone,
+    assigneeUsers: planningLabels.assigneeUsers,
+    assigneeResources: planningLabels.assigneeResources,
+    addPerson: planningLabels.addPerson,
+    addPersonPlaceholder: planningLabels.addPersonPlaceholder,
+    addPersonConfirm: planningLabels.addPersonConfirm,
+    personTypes: planningLabels.personTypes,
     predecessors: t.fields.predecessors ?? planningLabels.predecessors,
     predecessorsEmpty: t.fields.predecessorsEmpty ?? planningLabels.predecessorsEmpty,
     requiredMaterials: t.fields.requiredMaterials ?? planningLabels.requiredMaterials,
@@ -218,12 +246,27 @@ export function TaskFormDialog({
   const [newMaterials, setNewMaterials] = useState<string[]>([]);
   const [materialDraft, setMaterialDraft] = useState("");
 
+  // Assignee: 'user:<id>' | 'resource:<id>' | '' — controlled so the
+  // quick-add flow can select the freshly created resource.
+  const [assigneeValue, setAssigneeValue] = useState<string>(
+    isEdit && task?.assigned_to
+      ? `user:${task.assigned_to}`
+      : isEdit && task?.assigned_resource_id
+        ? `resource:${task.assigned_resource_id}`
+        : "",
+  );
+  const [addingPerson, setAddingPerson] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonType, setNewPersonType] = useState("person");
+  const [creatingPerson, setCreatingPerson] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     getTaskFormOptionsAction({ projectId }).then((res) => {
       if (!cancelled && !res.error) {
         setOptions({
           people: res.people ?? [],
+          resources: res.resources ?? [],
           tasks: res.tasks ?? [],
           materials: res.materials ?? [],
           dependencies: res.dependencies ?? [],
@@ -232,6 +275,37 @@ export function TaskFormDialog({
     });
     return () => { cancelled = true; };
   }, [projectId]);
+
+  async function handleAddPerson() {
+    const name = newPersonName.trim();
+    if (!name || creatingPerson) return;
+    setCreatingPerson(true);
+    try {
+      const res = await createPersonResourceAction({
+        projectId,
+        name,
+        resourceType: newPersonType,
+      });
+      const resourceId = res.resourceId;
+      if (resourceId) {
+        setOptions((prev) =>
+          prev
+            ? {
+                ...prev,
+                resources: prev.resources.some((r) => r.id === resourceId)
+                  ? prev.resources
+                  : [...prev.resources, { id: resourceId, name, resource_type: newPersonType }].sort((a, b) => a.name.localeCompare(b.name)),
+              }
+            : prev,
+        );
+        setAssigneeValue(`resource:${resourceId}`);
+        setAddingPerson(false);
+        setNewPersonName("");
+      }
+    } finally {
+      setCreatingPerson(false);
+    }
+  }
 
   const preselectedPredecessors = new Set(
     isEdit && task && options
@@ -273,7 +347,9 @@ export function TaskFormDialog({
     const startDate = (formData.get("start_date") as string) || "";
     const endDate = (formData.get("end_date") as string) || "";
     const progress = parseInt(formData.get("progress") as string) || 0;
-    const assignedTo = (formData.get("assigned_to") as string) || null;
+    const assigneeRaw = (formData.get("assigned_to") as string) || "";
+    const assignedTo = assigneeRaw.startsWith("user:") ? assigneeRaw.slice(5) : null;
+    const assignedResourceId = assigneeRaw.startsWith("resource:") ? assigneeRaw.slice(9) : null;
     const predecessorIds = formData.getAll("predecessor_ids").map(String);
     const materialIds = formData.getAll("material_ids").map(String);
 
@@ -306,6 +382,7 @@ export function TaskFormDialog({
         execution_notes: executionNotes,
         blocker_reason: blockerReason,
         assigned_to: assignedTo,
+        assigned_resource_id: assignedResourceId,
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
@@ -336,6 +413,7 @@ export function TaskFormDialog({
         execution_notes: executionNotes,
         blocker_reason: blockerReason,
         assigned_to: assignedTo,
+        assigned_resource_id: assignedResourceId,
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
@@ -539,15 +617,87 @@ export function TaskFormDialog({
                     <select
                       id="task-assignee"
                       name="assigned_to"
-                      defaultValue={isEdit ? task?.assigned_to ?? "" : ""}
+                      value={assigneeValue}
+                      onChange={(e) => {
+                        if (e.target.value === ADD_PERSON_VALUE) {
+                          setAddingPerson(true);
+                        } else {
+                          setAssigneeValue(e.target.value);
+                        }
+                      }}
                       className={inputClass}
                       disabled={isPending}
                     >
                       <option value="">{tp.assigneeNone}</option>
-                      {options.people.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      {options.people.length > 0 && (
+                        <optgroup label={tp.assigneeUsers}>
+                          {options.people.map((p) => (
+                            <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {options.resources.length > 0 && (
+                        <optgroup label={tp.assigneeResources}>
+                          {options.resources.map((r) => (
+                            <option key={r.id} value={`resource:${r.id}`}>
+                              {r.name} ({tp.personTypes[r.resource_type] ?? r.resource_type})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value={ADD_PERSON_VALUE}>{tp.addPerson}</option>
                     </select>
+
+                    {/* Inline quick-add person/crew */}
+                    {addingPerson && (
+                      <div className="space-y-2 rounded-lg border border-brand-200 bg-brand-50/50 p-2.5 dark:border-brand-800/50 dark:bg-brand-950/20">
+                        <input
+                          type="text"
+                          value={newPersonName}
+                          onChange={(e) => setNewPersonName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddPerson();
+                            }
+                          }}
+                          maxLength={200}
+                          autoFocus
+                          className={inputClass}
+                          placeholder={tp.addPersonPlaceholder}
+                          disabled={creatingPerson}
+                        />
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={newPersonType}
+                            onChange={(e) => setNewPersonType(e.target.value)}
+                            className={inputClass}
+                            disabled={creatingPerson}
+                          >
+                            {Object.entries(tp.personTypes).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={handleAddPerson}
+                            disabled={creatingPerson || !newPersonName.trim()}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {creatingPerson ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                            {tp.addPersonConfirm}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setAddingPerson(false); setNewPersonName(""); }}
+                            disabled={creatingPerson}
+                            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Predecessor tasks */}

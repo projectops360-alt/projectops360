@@ -69,6 +69,7 @@ const createTaskSchema = z.object({
   end_date: z.string().optional().default(""),
   progress: z.coerce.number().int().min(0).max(100).default(0),
   assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
+  assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
   predecessor_ids: z.array(z.string().uuid()).max(50).optional().default([]),
   material_ids: z.array(z.string().uuid()).max(200).optional().default([]),
   new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional().default([]),
@@ -99,11 +100,41 @@ const updateTaskSchema = z.object({
   end_date: z.string().optional().default(""),
   progress: z.coerce.number().int().min(0).max(100).default(0),
   assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
+  assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
   predecessor_ids: z.array(z.string().uuid()).max(50).optional(),
   material_ids: z.array(z.string().uuid()).max(200).optional(),
   new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional(),
   projectId: z.string().uuid("invalid_project_id"),
 });
+
+// ── Assignment type resolution ─────────────────────────────────────────────────────
+
+/** Derive roadmap_tasks.assignment_type from how the task is assigned:
+ *  direct user → 'person'; group-like resource → its mapped type. */
+async function resolveAssignmentType(
+  supabase: ReturnType<typeof createAdminClient>,
+  assignedTo: string | null | undefined,
+  assignedResourceId: string | null | undefined,
+): Promise<string | null> {
+  if (assignedResourceId) {
+    const { data } = await supabase
+      .from("resources")
+      .select("resource_type")
+      .eq("id", assignedResourceId)
+      .single();
+    const map: Record<string, string> = {
+      person: "person",
+      crew: "crew",
+      team: "team",
+      role: "role",
+      vendor: "vendor",
+      subcontractor: "vendor",
+    };
+    return map[data?.resource_type ?? ""] ?? "resource_group";
+  }
+  if (assignedTo) return "person";
+  return null;
+}
 
 // ── Task planning sync (predecessors + required materials) ────────────────────────
 
@@ -237,11 +268,15 @@ async function syncTaskPlanning(
 
 // ── Task form options (people, tasks, materials) ──────────────────────────────────
 
+/** Resource types that can own a task (shown in the assignee selector). */
+const ASSIGNABLE_RESOURCE_TYPES = ["person", "crew", "team", "role", "vendor", "subcontractor"] as const;
+
 export async function getTaskFormOptionsAction(input: {
   projectId: string;
 }): Promise<{
   error?: string;
   people?: { id: string; name: string }[];
+  resources?: { id: string; name: string; resource_type: string }[];
   tasks?: { id: string; title: string }[];
   materials?: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies?: { predecessor_id: string; successor_id: string; dependency_type: string }[];
@@ -257,11 +292,19 @@ export async function getTaskFormOptionsAction(input: {
   }
 
   const supabase = createAdminClient();
-  const [peopleRes, tasksRes, materialsRes, depsRes] = await Promise.all([
+  const [peopleRes, resourcesRes, tasksRes, materialsRes, depsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, display_name")
       .eq("organization_id", org.organizationId),
+    supabase
+      .from("resources")
+      .select("id, name, resource_type")
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", input.projectId)
+      .in("resource_type", [...ASSIGNABLE_RESOURCE_TYPES])
+      .is("deleted_at", null)
+      .order("name", { ascending: true }),
     supabase
       .from("roadmap_tasks")
       .select("id, title")
@@ -288,10 +331,76 @@ export async function getTaskFormOptionsAction(input: {
       id: p.id,
       name: p.display_name || "—",
     })),
+    resources: resourcesRes.data ?? [],
     tasks: tasksRes.data ?? [],
     materials: materialsRes.data ?? [],
     dependencies: depsRes.data ?? [],
   };
+}
+
+// ── Quick-add an assignable resource (person/crew/team/vendor) ────────────────────
+
+const createPersonResourceSchema = z.object({
+  projectId: z.string().uuid("invalid_project_id"),
+  name: z.string().min(1, "nameRequired").max(200).transform((s) => s.trim()),
+  resourceType: z.enum(ASSIGNABLE_RESOURCE_TYPES).default("person"),
+});
+
+export async function createPersonResourceAction(input: {
+  projectId: string;
+  name: string;
+  resourceType?: string;
+}): Promise<{ error?: string; resourceId?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const parsed = createPersonResourceSchema.safeParse(input);
+  if (!parsed.success) return { error: "validation_error" };
+  const data = parsed.data;
+
+  const supabase = createAdminClient();
+
+  // Reuse an existing resource with the same name instead of duplicating
+  const { data: existing } = await supabase
+    .from("resources")
+    .select("id")
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .ilike("name", data.name)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existing) return { resourceId: existing.id };
+
+  const { data: resource, error } = await supabase
+    .from("resources")
+    .insert({
+      organization_id: org.organizationId,
+      project_id: data.projectId,
+      resource_type: data.resourceType,
+      name: data.name,
+      status: "active",
+      metadata: { origin: "task_form_quick_add" },
+    })
+    .select("id")
+    .single();
+  if (error || !resource) {
+    console.error("Failed to create resource:", error);
+    return { error: "unexpected" };
+  }
+
+  await logAudit({
+    org,
+    projectId: data.projectId,
+    action: "create",
+    entityType: "resources",
+    entityId: resource.id,
+    metadata: { name: data.name, resource_type: data.resourceType },
+  });
+
+  return { resourceId: resource.id };
 }
 
 // ── Create Milestone ──────────────────────────────────────────────────────────────
@@ -475,6 +584,7 @@ export async function createTaskAction(input: {
   end_date?: string;
   progress?: number;
   assigned_to?: string | null;
+  assigned_resource_id?: string | null;
   predecessor_ids?: string[];
   material_ids?: string[];
   new_materials?: string[];
@@ -546,6 +656,8 @@ export async function createTaskAction(input: {
       end_date: data.end_date || null,
       progress: data.progress,
       assigned_to: data.assigned_to ?? null,
+      assigned_resource_id: data.assigned_resource_id ?? null,
+      assignment_type: await resolveAssignmentType(supabase, data.assigned_to, data.assigned_resource_id),
       project_id: data.projectId,
       organization_id: org.organizationId,
     })
@@ -621,6 +733,7 @@ export async function updateTaskAction(input: {
   end_date?: string;
   progress?: number;
   assigned_to?: string | null;
+  assigned_resource_id?: string | null;
   predecessor_ids?: string[];
   material_ids?: string[];
   new_materials?: string[];
@@ -665,7 +778,11 @@ export async function updateTaskAction(input: {
     progress: data.progress,
   };
   if (data.order_index !== undefined) updateData.order_index = data.order_index;
-  if (data.assigned_to !== undefined) updateData.assigned_to = data.assigned_to;
+  if (data.assigned_to !== undefined || data.assigned_resource_id !== undefined) {
+    updateData.assigned_to = data.assigned_to ?? null;
+    updateData.assigned_resource_id = data.assigned_resource_id ?? null;
+    updateData.assignment_type = await resolveAssignmentType(supabase, data.assigned_to, data.assigned_resource_id);
+  }
 
   const { error: updateError } = await supabase
     .from("roadmap_tasks")
