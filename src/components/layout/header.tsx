@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell } from "lucide-react";
 import { UserMenu } from "@/components/layout/user-menu";
+import { GlobalSearch } from "@/components/layout/global-search";
 import type { OrgData, UserData } from "@/components/layout/app-shell";
 import type { Locale } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -25,14 +26,8 @@ export function Header({ user, org }: HeaderProps) {
             {orgName}
           </span>
         )}
-        {/* ── Search ── */}
-        <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-          <Search className="h-4 w-4" />
-          <span>Search…</span>
-          <kbd className="ml-8 hidden rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline">
-            ⌘K
-          </kbd>
-        </div>
+        {/* ── Global PMO search ── */}
+        <GlobalSearch />
       </div>
 
       {/* ── Right actions ── */}
