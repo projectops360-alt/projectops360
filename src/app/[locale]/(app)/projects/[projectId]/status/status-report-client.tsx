@@ -165,7 +165,7 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
             alt="Project Ops 360°"
             width={2953}
             height={1024}
-            className="mb-5 h-10 w-auto"
+            className="mb-5 h-14 w-auto"
             priority
           />
           <div className="flex items-start justify-between gap-4">
