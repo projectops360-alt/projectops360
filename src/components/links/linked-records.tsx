@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
@@ -133,7 +134,7 @@ export function LinkedRecords({
         <div className="mt-3 space-y-2">
           {links.map((link) => {
             const routeBase = entityRouteSegment[link.otherType];
-            const href = `/${locale}/projects/${projectId}/${routeBase}/${link.otherId}`;
+            const href = localizedHref(locale, `/projects/${projectId}/${routeBase}/${link.otherId}`);
             const contextText = getI18nValue(link.contextI18n, locale);
             const formattedDate = new Date(link.createdAt).toLocaleDateString(locale, {
               month: "short",

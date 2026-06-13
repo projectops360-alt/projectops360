@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import {
   BookOpen,
@@ -112,7 +113,7 @@ export function ProjectMemoryClient({
   counts,
 }: ProjectMemoryClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
-  const base = `/${locale}/projects/${projectId}`;
+  const base = localizedHref(locale, `/projects/${projectId}`);
 
   const isEs = locale === "es";
 

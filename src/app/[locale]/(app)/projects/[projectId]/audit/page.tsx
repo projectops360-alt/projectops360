@@ -1,4 +1,5 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
+import { localizedHref } from "@/i18n/href";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -89,7 +90,7 @@ export default async function AuditLogPage({
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
-        href={`/${locale}/projects/${projectId}`}
+        href={localizedHref(locale, `/projects/${projectId}`)}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

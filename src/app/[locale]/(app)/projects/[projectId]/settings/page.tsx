@@ -1,4 +1,5 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
+import { localizedHref } from "@/i18n/href";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +34,7 @@ export default async function ProjectSettingsPage({
 
   const t = await getTranslations("projects");
   const isEs = locale === "es";
-  const base = `/${locale}/projects/${projectId}`;
+  const base = localizedHref(locale, `/projects/${projectId}`);
 
   // Fetch stakeholder count
   const { count: stakeholderCount } = await supabase
@@ -99,7 +100,7 @@ export default async function ProjectSettingsPage({
         </Link>
 
         <Link
-          href={`/${locale}/import?projectId=${projectId}`}
+          href={localizedHref(locale, `/import?projectId=${projectId}`)}
           className="group rounded-xl border border-border bg-card p-6 transition-all hover:border-brand-500/40 hover:shadow-md"
         >
           <div className="flex items-center gap-3">

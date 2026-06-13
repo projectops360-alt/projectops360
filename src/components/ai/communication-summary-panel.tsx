@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { localizedHref } from "@/i18n/href";
 import {
   FileText,
   Loader2,
@@ -61,8 +62,8 @@ function SourceRecordBadge({
 }) {
   const isComm = record.type === "communication";
   const route = isComm
-    ? `/${locale}/projects/${projectId}/communications`
-    : `/${locale}/projects/${projectId}/decisions`;
+    ? localizedHref(locale, `/projects/${projectId}/communications`)
+    : localizedHref(locale, `/projects/${projectId}/decisions`);
   const Icon = isComm ? MessageSquare : Gavel;
   const label = isComm ? t.communicationLabel : t.decisionLabel;
   const color = isComm

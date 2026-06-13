@@ -74,7 +74,7 @@ export function DocumentDetailClient({
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
-        href={`/${locale}/projects/${projectId}/documents`}
+        href={localizedHref(locale, `/projects/${projectId}/documents`)}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

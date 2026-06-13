@@ -136,7 +136,7 @@ export function DecisionDetailClient({
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
-        href={`/${locale}/projects/${projectId}/decisions`}
+        href={localizedHref(locale, `/projects/${projectId}/decisions`)}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

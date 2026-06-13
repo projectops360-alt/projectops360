@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { localizedHref } from "@/i18n/href";
 import { Calendar, Clock, MapPin, Users, MoreHorizontal } from "lucide-react";
 import type { Meeting, Locale } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -97,7 +98,7 @@ export function MeetingCard({
       {/* Footer with link + archive */}
       <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
         <Link
-          href={`/${locale}/projects/${projectId}/meetings/${meeting.id}`}
+          href={localizedHref(locale, `/projects/${projectId}/meetings/${meeting.id}`)}
           className="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
         >
           View details →

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { localizedHref } from "@/i18n/href";
 import { Link2, Upload } from "lucide-react";
 import type { Document, DocumentStatus, DocumentType, StorageType, Locale } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -30,7 +31,7 @@ export function DocumentCard({
 
   return (
     <Link
-      href={`/${locale}/projects/${projectId}/documents/${document.id}`}
+      href={localizedHref(locale, `/projects/${projectId}/documents/${document.id}`)}
       className="block rounded-lg border border-gray-200 bg-white p-4 transition-shadow hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-2">

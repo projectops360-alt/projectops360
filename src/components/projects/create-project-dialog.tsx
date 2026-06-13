@@ -191,7 +191,7 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
 
           {/* Import from file */}
           <a
-            href={`/${locale}/import`}
+            href={localizedHref(locale, `/import`)}
             className="block text-sm text-brand-600 hover:underline dark:text-brand-400"
           >
             {t("importFromFile")}

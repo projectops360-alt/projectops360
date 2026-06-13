@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { localizedHref } from "@/i18n/href";
 import { Plus, FolderKanban } from "lucide-react";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
@@ -57,7 +58,7 @@ export function ProjectListClient({
               project={project}
               locale={locale}
               statusLabel={project.statusLabel}
-              href={`/${locale}/projects/${project.id}`}
+              href={localizedHref(locale, `/projects/${project.id}`)}
             />
           ))}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -238,7 +239,7 @@ export function ProjectDashboard({
   roadmapProgress,
 }: ProjectDashboardProps) {
   const router = useRouter();
-  const base = `/${locale}/projects/${projectId}`;
+  const base = localizedHref(locale, `/projects/${projectId}`);
 
   // ── Resolve blocker handler ──────────────────────────────────────────────────
   const [resolvingBlocker, setResolvingBlocker] = React.useState<string | null>(null);

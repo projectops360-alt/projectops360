@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, FormEvent } from "react";
+import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import {
   Search,
@@ -192,7 +193,7 @@ export function SearchClient({
     <div className="space-y-6">
       {/* Breadcrumb */}
       <Link
-        href={`/${locale}/projects/${projectId}`}
+        href={localizedHref(locale, `/projects/${projectId}`)}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />

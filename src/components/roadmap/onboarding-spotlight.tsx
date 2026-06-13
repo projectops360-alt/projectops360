@@ -38,7 +38,8 @@ export function OnboardingSpotlight({
     const isOnboarding = searchParams.get("onboard") === "true";
     const alreadySeen = localStorage.getItem(ONBOARDING_SEEN_KEY) === "true";
     if (isOnboarding && !alreadySeen) {
-      setVisible(true);
+      const id = setTimeout(() => setVisible(true), 0);
+      return () => clearTimeout(id);
     }
   }, [searchParams]);
 

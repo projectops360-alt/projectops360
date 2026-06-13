@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { localizedHref } from "@/i18n/href";
 
 export default async function RoadmapRedirectPage({
   params,
@@ -6,5 +7,5 @@ export default async function RoadmapRedirectPage({
   params: Promise<{ locale: string; projectId: string }>;
 }) {
   const { locale, projectId } = await params;
-  redirect(`/${locale}/projects/${projectId}/execution-map`);
+  redirect(localizedHref(locale, `/projects/${projectId}/execution-map`));
 }

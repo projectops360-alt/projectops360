@@ -1,4 +1,5 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
+import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
 import { Bot, DraftingCompass, ArrowRight, UploadCloud } from "lucide-react";
@@ -30,7 +31,7 @@ export default async function AiOperatorPage({
       {/* AI modules */}
       <div className="w-full max-w-md space-y-3">
         <Link
-          href={`/${locale}/import`}
+          href={localizedHref(locale, `/import`)}
           className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-brand-500/40 hover:shadow-md"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">
@@ -49,7 +50,7 @@ export default async function AiOperatorPage({
           <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />
         </Link>
         <Link
-          href={`/${locale}/drawing-intelligence`}
+          href={localizedHref(locale, `/drawing-intelligence`)}
           className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-brand-500/40 hover:shadow-md"
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">

@@ -1,4 +1,5 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
+import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import { DraftingCompass, FolderKanban, ArrowRight, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -68,7 +69,7 @@ export default async function GlobalDrawingIntelligencePage({
               return (
                 <Link
                   key={project.id}
-                  href={`/${locale}/projects/${project.id}/drawing-intelligence`}
+                  href={localizedHref(locale, `/projects/${project.id}/drawing-intelligence`)}
                   className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-brand-500/40 hover:shadow-md"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">
