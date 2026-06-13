@@ -10,13 +10,11 @@
     "workboard": "Workboard",
     "projectMemory": "Project Memory",
     "aiOperator": "AI Operator",
-    "drawingIntelligence": "Drawing Intelligence",
     "reports": "Reports",
     "team": "Team",
     "settings": "Settings",
     "search": "Search…",
     "notifications": "Notifications",
-    "importProject": "Import Project",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar"
   },
@@ -27,11 +25,11 @@
     "projectMemory": "Project Memory",
     "settings": "Settings",
     "laborCapacity": "Labor Capacity",
-    "drawingIntelligence": "Drawing Intelligence",
+    "drawingIntelligence": "BIM",
     "statusReport": "Status"
   },
   "drawingIntelligence": {
-    "title": "Drawing Intelligence",
+    "title": "BIM — Building Information Module",
     "subtitle": "AI engine that reads construction drawings and turns them into structured project knowledge — risks, RFIs, submittals, quantities, schedule and cost impacts — with full evidence traceability.",
     "notStorageNote": "This is an intelligence engine, not a document storage area. Files live in Documents; understanding lives here.",
     "emptyTitle": "No drawings connected yet",
@@ -90,16 +88,16 @@
       "comingSoonBadge": "Coming soon"
     },
     "global": {
-      "selectProject": "Select a project to open its Drawing Intelligence workspace.",
+      "selectProject": "Select a project to open its BIM workspace.",
       "drawingsCount": "{count} drawings",
       "noDrawings": "No drawings",
       "open": "Open",
-      "noProjects": "Create a project first to start using Drawing Intelligence."
+      "noProjects": "Create a project first to start using BIM."
     },
     "aiOperatorCard": {
-      "title": "Drawing Intelligence",
+      "title": "BIM — Building Information Module",
       "description": "Read construction drawings, extract structured knowledge, detect risks and generate RFIs with evidence.",
-      "open": "Open Drawing Intelligence"
+      "open": "Open BIM"
     },
     "uploadZone": {
       "dropHere": "Drag and drop drawings here",

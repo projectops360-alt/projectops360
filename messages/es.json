@@ -10,13 +10,11 @@
     "workboard": "Tablero de Trabajo",
     "projectMemory": "Memoria del Proyecto",
     "aiOperator": "Operador IA",
-    "drawingIntelligence": "Drawing Intelligence",
     "reports": "Reportes",
     "team": "Equipo",
     "settings": "Configuración",
     "search": "Buscar…",
     "notifications": "Notificaciones",
-    "importProject": "Importar Proyecto",
     "collapseSidebar": "Colapsar barra lateral",
     "expandSidebar": "Expandir barra lateral"
   },
@@ -27,11 +25,11 @@
     "projectMemory": "Memoria del Proyecto",
     "settings": "Configuración",
     "laborCapacity": "Capacidad Laboral",
-    "drawingIntelligence": "Drawing Intelligence",
+    "drawingIntelligence": "BIM",
     "statusReport": "Estado"
   },
   "drawingIntelligence": {
-    "title": "Drawing Intelligence",
+    "title": "BIM — Módulo de Información de Construcción",
     "subtitle": "Motor de IA que lee planos de construcción y los convierte en conocimiento estructurado del proyecto — riesgos, RFIs, submittals, cantidades, impactos de cronograma y costo — con trazabilidad de evidencia completa.",
     "notStorageNote": "Esto es un motor de inteligencia, no un almacén de documentos. Los archivos viven en Documentos; el entendimiento vive aquí.",
     "emptyTitle": "Aún no hay planos conectados",
@@ -90,16 +88,16 @@
       "comingSoonBadge": "Próximamente"
     },
     "global": {
-      "selectProject": "Selecciona un proyecto para abrir su espacio de Drawing Intelligence.",
+      "selectProject": "Selecciona un proyecto para abrir su espacio de BIM.",
       "drawingsCount": "{count} planos",
       "noDrawings": "Sin planos",
       "open": "Abrir",
-      "noProjects": "Crea un proyecto primero para empezar a usar Drawing Intelligence."
+      "noProjects": "Crea un proyecto primero para empezar a usar BIM."
     },
     "aiOperatorCard": {
-      "title": "Drawing Intelligence",
+      "title": "BIM — Módulo de Información de Construcción",
       "description": "Lee planos de construcción, extrae conocimiento estructurado, detecta riesgos y genera RFIs con evidencia.",
-      "open": "Abrir Drawing Intelligence"
+      "open": "Abrir BIM"
     },
     "uploadZone": {
       "dropHere": "Arrastra y suelta planos aquí",
