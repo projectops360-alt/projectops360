@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 export function Logo({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      {/* Brand logo image */}
+      {/* Brand logo (transparent SVG mark) */}
       <Image
-        src="/logo.png"
+        src="/logo.svg"
         alt="ProjectOps360°"
-        width={32}
+        width={24}
         height={32}
-        className="h-8 w-8 shrink-0 rounded"
+        className="h-8 w-auto shrink-0"
         priority
       />
       <div className="flex flex-col">
