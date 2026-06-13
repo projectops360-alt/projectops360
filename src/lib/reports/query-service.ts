@@ -80,6 +80,7 @@ async function fetchProjectHealth(supabase: Admin, ctx: QueryContext): Promise<R
       const a = agg.get(p.id) ?? { total: 0, done: 0, blocked: 0, risks: 0, rfis: 0 };
       return {
         project_name: t?.en ?? p.slug,
+        _projectId: p.id,
         project_type: p.project_type ?? "general",
         status: p.status,
         start_date: p.start_date,
@@ -108,6 +109,7 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext): Promise<R
 
   return (tasks ?? []).map((t) => ({
     project_name: projects.get(t.project_id) ?? "—",
+    _projectId: t.project_id ?? null,
     milestone: t.milestone_id ? msName.get(t.milestone_id) ?? "—" : "—",
     task_name: t.title,
     status: t.status,
@@ -139,6 +141,7 @@ async function fetchBudget(supabase: Admin, ctx: QueryContext): Promise<ReportRo
     const variance = Math.round((fc - est) * 100) / 100;
     return {
       project_name: projects.get(b.project_id) ?? "—",
+      _projectId: b.project_id ?? null,
       budget_item: b.name,
       category: b.category,
       cost_code: b.cost_code ?? "",
@@ -161,6 +164,7 @@ async function fetchRisks(supabase: Admin, ctx: QueryContext): Promise<ReportRow
   );
   return (data ?? []).map((r) => ({
     project_name: projects.get(r.project_id) ?? "—",
+    _projectId: r.project_id ?? null,
     risk_title: r.title,
     category: r.category,
     probability: r.probability,
@@ -182,6 +186,7 @@ async function fetchMaterials(supabase: Admin, ctx: QueryContext): Promise<Repor
   );
   return (data ?? []).map((m) => ({
     project_name: projects.get(m.project_id) ?? "—",
+    _projectId: m.project_id ?? null,
     material_name: m.name,
     quantity: m.quantity != null ? Number(m.quantity) : null,
     unit: m.unit_of_measure ?? "",
@@ -203,6 +208,7 @@ async function fetchRfis(supabase: Admin, ctx: QueryContext): Promise<ReportRow[
   );
   return (data ?? []).map((r) => ({
     project_name: projects.get(r.project_id) ?? "—",
+    _projectId: r.project_id ?? null,
     rfi_number: r.rfi_number ?? "",
     subject: r.subject,
     status: r.status,

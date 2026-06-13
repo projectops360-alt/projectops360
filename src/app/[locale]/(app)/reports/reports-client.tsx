@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   BarChart3, LayoutGrid, Wrench, Bookmark, Compass, BookOpen, Play, Save, Download,
   Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle, Calculator, Sparkles,
@@ -195,7 +196,7 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
       {tab === "library" && <Library t={t} onRun={(cfg) => { openBuilder(cfg); run(cfg); }} />}
       {tab === "builder" && (
         <Builder
-          t={t} datasets={datasets} config={config} setConfig={setConfig} dataset={dataset}
+          t={t} locale={locale} datasets={datasets} config={config} setConfig={setConfig} dataset={dataset}
           result={result} running={running} error={error}
           onRun={() => config && run(config)} onSave={() => setShowSave(true)} onExport={exportCsv}
         />
@@ -218,6 +219,17 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId }: 
       )}
     </div>
   );
+}
+
+/** Where a report row drills into: the project page that owns the problem. */
+function entityHref(locale: string, datasetId: string, projectId: string | null): string | null {
+  if (!projectId) return null;
+  const baseP = `/${locale}/projects/${projectId}`;
+  switch (datasetId) {
+    case "task_execution": return `${baseP}/workboard`;
+    case "project_health": return `${baseP}/status`;
+    default: return baseP; // budget, risks, materials, rfis → project overview
+  }
 }
 
 function savedToConfig(r: SavedReportRow): ReportConfig {
@@ -313,8 +325,8 @@ function Library({ t, onRun }: { t: Labels; onRun: (cfg: ReportConfig) => void }
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
-function Builder({ t, datasets, config, setConfig, dataset, result, running, error, onRun, onSave, onExport }: {
-  t: Labels; datasets: ReturnType<typeof listDatasets>; config: ReportConfig | null;
+function Builder({ t, locale, datasets, config, setConfig, dataset, result, running, error, onRun, onSave, onExport }: {
+  t: Labels; locale: Locale; datasets: ReturnType<typeof listDatasets>; config: ReportConfig | null;
   setConfig: (c: ReportConfig) => void; dataset: ReturnType<typeof getDataset>;
   result: ReportResult | null; running: boolean; error: string | null;
   onRun: () => void; onSave: () => void; onExport: () => void;
@@ -422,7 +434,7 @@ function Builder({ t, datasets, config, setConfig, dataset, result, running, err
         ) : !result ? (
           <Empty icon={<Play className="h-8 w-8" />} text={t.runFirst} />
         ) : (
-          <PreviewPane t={t} config={config} result={result} />
+          <PreviewPane t={t} locale={locale} config={config} result={result} />
         )}
       </div>
     </div>
@@ -569,7 +581,8 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
   );
 }
 
-function PreviewPane({ t, config, result }: { t: Labels; config: ReportConfig; result: ReportResult }) {
+function PreviewPane({ t, locale, config, result }: { t: Labels; locale: Locale; config: ReportConfig; result: ReportResult }) {
+  const router = useRouter();
   const grouped = config.grouping && result.grouped ? result.grouped : null;
 
   // Grouped bar/donut/kpi
@@ -620,11 +633,23 @@ function PreviewPane({ t, config, result }: { t: Labels; config: ReportConfig; r
               </tr>
             </thead>
             <tbody>
-              {result.rows.map((row, i) => (
-                <tr key={i} className="border-b border-border last:border-0">
-                  {result.columns.map((c) => <td key={c.key} className="max-w-[260px] truncate px-3 py-1.5 text-foreground">{formatCell(row[c.key], c)}</td>)}
-                </tr>
-              ))}
+              {result.rows.map((row, i) => {
+                const href = entityHref(locale, config.datasetId, (row._projectId as string) ?? null);
+                return (
+                  <tr
+                    key={i}
+                    onClick={href ? () => router.push(href) : undefined}
+                    title={href ? t.open : undefined}
+                    className={`border-b border-border last:border-0 ${href ? "cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/20" : ""}`}
+                  >
+                    {result.columns.map((c, ci) => (
+                      <td key={c.key} className={`max-w-[260px] truncate px-3 py-1.5 ${ci === 0 && href ? "font-medium text-brand-600 dark:text-brand-400" : "text-foreground"}`}>
+                        {formatCell(row[c.key], c)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
