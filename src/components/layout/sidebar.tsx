@@ -92,7 +92,7 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
     >
       {/* ── Logo + collapse toggle ── */}
       <div className={cn("flex h-16 items-center border-b border-white/5", collapsed ? "justify-center px-2" : "gap-3 px-6")}>
-        {!collapsed && <Logo />}
+        {!collapsed && <Logo onDark />}
         {onToggle && (
           <button
             type="button"
