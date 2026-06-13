@@ -1756,10 +1756,6 @@
     }
   },
   "placeholders": {
-    "team": {
-      "title": "Equipo",
-      "description": "Gestión de equipo próximamente."
-    },
     "settings": {
       "title": "Configuración",
       "description": "Configuración de la aplicación próximamente."

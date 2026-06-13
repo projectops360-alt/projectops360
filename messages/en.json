@@ -1756,10 +1756,6 @@
     }
   },
   "placeholders": {
-    "team": {
-      "title": "Team",
-      "description": "Team management coming soon."
-    },
     "settings": {
       "title": "Settings",
       "description": "Application settings coming soon."
