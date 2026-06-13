@@ -9,15 +9,15 @@ import { cn } from "@/lib/utils";
  */
 export function Logo({ className, fullWidth = false }: { className?: string; fullWidth?: boolean }) {
   return (
-    <div className={cn("flex items-center justify-center", className)}>
+    <div className={cn("flex items-center justify-center overflow-hidden rounded-lg", className)}>
+      {/* 3D render already sits on a dark backdrop, so it blends into the dark
+          sidebar (rounded corners hide the seam). */}
       <Image
-        src="/logo-full.png"
+        src="/logo-3d.png"
         alt="Project Ops 360°"
-        width={2953}
-        height={1024}
-        // Fill the available width so the wide wordmark stays legible in the
-        // narrow sidebar; height follows the aspect ratio.
-        className={fullWidth ? "h-auto w-full" : "h-8 w-auto shrink-0"}
+        width={1672}
+        height={941}
+        className={fullWidth ? "h-auto w-full" : "h-14 w-auto shrink-0"}
         priority
       />
     </div>
