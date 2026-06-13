@@ -82,19 +82,10 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
 
 const PRIORITY_ORDER: Record<TaskPriority, number> = { p1: 0, p2: 1, p3: 2 };
 
-function formatDate(date: string | null, locale: Locale): string {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString(locale === "es" ? "es-ES" : "en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 // ── Component ────────────────────────────────────────────────────────────────────
 
 export function RoadmapSnapshot({
   projectId,
-  locale,
   milestones,
   tasks,
   progress,
@@ -131,7 +122,7 @@ export function RoadmapSnapshot({
             <h2 className="text-base font-semibold text-foreground">{t.title}</h2>
           </div>
           <Link
-            href={`/${locale}/projects/${projectId}/execution-map`}
+            href={`/projects/${projectId}/execution-map`}
             className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
           >
             {t.viewFull} →
@@ -155,7 +146,7 @@ export function RoadmapSnapshot({
           <h2 className="text-base font-semibold text-foreground">{t.title}</h2>
         </div>
         <Link
-          href={`/${locale}/projects/${projectId}/execution-map`}
+          href={`/projects/${projectId}/execution-map`}
           className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
         >
           {t.viewFull}

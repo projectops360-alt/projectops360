@@ -9,9 +9,9 @@
 // (print CSS in globals.css isolates #status-report-print).
 // ============================================================================
 
-import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, Package, CalendarDays } from "lucide-react";
+import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, OctagonAlert, Package, CalendarDays } from "lucide-react";
 import type { Locale } from "@/types/database";
-import type { ProjectStatusReport, PhaseState } from "@/lib/execution/status-report";
+import type { ProjectStatusReport, PhaseState, PhaseStatus } from "@/lib/execution/status-report";
 
 const L = {
   en: {
@@ -28,7 +28,11 @@ const L = {
     next: "Coming next",
     nothingNow: "Nothing is in progress right now.",
     nothingNext: "Nothing left — you're at the finish line.",
-    attention: "What needs your attention",
+    focusTitle: "Needs your attention now",
+    focusSubtitle: "These are blocking progress — resolve them first.",
+    inPhase: "in",
+    onHold: "On hold",
+    attention: "Other things to review",
     allGood: "Nothing needs your attention right now. 🎉",
     materials: "What it's being built with",
     noMaterials: "No materials recorded yet.",
@@ -58,7 +62,11 @@ const L = {
     next: "Lo que viene",
     nothingNow: "Ahora mismo no hay nada en marcha.",
     nothingNext: "No queda nada — estás en la meta.",
-    attention: "Lo que necesita tu atención",
+    focusTitle: "Necesita tu atención ahora",
+    focusSubtitle: "Esto está frenando el avance — resuélvelo primero.",
+    inPhase: "en",
+    onHold: "En pausa",
+    attention: "Otros puntos por revisar",
     allGood: "Nada necesita tu atención ahora mismo. 🎉",
     materials: "Con qué se está construyendo",
     noMaterials: "Todavía no hay materiales registrados.",
@@ -101,9 +109,10 @@ function ProgressRing({ pct }: { pct: number }) {
   );
 }
 
-function PhaseIcon({ state }: { state: PhaseState }) {
-  if (state === "completed") return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-  if (state === "in_progress") return <Loader2 className="h-5 w-5 text-amber-500" />;
+function PhaseIcon({ phase }: { phase: PhaseStatus }) {
+  if (phase.blocked.length > 0) return <OctagonAlert className="h-5 w-5 text-red-500" />;
+  if (phase.state === "completed") return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+  if (phase.state === "in_progress") return <Loader2 className="h-5 w-5 text-amber-500" />;
   return <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600" />;
 }
 
@@ -114,7 +123,10 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
     iso ? new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" }) : "—";
 
   const severityRank = { high: 0, medium: 1, low: 2 };
-  const attention = [...report.attention].sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+  // Blockers are surfaced in their own top banner — keep only the rest here.
+  const otherAttention = report.attention
+    .filter((a) => a.kind !== "blocked")
+    .sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -155,6 +167,36 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
           </div>
         </header>
 
+        {/* Problems first: blockers banner (only when something is on hold) */}
+        {report.blockers.length > 0 && (
+          <section className="rounded-xl border-2 border-red-300 bg-red-50 p-5 dark:border-red-800 dark:bg-red-950/30">
+            <div className="flex items-center gap-2">
+              <OctagonAlert className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+              <h2 className="text-base font-bold text-red-800 dark:text-red-300">
+                {t.focusTitle}
+                <span className="ml-1.5 font-semibold">({report.blockers.length})</span>
+              </h2>
+            </div>
+            <p className="mt-0.5 pl-7 text-sm text-red-700/90 dark:text-red-300/80">{t.focusSubtitle}</p>
+            <ul className="mt-3 space-y-2">
+              {report.blockers.map((b, i) => (
+                <li key={i} className="rounded-lg border border-red-200 bg-background/60 p-3 dark:border-red-800/60">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="font-semibold text-foreground">{b.taskTitle}</span>
+                    <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                      {t.onHold}
+                    </span>
+                  </div>
+                  {b.reason && <p className="mt-1 text-sm text-foreground/80">{b.reason}</p>}
+                  {b.phaseTitle && (
+                    <p className="mt-1.5 text-xs text-muted-foreground">{t.inPhase} {b.phaseTitle}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {/* Hero: ring + headline */}
         <section className="flex flex-col items-center gap-6 sm:flex-row">
           <ProgressRing pct={report.completionPct} />
@@ -176,14 +218,20 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
             {report.phases.map((phase) => {
               const c = STATE_COLOR[phase.state];
               return (
-                <li key={phase.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                  <PhaseIcon state={phase.state} />
+                <li key={phase.id} className={`flex items-center gap-3 rounded-lg border p-3 ${phase.blocked.length > 0 ? "border-red-300 dark:border-red-800" : "border-border"}`}>
+                  <PhaseIcon phase={phase} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-medium text-foreground">{phase.title}</span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
-                        {phase.total > 0 ? `${phase.done} ${t.of} ${phase.total}` : t.states[phase.state]}
-                      </span>
+                      {phase.blocked.length > 0 ? (
+                        <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                          {phase.blocked.length} {t.onHold.toLowerCase()}
+                        </span>
+                      ) : (
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${c.chip}`}>
+                          {phase.total > 0 ? `${phase.done} ${t.of} ${phase.total}` : t.states[phase.state]}
+                        </span>
+                      )}
                     </div>
                     {phase.total > 0 && (
                       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -216,16 +264,16 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
           </Bucket>
         </section>
 
-        {/* Attention */}
+        {/* Other things to review (blockers already shown at the top) */}
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{t.attention}</h2>
-          {attention.length === 0 ? (
+          {otherAttention.length === 0 ? (
             <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-300">
-              {t.allGood}
+              {report.blockers.length > 0 ? "—" : t.allGood}
             </p>
           ) : (
             <ul className="space-y-2">
-              {attention.map((a, i) => (
+              {otherAttention.map((a, i) => (
                 <li
                   key={i}
                   className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${

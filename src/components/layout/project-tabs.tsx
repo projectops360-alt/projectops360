@@ -94,7 +94,8 @@ const TAB_ITEMS: TabItem[] = [
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ProjectTabs({ projectId, locale, projectTitle, enabledModules }: ProjectTabsProps) {
+export function ProjectTabs({ projectId, projectTitle, enabledModules }: ProjectTabsProps) {
+  // next-intl usePathname() returns the locale-less path (e.g. /projects/x/workboard).
   const pathname = usePathname();
   const t = useTranslations("projectTabs");
 
@@ -114,8 +115,11 @@ export function ProjectTabs({ projectId, locale, projectTitle, enabledModules }:
           </span>
         )}
         {visibleTabs.map((tab) => {
-          const href = `/${locale}${tab.href.replace("[projectId]", projectId)}`;
-          // Match: exact for command center, startsWith for others
+          // Pass the locale-less path to next-intl <Link>; it prepends the
+          // active locale itself. (Manually adding /${locale} here caused a
+          // double prefix like /es/es/... → 404.)
+          const href = tab.href.replace("[projectId]", projectId);
+          // Match against the locale-less pathname from next-intl.
           const isActive =
             tab.titleKey === "commandCenter"
               ? pathname === href

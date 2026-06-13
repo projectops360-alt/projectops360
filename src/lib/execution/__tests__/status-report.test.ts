@@ -86,6 +86,22 @@ describe("buildStatusReport", () => {
     expect(blocked?.message_i18n.es).toContain("congeló");
   });
 
+  it("collects blockers (problems-first) with task, reason and phase", () => {
+    const r = buildStatusReport(fenceInput());
+    expect(r.blockers).toHaveLength(1);
+    expect(r.blockers[0]).toMatchObject({
+      taskTitle: "Task p3-3",
+      phaseTitle: "Foundation, Footing, and Structural Supports",
+    });
+    expect(r.blockers[0].reason).toContain("congeló");
+  });
+
+  it("reports no blockers when nothing is on hold", () => {
+    const input = fenceInput();
+    input.tasks = input.tasks.map((t) => (t.status === "blocked" ? { ...t, status: "not_started", blocker_reason: null } : t));
+    expect(buildStatusReport(input).blockers).toHaveLength(0);
+  });
+
   it("flags missing dates, budget and material detail", () => {
     const r = buildStatusReport(fenceInput());
     const kinds = r.attention.map((a) => a.kind);

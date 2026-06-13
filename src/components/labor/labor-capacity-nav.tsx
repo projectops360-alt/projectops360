@@ -19,7 +19,8 @@ export function LaborCapacityNav({
   locale,
   activeView,
 }: LaborCapacityNavProps) {
-  const basePath = `/${locale}/projects/${projectId}/labor-capacity`;
+  // Locale-less: next-intl <Link> prepends the active locale itself.
+  const basePath = `/projects/${projectId}/labor-capacity`;
 
   const tabs = [
     {

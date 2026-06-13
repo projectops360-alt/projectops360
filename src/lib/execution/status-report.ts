@@ -44,6 +44,13 @@ export interface ReportMaterial {
   status: string;
 }
 
+/** A blocked task, surfaced at the top of the report (problems first). */
+export interface BlockerDetail {
+  taskTitle: string;
+  reason: string | null;
+  phaseTitle: string | null;
+}
+
 export interface ProjectStatusReport {
   projectTitle: string;
   projectType: string;
@@ -60,6 +67,9 @@ export interface ProjectStatusReport {
   assignedPct: number;
 
   headline_i18n: I18nField;
+
+  /** Blocked work, surfaced first so the report focuses on problems. */
+  blockers: BlockerDetail[];
 
   phases: PhaseStatus[];
   donePhases: PhaseStatus[];
@@ -148,10 +158,12 @@ export function buildStatusReport(input: StatusReportInput): ProjectStatusReport
     (p) => p.state === "upcoming" || (p.state === "empty" && p.order > (currentPhase?.order ?? -1)),
   );
 
-  // ── Attention items ─────────────────────────────────────────────────────────
+  // ── Blockers (surfaced first) + attention items ──────────────────────────────
+  const blockers: BlockerDetail[] = [];
   const attention: AttentionItem[] = [];
   for (const phase of phases) {
     for (const b of phase.blocked) {
+      blockers.push({ taskTitle: b.title, reason: b.reason, phaseTitle: phase.title });
       attention.push({
         kind: "blocked",
         severity: "high",
@@ -228,6 +240,7 @@ export function buildStatusReport(input: StatusReportInput): ProjectStatusReport
     completionPct,
     assignedPct,
     headline_i18n,
+    blockers,
     phases,
     donePhases,
     currentPhase,
