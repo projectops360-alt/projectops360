@@ -277,7 +277,7 @@ export async function getTaskFormOptionsAction(input: {
   error?: string;
   people?: { id: string; name: string }[];
   resources?: { id: string; name: string; resource_type: string }[];
-  tasks?: { id: string; title: string }[];
+  tasks?: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials?: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies?: { predecessor_id: string; successor_id: string; dependency_type: string }[];
 }> {
@@ -307,7 +307,7 @@ export async function getTaskFormOptionsAction(input: {
       .order("name", { ascending: true }),
     supabase
       .from("roadmap_tasks")
-      .select("id, title")
+      .select("id, title, milestone_id, start_date, end_date, order_index")
       .eq("project_id", input.projectId)
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null)

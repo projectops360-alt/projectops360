@@ -102,6 +102,13 @@ const PLANNING_LABELS: Record<Locale, {
   personTypes: Record<string, string>;
   predecessors: string;
   predecessorsEmpty: string;
+  predecessorsNoMatch: string;
+  filterByMilestone: string;
+  allMilestones: string;
+  finishesBefore: string;
+  predecessorSearch: string;
+  selectedCount: (n: number) => string;
+  noMilestone: string;
   requiredMaterials: string;
   materialsEmpty: string;
   addMaterialPlaceholder: string;
@@ -118,6 +125,13 @@ const PLANNING_LABELS: Record<Locale, {
     personTypes: { person: "Person", crew: "Crew", team: "Team", role: "Role", vendor: "Vendor", subcontractor: "Subcontractor" },
     predecessors: "Predecessor tasks",
     predecessorsEmpty: "No other tasks in this project yet.",
+    predecessorsNoMatch: "No tasks match the current filters.",
+    filterByMilestone: "Filter by milestone",
+    allMilestones: "All milestones",
+    finishesBefore: "Finishes on or before",
+    predecessorSearch: "Search tasks…",
+    selectedCount: (n) => `${n} selected`,
+    noMilestone: "No milestone",
     requiredMaterials: "Required materials",
     materialsEmpty: "No materials registered for this project.",
     addMaterialPlaceholder: "Add a material and press Enter…",
@@ -134,6 +148,13 @@ const PLANNING_LABELS: Record<Locale, {
     personTypes: { person: "Persona", crew: "Cuadrilla", team: "Equipo", role: "Rol", vendor: "Proveedor", subcontractor: "Subcontratista" },
     predecessors: "Tareas predecesoras",
     predecessorsEmpty: "Aún no hay otras tareas en este proyecto.",
+    predecessorsNoMatch: "Ninguna tarea coincide con los filtros.",
+    filterByMilestone: "Filtrar por milestone",
+    allMilestones: "Todos los milestones",
+    finishesBefore: "Termina en o antes de",
+    predecessorSearch: "Buscar tareas…",
+    selectedCount: (n) => `${n} seleccionada(s)`,
+    noMilestone: "Sin milestone",
     requiredMaterials: "Materiales requeridos",
     materialsEmpty: "No hay materiales registrados en este proyecto.",
     addMaterialPlaceholder: "Agrega un material y presiona Enter…",
@@ -143,7 +164,7 @@ const PLANNING_LABELS: Record<Locale, {
 interface TaskFormOptions {
   people: { id: string; name: string }[];
   resources: { id: string; name: string; resource_type: string }[];
-  tasks: { id: string; title: string }[];
+  tasks: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies: { predecessor_id: string; successor_id: string; dependency_type: string }[];
 }
@@ -236,6 +257,13 @@ export function TaskFormDialog({
     personTypes: planningLabels.personTypes,
     predecessors: t.fields.predecessors ?? planningLabels.predecessors,
     predecessorsEmpty: t.fields.predecessorsEmpty ?? planningLabels.predecessorsEmpty,
+    predecessorsNoMatch: planningLabels.predecessorsNoMatch,
+    filterByMilestone: planningLabels.filterByMilestone,
+    allMilestones: planningLabels.allMilestones,
+    finishesBefore: planningLabels.finishesBefore,
+    predecessorSearch: planningLabels.predecessorSearch,
+    selectedCount: planningLabels.selectedCount,
+    noMilestone: planningLabels.noMilestone,
     requiredMaterials: t.fields.requiredMaterials ?? planningLabels.requiredMaterials,
     materialsEmpty: t.fields.materialsEmpty ?? planningLabels.materialsEmpty,
     addMaterialPlaceholder: t.fields.addMaterialPlaceholder ?? planningLabels.addMaterialPlaceholder,
@@ -244,6 +272,10 @@ export function TaskFormDialog({
   // People / tasks / materials for the planning section, loaded on open
   const [options, setOptions] = useState<TaskFormOptions | null>(null);
   const [newMaterials, setNewMaterials] = useState<string[]>([]);
+  // Predecessors are controlled so the selection survives filtering (hidden
+  // checkboxes would otherwise unmount and drop their values). Seeded from
+  // existing dependencies in the options-loading effect below.
+  const [selectedPredecessors, setSelectedPredecessors] = useState<Set<string>>(new Set());
   const [materialDraft, setMaterialDraft] = useState("");
 
   // Assignee: 'user:<id>' | 'resource:<id>' | '' — controlled so the
@@ -263,18 +295,28 @@ export function TaskFormDialog({
   useEffect(() => {
     let cancelled = false;
     getTaskFormOptionsAction({ projectId }).then((res) => {
-      if (!cancelled && !res.error) {
-        setOptions({
-          people: res.people ?? [],
-          resources: res.resources ?? [],
-          tasks: res.tasks ?? [],
-          materials: res.materials ?? [],
-          dependencies: res.dependencies ?? [],
-        });
+      if (cancelled || res.error) return;
+      setOptions({
+        people: res.people ?? [],
+        resources: res.resources ?? [],
+        tasks: res.tasks ?? [],
+        materials: res.materials ?? [],
+        dependencies: res.dependencies ?? [],
+      });
+      // Seed the predecessor selection from existing dependencies (edit mode).
+      // Done here in the async callback rather than a separate effect.
+      if (isEdit && task) {
+        setSelectedPredecessors(
+          new Set(
+            (res.dependencies ?? [])
+              .filter((d) => d.successor_id === task.id && d.dependency_type === "finish_to_start")
+              .map((d) => d.predecessor_id),
+          ),
+        );
       }
     });
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, isEdit, task]);
 
   async function handleAddPerson() {
     const name = newPersonName.trim();
@@ -307,18 +349,24 @@ export function TaskFormDialog({
     }
   }
 
-  const preselectedPredecessors = new Set(
-    isEdit && task && options
-      ? options.dependencies
-          .filter((d) => d.successor_id === task.id && d.dependency_type === "finish_to_start")
-          .map((d) => d.predecessor_id)
-      : [],
-  );
   const preselectedMaterials = new Set(
     isEdit && task && options
       ? options.materials.filter((m) => m.required_by_task_id === task.id).map((m) => m.id)
       : [],
   );
+
+  function togglePredecessor(id: string) {
+    setSelectedPredecessors((prev) =>
+      prev.has(id)
+        ? new Set([...prev].filter((x) => x !== id))
+        : new Set([...prev, id]),
+    );
+  }
+
+  // Predecessor filters
+  const [predMilestoneFilter, setPredMilestoneFilter] = useState<string>("");
+  const [predFinishBefore, setPredFinishBefore] = useState<string>("");
+  const [predSearch, setPredSearch] = useState<string>("");
 
   function addMaterialDraft() {
     const name = materialDraft.trim();
@@ -350,7 +398,7 @@ export function TaskFormDialog({
     const assigneeRaw = (formData.get("assigned_to") as string) || "";
     const assignedTo = assigneeRaw.startsWith("user:") ? assigneeRaw.slice(5) : null;
     const assignedResourceId = assigneeRaw.startsWith("resource:") ? assigneeRaw.slice(9) : null;
-    const predecessorIds = formData.getAll("predecessor_ids").map(String);
+    const predecessorIds = [...selectedPredecessors];
     const materialIds = formData.getAll("material_ids").map(String);
 
     if (!title) {
@@ -598,9 +646,10 @@ export function TaskFormDialog({
               open={showPlanning}
               onToggle={() => setShowPlanning(!showPlanning)}
               badge={
-                isEdit
-                  ? (task?.assigned_to ? 1 : 0) + preselectedPredecessors.size + preselectedMaterials.size
-                  : newMaterials.length
+                (assigneeValue ? 1 : 0) +
+                selectedPredecessors.size +
+                (isEdit ? preselectedMaterials.size : 0) +
+                newMaterials.length
               }
             >
               {options === null ? (
@@ -700,33 +749,123 @@ export function TaskFormDialog({
                     )}
                   </div>
 
-                  {/* Predecessor tasks */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-medium text-muted-foreground">
-                      {tp.predecessors}
-                    </label>
-                    {options.tasks.filter((tk) => tk.id !== task?.id).length === 0 ? (
-                      <p className="text-xs text-muted-foreground">{tp.predecessorsEmpty}</p>
-                    ) : (
-                      <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-                        {options.tasks
-                          .filter((tk) => tk.id !== task?.id)
-                          .map((tk) => (
-                            <label key={tk.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-foreground hover:bg-muted/50">
-                              <input
-                                type="checkbox"
-                                name="predecessor_ids"
-                                value={tk.id}
-                                defaultChecked={preselectedPredecessors.has(tk.id)}
-                                className="h-4 w-4 rounded border-border accent-brand-600"
-                                disabled={isPending}
-                              />
-                              <span className="truncate">{tk.title}</span>
-                            </label>
+                  {/* Predecessor tasks (with milestone + finish-date filters) */}
+                  {(() => {
+                    const candidates = options.tasks.filter((tk) => tk.id !== task?.id);
+                    if (candidates.length === 0) {
+                      return (
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-medium text-muted-foreground">{tp.predecessors}</label>
+                          <p className="text-xs text-muted-foreground">{tp.predecessorsEmpty}</p>
+                        </div>
+                      );
+                    }
+                    const milestoneName = (id: string | null) =>
+                      id ? milestones.find((m) => m.id === id)?.title ?? tp.noMilestone : tp.noMilestone;
+                    const search = predSearch.trim().toLowerCase();
+                    const filtered = candidates
+                      .filter((tk) => {
+                        if (predMilestoneFilter && (tk.milestone_id ?? "__none__") !== predMilestoneFilter) return false;
+                        if (predFinishBefore) {
+                          // keep tasks that finish on/before the date; tasks with no
+                          // finish date stay visible so they're never hidden silently
+                          if (tk.end_date && tk.end_date > predFinishBefore) return false;
+                        }
+                        if (search && !tk.title.toLowerCase().includes(search)) return false;
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        // chronological: by finish date, then by board order
+                        const da = a.end_date ?? "";
+                        const db = b.end_date ?? "";
+                        if (da && db && da !== db) return da < db ? -1 : 1;
+                        if (da && !db) return -1;
+                        if (!da && db) return 1;
+                        return a.order_index - b.order_index;
+                      });
+                    // Milestones that actually have candidate tasks
+                    const usedMilestoneIds = new Set(candidates.map((tk) => tk.milestone_id));
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-medium text-muted-foreground">{tp.predecessors}</label>
+                          {selectedPredecessors.size > 0 && (
+                            <span className="text-xs text-brand-600 dark:text-brand-400">
+                              {tp.selectedCount(selectedPredecessors.size)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex flex-wrap gap-2">
+                          <select
+                            value={predMilestoneFilter}
+                            onChange={(e) => setPredMilestoneFilter(e.target.value)}
+                            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:border-brand-500 focus:outline-none"
+                            disabled={isPending}
+                            aria-label={tp.filterByMilestone}
+                          >
+                            <option value="">{tp.allMilestones}</option>
+                            {milestones
+                              .filter((m) => usedMilestoneIds.has(m.id))
+                              .map((m) => (
+                                <option key={m.id} value={m.id}>{m.title}</option>
+                              ))}
+                            {usedMilestoneIds.has(null) && <option value="__none__">{tp.noMilestone}</option>}
+                          </select>
+                          <input
+                            type="date"
+                            value={predFinishBefore}
+                            onChange={(e) => setPredFinishBefore(e.target.value)}
+                            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:border-brand-500 focus:outline-none"
+                            disabled={isPending}
+                            title={tp.finishesBefore}
+                            aria-label={tp.finishesBefore}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={predSearch}
+                          onChange={(e) => setPredSearch(e.target.value)}
+                          placeholder={tp.predecessorSearch}
+                          className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none"
+                          disabled={isPending}
+                        />
+
+                        {/* List */}
+                        <div className="max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-border p-2">
+                          {filtered.length === 0 ? (
+                            <p className="px-1 py-2 text-xs text-muted-foreground">{tp.predecessorsNoMatch}</p>
+                          ) : (
+                            filtered.map((tk) => (
+                              <label key={tk.id} className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 text-sm text-foreground hover:bg-muted/50">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPredecessors.has(tk.id)}
+                                  onChange={() => togglePredecessor(tk.id)}
+                                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-brand-600"
+                                  disabled={isPending}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate">{tk.title}</span>
+                                  <span className="block truncate text-xs text-muted-foreground">
+                                    {milestoneName(tk.milestone_id)}
+                                    {tk.end_date ? ` · ${tk.end_date}` : ""}
+                                  </span>
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        {/* Hidden inputs keep selections that are currently filtered out */}
+                        {[...selectedPredecessors]
+                          .filter((id) => !filtered.some((tk) => tk.id === id))
+                          .map((id) => (
+                            <input key={id} type="hidden" name="predecessor_ids" value={id} />
                           ))}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Required materials */}
                   <div className="space-y-1.5">
