@@ -15,8 +15,8 @@ export function Logo({ className, fullWidth = false }: { className?: string; ful
       <Image
         src="/logo-3d.png"
         alt="Project Ops 360°"
-        width={1672}
-        height={941}
+        width={1344}
+        height={768}
         className={fullWidth ? "h-auto w-full" : "h-14 w-auto shrink-0"}
         priority
       />
