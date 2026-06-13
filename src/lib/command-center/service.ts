@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { localizedHref } from "@/i18n/href";
 import type { I18nField } from "@/types/database";
 
 const DONE = new Set(["done", "tested"]);
@@ -32,15 +33,15 @@ export interface KpiCard {
 }
 
 export type Severity = "critical" | "high" | "review" | "ready" | "info";
-export interface FocusItem { id: string; title: string; explanation: string; severity: Severity; project: string | null; action: string }
-export interface AiRecommendation { id: string; title: string; explanation: string; confidence: number | null; impact: string; action: string; status: string }
-export interface CriticalPathItem { order: number; task: string; project: string; status: string; risk: HealthBand; blocker: string | null; float: number | null }
-export interface DecisionItem { id: string; title: string; impact: string; project: string | null; status: string }
+export interface FocusItem { id: string; title: string; explanation: string; severity: Severity; project: string | null; action: string; href?: string }
+export interface AiRecommendation { id: string; title: string; explanation: string; confidence: number | null; impact: string; action: string; status: string; href?: string }
+export interface CriticalPathItem { order: number; task: string; project: string; status: string; risk: HealthBand; blocker: string | null; float: number | null; href?: string }
+export interface DecisionItem { id: string; title: string; impact: string; project: string | null; status: string; href?: string }
 export interface ResourceRow { name: string; type: string; trade: string | null; utilization: number | null; status: string; assignedTasks: number }
-export interface MaterialRow { name: string; quantity: string; project: string; requiredBy: string | null; confidence: number | null; status: string; needsReview: boolean }
+export interface MaterialRow { name: string; quantity: string; project: string; requiredBy: string | null; confidence: number | null; status: string; needsReview: boolean; href?: string }
 export interface GraphSignal { key: string; value: number; label: string }
-export interface LookaheadItem { date: string; event: string; project: string; impact: string; kind: "milestone" | "task" }
-export interface BudgetSignal { area: string; project: string; estimate: number; forecast: number; variance: number; signal: string }
+export interface LookaheadItem { date: string; event: string; project: string; impact: string; kind: "milestone" | "task"; href?: string }
+export interface BudgetSignal { area: string; project: string; estimate: number; forecast: number; variance: number; signal: string; href?: string }
 export interface ActivityItem { id: string; event: string; entity: string; at: string; source: string }
 
 export interface CommandCenterData {
@@ -68,6 +69,7 @@ function clamp(n: number): number { return Math.max(0, Math.min(100, Math.round(
 export async function getCommandCenterSummary(organizationId: string, locale = "en"): Promise<CommandCenterData> {
   const supabase = createAdminClient();
   const i18n = (f: I18nField | null, fallback = "—") => (f?.[locale as "en" | "es"] ?? f?.en ?? fallback);
+  const link = (path: string) => localizedHref(locale, path);
 
   const [
     projectsRes, tasksRes, milestonesRes, risksRes, materialsRes, rfisRes,
@@ -162,18 +164,18 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
   // ── PMO Focus ──────────────────────────────────────────────────────────
   const pmoFocus: FocusItem[] = [];
   for (const t of blockedCritical.slice(0, 3)) {
-    pmoFocus.push({ id: `bc-${t.id}`, title: `"${t.title}" is blocked on the critical path`, explanation: t.blocker_reason || "A critical-path task is on hold; it will push the finish date.", severity: "critical", project: t.project_id ? projectName.get(t.project_id) ?? null : null, action: "Resolve the blocker or re-sequence work." });
+    pmoFocus.push({ id: `bc-${t.id}`, title: `"${t.title}" is blocked on the critical path`, explanation: t.blocker_reason || "A critical-path task is on hold; it will push the finish date.", severity: "critical", project: t.project_id ? projectName.get(t.project_id) ?? null : null, action: "Resolve the blocker or re-sequence work.", href: t.project_id ? link(`/projects/${t.project_id}/workboard?task=${t.id}`) : undefined });
   }
-  if (matReview.length > 0) pmoFocus.push({ id: "mat-review", title: `${matReview.length} material(s) need validation`, explanation: "Extracted or AI-suggested materials are below the review threshold.", severity: "review", project: null, action: "Confirm quantities before purchasing." });
-  if (unassigned.length > 0) pmoFocus.push({ id: "unassigned", title: `${unassigned.length} open task(s) have no owner`, explanation: "Work cannot be accountable without an owner.", severity: "review", project: null, action: "Assign owners from the Workboard." });
-  if (blockingRfis.length > 0) pmoFocus.push({ id: "rfis", title: `${blockingRfis.length} open RFI(s) are blocking work`, explanation: "Unanswered RFIs hold up dependent tasks.", severity: "high", project: null, action: "Expedite RFI responses." });
+  if (matReview.length > 0) pmoFocus.push({ id: "mat-review", title: `${matReview.length} material(s) need validation`, explanation: "Extracted or AI-suggested materials are below the review threshold.", severity: "review", project: null, action: "Confirm quantities before purchasing.", href: link("/reports?report=material_requirements_report") });
+  if (unassigned.length > 0) pmoFocus.push({ id: "unassigned", title: `${unassigned.length} open task(s) have no owner`, explanation: "Work cannot be accountable without an owner.", severity: "review", project: null, action: "Assign owners from the Workboard.", href: link("/reports?report=tasks_without_owner") });
+  if (blockingRfis.length > 0) pmoFocus.push({ id: "rfis", title: `${blockingRfis.length} open RFI(s) are blocking work`, explanation: "Unanswered RFIs hold up dependent tasks.", severity: "high", project: null, action: "Expedite RFI responses.", href: link("/reports?report=rfis_blocking_work") });
   if (pmoFocus.length === 0 && totalTasks > 0) pmoFocus.push({ id: "ok", title: "No critical items need attention today", explanation: "No blocked critical work, unassigned tasks, or blocking RFIs right now.", severity: "ready", project: null, action: "Keep the schedule and risks current." });
 
   // ── AI recommendations (deterministic, evidence-based) ────────────────────
   const aiRecommendations: AiRecommendation[] = [];
-  if (matProblem.length > 0 || matReview.length > 0) aiRecommendations.push({ id: "ai-mat", title: "Turn material risk into a procurement action", explanation: `${matProblem.length + matReview.length} material(s) are delayed, unavailable, or low-confidence. Validate and order before they hit the schedule.`, confidence: 0.82, impact: "Schedule · Budget", action: "Open Materials", status: "pending" });
-  if (blockedCritical.length > 0) aiRecommendations.push({ id: "ai-cp", title: "Recalculate the critical path", explanation: "Critical-path tasks are blocked, so the current finish-date baseline is weak.", confidence: 0.9, impact: "Schedule", action: "Recalculate critical path", status: "pending" });
-  if (unassigned.length > 0) aiRecommendations.push({ id: "ai-owner", title: "Assign missing accountability", explanation: `${unassigned.length} open task(s) have no accountable owner.`, confidence: 0.88, impact: "Execution", action: "Assign owners", status: "pending" });
+  if (matProblem.length > 0 || matReview.length > 0) aiRecommendations.push({ id: "ai-mat", title: "Turn material risk into a procurement action", explanation: `${matProblem.length + matReview.length} material(s) are delayed, unavailable, or low-confidence. Validate and order before they hit the schedule.`, confidence: 0.82, impact: "Schedule · Budget", action: "Open Materials", status: "pending", href: link("/reports?report=delayed_materials") });
+  if (blockedCritical.length > 0) aiRecommendations.push({ id: "ai-cp", title: "Recalculate the critical path", explanation: "Critical-path tasks are blocked, so the current finish-date baseline is weak.", confidence: 0.9, impact: "Schedule", action: "Recalculate critical path", status: "pending", href: link("/reports?report=critical_path_report") });
+  if (unassigned.length > 0) aiRecommendations.push({ id: "ai-owner", title: "Assign missing accountability", explanation: `${unassigned.length} open task(s) have no accountable owner.`, confidence: 0.88, impact: "Execution", action: "Assign owners", status: "pending", href: link("/reports?report=tasks_without_owner") });
 
   // ── Critical Path Monitor (representative project = most critical tasks) ──
   const critByProject = new Map<string, typeof critical>();
@@ -187,12 +189,14 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
       status: t.status === "blocked" ? "Blocked" : DONE.has(t.status) ? "On Track" : STARTED.has(t.status) ? "In Progress" : "Ready",
       risk: (t.status === "blocked" || t.is_blocked) ? "red" : (t.slack_days ?? 99) <= 3 ? "amber" : "green",
       blocker: t.blocker_reason || null, float: t.slack_days,
+      href: t.project_id ? link(`/projects/${t.project_id}/workboard?task=${t.id}`) : undefined,
     }));
 
   // ── Decision Queue ────────────────────────────────────────────────────────
   const decisionQueue: DecisionItem[] = pendingDecisions.slice(0, 6).map((d, i) => ({
     id: `dec-${i}`, title: i18n(d.title_i18n as I18nField, "Decision"), impact: d.impact_area ?? "general",
     project: d.project_id ? projectName.get(d.project_id) ?? null : null, status: d.status,
+    href: d.project_id ? link(`/projects/${d.project_id}/decisions`) : undefined,
   }));
 
   // ── Resource & Labor Capacity (utilization from open-task assignment) ─────
@@ -217,6 +221,7 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
       project: m.project_id ? projectName.get(m.project_id) ?? "—" : "—", requiredBy: m.required_by_date,
       confidence: m.confidence_score != null ? Math.round(Number(m.confidence_score) * 100) : null,
       status: m.status, needsReview: !!m.needs_review,
+      href: m.project_id ? link(`/projects/${m.project_id}/execution-map`) : undefined,
     }));
 
   // ── Living Graph Signals ──────────────────────────────────────────────────
@@ -232,8 +237,8 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
   const today = new Date(); const horizon = new Date(today.getTime() + 14 * 86400000);
   const inWindow = (d: string | null) => !!d && new Date(d) >= today && new Date(d) <= horizon;
   const lookahead: LookaheadItem[] = [
-    ...milestones.filter((m) => inWindow(m.target_date)).map((m) => ({ date: m.target_date as string, event: m.title, project: m.project_id ? projectName.get(m.project_id) ?? "—" : "—", impact: "Milestone", kind: "milestone" as const })),
-    ...tasks.filter((t) => inWindow(t.end_date) && !DONE.has(t.status)).map((t) => ({ date: t.end_date as string, event: t.title, project: t.project_id ? projectName.get(t.project_id) ?? "—" : "—", impact: t.is_critical ? "Critical path" : "Execution", kind: "task" as const })),
+    ...milestones.filter((m) => inWindow(m.target_date)).map((m) => ({ date: m.target_date as string, event: m.title, project: m.project_id ? projectName.get(m.project_id) ?? "—" : "—", impact: "Milestone", kind: "milestone" as const, href: m.project_id ? link(`/projects/${m.project_id}/execution-map`) : undefined })),
+    ...tasks.filter((t) => inWindow(t.end_date) && !DONE.has(t.status)).map((t) => ({ date: t.end_date as string, event: t.title, project: t.project_id ? projectName.get(t.project_id) ?? "—" : "—", impact: t.is_critical ? "Critical path" : "Execution", kind: "task" as const, href: t.project_id ? link(`/projects/${t.project_id}/workboard?task=${t.id}`) : undefined })),
   ].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 8);
 
   // ── Budget & Forecast Signals ──────────────────────────────────────────────
@@ -242,7 +247,7 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
       const est = Number(b.estimated_cost ?? 0);
       const fc = b.forecast_cost != null ? Number(b.forecast_cost) : Number(b.actual_cost ?? 0);
       const v = Math.round((fc - est) * 100) / 100;
-      return { area: b.name, project: b.project_id ? projectName.get(b.project_id) ?? "—" : "—", estimate: est, forecast: fc, variance: v, signal: v > 0 ? (est > 0 && v / est > 0.1 ? "Over baseline" : "Watch") : "Stable" };
+      return { area: b.name, project: b.project_id ? projectName.get(b.project_id) ?? "—" : "—", estimate: est, forecast: fc, variance: v, signal: v > 0 ? (est > 0 && v / est > 0.1 ? "Over baseline" : "Watch") : "Stable", href: b.project_id ? link(`/projects/${b.project_id}/status`) : undefined };
     })
     .sort((a, b) => b.variance - a.variance)
     .slice(0, 6);

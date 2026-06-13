@@ -141,7 +141,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${SEV_BADGE[f.severity]}`}>{f.severity}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">{f.explanation}</p>
-                  <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{f.action}{f.project ? ` · ${f.project}` : ""}</p>
+                  {f.href ? (
+                    <Link href={f.href} className="mt-1 inline-block text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">{f.action}{f.project ? ` · ${f.project}` : ""} →</Link>
+                  ) : (
+                    <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{f.action}{f.project ? ` · ${f.project}` : ""}</p>
+                  )}
                 </div>
               </li>
             ))}
@@ -158,16 +162,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ul className="mt-3 space-y-2">
               {data.aiRecommendations.map((r) => (
-                <li key={r.id} className="rounded-lg border border-purple-200 bg-purple-50/40 p-3 dark:border-purple-900/50 dark:bg-purple-950/20">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-foreground">{r.title}</p>
-                    {r.confidence != null && <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">{Math.round(r.confidence * 100)}%</span>}
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{r.explanation}</p>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">{r.impact}</span>
-                    <span className="text-xs font-medium text-purple-700 dark:text-purple-400">{r.action} →</span>
-                  </div>
+                <li key={r.id}>
+                  <RowLink href={r.href} className="block rounded-lg border border-purple-200 bg-purple-50/40 p-3 dark:border-purple-900/50 dark:bg-purple-950/20">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground">{r.title}</p>
+                      {r.confidence != null && <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">{Math.round(r.confidence * 100)}%</span>}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{r.explanation}</p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">{r.impact}</span>
+                      <span className="text-xs font-medium text-purple-700 dark:text-purple-400">{r.action} →</span>
+                    </div>
+                  </RowLink>
                 </li>
               ))}
             </ul>
@@ -182,13 +188,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ol className="mt-3 space-y-1.5">
               {data.criticalPath.map((c) => (
-                <li key={c.order} className="flex items-center gap-3 rounded-lg border border-border p-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">{c.order}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{c.task}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">{c.project}{c.blocker ? ` · ${c.blocker}` : ""}</p>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${c.risk === "red" ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" : c.risk === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" : "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"}`}>{c.status}</span>
+                <li key={c.order}>
+                  <RowLink href={c.href} className="flex items-center gap-3 rounded-lg border border-border p-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">{c.order}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{c.task}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{c.project}{c.blocker ? ` · ${c.blocker}` : ""}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${c.risk === "red" ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" : c.risk === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" : "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"}`}>{c.status}</span>
+                  </RowLink>
                 </li>
               ))}
             </ol>
@@ -203,9 +211,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ul className="mt-3 space-y-2">
               {data.decisionQueue.map((d) => (
-                <li key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
-                  <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{d.title}</p><p className="text-xs text-muted-foreground">{d.project ?? "—"} · {d.impact}</p></div>
-                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{tt("Pending", "Pendiente")}</span>
+                <li key={d.id}>
+                  <RowLink href={d.href} className="flex items-center justify-between gap-2 rounded-lg border border-border p-3">
+                    <div className="min-w-0"><p className="truncate text-sm font-medium text-foreground">{d.title}</p><p className="text-xs text-muted-foreground">{d.project ?? "—"} · {d.impact}</p></div>
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{tt("Pending", "Pendiente")}</span>
+                  </RowLink>
                 </li>
               ))}
             </ul>
@@ -240,18 +250,20 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ul className="mt-3 space-y-2">
               {data.materialProcurementRisk.map((m, i) => (
-                <li key={i} className="rounded-lg border border-border p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{m.quantity}</span>
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>{m.project}{m.requiredBy ? ` · ${tt("by", "para")} ${m.requiredBy}` : ""}</span>
-                    <span className="flex items-center gap-1.5">
-                      {m.confidence != null && <span className={m.confidence < 80 ? "text-amber-600 dark:text-amber-400" : ""}>{m.confidence}%</span>}
-                      <span className="rounded-full bg-muted px-1.5 py-0.5">{m.status.replace(/_/g, " ")}</span>
-                    </span>
-                  </div>
+                <li key={i}>
+                  <RowLink href={m.href} className="block rounded-lg border border-border p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">{m.quantity}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{m.project}{m.requiredBy ? ` · ${tt("by", "para")} ${m.requiredBy}` : ""}</span>
+                      <span className="flex items-center gap-1.5">
+                        {m.confidence != null && <span className={m.confidence < 80 ? "text-amber-600 dark:text-amber-400" : ""}>{m.confidence}%</span>}
+                        <span className="rounded-full bg-muted px-1.5 py-0.5">{m.status.replace(/_/g, " ")}</span>
+                      </span>
+                    </div>
+                  </RowLink>
                 </li>
               ))}
             </ul>
@@ -283,10 +295,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ul className="mt-3 space-y-1.5">
               {data.upcomingLookahead.map((u, i) => (
-                <li key={i} className="flex items-center gap-3 text-sm">
-                  <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">{new Date(u.date).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>
-                  <span className="min-w-0 flex-1 truncate text-foreground">{u.event}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{u.impact}</span>
+                <li key={i}>
+                  <RowLink href={u.href} className="flex items-center gap-3 rounded-lg p-1 text-sm">
+                    <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground">{new Date(u.date).toLocaleDateString(locale, { month: "short", day: "numeric" })}</span>
+                    <span className="min-w-0 flex-1 truncate text-foreground">{u.event}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{u.impact}</span>
+                  </RowLink>
                 </li>
               ))}
             </ul>
@@ -301,10 +315,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           ) : (
             <ul className="mt-3 space-y-1.5">
               {data.budgetForecastSignals.map((b, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate text-foreground">{b.area}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{b.estimate.toLocaleString()} → {b.forecast.toLocaleString()}</span>
-                  <span className={`w-16 shrink-0 text-right text-xs font-medium ${b.variance > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>{b.variance >= 0 ? "+" : ""}{b.variance.toLocaleString()}</span>
+                <li key={i}>
+                  <RowLink href={b.href} className="flex items-center justify-between gap-2 rounded-lg p-1 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-foreground">{b.area}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{b.estimate.toLocaleString()} → {b.forecast.toLocaleString()}</span>
+                    <span className={`w-16 shrink-0 text-right text-xs font-medium ${b.variance > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>{b.variance >= 0 ? "+" : ""}{b.variance.toLocaleString()}</span>
+                  </RowLink>
                 </li>
               ))}
             </ul>
@@ -384,6 +400,14 @@ function Header({ tt, base }: { tt: (en: string, es: string) => string; base: st
       </div>
     </div>
   );
+}
+
+/** A list row that becomes a clickable Link when an href is provided, and a
+ *  plain div otherwise — so every actionable card drills into its record. */
+function RowLink({ href, className, children }: { href?: string; className: string; children: React.ReactNode }) {
+  return href
+    ? <Link href={href} className={`${className} cursor-pointer transition-colors hover:border-brand-400 hover:bg-muted/30`}>{children}</Link>
+    : <div className={className}>{children}</div>;
 }
 
 function SectionTitle({ icon, title, link }: { icon: React.ReactNode; title: string; link?: { href: string; label: string } }) {
