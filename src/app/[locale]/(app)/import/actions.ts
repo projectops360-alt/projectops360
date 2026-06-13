@@ -152,10 +152,15 @@ export async function analyzeImportJobAction(input: {
   await audit(org.organizationId, job.id, "analysis_started", "Analysis started", org.userId);
 
   try {
-    // Download from private storage (server-side, admin client)
-    const objectPath = job.storage_path.replace(/^project-imports\//, "");
-    const { data: blob, error: dlError } = await supabase.storage.from("project-imports").download(objectPath);
-    if (dlError || !blob) throw new ImportParseError("corrupted_file", "Could not download the uploaded file.");
+    // Download from private storage (server-side, admin client). The object
+    // key includes the 'project-imports/' folder prefix — same convention as
+    // the drawings bucket (storage.foldername RLS check).
+    const { data: blob, error: dlError } = await supabase.storage
+      .from("project-imports")
+      .download(job.storage_path);
+    if (dlError || !blob) {
+      throw new Error(`storage_error: ${dlError?.message ?? "download failed"}`);
+    }
     const buffer = new Uint8Array(await blob.arrayBuffer());
 
     // Parse → heuristic extraction
@@ -314,13 +319,14 @@ export async function analyzeImportJobAction(input: {
     await audit(org.organizationId, job.id, "analysis_completed", `Extracted ${counts.tasks} tasks, ${counts.milestones} milestones`, org.userId, counts);
     return { status: newStatus };
   } catch (e) {
-    const message = e instanceof ImportParseError ? e.code : e instanceof Error ? e.message : "unexpected";
+    const raw = e instanceof ImportParseError ? e.code : e instanceof Error ? e.message : "unexpected";
+    const code = raw.startsWith("storage_error") ? "storage_error" : raw;
     await supabase
       .from("project_import_jobs")
-      .update({ status: "failed", error_message: message })
+      .update({ status: "failed", error_message: raw })
       .eq("id", input.jobId);
-    await audit(org.organizationId, input.jobId, "failed", message, org.userId);
-    return { error: message };
+    await audit(org.organizationId, input.jobId, "failed", raw, org.userId);
+    return { error: code };
   }
 }
 
