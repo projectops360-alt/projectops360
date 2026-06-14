@@ -240,7 +240,7 @@ function ReadinessPanel({ readiness, isEs }: { readiness: CloseoutReadiness; isE
           <p className={`text-sm font-semibold ${ready ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}>
             {ready
               ? (isEs ? "Listo para cerrar el proyecto" : "Ready to close the project")
-              : (isEs ? `No listo para cierre — ${failCount} requisito(s) pendiente(s)` : `Not ready to close — ${failCount} blocking item(s)`)}
+              : (isEs ? `No listo para cierre — ${failCount} requisito(s) pendiente(s)` : `Not ready to close — ${failCount} requirement(s) pending`)}
           </p>
           <p className={`text-xs ${ready ? "text-green-700/80 dark:text-green-400/80" : "text-red-700/80 dark:text-red-400/80"}`}>
             {isEs

@@ -204,10 +204,13 @@ export function computeCloseoutReadiness(m: CloseoutMetrics): CloseoutReadiness 
   const checks: ReadinessCheck[] = [
     RD("open_tasks", "Actividades cerradas", "Activities closed",
       `${s.openTasks} actividad(es) sin completar`, `${s.openTasks} unfinished activit(ies)`, s.openTasks, true),
-    RD("blockers", "Sin bloqueos", "No blockers",
+    RD("blockers", "Sin tareas bloqueadas", "No blocked tasks",
       `${s.blockedTasks} tarea(s) bloqueada(s)`, `${s.blockedTasks} blocked task(s)`, s.blockedTasks, true),
+    // Non-blocking: a milestone is "pending" only because it still contains an
+    // open task — which is already counted by "Activities closed". Counting it
+    // as blocking too would double-count the same underlying work.
     RD("milestones", "Hitos completados", "Milestones complete",
-      `${s.pendingMilestones} hito(s) pendiente(s)`, `${s.pendingMilestones} pending milestone(s)`, s.pendingMilestones, true),
+      `${s.pendingMilestones} hito(s) pendiente(s)`, `${s.pendingMilestones} pending milestone(s)`, s.pendingMilestones, false),
     RD("open_risks", "Riesgos resueltos", "Risks resolved",
       `${m.risks.open + m.risks.mitigated} riesgo(s) abierto(s)`, `${m.risks.open + m.risks.mitigated} open risk(s)`, m.risks.open + m.risks.mitigated, true),
     RD("open_rfis", "RFIs respondidos", "RFIs answered",
