@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type SearchEntityType = "communication" | "meeting" | "decision" | "document" | "task";
+export type SearchEntityType = "communication" | "meeting" | "decision" | "document" | "task" | "memory";
 
 export type MatchType = "semantic" | "keyword";
 
@@ -29,6 +29,7 @@ export interface SearchTranslations {
   decision: string;
   document: string;
   task: string;
+  memory: string;
 }
 
 interface SearchActionInput {
@@ -237,6 +238,34 @@ export async function searchProjectAction(
     }
   }
 
+  // ── Project Memory Items ─────────────────────────────────────────────────────
+
+  if (!typeFilter || typeFilter === "memory") {
+    const { data: memory } = await supabase
+      .from("project_memory_items")
+      .select("id, title, summary, content, occurred_at, tags")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("occurred_at", { ascending: false, nullsFirst: false })
+      .limit(200);
+
+    for (const it of memory ?? []) {
+      const tags = Array.isArray(it.tags) ? (it.tags as string[]).join(" ") : "";
+      if (matches(it.title) || matches(it.summary) || matches(it.content) || matches(tags)) {
+        results.push({
+          id: it.id,
+          type: "memory",
+          title: it.title || "Untitled",
+          date: it.occurred_at,
+          snippet: snippet(it.summary || it.content, it.title),
+          href: `/${input.locale}/projects/${projectId}/memory?item=${it.id}`,
+          matchType: "keyword" as const,
+        });
+      }
+    }
+  }
+
   // ── Semantic Search (pgvector) ──────────────────────────────────────────────────
   // Try semantic search via match_documents RPC. Non-fatal: falls back to keyword-only.
 
@@ -285,6 +314,7 @@ export async function searchProjectAction(
             decision: `/${input.locale}/projects/${projectId}/decisions/${match.id}`,
             document: `/${input.locale}/projects/${projectId}/documents/${match.id}`,
             task: `/${input.locale}/projects/${projectId}/execution-map`,
+            memory: `/${input.locale}/projects/${projectId}/memory?item=${match.id}`,
           };
 
           semanticResults.push({

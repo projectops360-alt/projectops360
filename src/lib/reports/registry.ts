@@ -259,6 +259,45 @@ export const DATASETS: DatasetDefinition[] = [
     defaultColumns: ["project_name", "rfi_number", "subject", "status", "priority", "due_date", "blocks_work"],
     supportedVisualizations: ["table", "kpi_cards", "bar"],
   },
+
+  // 7 — Project Memory
+  {
+    id: "project_memory",
+    displayName: "Project Memory",
+    description: "Captured project context — notes, communications, decisions, risk signals, and evidence — with AI classification flags. Foundation for Decision Log, Communication Log, Risk Signals, Stakeholder Concerns and Evidence reports.",
+    category: "executive",
+    scope: "project",
+    columns: [
+      text("project_name", "Project", "Project Structure"),
+      text("title", "Title", "Identification"),
+      enumCol("source_type", "Source Type", "Identification", [
+        { value: "manual_note", label: "Manual note" }, { value: "email", label: "Email" },
+        { value: "chat_message", label: "Chat message" }, { value: "meeting_note", label: "Meeting note" },
+        { value: "decision", label: "Decision" }, { value: "action_item", label: "Action item" },
+        { value: "risk_signal", label: "Risk signal" }, { value: "evidence", label: "Evidence" },
+        { value: "approval", label: "Approval" }, { value: "change_request", label: "Change request" },
+        { value: "system_event", label: "System event" }, { value: "document", label: "Document" },
+      ]),
+      enumCol("importance_level", "Importance", "Assessment", SEVERITY_VALUES),
+      enumCol("sentiment", "Sentiment", "Assessment", [
+        { value: "positive", label: "Positive" }, { value: "neutral", label: "Neutral" },
+        { value: "negative", label: "Negative" }, { value: "concerned", label: "Concerned" },
+        { value: "mixed", label: "Mixed" },
+      ]),
+      text("author", "Author", "People", { groupable: true }),
+      date("occurred_at", "Occurred At", "Schedule"),
+      bool("contains_decision", "Decision", "AI Classification"),
+      bool("contains_risk", "Risk", "AI Classification"),
+      bool("contains_action_item", "Action Item", "AI Classification"),
+      bool("contains_scope_change", "Scope Change", "AI Classification"),
+      bool("contains_schedule_impact", "Schedule Impact", "AI Classification"),
+      bool("contains_cost_impact", "Cost Impact", "AI Classification"),
+      bool("contains_stakeholder_concern", "Stakeholder Concern", "AI Classification"),
+      num("ai_confidence_pct", "AI Confidence %", "AI Classification"),
+    ],
+    defaultColumns: ["project_name", "title", "source_type", "importance_level", "occurred_at", "contains_decision", "contains_risk"],
+    supportedVisualizations: ["table", "kpi_cards", "bar", "donut"],
+  },
 ];
 
 // ── Lookups ───────────────────────────────────────────────────────────────────

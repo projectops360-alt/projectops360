@@ -32,7 +32,7 @@ interface LinksTranslations {
   removeConfirm: string;
   context: string;
   createdAt: string;
-  entityTypeLabels: Record<TraceableEntityType, string>;
+  entityTypeLabels: Partial<Record<TraceableEntityType, string>>;
   linkTypeLabels: Record<LinkType, string>;
   dialogTranslations: {
     title: string;
@@ -43,7 +43,7 @@ interface LinksTranslations {
     contextNotesPlaceholder: string;
     submit: string;
     cancel: string;
-    entityTypeLabels: Record<TraceableEntityType, string>;
+    entityTypeLabels: Partial<Record<TraceableEntityType, string>>;
     linkTypeLabels: Record<LinkType, string>;
     errors: {
       targetRequired: string;

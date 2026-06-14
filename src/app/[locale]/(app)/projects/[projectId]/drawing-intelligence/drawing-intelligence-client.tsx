@@ -15,6 +15,7 @@ import { DrawingProcessingProgress } from "@/components/drawing-intelligence/dra
 import {
   retryDrawingProcessingJobAction,
   archiveDrawingFileAction,
+  generateTakeoffEstimateAction,
 } from "./actions";
 import type { Locale } from "@/types/database";
 import type {
@@ -28,6 +29,17 @@ import type {
 } from "@/types/drawing-intelligence";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+/** One traceability evidence record: the verbatim excerpt (+ page) that backs
+ *  an AI extraction or insight. */
+export interface EvidenceRow {
+  id: string;
+  drawing_file_id: string | null;
+  page_number: number | null;
+  related_entity_type: string | null;
+  text_excerpt: string | null;
+  confidence_score: number | null;
+}
 
 type DrawingTab =
   | "upload" | "library" | "extractions" | "risks" | "rfis" | "submittals"
@@ -129,6 +141,7 @@ interface DrawingIntelligenceClientProps {
   insights: DrawingInsight[];
   tasks: { id: string; title: string }[];
   versions: DrawingVersion[];
+  evidence: EvidenceRow[];
   /** Autodesk connector readiness (checked server-side, env never exposed) */
   autodeskConfigured: boolean;
   locale: Locale;
@@ -192,6 +205,7 @@ export function DrawingIntelligenceClient({
   insights,
   tasks,
   versions,
+  evidence,
   autodeskConfigured,
   locale,
   translations: t,
@@ -200,6 +214,25 @@ export function DrawingIntelligenceClient({
   const [activeTab, setActiveTab] = useState<DrawingTab>(files.length > 0 ? "library" : "upload");
   const [detailFileId, setDetailFileId] = useState<string | null>(null);
   const [busyFileId, setBusyFileId] = useState<string | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [estimate, setEstimate] = useState<{ total: number; items: number; withCost: number; currency: string } | null>(null);
+
+  const handleGenerateEstimate = async (fileIds: string[]) => {
+    setEstimating(true);
+    let total = 0, items = 0, withCost = 0, currency = "USD";
+    for (const fid of fileIds) {
+      const res = await generateTakeoffEstimateAction({ fileId: fid, projectId });
+      if (res.summary) {
+        total += res.summary.totalCost;
+        items += res.summary.lineItems;
+        withCost += res.summary.withUnitCost;
+        currency = res.summary.currency;
+      }
+    }
+    setEstimate({ total, items, withCost, currency });
+    setEstimating(false);
+    router.refresh();
+  };
 
   const formatDate = (dateStr: string): string =>
     new Date(dateStr).toLocaleDateString(locale === "es" ? "es-ES" : "en-US", {
@@ -600,8 +633,46 @@ export function DrawingIntelligenceClient({
           if (!byCategory.has(category)) byCategory.set(category, []);
           byCategory.get(category)!.push(row);
         }
+        const takeoffFileIds = [...new Set(takeoffRows.map((r) => r.drawing_file_id).filter(Boolean) as string[])];
         return (
           <div className="space-y-4">
+            {/* Cost estimate toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3">
+              <div className="text-sm">
+                <p className="font-medium text-foreground">
+                  {locale === "es" ? "Estimado de costo" : "Cost estimate"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {locale === "es"
+                    ? "Genera cantidades y costos desde el takeoff. Las líneas quedan en Materiales / Reports (editables)."
+                    : "Generate quantities and costs from the takeoff. Lines land in Materials / Reports (editable)."}
+                </p>
+                {estimate && (
+                  <p className="mt-1 text-sm font-semibold text-brand-600 dark:text-brand-400">
+                    {locale === "es" ? "Total estimado" : "Estimated total"}: {estimate.currency}{" "}
+                    {estimate.total.toLocaleString(locale === "es" ? "es-ES" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {" · "}
+                    {estimate.withCost}/{estimate.items} {locale === "es" ? "con costo" : "costed"}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={`/${locale}/projects/${projectId}/budget`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  {locale === "es" ? "Ver presupuesto / PDF" : "View budget / PDF"}
+                </a>
+                <button
+                  onClick={() => handleGenerateEstimate(takeoffFileIds)}
+                  disabled={estimating || takeoffFileIds.length === 0}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {estimating && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {locale === "es" ? "Generar estimado" : "Generate estimate"}
+                </button>
+              </div>
+            </div>
             {[...byCategory.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([category, rows]) => (
               <div key={category} className="overflow-x-auto rounded-xl border border-border">
                 <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground">
@@ -674,9 +745,71 @@ export function DrawingIntelligenceClient({
         );
       })()}
 
-      {/* ── Remaining tabs (evidence viewer) ── */}
+      {/* ── Evidence Viewer (traceability: verbatim excerpts backing extractions) ── */}
+      {activeTab === "evidence" && (
+        evidence.length === 0 ? (
+          <PlaceholderPanel icon={Crosshair} label={t.tabs.evidence} message={hasFiles ? t.comingSoon : t.emptyDescription} />
+        ) : (() => {
+          const isEs = locale === "es";
+          const TYPE_LABELS: Record<string, { en: string; es: string }> = {
+            drawing_extraction: { en: "Takeoff / Material", es: "Takeoff / Material" },
+            drawing_insight: { en: "Insight", es: "Insight" },
+            drawing_extraction_note: { en: "Note", es: "Nota" },
+            drawing_title_block_field: { en: "Title block", es: "Cajetín" },
+          };
+          const typeLabel = (k: string | null) => {
+            const e = k ? TYPE_LABELS[k] : undefined;
+            return e ? (isEs ? e.es : e.en) : (k ?? "—");
+          };
+          const byPage = new Map<number, EvidenceRow[]>();
+          for (const ev of evidence) {
+            const p = ev.page_number ?? 0;
+            if (!byPage.has(p)) byPage.set(p, []);
+            byPage.get(p)!.push(ev);
+          }
+          const pages = [...byPage.keys()].sort((a, b) => a - b);
+          return (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-sm font-medium text-foreground">{isEs ? "Trazabilidad de evidencia" : "Evidence traceability"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isEs
+                    ? `${evidence.length} citas textuales del plano que respaldan cada extracción e insight — garantía de que nada se inventó.`
+                    : `${evidence.length} verbatim excerpts from the drawing backing every extraction and insight — proof nothing was invented.`}
+                </p>
+              </div>
+              {pages.map((p) => (
+                <div key={p} className="overflow-hidden rounded-xl border border-border">
+                  <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs font-semibold text-foreground">
+                    {isEs ? "Página" : "Page"} {p || "—"}
+                    <span className="ml-1.5 font-normal text-muted-foreground">({byPage.get(p)!.length})</span>
+                  </div>
+                  <ul className="divide-y divide-border">
+                    {byPage.get(p)!.map((ev) => (
+                      <li key={ev.id} className="flex items-start gap-3 px-3 py-2">
+                        <span className="mt-0.5 inline-flex shrink-0 rounded-full bg-brand-500/10 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-400">
+                          {typeLabel(ev.related_entity_type)}
+                        </span>
+                        <p className="min-w-0 flex-1 text-sm text-foreground">“{ev.text_excerpt}”</p>
+                        {ev.confidence_score != null && (
+                          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                            {Math.round(Number(ev.confidence_score) * 100)}%
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          );
+        })()
+      )}
+
+      {/* ── Remaining placeholder tabs ── */}
       {activeTab !== "upload" && activeTab !== "library" && activeTab !== "logs" &&
         activeTab !== "extractions" && activeTab !== "versions" && activeTab !== "takeoff" &&
+        activeTab !== "evidence" &&
         INSIGHT_TAB_TYPES[activeTab] === undefined && (
         <PlaceholderPanel
           icon={TAB_CONFIG.find((tab) => tab.key === activeTab)?.icon ?? ScanSearch}

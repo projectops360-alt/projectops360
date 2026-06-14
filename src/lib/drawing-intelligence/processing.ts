@@ -437,8 +437,11 @@ export async function processDrawingFile(input: {
         fileId,
         organizationId,
         projectId,
-        // AI enhancement (token cost) only in deep_analysis
-        orgContext: mode === "deep_analysis" ? input.orgContext : undefined,
+        // AI enhancement (material takeoff + insights) runs for standard and
+        // deep modes — the takeoff is the core value of the module. Only
+        // quick_scan stays heuristic-only for cost control (handled by the
+        // enclosing `mode !== "quick_scan"` guard).
+        orgContext: input.orgContext,
       });
       if (interpretation.ok) stages.push("insights_generated");
     } catch (error) {
@@ -479,6 +482,10 @@ async function insertPages(
         drawing_file_id: file.id,
         project_id: file.project_id,
         page_number: page.pageNumber,
+        // Persist the full per-page text so the interpretation/takeoff engine
+        // sees ALL sheet content (materials, assemblies, schedules), not just
+        // the heuristic "general notes" block. Empty for scanned pages.
+        extracted_text: page.text?.trim() ? page.text : null,
       })),
     )
     .select("id, page_number");

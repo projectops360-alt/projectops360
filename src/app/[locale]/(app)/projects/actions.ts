@@ -184,6 +184,17 @@ const updateProjectSchema = z.object({
     .transform((s) => s.trim())
     .default(""),
   status: z.enum(["planning", "active", "on_hold", "completed", "cancelled"]),
+  projectType: z
+    .enum([
+      "software_development",
+      "data_center_construction",
+      "residential_construction",
+      "commercial_construction",
+      "infrastructure",
+      "industrial",
+      "general",
+    ])
+    .optional(),
   startDate: z.string().optional(),
   targetEndDate: z.string().optional(),
   locale: z.enum(["en", "es"]).default("en"),
@@ -194,6 +205,7 @@ export async function updateProjectAction(input: {
   name: string;
   description?: string;
   status: string;
+  projectType?: string;
   startDate?: string;
   targetEndDate?: string;
   locale: string;
@@ -210,6 +222,7 @@ export async function updateProjectAction(input: {
     name: input.name,
     description: input.description,
     status: input.status,
+    projectType: input.projectType,
     startDate: input.startDate,
     targetEndDate: input.targetEndDate,
     locale: input.locale,
@@ -223,10 +236,22 @@ export async function updateProjectAction(input: {
   const data = parsed.data;
   const lang = data.locale as Locale;
 
-  const titleI18n = { [lang]: data.name };
-  const descriptionI18n = data.description ? { [lang]: data.description } : {};
-
   const supabase = createAdminClient();
+
+  // Preserve other locales: merge into the existing i18n maps instead of
+  // replacing them, so editing in one language never wipes the other.
+  const { data: existing } = await supabase
+    .from("projects")
+    .select("title_i18n, description_i18n")
+    .eq("id", data.projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .single();
+
+  const titleI18n = { ...((existing?.title_i18n as Record<string, string>) ?? {}), [lang]: data.name };
+  const descriptionI18n = data.description
+    ? { ...((existing?.description_i18n as Record<string, string>) ?? {}), [lang]: data.description }
+    : ((existing?.description_i18n as Record<string, string>) ?? {});
 
   const { error: updateError } = await supabase
     .from("projects")
@@ -234,6 +259,8 @@ export async function updateProjectAction(input: {
       title_i18n: titleI18n,
       description_i18n: descriptionI18n,
       status: data.status,
+      // Only change the type when explicitly provided (drives module visibility).
+      ...(data.projectType ? { project_type: data.projectType } : {}),
       start_date: data.startDate || null,
       target_end_date: data.targetEndDate || null,
     })

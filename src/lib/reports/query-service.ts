@@ -221,6 +221,40 @@ async function fetchRfis(supabase: Admin, ctx: QueryContext): Promise<ReportRow[
   } as ReportRow));
 }
 
+async function fetchProjectMemory(supabase: Admin, ctx: QueryContext): Promise<ReportRow[]> {
+  const projects = await projectNameMap(supabase, ctx.organizationId);
+  const { data } = await scope(
+    supabase
+      .from("project_memory_items")
+      .select("title, source_type, importance_level, sentiment, author_name, occurred_at, ai_classification, project_id")
+      .is("deleted_at", null)
+      .limit(ROW_CAP),
+    ctx.organizationId, ctx.projectId,
+  );
+  return (data ?? []).filter((m) => m.project_id != null && projects.has(m.project_id)).map((m) => {
+    const ai = (m.ai_classification ?? {}) as Record<string, unknown>;
+    const flag = (k: string) => ai[k] === true;
+    return {
+      project_name: projects.get(m.project_id) ?? "—",
+      _projectId: m.project_id ?? null,
+      title: m.title,
+      source_type: m.source_type,
+      importance_level: m.importance_level,
+      sentiment: m.sentiment ?? (typeof ai.sentiment === "string" ? ai.sentiment : null),
+      author: m.author_name ?? "",
+      occurred_at: m.occurred_at,
+      contains_decision: flag("contains_decision"),
+      contains_risk: flag("contains_risk"),
+      contains_action_item: flag("contains_action_item"),
+      contains_scope_change: flag("contains_scope_change"),
+      contains_schedule_impact: flag("contains_schedule_impact"),
+      contains_cost_impact: flag("contains_cost_impact"),
+      contains_stakeholder_concern: flag("contains_stakeholder_concern"),
+      ai_confidence_pct: typeof ai.confidence === "number" ? Math.round(ai.confidence * 100) : null,
+    } as ReportRow;
+  });
+}
+
 const FETCHERS: Record<string, (s: Admin, c: QueryContext) => Promise<ReportRow[]>> = {
   project_health: fetchProjectHealth,
   task_execution: fetchTaskExecution,
@@ -228,6 +262,7 @@ const FETCHERS: Record<string, (s: Admin, c: QueryContext) => Promise<ReportRow[
   risk_register: fetchRisks,
   material_requirements: fetchMaterials,
   rfi_log: fetchRfis,
+  project_memory: fetchProjectMemory,
 };
 
 // ── Calculated fields ─────────────────────────────────────────────────────────

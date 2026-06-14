@@ -15,6 +15,7 @@ import type {
   DrawingPage,
   DrawingProcessingJob,
 } from "@/types/drawing-intelligence";
+import type { EstimateSummary } from "@/lib/drawing-intelligence/costing";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -197,6 +198,10 @@ export async function registerDrawingFileAction(
       fileId: fileRow.id,
       organizationId: org.organizationId,
       projectId: data.projectId,
+      // Pass org context so the AI enhancement (material takeoff + insights)
+      // can run on upload — without this, AI never runs and only the heuristic
+      // general-notes insights are produced.
+      orgContext: org,
     }).catch((error) => {
       console.error("[drawing-intelligence] background processing failed:", error);
     });
@@ -237,6 +242,35 @@ export async function processDrawingFileAction(input: {
   revalidatePath(`/projects/${input.projectId}/drawing-intelligence`, "page");
   if (!outcome.ok) return { error: outcome.error ?? "processing_job_failed", status: outcome.status };
   return { status: outcome.status };
+}
+
+// ── Generate the costed estimate from a drawing's takeoff ─────────────────────
+
+export async function generateTakeoffEstimateAction(input: {
+  fileId: string;
+  projectId: string;
+}): Promise<{ error?: string; summary?: EstimateSummary }> {
+  let access;
+  try {
+    access = await assertProjectAccess(input.projectId);
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  if (!access) return { error: "missing_project_context" };
+  if (!z.string().uuid().safeParse(input.fileId).success) {
+    return { error: "validation_error" };
+  }
+
+  const { generateTakeoffEstimate } = await import("@/lib/drawing-intelligence/costing");
+  const summary = await generateTakeoffEstimate({
+    organizationId: access.org.organizationId,
+    projectId: input.projectId,
+    fileId: input.fileId,
+  });
+
+  revalidatePath(`/projects/${input.projectId}/drawing-intelligence`, "page");
+  if (!summary.ok) return { error: summary.error ?? "estimate_failed" };
+  return { summary };
 }
 
 // ── Retry a failed processing job ─────────────────────────────────────────────

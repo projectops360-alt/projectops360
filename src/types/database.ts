@@ -140,6 +140,70 @@ export interface Meeting extends OrganizationScoped {
   status: MeetingStatus;
   linked_stakeholder_ids: string[];
   created_by: string | null;
+  // ── Rhythm Center extensions ──
+  event_id: string | null;
+  meeting_type: RhythmMeetingType | null;
+  objective: string | null;
+  expected_outcome: string | null;
+  agenda_json: AgendaSection[];
+  ai_summary: Record<string, unknown>;
+  meeting_status: EventStatus;
+  meeting_link: string | null;
+}
+
+// ── Project Rhythm Center ────────────────────────────────────────────────────────
+
+export type EventType =
+  | "kickoff_meeting" | "status_update" | "stakeholder_review" | "project_review" | "project_closing"
+  | "milestone" | "deliverable_deadline" | "risk_review" | "budget_review"
+  | "change_review" | "vendor_followup" | "resource_planning" | "action_followup" | "other";
+
+export type EventStatus =
+  | "draft" | "scheduled" | "agenda_ready" | "in_progress"
+  | "completed" | "follow_up_pending" | "closed" | "canceled";
+
+export type EventPriority = "low" | "medium" | "high" | "critical";
+export type EventSource = "manual" | "template" | "system" | "ai";
+export type RhythmMeetingType = "kickoff" | "status_update" | "stakeholder_review" | "project_review" | "closing" | "other";
+export type AttendeeRole = "organizer" | "presenter" | "required" | "optional";
+export type AttendanceStatus = "invited" | "accepted" | "declined" | "tentative" | "attended" | "absent";
+
+export interface AgendaSection {
+  key: string;
+  title: string;
+  content: string;
+}
+
+export interface ProjectEvent extends OrganizationScoped {
+  id: string;
+  project_id: string;
+  title: string;
+  description: string | null;
+  event_type: EventType;
+  start_datetime: string;
+  end_datetime: string | null;
+  status: EventStatus;
+  priority: EventPriority;
+  source: EventSource;
+  related_milestone_id: string | null;
+  related_task_id: string | null;
+  related_risk_id: string | null;
+  related_change_id: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string | null;
+}
+
+export interface MeetingAttendee {
+  id: string;
+  organization_id: string;
+  meeting_id: string;
+  user_id: string | null;
+  stakeholder_id: string | null;
+  name: string | null;
+  role: AttendeeRole;
+  attendance_status: AttendanceStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── Decisions ──────────────────────────────────────────────────────────────────
@@ -214,9 +278,75 @@ export interface Document extends OrganizationScoped {
   created_by: string | null;
 }
 
+// ── Project Memory Items ─────────────────────────────────────────────────────────
+
+export type MemorySourceType =
+  | "manual_note"
+  | "email"
+  | "chat_message"
+  | "meeting_note"
+  | "decision"
+  | "action_item"
+  | "risk_signal"
+  | "evidence"
+  | "approval"
+  | "change_request"
+  | "system_event"
+  | "document";
+
+export type MemoryImportance = "low" | "medium" | "high" | "critical";
+export type MemorySentiment = "positive" | "neutral" | "negative" | "concerned" | "mixed";
+export type MemoryVisibility = "project" | "organization" | "private";
+export type MemoryPipelineStatus = "pending" | "processing" | "completed" | "failed" | "skipped";
+export type MemoryUrgency = "low" | "medium" | "high";
+
+/** Structured JSON stored in project_memory_items.ai_classification. */
+export interface MemoryClassification {
+  contains_decision?: boolean;
+  contains_risk?: boolean;
+  contains_action_item?: boolean;
+  contains_scope_change?: boolean;
+  contains_schedule_impact?: boolean;
+  contains_cost_impact?: boolean;
+  contains_stakeholder_concern?: boolean;
+  sentiment?: MemorySentiment;
+  urgency?: MemoryUrgency;
+  suggested_tags?: string[];
+  /** AI-suggested links to existing entities (not auto-applied). */
+  suggested_links?: Array<{ entity_type: string; hint: string }>;
+  confidence?: number;
+}
+
+export interface ProjectMemoryItem extends OrganizationScoped {
+  id: string;
+  project_id: string;
+  title: string;
+  content: string | null;
+  summary: string | null;
+  source_type: MemorySourceType;
+  source_system: string | null;
+  source_external_id: string | null;
+  author_name: string | null;
+  author_email: string | null;
+  participants: string[];
+  occurred_at: string | null;
+  importance_level: MemoryImportance;
+  sentiment: MemorySentiment | null;
+  ai_classification: MemoryClassification;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  visibility: MemoryVisibility;
+  ai_status: MemoryPipelineStatus;
+  index_status: MemoryPipelineStatus;
+  created_by: string | null;
+}
+
 // ── Traceability Links ─────────────────────────────────────────────────────────
 
-export type TraceableEntityType = "decision" | "meeting" | "communication" | "document" | "action_item" | "stakeholder" | "project";
+export type TraceableEntityType =
+  | "decision" | "meeting" | "communication" | "document"
+  | "action_item" | "stakeholder" | "project"
+  | "memory" | "task" | "milestone" | "risk";
 export type LinkType = "related_to" | "caused_by" | "depends_on" | "supersedes" | "derived_from" | "contradicts";
 
 export interface TraceabilityLink {
@@ -234,9 +364,9 @@ export interface TraceabilityLink {
 
 // ── AI Runs ────────────────────────────────────────────────────────────────────
 
-export type AiPromptType = "summary" | "decision_analysis" | "stakeholder_mapping" | "risk_assessment" | "action_extraction" | "communication_history_summary" | "drawing_interpretation" | "custom";
+export type AiPromptType = "summary" | "decision_analysis" | "stakeholder_mapping" | "risk_assessment" | "action_extraction" | "communication_history_summary" | "drawing_interpretation" | "memory_classification" | "custom";
 export type AiRunStatus = "pending" | "completed" | "failed" | "cancelled";
-export type AiSourceType = "decision" | "meeting" | "communication" | "document" | "action_item" | "project";
+export type AiSourceType = "decision" | "meeting" | "communication" | "document" | "action_item" | "project" | "memory";
 
 export interface AiRun {
   id: string;
@@ -814,8 +944,11 @@ export interface DatabaseTables {
   stakeholders: Stakeholder;
   communication_items: CommunicationItem;
   meetings: Meeting;
+  project_events: ProjectEvent;
+  meeting_attendees: MeetingAttendee;
   decisions: Decision;
   documents: Document;
+  project_memory_items: ProjectMemoryItem;
   traceability_links: TraceabilityLink;
   ai_runs: AiRun;
   action_items: ActionItem;

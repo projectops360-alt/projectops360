@@ -38,7 +38,7 @@ interface CreateLinkDialogProps {
     contextNotesPlaceholder: string;
     submit: string;
     cancel: string;
-    entityTypeLabels: Record<TraceableEntityType, string>;
+    entityTypeLabels: Partial<Record<TraceableEntityType, string>>;
     linkTypeLabels: Record<LinkType, string>;
     errors: {
       targetRequired: string;

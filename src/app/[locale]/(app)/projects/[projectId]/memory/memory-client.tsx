@@ -5,6 +5,7 @@ import { localizedHref } from "@/i18n/href";
 import Link from "next/link";
 import {
   BookOpen,
+  Sparkles,
   MessageSquare,
   CalendarDays,
   Scale,
@@ -16,6 +17,9 @@ import {
   Circle,
   ArrowRight,
 } from "lucide-react";
+import { MemoryTimeline } from "@/components/memory";
+import type { MemoryItemView, LinkableEntities } from "@/components/memory";
+import type { Locale } from "@/types/database";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -52,11 +56,15 @@ interface Document {
 interface ProjectMemoryClientProps {
   projectId: string;
   locale: string;
+  memoryItems: MemoryItemView[];
+  entities: LinkableEntities;
+  initialItemId?: string;
   communications: Communication[];
   meetings: Meeting[];
   decisions: Decision[];
   documents: Document[];
   counts: {
+    memory: number;
     communications: number;
     meetings: number;
     decisions: number;
@@ -78,7 +86,7 @@ const SOURCE_TYPE_COLORS: Record<string, string> = {
   other: "bg-gray-50 text-gray-700 dark:bg-gray-950/50 dark:text-gray-300",
 };
 
-type TabKey = "all" | "communications" | "meetings" | "decisions" | "documents" | "search";
+type TabKey = "timeline" | "all" | "communications" | "meetings" | "decisions" | "documents" | "search";
 
 // ── Sub-components ──────────────────────────────────────────────────────────────
 
@@ -106,13 +114,16 @@ function EmptyState({ message }: { message: string }) {
 export function ProjectMemoryClient({
   projectId,
   locale,
+  memoryItems,
+  entities,
+  initialItemId,
   communications,
   meetings,
   decisions,
   documents,
   counts,
 }: ProjectMemoryClientProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [activeTab, setActiveTab] = useState<TabKey>("timeline");
   const base = localizedHref(locale, `/projects/${projectId}`);
 
   const isEs = locale === "es";
@@ -120,7 +131,8 @@ export function ProjectMemoryClient({
   // ── Tab definitions ───────────────────────────────────────────────────────
 
   const tabs: Array<{ key: TabKey; label: string; count?: number; icon: typeof BookOpen }> = [
-    { key: "all", label: isEs ? "Todo" : "All", icon: BookOpen },
+    { key: "timeline", label: isEs ? "Memoria" : "Memory", count: counts.memory, icon: Sparkles },
+    { key: "all", label: isEs ? "Resumen" : "Overview", icon: BookOpen },
     { key: "communications", label: isEs ? "Comunicaciones" : "Communications", count: counts.communications, icon: MessageSquare },
     { key: "meetings", label: isEs ? "Reuniones" : "Meetings", count: counts.meetings, icon: CalendarDays },
     { key: "decisions", label: isEs ? "Decisiones" : "Decisions", count: counts.decisions, icon: Scale },
@@ -212,8 +224,8 @@ export function ProjectMemoryClient({
         </h1>
         <p className="text-sm text-muted-foreground">
           {isEs
-            ? "Historial completo de comunicaciones, reuniones, decisiones y documentos."
-            : "Complete history of communications, meetings, decisions, and documents."}
+            ? "La memoria operativa viva del proyecto: captura notas, emails, decisiones, riesgos y evidencia con clasificación IA y búsqueda semántica."
+            : "The project's living operational memory: capture notes, emails, decisions, risks, and evidence with AI classification and semantic search."}
         </p>
       </div>
 
@@ -250,7 +262,18 @@ export function ProjectMemoryClient({
 
       {/* Tab content */}
       <div className="min-h-[300px]">
-        {/* ── All ─────────────────────────────────────────────────────────── */}
+        {/* ── Memory timeline (capture layer) ─────────────────────────────── */}
+        {activeTab === "timeline" && (
+          <MemoryTimeline
+            locale={locale as Locale}
+            projectId={projectId}
+            items={memoryItems}
+            entities={entities}
+            initialItemId={initialItemId}
+          />
+        )}
+
+        {/* ── Overview (aggregated existing records) ──────────────────────── */}
         {activeTab === "all" && (
           <>
             {allItems.length === 0 ? (

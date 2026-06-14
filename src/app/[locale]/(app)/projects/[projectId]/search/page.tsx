@@ -51,6 +51,7 @@ export default async function SearchPage({
       decision: tSearch("filters.decision"),
       document: tSearch("filters.document"),
       task: tSearch("filters.task"),
+      memory: locale === "es" ? "Memoria" : "Memory",
     },
     entityLabels: {
       communication: tSearch("communication"),
@@ -58,6 +59,7 @@ export default async function SearchPage({
       decision: tSearch("decision"),
       document: tSearch("document"),
       task: tSearch("task"),
+      memory: locale === "es" ? "Memoria" : "Memory",
     },
     semanticMatch: tSearch("semanticMatch"),
   };

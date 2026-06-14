@@ -58,3 +58,6 @@ next-env.d.ts
 .claude/
 dev_out.log
 olla.bat
+
+# sample plan PDFs — local testing only, may be copyrighted; do not commit
+docs/sample-plans/*.pdf

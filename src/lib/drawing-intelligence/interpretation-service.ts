@@ -47,6 +47,41 @@ export interface TakeoffCandidate {
 
 type Supabase = ReturnType<typeof createAdminClient>;
 
+/** Full extracted text for one drawing page. */
+interface PageText {
+  page: number;
+  text: string;
+}
+
+/** Characters of drawing text per AI call. Small, focused chunks extract far
+ *  more reliably than one large blob: a 44k-char dump made gpt-4o-mini return
+ *  empty, while ~5k focused input produced a full takeoff. We chunk the sheet
+ *  text and run the model per chunk, then merge + dedupe. */
+const CHUNK_CHARS = 7000;
+/** Cost guard: never fan out beyond this many AI calls for one drawing. */
+const MAX_CHUNKS = 14;
+/** Chunk AI calls run concurrently (bounded) so wall-clock stays low instead
+ *  of summing N sequential round-trips. */
+const AI_CONCURRENCY = 5;
+
+/** Run `fn` over items with bounded concurrency, preserving input order. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 const VALID_TYPES = new Set<string>([
   "risk", "rfi_candidate", "submittal_requirement", "inspection_requirement",
   "schedule_impact", "cost_impact", "missing_information", "contradiction",
@@ -74,7 +109,7 @@ export async function runDrawingInterpretation(input: {
   await setJob(supabase, fileId, { status: "processing", started_at: startedAt });
 
   // ── Load drawing + extracted content + project context ──────────────────
-  const [fileResult, extractionsResult, tasksResult, milestonesResult] = await Promise.all([
+  const [fileResult, extractionsResult, tasksResult, milestonesResult, pagesResult] = await Promise.all([
     supabase.from("drawing_files").select("*").eq("id", fileId)
       .eq("organization_id", organizationId).is("deleted_at", null).single(),
     supabase.from("drawing_extractions").select("*").eq("drawing_file_id", fileId)
@@ -83,6 +118,11 @@ export async function runDrawingInterpretation(input: {
       .eq("project_id", projectId).eq("organization_id", organizationId).is("deleted_at", null),
     supabase.from("milestones").select("id, title, status")
       .eq("project_id", projectId).eq("organization_id", organizationId).is("deleted_at", null),
+    // Full per-page sheet text — the source for material takeoff. The heuristic
+    // "notes" only capture the general-notes block; materials/assemblies live in
+    // the sheet text and must reach the AI (and the evidence-validation corpus).
+    supabase.from("drawing_pages").select("page_number, extracted_text").eq("drawing_file_id", fileId)
+      .eq("organization_id", organizationId).is("deleted_at", null).order("page_number", { ascending: true }),
   ]);
 
   const file = fileResult.data;
@@ -98,6 +138,13 @@ export async function runDrawingInterpretation(input: {
   const revisions: RevisionEntry[] = extractions
     .filter((e) => e.extraction_type === "revision_block")
     .flatMap((e) => ((e.extracted_json as { entries?: RevisionEntry[] }).entries ?? []));
+
+  // Full sheet text per page (drives material takeoff + evidence validation).
+  const pageTexts: PageText[] = (pagesResult.data ?? [])
+    .filter((p): p is { page_number: number; extracted_text: string } =>
+      typeof p.extracted_text === "string" && p.extracted_text.trim().length > 0)
+    .map((p) => ({ page: p.page_number, text: p.extracted_text }))
+    .sort((a, b) => a.page - b.page);
 
   const ctx: InterpretationContext = {
     fileName: file.original_file_name ?? file.file_name,
@@ -121,17 +168,35 @@ export async function runDrawingInterpretation(input: {
   let aiCostUsd: number | null = null;
   let aiModel: string | null = null;
   let takeoffCandidates: TakeoffCandidate[] = [];
-  if (input.orgContext && notes.length > 0 && process.env.OPENAI_API_KEY) {
-    try {
-      const enhancement = await runAiEnhancement(input.orgContext, file.id, ctx);
-      aiUsed = enhancement.candidates.length > 0 || enhancement.takeoff.length > 0;
-      aiCostUsd = enhancement.costUsd;
-      aiModel = enhancement.model;
+  if (input.orgContext && (pageTexts.length > 0 || notes.length > 0) && process.env.OPENAI_API_KEY) {
+    // Chunk the sheet text into focused pieces — one large blob makes the model
+    // return nothing; small chunks extract reliably. Run per chunk, merge.
+    const chunks = buildChunks(pageTexts, ctx.notes);
+    const org = input.orgContext;
+    // Run chunks concurrently (bounded) — sequential calls made the AI step
+    // feel hung; parallel keeps wall-clock to roughly one round-trip per batch.
+    const enhancements = await mapWithConcurrency(chunks, AI_CONCURRENCY, (chunk) =>
+      runAiEnhancement(org, file.id, ctx, chunk).catch((error) => {
+        console.error("[drawing-interpretation] AI chunk failed (continuing):", error);
+        return { candidates: [] as InsightCandidate[], takeoff: [] as TakeoffCandidate[], costUsd: null as number | null, model: null as string | null };
+      }),
+    );
+
+    const seenTakeoff = new Set<string>();
+    let costSum = 0;
+    for (const enhancement of enhancements) {
+      if (enhancement.model) aiModel = enhancement.model;
+      if (typeof enhancement.costUsd === "number") costSum += enhancement.costUsd;
       candidates = mergeCandidates(candidates, enhancement.candidates);
-      takeoffCandidates = enhancement.takeoff;
-    } catch (error) {
-      console.error("[drawing-interpretation] AI enhancement failed (continuing with heuristics):", error);
+      for (const row of enhancement.takeoff) {
+        const key = `${row.category}|${row.item}|${row.specification}`.toLowerCase();
+        if (seenTakeoff.has(key)) continue;
+        seenTakeoff.add(key);
+        takeoffCandidates.push(row);
+      }
+      if (enhancement.candidates.length > 0 || enhancement.takeoff.length > 0) aiUsed = true;
     }
+    aiCostUsd = costSum > 0 ? costSum : null;
   }
 
   // ── 3. Idempotency: refresh unreviewed insights, keep user-reviewed ones ──
@@ -324,12 +389,74 @@ async function persistTakeoffRows(
 
 // ── AI enhancement ────────────────────────────────────────────────────────────
 
+/** Split the sheet text into focused, model-sized chunks (≤ CHUNK_CHARS each),
+ *  capped at MAX_CHUNKS. Each chunk carries its sheet label so the AI can cite
+ *  the page. Falls back to the notes block when no page text exists. */
+function buildChunks(pageTexts: PageText[], notes: ExtractedNote[]): string[] {
+  if (pageTexts.length === 0) {
+    const notesBlock = notes.map((n) => `[p.${n.page_number} ${n.note_id}] ${n.text}`).join("\n").trim();
+    return notesBlock ? [notesBlock.slice(0, CHUNK_CHARS)] : [];
+  }
+  const chunks: string[] = [];
+  let cur = "";
+  const flush = () => { if (cur.trim()) chunks.push(cur.trim()); cur = ""; };
+  for (const p of pageTexts) {
+    if (chunks.length >= MAX_CHUNKS) break;
+    const header = `===== SHEET p.${p.page} =====\n`;
+    const text = p.text;
+    if (header.length + text.length > CHUNK_CHARS) {
+      flush();
+      for (let i = 0; i < text.length && chunks.length < MAX_CHUNKS; i += CHUNK_CHARS) {
+        chunks.push(header + text.slice(i, i + CHUNK_CHARS));
+      }
+      continue;
+    }
+    if (cur.length + header.length + text.length > CHUNK_CHARS) flush();
+    cur += header + text + "\n\n";
+  }
+  flush();
+  return chunks.slice(0, MAX_CHUNKS);
+}
+
+/** True when a takeoff candidate isn't a real, quantifiable material — i.e.
+ *  a fastening/nailing schedule row or a pure specification/code statement.
+ *  These pollute the takeoff and have no quantity, so they're dropped. */
+function isNonMaterial(item: string, spec: string): boolean {
+  const itemL = item.toLowerCase();
+  const specL = spec.toLowerCase();
+  const text = `${itemL} ${specL}`;
+
+  // Fastening / Nailing Schedule rows (IBC Table 2304.10.1) pair a CONNECTION
+  // (e.g. "rafter to plate", "collar tie", "subfloor to joist") with a fastener
+  // callout (e.g. "3-10d (3\" x 0.128\")", "16d", "toe nail"). They are not
+  // materials. Keep genuine fastener MATERIALS (item mentions nail/screw/bolt…).
+  const itemIsFastenerMaterial = /\b(nail|screw|bolt|staple|fastener|hardware|anchor|connector|hanger|strap|clip|hold[- ]?down)s?\b/.test(itemL);
+  // Spec is essentially just a fastener callout: "10d (3\" x 0.128\")", "3-10d (…", "4-8d (…"
+  const fastenerSpec = /(^|\s)\d{0,2}-?\d+d\s*\(\s*\d/.test(specL);
+  if (fastenerSpec && !itemIsFastenerMaterial) return true;
+  // Nailing instructions / connection verbs.
+  if (/\b(toe[- ]?nail|face[- ]?nail|blind[- ]?nail|end[- ]?nail)\b/.test(text)) return true;
+  // Classic nail/staple/screw schedule language.
+  const fasteningSchedule =
+    /\b(nail|staple|screw)s?\b/.test(text) &&
+    /\b(common|deformed|galvanized|o\.?c\.?|schedule|roofing nail)\b/.test(text);
+  if (fasteningSchedule && !itemIsFastenerMaterial && text.length > 35) return true;
+  // Pure spec / code statements (no physical material to quantify).
+  if (/\b(shall be|do not scale|compressive strength|min(imum)?\s+\d+\s*day|conform to|in accordance with)\b/.test(text)) return true;
+  return false;
+}
+
 async function runAiEnhancement(
   orgContext: OrgContext,
   fileId: string,
   ctx: InterpretationContext,
+  chunkText: string,
 ): Promise<{ candidates: InsightCandidate[]; takeoff: TakeoffCandidate[]; costUsd: number | null; model: string | null }> {
   const { runAi } = await import("@/lib/ai/service");
+
+  // One focused chunk of sheet text per call (materials/assemblies/schedules
+  // live here → the source of the takeoff). Small input = reliable extraction.
+  const aiContent = chunkText.trim() || "(none)";
 
   const result = await runAi(orgContext, {
     promptType: "drawing_interpretation",
@@ -338,7 +465,7 @@ async function runAiEnhancement(
       drawingTitle: ctx.fileName,
       discipline: ctx.discipline ?? "Unknown",
       revision: ctx.currentRevision ?? "—",
-      notes: ctx.notes.map((n) => `[p.${n.page_number} ${n.note_id}] ${n.text}`).join("\n") || "(none)",
+      notes: aiContent,
       revisions: ctx.revisions.map((r) => `${r.revision} ${r.revision_date ?? ""} ${r.description ?? ""}`).join("\n") || "(none)",
       tasks: ctx.tasks.slice(0, 50).map((t) => `- ${t.title} (${t.status})`).join("\n") || "(none)",
     },
@@ -350,11 +477,21 @@ async function runAiEnhancement(
   const rawInsights = (result.parsedJson as { insights?: unknown[] }).insights ?? [];
   const rawExtractions = (result.parsedJson as { extractions?: unknown[] }).extractions ?? [];
 
-  // Verbatim evidence corpus for validation
+  // Verbatim evidence corpus for validation — this chunk's text plus the
+  // shared notes/revisions so cited excerpts validate.
   const corpus = [
+    chunkText,
     ...ctx.notes.map((n) => n.text),
     ...ctx.revisions.map((r) => `${r.revision} ${r.revision_date ?? ""} ${r.description ?? ""}`),
   ].join("\n").toLowerCase();
+  // Whitespace-tolerant evidence match: PDF text extraction produces erratic
+  // spacing, so the model's verbatim quote rarely matches byte-for-byte. We
+  // collapse whitespace on BOTH sides before the substring check — still an
+  // anti-hallucination gate (the words must appear, in order, in the source),
+  // just resilient to spacing noise.
+  const matchCorpus = corpus.replace(/\s+/g, " ");
+  const inCorpus = (excerpt: string): boolean =>
+    matchCorpus.includes(excerpt.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100));
 
   const taskByTitle = new Map(ctx.tasks.map((t) => [t.title.toLowerCase(), t]));
   const valid: InsightCandidate[] = [];
@@ -381,7 +518,7 @@ async function runAiEnhancement(
       })
       .filter((ev) => ev.text_excerpt.length >= 8);
     if (evidenceRefs.length === 0) continue;
-    if (!evidenceRefs.every((ev) => corpus.includes(ev.text_excerpt.toLowerCase().slice(0, 120)))) continue;
+    if (!evidenceRefs.every((ev) => inCorpus(ev.text_excerpt))) continue;
 
     const linkedTask = insight.linked_task_title
       ? taskByTitle.get(String(insight.linked_task_title).toLowerCase()) ?? null
@@ -423,6 +560,9 @@ async function runAiEnhancement(
     if (!VALID_TAKEOFF_TYPES.has(extractionType)) continue;
     if (!category || !item || !specification) continue;
     if (!Number.isFinite(confidence) || confidence <= 0 || confidence > 1) continue;
+    // Safety net: drop non-material noise the model may still leak (fastening
+    // schedule rows, pure spec/code statements) so the takeoff stays clean.
+    if (isNonMaterial(item, specification)) continue;
 
     const evidenceRefs = evidence
       .map((e) => {
@@ -434,7 +574,7 @@ async function runAiEnhancement(
       })
       .filter((ev) => ev.text_excerpt.length >= 8);
     if (evidenceRefs.length === 0) continue;
-    if (!evidenceRefs.every((ev) => corpus.includes(ev.text_excerpt.toLowerCase().slice(0, 120)))) continue;
+    if (!evidenceRefs.every((ev) => inCorpus(ev.text_excerpt))) continue;
 
     const dedupeKey = `${category}|${item}|${specification}`.toLowerCase();
     if (seenTakeoff.has(dedupeKey)) continue;

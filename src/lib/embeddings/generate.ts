@@ -29,7 +29,8 @@ export type EmbeddableEntityType =
   | "communication_items"
   | "meetings"
   | "decisions"
-  | "documents";
+  | "documents"
+  | "project_memory_items";
 
 // ── Text builder per entity type ─────────────────────────────────────────────────
 
@@ -41,6 +42,10 @@ function buildEmbeddingText(
   const get = (key: string): string => {
     const val = record[key];
     if (val === null || val === undefined) return "";
+    if (Array.isArray(val)) {
+      // String arrays (e.g. participants, tags): join into a flat phrase.
+      return val.filter((v) => typeof v === "string" && v.trim()).join(", ");
+    }
     if (typeof val === "object" && val !== null) {
       // i18n JSONB: concatenate en + es for richer embedding
       const i18n = val as Record<string, string>;
@@ -90,6 +95,19 @@ function buildEmbeddingText(
       return [
         get("title_i18n"),
         get("description_i18n"),
+      ].filter(Boolean).join("\n");
+
+    case "project_memory_items":
+      // Include all meaningful project context in the searchable text:
+      // source type, author, participants, tags, summary, and full content.
+      return [
+        get("source_type"),
+        get("title"),
+        get("author_name"),
+        get("participants"),
+        get("tags"),
+        get("summary"),
+        get("content"),
       ].filter(Boolean).join("\n");
 
     default:

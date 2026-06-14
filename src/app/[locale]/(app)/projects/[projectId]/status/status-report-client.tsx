@@ -161,11 +161,11 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
         <header className="border-b border-border pb-5">
           {/* Brand mark — full-color logo on the light report surface */}
           <Image
-            src="/logo-full.png"
+            src="/logo-report.png"
             alt="Project Ops 360°"
-            width={2953}
-            height={1024}
-            className="mb-5 h-14 w-auto"
+            width={358}
+            height={473}
+            className="mb-5 h-40 w-auto"
             priority
           />
           <div className="flex items-start justify-between gap-4">

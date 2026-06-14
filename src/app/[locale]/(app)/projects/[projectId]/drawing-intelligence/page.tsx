@@ -6,7 +6,7 @@ import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import type { DrawingExtraction, DrawingFile, DrawingInsight, DrawingProcessingJob, DrawingVersion } from "@/types/drawing-intelligence";
 import { getConnector } from "@/lib/drawing-intelligence/connectors/registry";
-import { DrawingIntelligenceClient } from "./drawing-intelligence-client";
+import { DrawingIntelligenceClient, type EvidenceRow } from "./drawing-intelligence-client";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export default async function DrawingIntelligencePage({
   // Fetch project, drawing files and processing jobs in parallel.
   // Drawing tables may not exist before the migration is applied — errors
   // degrade gracefully to empty lists.
-  const [projectResult, filesResult, jobsResult, extractionsResult, insightsResult, tasksResult, versionsResult] = await Promise.all([
+  const [projectResult, filesResult, jobsResult, extractionsResult, insightsResult, tasksResult, versionsResult, evidenceResult] = await Promise.all([
     supabase
       .from("projects")
       .select("id, slug, title_i18n")
@@ -79,6 +79,14 @@ export default async function DrawingIntelligencePage({
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(100),
+    supabase
+      .from("drawing_evidence")
+      .select("id, drawing_file_id, page_number, related_entity_type, text_excerpt, confidence_score")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("page_number", { ascending: true })
+      .limit(1000),
   ]);
 
   // Connector readiness — env checked server-side only, credentials never
@@ -103,6 +111,7 @@ export default async function DrawingIntelligencePage({
       insights={(insightsResult.data ?? []) as DrawingInsight[]}
       tasks={(tasksResult.data ?? []) as { id: string; title: string }[]}
       versions={(versionsResult.data ?? []) as DrawingVersion[]}
+      evidence={(evidenceResult.data ?? []) as EvidenceRow[]}
       autodeskConfigured={autodeskConfigured}
       locale={locale as Locale}
       translations={{

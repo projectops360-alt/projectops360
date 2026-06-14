@@ -36,6 +36,10 @@ const entityRouteSegment: Record<TraceableEntityType, string> = {
   action_item: "action-items",
   stakeholder: "stakeholders",
   project: "projects",
+  memory: "memory",
+  task: "execution-map",
+  milestone: "execution-map",
+  risk: "execution-map",
 };
 
 interface LinkedRecordsProps {
@@ -57,7 +61,7 @@ interface LinkedRecordsProps {
     removeConfirm: string;
     context: string;
     createdAt: string;
-    entityTypeLabels: Record<TraceableEntityType, string>;
+    entityTypeLabels: Partial<Record<TraceableEntityType, string>>;
     linkTypeLabels: Record<LinkType, string>;
     dialogTranslations: {
       title: string;
@@ -68,7 +72,7 @@ interface LinkedRecordsProps {
       contextNotesPlaceholder: string;
       submit: string;
       cancel: string;
-      entityTypeLabels: Record<TraceableEntityType, string>;
+      entityTypeLabels: Partial<Record<TraceableEntityType, string>>;
       linkTypeLabels: Record<LinkType, string>;
       errors: {
         targetRequired: string;
@@ -166,7 +170,7 @@ export function LinkedRecords({
                   <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <EntityTypeIcon entityType={link.otherType} className="h-3 w-3" />
-                      {t.entityTypeLabels[link.otherType]}
+                      {t.entityTypeLabels[link.otherType] ?? link.otherType}
                     </span>
                     <span>· {t.createdAt} {formattedDate}</span>
                   </div>

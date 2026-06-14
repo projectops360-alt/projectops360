@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Code,
   Send,
+  FileBarChart,
 } from "lucide-react";
 import type { TraceableEntityType, Milestone, RoadmapTask, TaskStatus, TaskPriority, MilestoneStatus } from "@/types/database";
 import type { RoadmapProgress, MilestoneProgress } from "@/lib/roadmap/progress";
@@ -808,6 +809,25 @@ export function ProjectDashboard({
               </div>
             )}
           </div>
+
+          {/* 3g. Project Closeout Report */}
+          <Link
+            href={`${base}/closeout`}
+            className="group flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50/60 p-5 transition-colors hover:bg-brand-100/60 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <FileBarChart className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">
+                  {locale === "es" ? "Reporte de Cierre" : "Closeout Report"}
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {locale === "es" ? "Métricas y resumen ejecutivo · PDF" : "Metrics & executive summary · PDF"}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400" />
+          </Link>
         </div>
       </div>
     </div>

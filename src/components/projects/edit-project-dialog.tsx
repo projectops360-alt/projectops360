@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { X, Loader2 } from "lucide-react";
 import { updateProjectAction } from "@/app/[locale]/(app)/projects/actions";
-import type { ProjectStatus } from "@/types/database";
+import type { ProjectStatus, ProjectType } from "@/types/database";
 import type { Locale } from "@/types/database";
 
 type EditState =
@@ -19,6 +19,7 @@ interface EditProjectDialogProps {
   name: string;
   description: string;
   status: ProjectStatus;
+  projectType: ProjectType;
   startDate: string | null;
   targetEndDate: string | null;
   onClose: () => void;
@@ -31,6 +32,7 @@ export function EditProjectDialog({
   name,
   description,
   status,
+  projectType,
   startDate,
   targetEndDate,
   onClose,
@@ -55,6 +57,7 @@ export function EditProjectDialog({
     const nameVal = (formData.get("name") as string)?.trim();
     const descVal = (formData.get("description") as string)?.trim() ?? "";
     const statusVal = formData.get("status") as string;
+    const projectTypeVal = formData.get("projectType") as string;
     const startDateRaw = formData.get("startDate") as string;
     const targetEndDateRaw = formData.get("targetEndDate") as string;
 
@@ -67,6 +70,7 @@ export function EditProjectDialog({
       name: nameVal,
       description: descVal,
       status: statusVal,
+      projectType: projectTypeVal,
       startDate: startDateRaw ? new Date(startDateRaw).toISOString() : undefined,
       targetEndDate: targetEndDateRaw ? new Date(targetEndDateRaw).toISOString() : undefined,
       locale,
@@ -157,6 +161,28 @@ export function EditProjectDialog({
               <option value="on_hold">{tStatus("on_hold")}</option>
               <option value="completed">{tStatus("completed")}</option>
               <option value="cancelled">{tStatus("cancelled")}</option>
+            </select>
+          </div>
+
+          {/* Project Type — drives which modules/tabs are visible (e.g. Drawing Intelligence) */}
+          <div className="space-y-2">
+            <label htmlFor="edit-project-type" className="block text-sm font-medium text-foreground">
+              {t("projectType")}
+            </label>
+            <select
+              id="edit-project-type"
+              name="projectType"
+              defaultValue={projectType}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              disabled={isPending}
+            >
+              <option value="general">{t("types.general")}</option>
+              <option value="software_development">{t("types.software_development")}</option>
+              <option value="data_center_construction">{t("types.data_center_construction")}</option>
+              <option value="residential_construction">{t("types.residential_construction")}</option>
+              <option value="commercial_construction">{t("types.commercial_construction")}</option>
+              <option value="infrastructure">{t("types.infrastructure")}</option>
+              <option value="industrial">{t("types.industrial")}</option>
             </select>
           </div>
 

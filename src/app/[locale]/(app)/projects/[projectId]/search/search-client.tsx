@@ -10,6 +10,7 @@ import {
   Scale,
   FileText,
   ListTodo,
+  BookOpen,
   ArrowLeft,
   Loader2,
   Sparkles,
@@ -39,6 +40,7 @@ export interface SearchPageTranslations {
     decision: string;
     document: string;
     task: string;
+    memory: string;
   };
   semanticMatch: string;
   entityLabels: SearchTranslations;
@@ -83,11 +85,17 @@ const ENTITY_CONFIG: Record<
     color:
       "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800",
   },
+  memory: {
+    icon: BookOpen,
+    color:
+      "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800",
+  },
 };
 
 type FilterValue = SearchEntityType | "all";
 const FILTER_OPTIONS: FilterValue[] = [
   "all",
+  "memory",
   "communication",
   "meeting",
   "decision",

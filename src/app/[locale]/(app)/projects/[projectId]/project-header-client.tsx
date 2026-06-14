@@ -7,7 +7,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { ProjectStatusBadge } from "@/components/projects/status-badge";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 import { archiveProjectAction } from "@/app/[locale]/(app)/projects/actions";
-import type { ProjectStatus, Locale } from "@/types/database";
+import type { ProjectStatus, ProjectType, Locale } from "@/types/database";
 
 interface ProjectHeaderClientProps {
   projectId: string;
@@ -16,6 +16,7 @@ interface ProjectHeaderClientProps {
   description: string | null;
   status: ProjectStatus;
   statusLabel: string;
+  projectType: ProjectType;
   startDate: string | null;
   targetEndDate: string | null;
   editLabel: string;
@@ -30,6 +31,7 @@ export function ProjectHeaderClient({
   description,
   status,
   statusLabel,
+  projectType,
   startDate,
   targetEndDate,
   editLabel,
@@ -92,6 +94,7 @@ export function ProjectHeaderClient({
           name={title}
           description={description ?? ""}
           status={status}
+          projectType={projectType}
           startDate={startDate}
           targetEndDate={targetEndDate}
           onClose={() => setShowEdit(false)}

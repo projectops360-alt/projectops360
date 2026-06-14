@@ -8,6 +8,10 @@ import {
   CheckSquare,
   Users,
   FolderKanban,
+  BookOpen,
+  ListChecks,
+  Flag,
+  ShieldAlert,
 } from "lucide-react";
 import type { TraceableEntityType } from "@/types/database";
 
@@ -19,6 +23,10 @@ const iconMap: Record<TraceableEntityType, typeof Gavel> = {
   action_item: CheckSquare,
   stakeholder: Users,
   project: FolderKanban,
+  memory: BookOpen,
+  task: ListChecks,
+  milestone: Flag,
+  risk: ShieldAlert,
 };
 
 interface EntityTypeIconProps {

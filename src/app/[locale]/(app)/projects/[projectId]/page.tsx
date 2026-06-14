@@ -40,7 +40,7 @@ export default async function ProjectDetailPage({
   // Fetch the project, scoped to the user's organization
   const { data: project } = await supabase
     .from("projects")
-    .select("id, slug, title_i18n, description_i18n, status, start_date, target_end_date, created_at, updated_at")
+    .select("id, slug, title_i18n, description_i18n, status, project_type, start_date, target_end_date, created_at, updated_at")
     .eq("id", projectId)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
@@ -448,6 +448,7 @@ export default async function ProjectDetailPage({
         description={description}
         status={project.status}
         statusLabel={statusLabel}
+        projectType={project.project_type ?? "general"}
         startDate={project.start_date}
         targetEndDate={project.target_end_date}
         editLabel={t("detail.edit")}

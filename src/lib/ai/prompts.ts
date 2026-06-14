@@ -231,8 +231,9 @@ Respond in JSON with this structure:
       "4. Do not duplicate items for the same excerpt and type.",
       "5. severity is one of: low, medium, high, critical. confidence_score is 0..1.",
       "6. insight type is one of: risk, rfi_candidate, submittal_requirement, inspection_requirement, schedule_impact, cost_impact, missing_information, contradiction, decision_required.",
-      "7. MATERIAL TAKEOFF IS MANDATORY: walk this taxonomy and emit one extraction row for EVERY material/spec actually present in the content — lumber/framing (species, grade, sizes, spacing), plywood/sheathing (thickness, grade, nailing), concrete & reinforcement (slab, rebar size/spacing, footings, dowels, gravel, membrane), structural steel (HSS/W shapes, plates, bolts, welds), connectors/hardware (hold-downs, clips, straps, hangers, anchor bolts, epoxy), insulation (R-values), roofing, siding/cladding, interior finishes, doors (mark, size, material), windows/glazing (mark, size, U/SHGC, tempered), plumbing (pipe sizes, fixtures, flow rates, water heater), electrical/lighting (fixtures, GFCI/AFCI, detectors, low-voltage), HVAC (equipment, ducts, MERV). Preserve original units and notation exactly (e.g. 5/8\", 2x12 @ 24\" O.C., #4 @ 16\"). Do not skip structural notes, schedules or Title 24 content.",
-      "8. extraction_type is material_takeoff for materials/specs, quantity_takeoff when an explicit quantity or measurable extent is stated. quantity is a number only when countable from the text; otherwise null.",
+      "7. MATERIAL TAKEOFF: emit ONE row per PHYSICAL, QUANTIFIABLE MATERIAL actually present — lumber/framing (species, grade, sizes, spacing), plywood/sheathing (thickness, grade), concrete & reinforcement (slab, rebar size/spacing, footings, dowels, gravel, membrane), structural steel (HSS/W shapes, plates, bolts, welds), connectors/hardware (hold-downs, clips, straps, hangers, anchor bolts), insulation (R-values), roofing, siding/cladding, interior finishes, doors (mark, size, material), windows/glazing (mark, size), plumbing (pipe, fixtures), electrical/lighting (fixtures, devices), HVAC (equipment, ducts). Preserve original units and notation exactly (e.g. 5/8\", 2x12 @ 24\" O.C., #4 @ 16\"). Consolidate: the same material is ONE row, even if it appears in several notes.",
+      "8. DO NOT create takeoff rows for any of these (they are NOT materials): the FASTENING / NAILING SCHEDULE (IBC Table 2304.10.1) — its rows pair a CONNECTION (e.g. 'rafter to plate', 'collar tie rafter', 'subfloor to joist', 'continuous header to stud', 'rim joist to top plate') with a fastener ('3-10d', '16d (3\" x 0.135\")', 'toe nail', 'face nail') — NEVER emit these connection/fastener rows as materials; general specification or code statements (e.g. 'concrete shall be 3000 PSI', 'all rebar shall be grade 60', 'do not scale drawings'); table headers, legends, abbreviation lists, or bare row-index numbers; code citations. Extract the underlying PHYSICAL material once (e.g. one 'Wood structural panel sheathing' line), never one row per fastening-schedule entry.",
+      "9. extraction_type is material_takeoff for materials, quantity_takeoff when an explicit quantity or measurable extent is stated. quantity is a number ONLY when an actual count or measure is stated in the text (e.g. '(2) 2x10' → 2, '8 doors' → 8); otherwise null. Never use a schedule row number, a member size, or a code number as the quantity.",
     ].join("\n"),
     userPromptTemplate: `Analyze this extracted construction drawing content. Produce the material/quantity takeoff AND candidate insights.
 
@@ -281,6 +282,65 @@ Respond in JSON with this structure:
     outputSchema: {
       extractions: "array of evidence-first material/quantity takeoff rows",
       insights: "array of evidence-first insight objects",
+    },
+  },
+
+  memory_classification: {
+    name: "memory_classification",
+    label: "Project Memory Classification",
+    defaultModel: "gpt-4o-mini",
+    requiresJson: true,
+    systemPrompt: [
+      "You are a project operations assistant that classifies a single piece of captured project memory.",
+      "The memory item may be a note, a pasted email, a meeting note, a decision, a risk signal, evidence, or other project context.",
+      "Analyze ONLY the provided content. Never invent information that is not present.",
+      "Produce a concise factual summary and a set of boolean signal flags.",
+      "Set a flag to true ONLY when the content clearly supports it; otherwise false.",
+      "suggested_tags are short, lowercase, single-or-two-word topic labels.",
+      "suggested_links are hints about which existing project entity types the item likely relates to — never fabricate IDs.",
+      "Write the summary in the same language as the input content.",
+    ].join("\n"),
+    userPromptTemplate: `Classify the following project memory item.
+
+Source type: {sourceType}
+Title: {title}
+Author: {author}
+Participants: {participants}
+Content:
+{content}
+
+Respond in JSON with EXACTLY this structure:
+{
+  "summary": "1-3 sentence factual summary of the item",
+  "contains_decision": true | false,
+  "contains_risk": true | false,
+  "contains_action_item": true | false,
+  "contains_scope_change": true | false,
+  "contains_schedule_impact": true | false,
+  "contains_cost_impact": true | false,
+  "contains_stakeholder_concern": true | false,
+  "sentiment": "positive" | "neutral" | "negative" | "concerned" | "mixed",
+  "urgency": "low" | "medium" | "high",
+  "suggested_tags": ["tag1", "tag2"],
+  "suggested_links": [
+    { "entity_type": "task" | "milestone" | "risk" | "decision" | "stakeholder" | "document", "hint": "what in the content points to this entity" }
+  ],
+  "confidence": 0.0-1.0
+}`,
+    outputSchema: {
+      summary: "1-3 sentence factual summary string",
+      contains_decision: "boolean",
+      contains_risk: "boolean",
+      contains_action_item: "boolean",
+      contains_scope_change: "boolean",
+      contains_schedule_impact: "boolean",
+      contains_cost_impact: "boolean",
+      contains_stakeholder_concern: "boolean",
+      sentiment: "positive | neutral | negative | concerned | mixed",
+      urgency: "low | medium | high",
+      suggested_tags: "array of short topic strings",
+      suggested_links: "array of { entity_type, hint } objects",
+      confidence: "float 0.0-1.0",
     },
   },
 

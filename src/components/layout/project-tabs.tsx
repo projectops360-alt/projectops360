@@ -13,6 +13,7 @@ import {
   HardHat,
   DraftingCompass,
   FileBarChart,
+  CalendarClock,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -77,6 +78,12 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]/memory",
     icon: BookOpen,
     matchPattern: "/projects/[projectId]/memory",
+  },
+  {
+    titleKey: "rhythm",
+    href: "/projects/[projectId]/rhythm",
+    icon: CalendarClock,
+    matchPattern: "/projects/[projectId]/rhythm",
   },
   {
     titleKey: "statusReport",
