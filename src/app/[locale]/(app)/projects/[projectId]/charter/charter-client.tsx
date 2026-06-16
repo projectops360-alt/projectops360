@@ -11,7 +11,7 @@ import { Link } from "@/i18n/navigation";
 import {
   FileText, ShieldCheck, Sparkles, Save, Loader2, AlertTriangle, CheckCircle2,
   Send, Stamp, XCircle, History, ScrollText, Target, ClipboardCheck, Landmark, Info,
-  Users, GitBranch, Gavel, PenLine, BrainCircuit,
+  Users, GitBranch, Gavel, PenLine, BrainCircuit, ArrowRight,
 } from "lucide-react";
 import {
   CHARTER_SECTIONS, CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES,
@@ -85,6 +85,16 @@ export function CharterClient({ locale, projectId, projectName, charter, version
 
   const completion = useMemo(() => computeCharterCompletion(values as Partial<Record<CharterFieldKey, string>>), [values]);
   const dirty = useMemo(() => CHARTER_SECTIONS.some((s) => s.fields.some((f) => values[f.key] !== initial[f.key])), [values, initial]);
+  // First section that still has a missing required field — the link target.
+  const firstIncompleteSection = useMemo(
+    () => CHARTER_SECTIONS.find((s) => s.fields.some((f) => f.required && !values[f.key]?.trim())) ?? null,
+    [values],
+  );
+
+  function goTo(sectionKey: string) {
+    setActiveKey(sectionKey);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   const section = CHARTER_SECTIONS.find((s) => s.key === activeKey) ?? CHARTER_SECTIONS[0];
 
@@ -191,19 +201,42 @@ export function CharterClient({ locale, projectId, projectName, charter, version
             <div className={`h-1.5 rounded-full transition-all ${completion.pct === 100 ? "bg-green-500" : "bg-brand-600"}`} style={{ width: `${completion.pct}%` }} />
           </div>
           {completion.missing.length > 0 && (
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="h-3.5 w-3.5" />
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
               {isEs ? `Faltan ${completion.missing.length} campo(s) requerido(s) para poder aprobar el charter.` : `${completion.missing.length} required field(s) missing before the charter can be approved.`}
+              {firstIncompleteSection && (
+                <button onClick={() => goTo(firstIncompleteSection.key)} className="inline-flex items-center gap-0.5 font-semibold underline underline-offset-2 hover:opacity-80">
+                  {isEs ? `Ir a «${firstIncompleteSection.es}»` : `Go to "${firstIncompleteSection.en}"`}<ArrowRight className="h-3 w-3" />
+                </button>
+              )}
             </p>
           )}
         </div>
 
-        {/* Locked-charter execution note */}
+        {/* Locked-charter execution note — with a direct CTA to the next step */}
         {!locked && (
-          <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
-            <Info className="h-3.5 w-3.5 shrink-0" />
-            {isEs ? "El proyecto debería tener el charter aprobado antes de iniciar la ejecución real." : "The project should have an approved charter before real execution begins."}
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
+            <span className="flex items-center gap-1.5">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              {isEs ? "El proyecto debería tener el charter aprobado antes de iniciar la ejecución real." : "The project should have an approved charter before real execution begins."}
+            </span>
+            {firstIncompleteSection ? (
+              <button onClick={() => goTo(firstIncompleteSection.key)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700">
+                {isEs ? `Completar «${firstIncompleteSection.es}»` : `Complete "${firstIncompleteSection.en}"`}<ArrowRight className="h-3 w-3" />
+              </button>
+            ) : canSubmit ? (
+              <button onClick={doSubmit} disabled={pending}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50">
+                {isEs ? "Enviar a aprobación" : "Submit for approval"}<ArrowRight className="h-3 w-3" />
+              </button>
+            ) : canReview ? (
+              <button onClick={doApprove} disabled={pending}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50">
+                {isEs ? "Aprobar charter" : "Approve charter"}<ArrowRight className="h-3 w-3" />
+              </button>
+            ) : null}
+          </div>
         )}
         {(charter.approval_notes as string) && (
           <p className="mt-2 text-xs text-muted-foreground"><strong>{isEs ? "Notas de revisión" : "Review notes"}:</strong> {charter.approval_notes as string}</p>
