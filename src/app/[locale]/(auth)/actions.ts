@@ -29,7 +29,11 @@ export async function signupAction(formData: FormData) {
   const password = formData.get("password") as string;
   const displayName = formData.get("displayName") as string;
 
-  const origin = (await headers()).get("origin") ?? "http://localhost:3000";
+  // Prefer an explicit canonical site URL (production) over the request origin,
+  // so confirmation links always point at the real domain — not a Vercel preview
+  // hash URL or localhost. Falls back to the request origin for local dev.
+  const configuredSite = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
+  const origin = configuredSite || (await headers()).get("origin") || "http://localhost:3000";
 
   const { error } = await supabase.auth.signUp({
     email,
