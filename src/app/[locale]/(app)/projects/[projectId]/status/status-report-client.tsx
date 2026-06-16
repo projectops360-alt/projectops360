@@ -129,7 +129,7 @@ function PhaseIcon({ phase }: { phase: PhaseStatus }) {
   return <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600" />;
 }
 
-export function StatusReportClient({ report, locale }: { report: ProjectStatusReport; locale: Locale }) {
+export function StatusReportClient({ report, locale, charterContext }: { report: ProjectStatusReport; locale: Locale; charterContext?: { goal: string | null; status: string | null } }) {
   const t = L[locale] ?? L.en;
   const i18n = (f: { en?: string; es?: string }) => f[locale] ?? f.en ?? "";
   const fmtDate = (iso: string | null) =>
@@ -187,6 +187,14 @@ export function StatusReportClient({ report, locale }: { report: ProjectStatusRe
               </span>
             )}
           </div>
+          {charterContext?.goal && (
+            <div className="mt-3 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2 dark:border-brand-900 dark:bg-brand-950/20">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
+                {locale === "es" ? "Meta del proyecto (según el Charter)" : "Project goal (from the Charter)"}
+              </p>
+              <p className="text-sm text-foreground">{charterContext.goal}</p>
+            </div>
+          )}
         </header>
 
         {/* Problems first: blockers banner (only when something is on hold) */}

@@ -7,9 +7,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import {
   FileText, ShieldCheck, Sparkles, Save, Loader2, AlertTriangle, CheckCircle2,
   Send, Stamp, XCircle, History, ScrollText, Target, ClipboardCheck, Landmark, Info,
+  Users, GitBranch, Gavel, PenLine, BrainCircuit,
 } from "lucide-react";
 import {
   CHARTER_SECTIONS, CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES,
@@ -17,7 +19,12 @@ import {
 } from "@/lib/charter/fields";
 import {
   updateCharterAction, submitCharterAction, approveCharterAction, rejectCharterAction,
+  generateCharterDraftAction,
 } from "./actions";
+import {
+  RolesTab, GovernanceRulesTab, ApprovalMatrixTab, SignoffTab, GovernanceAiTab,
+  CharterQnA, StakeholderSummaryButton,
+} from "./charter-extra";
 
 interface CharterVersion { id: string; version: number; change_reason: string | null; created_at: string; }
 
@@ -27,12 +34,25 @@ interface Props {
   projectName: string;
   charter: Record<string, unknown>;
   versions: CharterVersion[];
+  roles: Record<string, unknown>[];
+  rules: Record<string, unknown>[];
+  approvals: Record<string, unknown>[];
+  signoffs: Record<string, unknown>[];
   onboarding: boolean;
 }
 
 const SECTION_ICON: Record<string, typeof FileText> = {
   summary: FileText, scope: Target, deliverables: ClipboardCheck, governance: Landmark,
 };
+
+interface ExtraTab { key: string; es: string; en: string; icon: typeof FileText; }
+const EXTRA_TABS: ExtraTab[] = [
+  { key: "roles", es: "Roles", en: "Roles", icon: Users },
+  { key: "approvals", es: "Matriz de Aprobación", en: "Approval Matrix", icon: Gavel },
+  { key: "governance_rules", es: "Reglas de Gobernanza", en: "Governance Rules", icon: GitBranch },
+  { key: "signoff", es: "Firmas", en: "Sign-Off", icon: PenLine },
+  { key: "ai", es: "IA y Control", en: "AI & Control", icon: BrainCircuit },
+];
 
 const TONE_BADGE: Record<string, string> = {
   gray: "bg-muted text-muted-foreground",
@@ -42,12 +62,13 @@ const TONE_BADGE: Record<string, string> = {
   red: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
 };
 
-export function CharterClient({ locale, projectId, projectName, charter, versions, onboarding }: Props) {
+export function CharterClient({ locale, projectId, projectName, charter, versions, roles, rules, approvals, signoffs, onboarding }: Props) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
   const [activeKey, setActiveKey] = useState(CHARTER_SECTIONS[0].key);
   const [showHistory, setShowHistory] = useState(false);
+  const isTextSection = CHARTER_SECTIONS.some((s) => s.key === activeKey);
 
   const initial = useMemo(() => {
     const v: Record<string, string> = {};
@@ -78,6 +99,7 @@ export function CharterClient({ locale, projectId, projectName, charter, version
       if (!res.error) { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 2000); router.refresh(); }
     });
   }
+  const doGenerate = () => start(async () => { await generateCharterDraftAction({ projectId, locale }); router.refresh(); });
   const doSubmit = () => start(async () => { await submitCharterAction({ projectId }); router.refresh(); });
   const doApprove = () => start(async () => { await approveCharterAction({ projectId, locale }); router.refresh(); });
   const doReject = () => {
@@ -121,6 +143,13 @@ export function CharterClient({ locale, projectId, projectName, charter, version
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {!locked && (
+              <button onClick={doGenerate} disabled={pending}
+                title={isEs ? "Rellena los campos vacíos con IA" : "Fill empty fields with AI"}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
+              </button>
+            )}
             {canSubmit && (
               <button onClick={doSubmit} disabled={pending || completion.pct < 100}
                 title={completion.pct < 100 ? (isEs ? "Completa los campos requeridos primero" : "Complete required fields first") : ""}
@@ -145,6 +174,10 @@ export function CharterClient({ locale, projectId, projectName, charter, version
                 <CheckCircle2 className="h-4 w-4" />{isEs ? "Aprobado" : "Approved"}
               </span>
             )}
+            <Link href={`/projects/${projectId}/charter/summary`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+              <Users className="h-4 w-4" />{isEs ? "Vista stakeholders" : "Stakeholder view"}
+            </Link>
             <button onClick={() => setShowHistory((v) => !v)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
               <History className="h-4 w-4" />{isEs ? "Versiones" : "Versions"}
@@ -217,9 +250,22 @@ export function CharterClient({ locale, projectId, projectName, charter, version
               </button>
             );
           })}
+          <div className="my-1 hidden border-t border-border/60 lg:block" />
+          {EXTRA_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = tab.key === activeKey;
+            return (
+              <button key={tab.key} onClick={() => setActiveKey(tab.key)}
+                className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? "bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300" : "text-muted-foreground hover:bg-muted"}`}>
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate">{isEs ? tab.es : tab.en}</span>
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Editor */}
+        {/* Editor / sub-modules */}
+        {isTextSection ? (
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -262,6 +308,20 @@ export function CharterClient({ locale, projectId, projectName, charter, version
             ))}
           </div>
         </div>
+        ) : activeKey === "ai" ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-card p-5"><GovernanceAiTab projectId={projectId} locale={locale} /></div>
+            <StakeholderSummaryButton projectId={projectId} locale={locale} />
+            <CharterQnA projectId={projectId} locale={locale} />
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-card p-5">
+            {activeKey === "roles" && <RolesTab projectId={projectId} locale={locale} roles={roles} />}
+            {activeKey === "approvals" && <ApprovalMatrixTab projectId={projectId} locale={locale} approvals={approvals} />}
+            {activeKey === "governance_rules" && <GovernanceRulesTab projectId={projectId} locale={locale} rules={rules} />}
+            {activeKey === "signoff" && <SignoffTab projectId={projectId} locale={locale} signoffs={signoffs} />}
+          </div>
+        )}
       </div>
     </div>
   );

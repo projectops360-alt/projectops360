@@ -38,12 +38,13 @@ export default async function CharterPage({
   }
   if (!charter) notFound();
 
-  const { data: versions } = await supabase
-    .from("project_charter_versions")
-    .select("id, version, change_reason, created_at")
-    .eq("charter_id", charter.id)
-    .order("version", { ascending: false })
-    .limit(25);
+  const [versionsRes, rolesRes, rulesRes, approvalsRes, signoffsRes] = await Promise.all([
+    supabase.from("project_charter_versions").select("id, version, change_reason, created_at").eq("charter_id", charter.id).order("version", { ascending: false }).limit(25),
+    supabase.from("project_charter_roles").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
+    supabase.from("project_governance_rules").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
+    supabase.from("project_approval_matrix").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
+    supabase.from("project_signoffs").select("*").eq("charter_id", charter.id).order("created_at"),
+  ]);
 
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
 
@@ -53,7 +54,11 @@ export default async function CharterPage({
       projectId={projectId}
       projectName={projectName}
       charter={charter}
-      versions={versions ?? []}
+      versions={versionsRes.data ?? []}
+      roles={(rolesRes.data ?? []) as Record<string, unknown>[]}
+      rules={(rulesRes.data ?? []) as Record<string, unknown>[]}
+      approvals={(approvalsRes.data ?? []) as Record<string, unknown>[]}
+      signoffs={(signoffsRes.data ?? []) as Record<string, unknown>[]}
       onboarding={onboard === "true"}
     />
   );

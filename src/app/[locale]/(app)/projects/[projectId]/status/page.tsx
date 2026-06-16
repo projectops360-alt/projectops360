@@ -67,6 +67,10 @@ export default async function ProjectStatusPage({
       .is("deleted_at", null),
   ]);
 
+  const { data: charterCtx } = await supabase
+    .from("project_charters").select("project_goal, status")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle();
+
   const peopleNames: Record<string, string> = {};
   for (const p of peopleRes.data ?? []) peopleNames[p.id] = p.display_name || "—";
   const resourceNames: Record<string, string> = {};
@@ -88,5 +92,11 @@ export default async function ProjectStatusPage({
     budgetItemCount: budgetRes.count ?? 0,
   });
 
-  return <StatusReportClient report={report} locale={locale as Locale} />;
+  return (
+    <StatusReportClient
+      report={report}
+      locale={locale as Locale}
+      charterContext={charterCtx ? { goal: (charterCtx as { project_goal: string | null }).project_goal, status: (charterCtx as { status: string | null }).status } : undefined}
+    />
+  );
 }

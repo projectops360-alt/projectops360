@@ -128,3 +128,170 @@ export async function rejectCharterAction(input: { projectId: string; notes?: st
   await logAudit({ org, projectId: input.projectId, action: "update", entityType: "project_charters", entityId: charter.id, metadata: { status: "revision_required" } });
   return {};
 }
+
+// ── Child entities (roles / governance rules / approval matrix / sign-off) ──
+
+async function charterCtx(projectId: string) {
+  const org = await authed();
+  if (!org) return null;
+  const supabase = createAdminClient();
+  const charter = await getCharterByProject(supabase, org.organizationId, projectId);
+  if (!charter) return null;
+  return { org, supabase, charter };
+}
+
+/** Upsert a charter role. */
+export async function saveCharterRoleAction(input: {
+  projectId: string; id?: string;
+  role_name: string; person_name?: string; external_contact_name?: string;
+  responsibility?: string; authority_level?: string; decision_rights?: string; escalation_level?: number;
+}): Promise<{ error?: string }> {
+  const ctx = await charterCtx(input.projectId);
+  if (!ctx) return { error: "no_charter" };
+  const row = {
+    organization_id: ctx.org.organizationId, project_id: input.projectId, charter_id: ctx.charter.id,
+    role_name: input.role_name.trim(), person_name: input.person_name?.trim() || null,
+    external_contact_name: input.external_contact_name?.trim() || null,
+    responsibility: input.responsibility?.trim() || null, authority_level: input.authority_level?.trim() || null,
+    decision_rights: input.decision_rights?.trim() || null, escalation_level: input.escalation_level ?? null,
+  };
+  const q = input.id
+    ? ctx.supabase.from("project_charter_roles").update(row).eq("id", input.id).eq("organization_id", ctx.org.organizationId)
+    : ctx.supabase.from("project_charter_roles").insert(row);
+  const { error } = await q;
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Upsert a governance rule. */
+export async function saveGovernanceRuleAction(input: {
+  projectId: string; id?: string;
+  rule_type: string; rule_name: string; description?: string; trigger_condition?: string;
+  required_approval_role?: string; escalation_role?: string; is_active?: boolean;
+}): Promise<{ error?: string }> {
+  const ctx = await charterCtx(input.projectId);
+  if (!ctx) return { error: "no_charter" };
+  const row = {
+    organization_id: ctx.org.organizationId, project_id: input.projectId, charter_id: ctx.charter.id,
+    rule_type: input.rule_type.trim(), rule_name: input.rule_name.trim(), description: input.description?.trim() || null,
+    trigger_condition: input.trigger_condition?.trim() || null, required_approval_role: input.required_approval_role?.trim() || null,
+    escalation_role: input.escalation_role?.trim() || null, is_active: input.is_active ?? true,
+  };
+  const q = input.id
+    ? ctx.supabase.from("project_governance_rules").update(row).eq("id", input.id).eq("organization_id", ctx.org.organizationId)
+    : ctx.supabase.from("project_governance_rules").insert(row);
+  const { error } = await q;
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Upsert an approval-matrix rule. */
+export async function saveApprovalRuleAction(input: {
+  projectId: string; id?: string;
+  approval_area: string; approval_required_from?: string; threshold_type?: string; threshold_value?: string;
+  escalation_path?: string; required_response_time?: string; is_active?: boolean;
+}): Promise<{ error?: string }> {
+  const ctx = await charterCtx(input.projectId);
+  if (!ctx) return { error: "no_charter" };
+  const row = {
+    organization_id: ctx.org.organizationId, project_id: input.projectId, charter_id: ctx.charter.id,
+    approval_area: input.approval_area.trim(), approval_required_from: input.approval_required_from?.trim() || null,
+    threshold_type: input.threshold_type?.trim() || null, threshold_value: input.threshold_value?.trim() || null,
+    escalation_path: input.escalation_path?.trim() || null, required_response_time: input.required_response_time?.trim() || null,
+    is_active: input.is_active ?? true,
+  };
+  const q = input.id
+    ? ctx.supabase.from("project_approval_matrix").update(row).eq("id", input.id).eq("organization_id", ctx.org.organizationId)
+    : ctx.supabase.from("project_approval_matrix").insert(row);
+  const { error } = await q;
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Add or update a sign-off. Setting status to approved/rejected stamps signed_at. */
+export async function saveSignoffAction(input: {
+  projectId: string; id?: string; signer_role: string; status?: "pending" | "approved" | "rejected"; comments?: string;
+}): Promise<{ error?: string }> {
+  const ctx = await charterCtx(input.projectId);
+  if (!ctx) return { error: "no_charter" };
+  const status = input.status ?? "pending";
+  const row = {
+    organization_id: ctx.org.organizationId, project_id: input.projectId, charter_id: ctx.charter.id,
+    signer_user_id: ctx.org.userId, signer_role: input.signer_role.trim(), status,
+    comments: input.comments?.trim() || null,
+    signed_at: status === "pending" ? null : new Date().toISOString(),
+  };
+  const q = input.id
+    ? ctx.supabase.from("project_signoffs").update(row).eq("id", input.id).eq("organization_id", ctx.org.organizationId)
+    : ctx.supabase.from("project_signoffs").insert(row);
+  const { error } = await q;
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Soft-delete a charter child row (roles / governance rules / approval matrix). */
+export async function deleteCharterChildAction(input: {
+  projectId: string; table: "project_charter_roles" | "project_governance_rules" | "project_approval_matrix"; id: string;
+}): Promise<{ error?: string }> {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated" };
+  const supabase = createAdminClient();
+  const { error } = await supabase.from(input.table)
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", input.id).eq("organization_id", org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+// ── AI actions (Phase 4) ────────────────────────────────────────────────────
+
+export async function generateCharterDraftAction(input: { projectId: string; locale: string }): Promise<{ error?: string; count?: number }> {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated" };
+  const supabase = createAdminClient();
+  const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
+  if (!charter) return { error: "no_charter" };
+  if (CHARTER_LOCKED_STATUSES.includes(charter.status as never)) return { error: "locked" };
+
+  const { generateCharterDraft } = await import("@/lib/charter/ai");
+  const { fields, count } = await generateCharterDraft(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  if (count === 0) return { error: "ai_failed" };
+
+  // Fill only currently-empty fields (never overwrite the user's content).
+  const patch: Record<string, string> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (VALID_KEYS.has(k) && (!charter[k] || !String(charter[k]).trim())) patch[k] = v;
+  }
+  if (Object.keys(patch).length > 0) {
+    await supabase.from("project_charters").update(patch).eq("id", charter.id).eq("organization_id", org.organizationId);
+  }
+  return { count: Object.keys(patch).length };
+}
+
+export async function gapAnalysisAction(input: { projectId: string; locale: string }) {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated", items: [] as { area: string; severity: string; recommendation: string }[] };
+  const { runGapAnalysis } = await import("@/lib/charter/ai");
+  const items = await runGapAnalysis(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  return { items };
+}
+
+export async function scopeCreepAction(input: { projectId: string; locale: string }) {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated", flags: [] as { item: string; reason: string }[] };
+  const { detectScopeCreep } = await import("@/lib/charter/ai");
+  const flags = await detectScopeCreep(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  return { flags };
+}
+
+export async function stakeholderSummaryAction(input: { projectId: string; locale: string }) {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated", summary: "" };
+  const { generateStakeholderSummary } = await import("@/lib/charter/ai");
+  const summary = await generateStakeholderSummary(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  return { summary };
+}
+
+export async function askCharterAction(input: { projectId: string; question: string; locale: string }) {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated", answer: "" };
+  if (!input.question?.trim()) return { answer: "" };
+  const { askCharter } = await import("@/lib/charter/ai");
+  const answer = await askCharter(org, input.projectId, input.question.trim(), (input.locale === "es" ? "es" : "en") as Locale);
+  return { answer };
+}
