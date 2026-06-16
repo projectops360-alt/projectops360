@@ -182,6 +182,44 @@ export async function generateStakeholderSummary(
   return str(json?.summary);
 }
 
+// ── G. Generate / expand a SINGLE charter field from the user's idea ─────────
+
+export async function generateCharterField(
+  org: OrgContext, projectId: string, fieldKey: CharterFieldKey, idea: string, locale: Locale,
+): Promise<string> {
+  const field = CHARTER_FIELDS.find((f) => f.key === fieldKey);
+  if (!field) return "";
+  const supabase = createAdminClient();
+  const ctx = await projectContext(supabase, org.organizationId, projectId, locale);
+  const charter = await getCharterByProject(supabase, org.organizationId, projectId);
+  // Context = the OTHER filled fields, so the generated text stays consistent.
+  const others = charter
+    ? CHARTER_SECTIONS.flatMap((s) => s.fields)
+        .filter((f) => f.key !== fieldKey && charter[f.key] && String(charter[f.key]).trim())
+        .map((f) => `- ${locale === "es" ? f.es : f.en}: ${String(charter[f.key]).trim()}`)
+        .join("\n")
+    : "";
+  const lang = locale === "es" ? "español" : "English";
+  const label = locale === "es" ? field.es : field.en;
+
+  const prompt = [
+    `You are a PMO consultant drafting one section of a Project Charter. Write ONLY the "${label}" section, in ${lang}.`,
+    "Base it primarily on the user's idea/draft below; if the idea is empty, infer a sensible, professional value from the project and the rest of the charter.",
+    "Be concrete and concise: 1 short paragraph, or a few line-separated bullets. Do not add headings or quotes. Stay consistent with the rest of the charter; do not contradict it or repeat other sections.",
+    'Return ONLY JSON: { "text": "..." }.',
+    "",
+    `SECTION TO WRITE: ${label}`,
+    `USER IDEA / DRAFT: ${idea.trim() || "(empty — infer it)"}`,
+    "",
+    "=== PROJECT ===",
+    ctx,
+    others ? `\n=== REST OF THE CHARTER (for consistency) ===\n${others}` : "",
+  ].join("\n");
+
+  const json = await runJson(org, projectId, prompt);
+  return str(json?.text);
+}
+
 // ── F. Generate Governance (roles + rules + approval matrix by project type) ─
 
 export interface GeneratedRole { role_name: string; responsibility: string; authority_level: string; decision_rights: string; escalation_level: number; }

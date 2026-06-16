@@ -263,6 +263,16 @@ export async function generateCharterDraftAction(input: { projectId: string; loc
   return { count: Object.keys(patch).length };
 }
 
+/** Generate / expand a SINGLE charter field from the user's idea (no save). */
+export async function generateFieldAction(input: { projectId: string; fieldKey: string; idea?: string; locale: string }): Promise<{ error?: string; text?: string }> {
+  const org = await authed();
+  if (!org) return { error: "not_authenticated" };
+  if (!VALID_KEYS.has(input.fieldKey)) return { error: "bad_field" };
+  const { generateCharterField } = await import("@/lib/charter/ai");
+  const text = await generateCharterField(org, input.projectId, input.fieldKey as CharterFieldKey, input.idea ?? "", (input.locale === "es" ? "es" : "en") as Locale);
+  return text ? { text } : { error: "ai_failed" };
+}
+
 export async function gapAnalysisAction(input: { projectId: string; locale: string }) {
   const org = await authed();
   if (!org) return { error: "not_authenticated", items: [] as { area: string; severity: string; recommendation: string }[] };

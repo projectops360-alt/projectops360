@@ -19,7 +19,7 @@ import {
 } from "@/lib/charter/fields";
 import {
   updateCharterAction, submitCharterAction, approveCharterAction, rejectCharterAction,
-  generateCharterDraftAction,
+  generateCharterDraftAction, generateFieldAction,
 } from "./actions";
 import {
   RolesTab, GovernanceRulesTab, ApprovalMatrixTab, SignoffTab, GovernanceAiTab,
@@ -77,6 +77,16 @@ export function CharterClient({ locale, projectId, projectName, charter, version
   }, [charter]);
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [genningKey, setGenningKey] = useState<string | null>(null);
+
+  function genField(key: CharterFieldKey) {
+    setGenningKey(key);
+    start(async () => {
+      const r = await generateFieldAction({ projectId, fieldKey: key, idea: values[key] ?? "", locale });
+      if (r.text) setValues((v) => ({ ...v, [key]: r.text as string }));
+      setGenningKey(null);
+    });
+  }
 
   const status = charter.status as CharterStatus;
   const version = charter.version as number;
@@ -326,10 +336,20 @@ export function CharterClient({ locale, projectId, projectName, charter, version
           <div className="space-y-4">
             {section.fields.map((f) => (
               <div key={f.key}>
-                <label htmlFor={`f-${f.key}`} className="mb-1 block text-sm font-medium text-foreground">
-                  {isEs ? f.es : f.en}
-                  {f.required && <span className="ml-1 text-red-500">*</span>}
-                </label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label htmlFor={`f-${f.key}`} className="block text-sm font-medium text-foreground">
+                    {isEs ? f.es : f.en}
+                    {f.required && <span className="ml-1 text-red-500">*</span>}
+                  </label>
+                  {!locked && (
+                    <button type="button" onClick={() => genField(f.key)} disabled={pending}
+                      title={isEs ? "Genera o mejora este campo con IA a partir de lo que escribiste" : "Generate or improve this field with AI from what you wrote"}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+                      {genningKey === f.key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {isEs ? "IA" : "AI"}
+                    </button>
+                  )}
+                </div>
                 {(f.helpEs || f.helpEn) && (
                   <p className="mb-1 text-[11px] text-muted-foreground">{isEs ? f.helpEs : f.helpEn}</p>
                 )}
