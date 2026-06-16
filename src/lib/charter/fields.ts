@@ -130,3 +130,18 @@ export const CHARTER_STATUS_META: Record<CharterStatus, { es: string; en: string
 
 /** A charter is considered "locked" (execution-ready) when approved or active. */
 export const CHARTER_LOCKED_STATUSES: CharterStatus[] = ["approved", "active"];
+
+// ── Governance vocabularies (shared client/server) ──────────────────────────
+
+export const ROLE_OPTIONS = [
+  "Project Sponsor", "Project Manager", "Steering Committee", "PMO",
+  "Team Lead", "Work Team", "Vendor / Consultant", "Stakeholder",
+];
+export const RULE_TYPES = [
+  "Issue Management", "Change Management", "Risk Management", "Quality Management",
+  "Communication Management", "Status Reporting", "Stakeholder Review", "Budget Control", "Schedule Control",
+];
+export const APPROVAL_AREAS = [
+  "Scope change", "Budget change", "Schedule change", "Risk acceptance",
+  "Major issue escalation", "Vendor change", "Milestone acceptance", "Project closure",
+];

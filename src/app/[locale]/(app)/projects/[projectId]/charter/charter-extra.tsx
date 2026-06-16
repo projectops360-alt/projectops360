@@ -11,11 +11,9 @@ import { Plus, Trash2, Loader2, Sparkles, Stamp, CheckCircle2, XCircle, Search, 
 import {
   saveCharterRoleAction, saveGovernanceRuleAction, saveApprovalRuleAction, saveSignoffAction,
   deleteCharterChildAction, gapAnalysisAction, scopeCreepAction, stakeholderSummaryAction, askCharterAction,
+  generateGovernanceAction,
 } from "./actions";
-
-export const ROLE_OPTIONS = ["Project Sponsor", "Project Manager", "Steering Committee", "PMO", "Team Lead", "Work Team", "Vendor / Consultant", "Stakeholder"];
-export const RULE_TYPES = ["Issue Management", "Change Management", "Risk Management", "Quality Management", "Communication Management", "Status Reporting", "Stakeholder Review", "Budget Control", "Schedule Control"];
-export const APPROVAL_AREAS = ["Scope change", "Budget change", "Schedule change", "Risk acceptance", "Major issue escalation", "Vendor change", "Milestone acceptance", "Project closure"];
+import { ROLE_OPTIONS, RULE_TYPES, APPROVAL_AREAS } from "@/lib/charter/fields";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 const cell = (v: unknown) => (v ? String(v) : "—");
@@ -212,17 +210,36 @@ export function SignoffTab({ projectId, locale, signoffs }: { projectId: string;
 
 export function GovernanceAiTab({ projectId, locale }: { projectId: string; locale: string }) {
   const isEs = locale === "es";
+  const router = useRouter();
   const [pending, start] = useTransition();
   const [gap, setGap] = useState<{ area: string; severity: string; recommendation: string }[] | null>(null);
   const [creep, setCreep] = useState<{ item: string; reason: string }[] | null>(null);
+  const [govMsg, setGovMsg] = useState<string | null>(null);
 
   const runGap = () => start(async () => { const r = await gapAnalysisAction({ projectId, locale }); setGap(r.items ?? []); });
   const runCreep = () => start(async () => { const r = await scopeCreepAction({ projectId, locale }); setCreep(r.flags ?? []); });
+  const genGov = () => {
+    if (!window.confirm(isEs ? "Esto generará la gobernanza recomendada según el tipo de proyecto y REEMPLAZARÁ los roles, reglas y matriz de aprobación actuales. ¿Continuar?" : "This generates the recommended governance for the project type and REPLACES current roles, rules and approval matrix. Continue?")) return;
+    start(async () => {
+      const r = await generateGovernanceAction({ projectId, locale });
+      setGovMsg(r.error ? (isEs ? "No se pudo generar." : "Generation failed.") : (isEs ? `Generado: ${r.roles} roles, ${r.rules} reglas, ${r.approvals} aprobaciones.` : `Generated: ${r.roles} roles, ${r.rules} rules, ${r.approvals} approvals.`));
+      router.refresh();
+    });
+  };
 
   const sevCls: Record<string, string> = { high: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300", medium: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300", low: "bg-muted text-muted-foreground" };
 
   return (
     <div className="space-y-5">
+      {/* Generate best-practice governance by project type */}
+      <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-900 dark:bg-brand-950/20">
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Sparkles className="h-4 w-4 text-brand-600 dark:text-brand-400" />{isEs ? "Generar gobernanza recomendada (IA)" : "Generate recommended governance (AI)"}</h3>
+          <button onClick={genGov} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar" : "Generate"}</button>
+        </div>
+        <p className="text-xs text-muted-foreground">{isEs ? "Crea roles, reglas de gobernanza y matriz de aprobación según las mejores prácticas para la naturaleza de este proyecto. Reemplaza los actuales." : "Creates roles, governance rules and an approval matrix per best practices for this project's nature. Replaces the current ones."}</p>
+        {govMsg && <p className="mt-2 text-xs font-medium text-brand-700 dark:text-brand-400">{govMsg}</p>}
+      </div>
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Search className="h-4 w-4 text-brand-500" />{isEs ? "Análisis de brechas (IA)" : "Gap analysis (AI)"}</h3>

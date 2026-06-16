@@ -287,6 +287,40 @@ export async function stakeholderSummaryAction(input: { projectId: string; local
   return { summary };
 }
 
+/** Generate a best-practice governance model (roles + rules + approval matrix)
+ *  tailored to the project's nature, and REPLACE the current child rows. */
+export async function generateGovernanceAction(input: { projectId: string; locale: string }): Promise<{ error?: string; roles?: number; rules?: number; approvals?: number }> {
+  const ctx = await charterCtx(input.projectId);
+  if (!ctx) return { error: "no_charter" };
+  const locale = (input.locale === "es" ? "es" : "en") as Locale;
+
+  const { generateGovernance } = await import("@/lib/charter/ai");
+  const gov = await generateGovernance(ctx.org, input.projectId, locale);
+  if (gov.roles.length + gov.governanceRules.length + gov.approvalMatrix.length === 0) return { error: "ai_failed" };
+
+  const orgId = ctx.org.organizationId, charterId = ctx.charter.id, now = new Date().toISOString();
+
+  // Replace existing governance for a clean, coherent set.
+  await Promise.all([
+    ctx.supabase.from("project_charter_roles").update({ deleted_at: now }).eq("charter_id", charterId).eq("organization_id", orgId).is("deleted_at", null),
+    ctx.supabase.from("project_governance_rules").update({ deleted_at: now }).eq("charter_id", charterId).eq("organization_id", orgId).is("deleted_at", null),
+    ctx.supabase.from("project_approval_matrix").update({ deleted_at: now }).eq("charter_id", charterId).eq("organization_id", orgId).is("deleted_at", null),
+  ]);
+
+  const common = { organization_id: orgId, project_id: input.projectId, charter_id: charterId };
+  const roleRows = gov.roles.map((r) => ({ ...common, role_name: r.role_name, responsibility: r.responsibility || null, authority_level: r.authority_level || null, decision_rights: r.decision_rights || null, escalation_level: r.escalation_level || null }));
+  const ruleRows = gov.governanceRules.map((r) => ({ ...common, rule_type: r.rule_type, rule_name: r.rule_name, description: r.description || null, trigger_condition: r.trigger_condition || null, required_approval_role: r.required_approval_role || null, escalation_role: r.escalation_role || null, is_active: true }));
+  const apprRows = gov.approvalMatrix.map((r) => ({ ...common, approval_area: r.approval_area, approval_required_from: r.approval_required_from || null, threshold_type: r.threshold_type || null, threshold_value: r.threshold_value || null, escalation_path: r.escalation_path || null, required_response_time: r.required_response_time || null, is_active: true }));
+
+  await Promise.all([
+    roleRows.length ? ctx.supabase.from("project_charter_roles").insert(roleRows) : Promise.resolve(),
+    ruleRows.length ? ctx.supabase.from("project_governance_rules").insert(ruleRows) : Promise.resolve(),
+    apprRows.length ? ctx.supabase.from("project_approval_matrix").insert(apprRows) : Promise.resolve(),
+  ]);
+
+  return { roles: roleRows.length, rules: ruleRows.length, approvals: apprRows.length };
+}
+
 export async function askCharterAction(input: { projectId: string; question: string; locale: string }) {
   const org = await authed();
   if (!org) return { error: "not_authenticated", answer: "" };

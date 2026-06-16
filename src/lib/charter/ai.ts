@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
 import type { Locale } from "@/types/database";
 import { getI18nValue } from "@/types/database";
-import { CHARTER_SECTIONS, CHARTER_FIELDS, type CharterFieldKey } from "./fields";
+import { CHARTER_SECTIONS, CHARTER_FIELDS, ROLE_OPTIONS, RULE_TYPES, APPROVAL_AREAS, type CharterFieldKey } from "./fields";
 import { getCharterByProject } from "./service";
 
 type Supabase = ReturnType<typeof createAdminClient>;
@@ -180,6 +180,64 @@ export async function generateStakeholderSummary(
   ].join("\n");
   const json = await runJson(org, projectId, prompt);
   return str(json?.summary);
+}
+
+// ── F. Generate Governance (roles + rules + approval matrix by project type) ─
+
+export interface GeneratedRole { role_name: string; responsibility: string; authority_level: string; decision_rights: string; escalation_level: number; }
+export interface GeneratedRule { rule_type: string; rule_name: string; description: string; trigger_condition: string; required_approval_role: string; escalation_role: string; }
+export interface GeneratedApproval { approval_area: string; approval_required_from: string; threshold_type: string; threshold_value: string; escalation_path: string; required_response_time: string; }
+export interface GeneratedGovernance { roles: GeneratedRole[]; governanceRules: GeneratedRule[]; approvalMatrix: GeneratedApproval[]; }
+
+export async function generateGovernance(
+  org: OrgContext, projectId: string, locale: Locale,
+): Promise<GeneratedGovernance> {
+  const supabase = createAdminClient();
+  const { data: proj } = await supabase
+    .from("projects").select("project_type, title_i18n, description_i18n")
+    .eq("id", projectId).eq("organization_id", org.organizationId).single();
+  const projectType = (proj?.project_type as string) ?? "general";
+  const ctx = await projectContext(supabase, org.organizationId, projectId, locale);
+  const charter = await getCharterByProject(supabase, org.organizationId, projectId);
+  const scope = charter ? charterToText(charter, locale) : "";
+  const lang = locale === "es" ? "español" : "English";
+
+  const prompt = [
+    `You are a PMO governance expert. Design the project's GOVERNANCE following best practices (PMI / PMBOK and the domain practices relevant to this project's nature). Respond in ${lang}.`,
+    `Tailor EVERYTHING to the project's nature/type: "${projectType}". For construction-type projects emphasize RFIs, submittals, inspections, safety, change orders and milestone acceptance; for software projects emphasize releases, QA gates, sprint reviews and technical decisions; adapt accordingly.`,
+    "Produce a coherent, realistic governance model: who decides, who approves what (with thresholds), how issues/risks/changes escalate, and the reporting cadence.",
+    "Return ONLY JSON with exactly these arrays:",
+    `{`,
+    `  "roles": [ { "role_name", "responsibility", "authority_level", "decision_rights", "escalation_level" } ],          // 5-7 roles`,
+    `  "governanceRules": [ { "rule_type", "rule_name", "description", "trigger_condition", "required_approval_role", "escalation_role" } ],  // 6-9 rules`,
+    `  "approvalMatrix": [ { "approval_area", "approval_required_from", "threshold_type", "threshold_value", "escalation_path", "required_response_time" } ]  // 6-8 areas`,
+    `}`,
+    `Use "role_name" from this set when possible: ${ROLE_OPTIONS.join(", ")}.`,
+    `Use "rule_type" from this set: ${RULE_TYPES.join(", ")}.`,
+    `Use "approval_area" from this set: ${APPROVAL_AREAS.join(", ")}.`,
+    `"escalation_level" is an integer 1-4 (1 = highest authority). Keep each text field short and concrete.`,
+    "",
+    "=== PROJECT ===",
+    ctx,
+    scope ? `\n=== CHARTER SCOPE (for alignment) ===\n${scope}` : "",
+  ].join("\n");
+
+  const json = await runJson(org, projectId, prompt);
+  const roles: GeneratedRole[] = asArr(json?.roles).map((r) => {
+    const o = r as Record<string, unknown>;
+    const lvl = Number(o.escalation_level);
+    return { role_name: str(o.role_name), responsibility: str(o.responsibility), authority_level: str(o.authority_level), decision_rights: str(o.decision_rights), escalation_level: Number.isFinite(lvl) ? lvl : 0 };
+  }).filter((r) => r.role_name);
+  const governanceRules: GeneratedRule[] = asArr(json?.governanceRules).map((r) => {
+    const o = r as Record<string, unknown>;
+    return { rule_type: str(o.rule_type) || "Change Management", rule_name: str(o.rule_name), description: str(o.description), trigger_condition: str(o.trigger_condition), required_approval_role: str(o.required_approval_role), escalation_role: str(o.escalation_role) };
+  }).filter((r) => r.rule_name);
+  const approvalMatrix: GeneratedApproval[] = asArr(json?.approvalMatrix).map((r) => {
+    const o = r as Record<string, unknown>;
+    return { approval_area: str(o.approval_area), approval_required_from: str(o.approval_required_from), threshold_type: str(o.threshold_type), threshold_value: str(o.threshold_value), escalation_path: str(o.escalation_path), required_response_time: str(o.required_response_time) };
+  }).filter((r) => r.approval_area);
+
+  return { roles, governanceRules, approvalMatrix };
 }
 
 // ── E. Charter Q&A ──────────────────────────────────────────────────────────
