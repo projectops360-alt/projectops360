@@ -199,12 +199,15 @@ body {
   #budget-report-print,
   #budget-report-print *,
   #closeout-report-print,
-  #closeout-report-print * {
+  #closeout-report-print *,
+  #charter-report-print,
+  #charter-report-print * {
     visibility: visible;
   }
   #status-report-print,
   #budget-report-print,
-  #closeout-report-print {
+  #closeout-report-print,
+  #charter-report-print {
     position: absolute;
     left: 0;
     top: 0;

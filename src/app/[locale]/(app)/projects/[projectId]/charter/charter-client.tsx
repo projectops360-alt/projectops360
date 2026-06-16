@@ -11,7 +11,7 @@ import { Link } from "@/i18n/navigation";
 import {
   FileText, ShieldCheck, Sparkles, Save, Loader2, AlertTriangle, CheckCircle2,
   Send, Stamp, XCircle, History, ScrollText, Target, ClipboardCheck, Landmark, Info,
-  Users, GitBranch, Gavel, PenLine, BrainCircuit, ArrowRight,
+  Users, GitBranch, Gavel, PenLine, BrainCircuit, ArrowRight, Printer,
 } from "lucide-react";
 import {
   CHARTER_SECTIONS, CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES,
@@ -187,6 +187,10 @@ export function CharterClient({ locale, projectId, projectName, charter, version
             <Link href={`/projects/${projectId}/charter/summary`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
               <Users className="h-4 w-4" />{isEs ? "Vista stakeholders" : "Stakeholder view"}
+            </Link>
+            <Link href={`/projects/${projectId}/charter/print`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+              <Printer className="h-4 w-4" />{isEs ? "Imprimir / PDF" : "Print / PDF"}
             </Link>
             <button onClick={() => setShowHistory((v) => !v)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
