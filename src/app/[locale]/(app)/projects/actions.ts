@@ -6,6 +6,7 @@ import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { getTemplateForType } from "@/lib/execution/templates";
 import { instantiateTemplate } from "@/lib/execution/template-service";
+import { createCharterForProject } from "@/lib/charter/service";
 import type { Locale } from "@/types/database";
 
 // ── Zod Schema ──────────────────────────────────────────────────────────────────
@@ -145,6 +146,15 @@ export async function createProjectAction(input: {
       return { error: "slug_exists" };
     }
     return { error: "unexpected" };
+  }
+
+  // ── Create the empty Project Charter (the official foundation step) ───────
+  // The user is redirected here right after creation to define the charter
+  // before real execution begins.
+  try {
+    await createCharterForProject(supabase, org.organizationId, project.id, org.userId, data.name);
+  } catch (e) {
+    console.error("Charter creation failed:", e);
   }
 
   // ── Instantiate template (milestones, tasks, dependencies, resources,

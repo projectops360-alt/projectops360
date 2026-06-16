@@ -55,10 +55,11 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
       return { error: t("errors.unexpected") };
     }
 
-    // Close dialog and navigate to the Execution Map with onboarding
+    // Close dialog and navigate to the Project Charter — the official first
+    // step. The user defines the project foundation before real execution.
     onClose();
     if (result.projectId) {
-      router.push(localizedHref(locale, `/projects/${result.projectId}/execution-map?onboard=true`));
+      router.push(localizedHref(locale, `/projects/${result.projectId}/charter?onboard=true`));
     }
     return { success: true as const, projectId: result.projectId ?? "" };
   }

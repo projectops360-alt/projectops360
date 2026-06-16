@@ -6,12 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, I18nField, TraceableEntityType, Milestone, RoadmapTask } from "@/types/database";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { ProjectAiSummarySection } from "./project-detail-client";
+import { Link as I18nLink } from "@/i18n/navigation";
 import { ProjectHeaderClient } from "./project-header-client";
 import type { AiCommSummaryTranslations } from "@/components/ai";
 import { ProjectDashboard } from "./dashboard-client";
 import { computeRoadmapProgress } from "@/lib/roadmap/progress";
+import { CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES, computeCharterCompletion, CHARTER_FIELDS, type CharterStatus, type CharterFieldKey } from "@/lib/charter/fields";
 import type {
   DashboardData,
   DashboardTranslations,
@@ -49,6 +51,20 @@ export default async function ProjectDetailPage({
   if (!project) {
     notFound();
   }
+
+  // Charter status (governance health for the Command Center).
+  const { data: charterRowRaw } = await supabase
+    .from("project_charters")
+    .select(`status, version, ${CHARTER_FIELDS.map((f) => f.key).join(", ")}`)
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null)
+    .maybeSingle();
+  const charterRow = charterRowRaw as Record<string, unknown> | null;
+  const charterStatus = (charterRow?.status as CharterStatus | undefined) ?? null;
+  const charterMeta = charterStatus ? CHARTER_STATUS_META[charterStatus] : null;
+  const charterLocked = charterStatus ? CHARTER_LOCKED_STATUSES.includes(charterStatus) : false;
+  const charterCompletion = charterRow
+    ? computeCharterCompletion(charterRow as Partial<Record<CharterFieldKey, string>>).pct
+    : 0;
 
   const lang = locale as Locale;
   const title = getI18nValue(project.title_i18n, lang) || project.slug;
@@ -455,6 +471,32 @@ export default async function ProjectDetailPage({
         archiveLabel={t("detail.archive")}
         archiveConfirm={t("detail.archiveConfirm")}
       />
+
+      {/* Charter & Governance status strip */}
+      <I18nLink
+        href={`/projects/${projectId}/charter`}
+        className={`group flex items-center justify-between gap-3 rounded-xl border p-4 transition-colors ${
+          charterLocked
+            ? "border-green-200 bg-green-50/50 hover:bg-green-100/50 dark:border-green-900 dark:bg-green-950/20"
+            : "border-amber-200 bg-amber-50/50 hover:bg-amber-100/50 dark:border-amber-900 dark:bg-amber-950/20"
+        }`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <ShieldCheck className={`h-5 w-5 shrink-0 ${charterLocked ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {lang === "es" ? "Charter y Gobernanza" : "Charter & Governance"}
+              {charterMeta && <span className="ml-2 text-xs font-normal text-muted-foreground">· {lang === "es" ? charterMeta.es : charterMeta.en} · {charterCompletion}%</span>}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {charterLocked
+                ? (lang === "es" ? "El charter está aprobado. Base del proyecto definida." : "Charter is approved. Project foundation is set.")
+                : (lang === "es" ? "Completa y aprueba el charter antes de la ejecución real." : "Complete and approve the charter before real execution.")}
+            </p>
+          </div>
+        </div>
+        <ArrowLeft className="h-4 w-4 rotate-180 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </I18nLink>
 
       {/* AI Communication Summary */}
       <ProjectAiSummarySection

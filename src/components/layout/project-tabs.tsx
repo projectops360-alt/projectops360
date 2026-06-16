@@ -14,6 +14,7 @@ import {
   DraftingCompass,
   FileBarChart,
   CalendarClock,
+  ShieldCheck,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -46,6 +47,12 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]",
     icon: LayoutDashboard,
     matchPattern: "/projects/[projectId]",
+  },
+  {
+    titleKey: "charterGovernance",
+    href: "/projects/[projectId]/charter",
+    icon: ShieldCheck,
+    matchPattern: "/projects/[projectId]/charter",
   },
   {
     titleKey: "executionMap",
