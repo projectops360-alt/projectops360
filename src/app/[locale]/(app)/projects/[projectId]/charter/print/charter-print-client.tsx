@@ -27,6 +27,9 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
   const status = (charter.status as CharterStatus) ?? "draft";
   const meta = CHARTER_STATUS_META[status];
   const v = (k: string) => { const x = charter[k]; return x && String(x).trim() ? String(x) : null; };
+  // Folio / acta number — deterministic from the charter id + version.
+  const shortId = String(charter.id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase();
+  const folio = `${isEs ? "ACTA" : "CHR"}-${shortId}-V${(charter.version as number) ?? 1}`;
 
   // Signature blocks: any defined sponsor/PM/steering roles + a client line.
   const sigRoles = [
@@ -55,8 +58,16 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
         {/* Header */}
         <header className="border-b border-border pb-5">
           <Image src="/logo-report.png" alt="Project Ops 360°" width={358} height={473} className="mb-4 h-24 w-auto" priority />
-          <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">{isEs ? "Acta de Constitución del Proyecto (Project Charter)" : "Project Charter"}</p>
-          <h1 className="text-2xl font-bold text-foreground">{projectName}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">{isEs ? "Acta de Constitución del Proyecto (Project Charter)" : "Project Charter"}</p>
+              <h1 className="text-2xl font-bold text-foreground">{projectName}</h1>
+            </div>
+            <div className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-right">
+              <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{isEs ? "Folio" : "Folio"}</p>
+              <p className="font-mono text-xs font-bold text-foreground">{folio}</p>
+            </div>
+          </div>
           <div className="mt-1 flex flex-wrap gap-x-4 text-sm text-muted-foreground">
             <span>{today}</span>
             <span>{isEs ? "Versión" : "Version"} {(charter.version as number) ?? 1}</span>
@@ -163,6 +174,11 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
             </p>
           )}
         </section>
+
+        {/* Repeating print footer (folio + generation date on every page) */}
+        <div className="charter-print-footer hidden print:block">
+          {folio} · ProjectOps360° · {isEs ? "Generado" : "Generated"}: {today}
+        </div>
       </div>
     </div>
   );

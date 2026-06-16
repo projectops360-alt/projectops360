@@ -215,6 +215,18 @@ body {
     padding: 0;
   }
   @page {
-    margin: 1.5cm;
+    size: letter;
+    margin: 1.6cm 1.6cm 1.9cm 1.6cm;
+  }
+  /* Repeating footer on every printed page (folio + generation date). */
+  .charter-print-footer {
+    position: fixed;
+    bottom: 0.5cm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+    color: #64748b;
   }
 }
