@@ -8,7 +8,7 @@ import {
   getFrameworkByProject, createFrameworkForProject, saveFrameworkEvent, syncFrameworkToMemory,
 } from "@/lib/delivery/service";
 import { recommendFramework, type FrameworkInputs } from "@/lib/delivery/recommend";
-import { BOARD_TEMPLATES, boardTemplateFor, type DeliveryMethod } from "@/lib/delivery/config";
+import { BOARD_TEMPLATES, boardTemplateFor, MEETING_RHYTHM, type DeliveryMethod } from "@/lib/delivery/config";
 
 async function authed() {
   try { return await getOrgContext(); } catch { return null; }
@@ -387,4 +387,126 @@ export async function frameworkHealthAction(input: { projectId: string; locale: 
   const { recommendFrameworkHealth } = await import("@/lib/delivery/ai");
   const recommendation = await recommendFrameworkHealth(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { recommendation };
+}
+
+// ── Backlog ordering & prioritization ───────────────────────────────────────
+
+/** Move a backlog item up/down within its milestone (normalizes positions). */
+export async function moveBacklogItemAction(input: { projectId: string; id: string; direction: "up" | "down" }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { data: item } = await c.supabase.from("project_backlog_items").select("id, linked_milestone_id").eq("id", input.id).eq("organization_id", c.org.organizationId).is("deleted_at", null).maybeSingle();
+  if (!item) return { error: "not_found" };
+  const mid = (item as { linked_milestone_id: string | null }).linked_milestone_id;
+
+  let q = c.supabase.from("project_backlog_items").select("id").eq("project_id", input.projectId).eq("organization_id", c.org.organizationId).is("deleted_at", null).neq("status", "promoted");
+  q = mid ? q.eq("linked_milestone_id", mid) : q.is("linked_milestone_id", null);
+  const { data: sibs } = await q.order("position", { ascending: true }).order("created_at", { ascending: true });
+  const order = ((sibs ?? []) as { id: string }[]).map((s) => String(s.id));
+  const idx = order.findIndex((id) => id === input.id);
+  if (idx < 0) return { error: "not_found" };
+  const swapWith = input.direction === "up" ? idx - 1 : idx + 1;
+  if (swapWith < 0 || swapWith >= order.length) return {}; // at the edge
+  [order[idx], order[swapWith]] = [order[swapWith], order[idx]];
+  await Promise.all(order.map((id, i) =>
+    c.supabase.from("project_backlog_items").update({ position: i }).eq("id", id).eq("organization_id", c.org.organizationId),
+  ));
+  return {};
+}
+
+/** AI-prioritize the backlog: sets priority + position by value/risk/alignment. */
+export async function prioritizeBacklogAction(input: { projectId: string; locale: string }): Promise<{ error?: string; count?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { prioritizeBacklog } = await import("@/lib/delivery/ai");
+  const ranked = await prioritizeBacklog(c.org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  if (ranked.length === 0) return { error: "ai_failed" };
+  await Promise.all(ranked.map((r, i) =>
+    c.supabase.from("project_backlog_items").update({ priority: r.priority, position: i }).eq("id", r.id).eq("organization_id", c.org.organizationId),
+  ));
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "backlog_prioritized", `AI prioritized ${ranked.length} backlog items`);
+  return { count: ranked.length };
+}
+
+// ── Rhythm Center integration ───────────────────────────────────────────────
+
+/** Map a rhythm label (english) to a Rhythm Center event_type. */
+function rhythmEventType(enLabel: string): string {
+  const s = enLabel.toLowerCase();
+  if (s.includes("stakeholder")) return "stakeholder_review";
+  if (s.includes("risk")) return "risk_review";
+  if (s.includes("change")) return "change_review";
+  if (s.includes("lessons") || s.includes("acceptance") || s.includes("phase") || s.includes("technical") || s.includes("release") || s.includes("service")) return "project_review";
+  return "status_update";
+}
+
+/** Create Rhythm Center events from the framework's suggested meeting rhythm.
+ *  Idempotent: skips if framework-sourced events already exist. */
+export async function scheduleFrameworkMeetingsAction(input: { projectId: string; locale: string }): Promise<{ error?: string; created?: number; skipped?: boolean }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const fw = await getFrameworkByProject(c.supabase, c.org.organizationId, input.projectId);
+  if (!fw || !fw.delivery_method) return { error: "no_framework" };
+  const rhythm = MEETING_RHYTHM[fw.delivery_method as DeliveryMethod] ?? [];
+  if (rhythm.length === 0) return { created: 0 };
+
+  const { count: existing } = await c.supabase.from("project_events").select("id", { count: "exact", head: true })
+    .eq("project_id", input.projectId).eq("organization_id", c.org.organizationId).eq("source", "framework").is("deleted_at", null);
+  if ((existing ?? 0) > 0) return { skipped: true, created: 0 };
+
+  const isEs = input.locale === "es";
+  const base = new Date(); base.setHours(10, 0, 0, 0); base.setDate(base.getDate() + 7);
+  const rows = rhythm.map((r, i) => {
+    const start = new Date(base); start.setDate(base.getDate() + i * 7);
+    const end = new Date(start); end.setHours(start.getHours() + 1);
+    return {
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: isEs ? r.es : r.en, event_type: rhythmEventType(r.en),
+      start_datetime: start.toISOString(), end_datetime: end.toISOString(),
+      status: "scheduled", priority: "medium", source: "framework", created_by: c.org.userId,
+    };
+  });
+  const { error } = await c.supabase.from("project_events").insert(rows);
+  if (error) return { error: "unexpected" };
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, fw.id, "meetings_scheduled", `Scheduled ${rows.length} framework meetings in the Rhythm Center`);
+  return { created: rows.length };
+}
+
+// ── Scope alert → change request ────────────────────────────────────────────
+
+const SEV_PRIORITY: Record<string, string> = { high: "High", medium: "Medium", low: "Low" };
+
+/** Convert a scope-creep alert into a formal Change Request backlog item and
+ *  resolve the alert. Keeps change control inside the unified backlog. */
+export async function alertToChangeRequestAction(input: { projectId: string; alertId: string; locale: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { data: alert } = await c.supabase.from("project_scope_creep_alerts").select("*").eq("id", input.alertId).eq("organization_id", c.org.organizationId).maybeSingle();
+  if (!alert) return { error: "not_found" };
+  const a = alert as Record<string, unknown>;
+  const isEs = input.locale === "es";
+  const reason = String(a.detection_reason ?? "");
+  const title = `${isEs ? "Solicitud de cambio" : "Change request"}: ${(reason.split(":")[0] || reason).slice(0, 120)}`;
+  const description = [reason, a.recommendation ? `${isEs ? "Recomendación" : "Recommendation"}: ${String(a.recommendation)}` : ""].filter(Boolean).join("\n");
+
+  const { error } = await c.supabase.from("project_backlog_items").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId, framework_id: c.frameworkId,
+    title, description, item_type: "Change Request", priority: SEV_PRIORITY[String(a.severity)] ?? "Medium",
+    status: "backlog", source: "scope_alert",
+  });
+  if (error) return { error: "unexpected" };
+  await c.supabase.from("project_scope_creep_alerts").update({ status: "resolved", resolved_by: c.org.userId, resolved_at: new Date().toISOString() }).eq("id", input.alertId).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "change_request_created", `Scope alert converted to change request: ${title}`);
+  return {};
+}
+
+// ── WIP limits (board columns) ──────────────────────────────────────────────
+
+/** Set/clear a column's WIP limit (visible on the framework board). */
+export async function setColumnWipAction(input: { projectId: string; columnId: string; wipLimit: number | null }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const wip = input.wipLimit && input.wipLimit > 0 ? Math.floor(input.wipLimit) : null;
+  const { error } = await c.supabase.from("project_board_columns").update({ wip_limit: wip }).eq("id", input.columnId).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
 }

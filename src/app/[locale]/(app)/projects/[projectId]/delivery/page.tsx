@@ -33,7 +33,7 @@ export default async function DeliveryPage({
 
   const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes] = await Promise.all([
     framework
-      ? supabase.from("project_board_columns").select("id, name, position, is_done_column").eq("framework_id", framework.id).order("position")
+      ? supabase.from("project_board_columns").select("id, name, position, is_done_column, wip_limit").eq("framework_id", framework.id).order("position")
       : Promise.resolve({ data: [] }),
     supabase.from("project_framework_events").select("id, event_type, event_summary, created_at").eq("project_id", projectId).order("created_at", { ascending: false }).limit(10),
     supabase.from("project_charters").select("project_goal, objectives, status").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle(),
@@ -47,6 +47,15 @@ export default async function DeliveryPage({
   const { data: cycleItemsData } = await supabase
     .from("project_cycle_items").select("id, cycle_id, backlog_item_id")
     .eq("project_id", projectId).eq("organization_id", org.organizationId);
+
+  // Live task counts per status — powers the WIP badges and adaptive metrics.
+  const { data: taskRows } = await supabase
+    .from("roadmap_tasks").select("status")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null);
+  const taskStatusCounts: Record<string, number> = {};
+  for (const r of (taskRows ?? []) as { status: string }[]) {
+    taskStatusCounts[r.status] = (taskStatusCounts[r.status] ?? 0) + 1;
+  }
 
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   const defaultProjectType = mapProjectType(project.project_type);
@@ -66,6 +75,7 @@ export default async function DeliveryPage({
       backlog={(backlogRes.data ?? []) as Record<string, unknown>[]}
       cycles={(cyclesRes.data ?? []) as Record<string, unknown>[]}
       cycleItems={(cycleItemsData ?? []) as Record<string, unknown>[]}
+      taskStatusCounts={taskStatusCounts}
       alerts={(alertsRes.data ?? []) as Record<string, unknown>[]}
       milestones={(milestonesRes.data ?? []) as Record<string, unknown>[]}
       risks={(risksRes.data ?? []) as Record<string, unknown>[]}

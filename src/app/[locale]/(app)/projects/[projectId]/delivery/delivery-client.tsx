@@ -9,13 +9,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Layers, Sparkles, Loader2, CheckCircle2, Settings2, Gauge, ShieldCheck,
-  FileText, MessageSquare, GitBranch, Columns3, CalendarClock, Rocket, Info,
+  FileText, MessageSquare, GitBranch, Columns3, CalendarClock, Rocket, Info, BarChart3,
 } from "lucide-react";
 import {
   PROJECT_TYPES, UNCERTAINTY, GOVERNANCE, CADENCE, FEEDBACK_FREQ, DOCUMENTATION, CHANGE_CONTROL,
-  VENDOR_DEP, DELIVERY_METHODS, FRAMEWORK_STATUS_META, MEETING_RHYTHM, label, type DeliveryMethod, type Opt,
+  VENDOR_DEP, DELIVERY_METHODS, FRAMEWORK_STATUS_META, MEETING_RHYTHM, workboardColumnLabels,
+  label, type DeliveryMethod, type Opt,
 } from "@/lib/delivery/config";
-import { recommendFrameworkAction, saveFrameworkAction, activateFrameworkAction, type FrameworkConfig } from "./actions";
+import {
+  recommendFrameworkAction, saveFrameworkAction, activateFrameworkAction,
+  scheduleFrameworkMeetingsAction, setColumnWipAction, type FrameworkConfig,
+} from "./actions";
 import { BacklogTab, CyclesTab, AiHealthTab } from "./delivery-tabs";
 import { Link } from "@/i18n/navigation";
 
@@ -32,6 +36,7 @@ interface Props {
   backlog: Record<string, unknown>[];
   cycles: Record<string, unknown>[];
   cycleItems: Record<string, unknown>[];
+  taskStatusCounts: Record<string, number>;
   alerts: Record<string, unknown>[];
   milestones: Record<string, unknown>[];
   risks: Record<string, unknown>[];
@@ -211,11 +216,26 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
 // ── Overview ────────────────────────────────────────────────────────────────
 
 function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
   const fw = p.framework!;
   const method = fw.delivery_method as DeliveryMethod;
+  const projectType = (fw.project_type as string) ?? null;
   const m = DELIVERY_METHODS[method];
   const rhythm = MEETING_RHYTHM[method] ?? [];
   const Card = OverviewCard;
+
+  // Live task counts (drives adaptive metrics + WIP badges).
+  const counts = p.taskStatusCounts ?? {};
+  const totalTasks = Object.values(counts).reduce((s, n) => s + n, 0);
+  const c = (k: string) => counts[k] ?? 0;
+  const metrics = buildMetrics(method, counts, totalTasks, p, isEs);
+
+  // Reverse map for WIP: workboard label → TaskStatus (only for adapted profiles).
+  const statusByLabel: Record<string, string> = {};
+  for (const [status, lbl] of Object.entries(workboardColumnLabels(method, projectType, isEs))) statusByLabel[lbl] = status;
+
+  const scheduleMeetings = () => start(async () => { await scheduleFrameworkMeetingsAction({ projectId: p.projectId, locale: p.locale }); router.refresh(); });
 
   return (
     <div className="space-y-5">
@@ -224,6 +244,23 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
         <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{isEs ? "Método de entrega" : "Delivery method"}</p>
         <h2 className="text-xl font-bold text-foreground">{isEs ? m.es : m.en}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{(fw.recommendation_reason as string) || (isEs ? m.descEs : m.descEn)}</p>
+      </div>
+
+      {/* Adaptive metrics — emphasis changes per delivery method */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground"><BarChart3 className="h-4 w-4 text-brand-500" />{isEs ? `Reporte del marco (${isEs ? m.es : m.en})` : `Framework report (${m.en})`}</h3>
+        {totalTasks === 0 ? (
+          <p className="text-xs text-muted-foreground">{isEs ? "Aún no hay tareas en el Workboard. Promueve items del backlog para ver métricas." : "No tasks on the Workboard yet. Promote backlog items to see metrics."}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {metrics.map((mt, i) => (
+              <div key={i} className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{mt.label}</p>
+                <p className={`mt-0.5 text-lg font-bold ${mt.tone ?? "text-foreground"}`}>{mt.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
@@ -238,25 +275,40 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Single execution board → Workboard */}
-        <Link href={`/projects/${p.projectId}/workboard`} className="group rounded-xl border border-border bg-card p-5 transition-colors hover:border-brand-500/40 hover:bg-muted/30">
+        {/* Single execution board → Workboard, with WIP limits */}
+        <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-1 flex items-center justify-between gap-1.5 text-sm font-semibold text-foreground">
             <span className="flex items-center gap-1.5"><Columns3 className="h-4 w-4 text-brand-500" />{isEs ? "Tablero de ejecución" : "Execution board"}</span>
-            <span className="text-xs font-normal text-brand-600 group-hover:underline dark:text-brand-400">{isEs ? "Abrir Workboard →" : "Open Workboard →"}</span>
+            <Link href={`/projects/${p.projectId}/workboard`} className="text-xs font-normal text-brand-600 hover:underline dark:text-brand-400">{isEs ? "Abrir Workboard →" : "Open Workboard →"}</Link>
           </h3>
-          <p className="mb-2 text-[11px] text-muted-foreground">{isEs ? "El trabajo se ejecuta en el Workboard único. Columnas recomendadas para este marco:" : "Work is executed on the single Workboard. Recommended columns for this framework:"}</p>
-          {p.boardColumns.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {p.boardColumns.map((c) => <span key={String(c.id)} className="inline-flex items-center rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground">{String(c.name)}</span>)}
+          <p className="mb-2 text-[11px] text-muted-foreground">{isEs ? "Columnas del marco con límite de WIP (en curso / límite). En rojo si se excede." : "Framework columns with WIP limits (in progress / limit). Red when exceeded."}</p>
+          {p.boardColumns.length > 0 ? (
+            <div className="space-y-1.5">
+              {p.boardColumns.map((col) => (
+                <WipRow key={String(col.id)} col={col} projectId={p.projectId} isEs={isEs}
+                  liveCount={statusByLabel[String(col.name)] ? c(statusByLabel[String(col.name)]) : null}
+                  onSaved={() => router.refresh()} />
+              ))}
             </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">{isEs ? "Configura el marco para generar las columnas." : "Configure the framework to generate columns."}</p>
           )}
-        </Link>
-        {/* Meeting rhythm */}
+        </div>
+        {/* Meeting rhythm + schedule into Rhythm Center */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground"><CalendarClock className="h-4 w-4 text-brand-500" />{isEs ? "Ritmo de reuniones sugerido" : "Suggested meeting rhythm"}</h3>
+          <h3 className="mb-2 flex items-center justify-between gap-1.5 text-sm font-semibold text-foreground">
+            <span className="flex items-center gap-1.5"><CalendarClock className="h-4 w-4 text-brand-500" />{isEs ? "Ritmo de reuniones sugerido" : "Suggested meeting rhythm"}</span>
+          </h3>
           <ul className="space-y-1 text-sm text-foreground">
             {rhythm.map((r, i) => <li key={i} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-brand-500" />{isEs ? r.es : r.en}</li>)}
           </ul>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={scheduleMeetings} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}{isEs ? "Programar en el Rhythm Center" : "Schedule in the Rhythm Center"}
+            </button>
+            <Link href={`/projects/${p.projectId}/rhythm`} className="text-xs text-brand-600 hover:underline dark:text-brand-400">{isEs ? "Ver calendario →" : "View calendar →"}</Link>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">{isEs ? "Crea estas reuniones (semanales desde la próxima semana) en el calendario del proyecto. No duplica si ya existen." : "Creates these meetings (weekly from next week) in the project calendar. Won't duplicate if they already exist."}</p>
         </div>
       </div>
 
@@ -264,6 +316,82 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
         <Info className="h-3.5 w-3.5 shrink-0" />
         {isEs ? "Flujo: define el Backlog → promueve a tarea → ejecuta en el Workboard. Usa Ciclos e IA para planear y controlar." : "Flow: define the Backlog → promote to task → execute on the Workboard. Use Cycles and AI to plan and control."}
       </p>
+    </div>
+  );
+}
+
+// ── Adaptive metrics per delivery method ────────────────────────────────────
+
+interface Metric { label: string; value: string | number; tone?: string }
+
+function buildMetrics(method: DeliveryMethod, counts: Record<string, number>, total: number, p: Props, isEs: boolean): Metric[] {
+  const c = (k: string) => counts[k] ?? 0;
+  const done = c("done");
+  const blocked = c("blocked");
+  const inProgress = c("in_progress");
+  const queue = c("not_started") + c("prompt_ready") + c("sent_to_ai");
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const activeCycles = p.cycles.filter((x) => String(x.status) === "active").length;
+  const openBacklog = p.backlog.filter((x) => String(x.status) !== "promoted").length;
+  const blkTone = blocked > 0 ? "text-red-600 dark:text-red-400" : "text-foreground";
+
+  if (method === "kanban") {
+    return [
+      { label: isEs ? "En curso (WIP)" : "In progress (WIP)", value: inProgress },
+      { label: isEs ? "Bloqueados" : "Blocked", value: blocked, tone: blkTone },
+      { label: isEs ? "En cola" : "In queue", value: queue },
+      { label: isEs ? "Entregados" : "Delivered", value: done, tone: "text-green-600 dark:text-green-400" },
+    ];
+  }
+  if (method === "predictive") {
+    return [
+      { label: isEs ? "Avance" : "Progress", value: `${pct}%`, tone: "text-brand-600 dark:text-brand-400" },
+      { label: isEs ? "Hitos" : "Milestones", value: p.milestones.length },
+      { label: isEs ? "Pendientes" : "Pending", value: queue + inProgress },
+      { label: isEs ? "Bloqueados" : "Blocked", value: blocked, tone: blkTone },
+    ];
+  }
+  // scrum / agile / xp / hybrid
+  return [
+    { label: isEs ? "Ciclos activos" : "Active cycles", value: activeCycles },
+    { label: isEs ? "Backlog abierto" : "Open backlog", value: openBacklog },
+    { label: isEs ? "En curso" : "In progress", value: inProgress },
+    { label: isEs ? "Completado" : "Completed", value: `${pct}%`, tone: "text-green-600 dark:text-green-400" },
+  ];
+}
+
+// ── WIP limit row (editable) ────────────────────────────────────────────────
+
+function WipRow({ col, projectId, isEs, liveCount, onSaved }: { col: Record<string, unknown>; projectId: string; isEs: boolean; liveCount: number | null; onSaved: () => void }) {
+  const [pending, start] = useTransition();
+  const initial = col.wip_limit != null ? String(col.wip_limit) : "";
+  const [val, setVal] = useState(initial);
+  const limit = col.wip_limit != null ? Number(col.wip_limit) : null;
+  const over = limit != null && liveCount != null && liveCount > limit;
+
+  const save = () => {
+    const n = val.trim() === "" ? null : Number(val);
+    if ((n === null && initial === "") || String(n) === initial) return;
+    start(async () => { await setColumnWipAction({ projectId, columnId: String(col.id), wipLimit: n }); onSaved(); });
+  };
+
+  return (
+    <div className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-xs ${over ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/20" : "border-border bg-muted/20"}`}>
+      <span className="flex items-center gap-2 truncate text-foreground">
+        {String(col.name)}
+        {liveCount != null && (
+          <span className={`rounded px-1.5 py-0.5 font-semibold ${over ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-muted text-muted-foreground"}`}>
+            {liveCount}{limit != null ? ` / ${limit}` : ""}
+          </span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+        {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+        <label className="text-[10px]">{isEs ? "WIP" : "WIP"}</label>
+        <input type="number" min={0} value={val} onChange={(e) => setVal(e.target.value)} onBlur={save}
+          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          placeholder="∞" className="w-12 rounded border border-border bg-background px-1.5 py-0.5 text-center text-xs text-foreground focus:border-brand-500 focus:outline-none" />
+      </span>
     </div>
   );
 }

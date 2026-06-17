@@ -8,14 +8,15 @@ import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Loader2, Sparkles, Play, CheckCircle2, AlertTriangle, XCircle, Lightbulb,
-  MessageSquareText, Activity, Send,
+  MessageSquareText, Activity, Send, ArrowUp, ArrowDown, ListOrdered, GitPullRequestArrow,
 } from "lucide-react";
 import { BACKLOG_ITEM_TYPES } from "@/lib/delivery/config";
 import {
   saveBacklogItemAction, deleteBacklogItemAction, promoteBacklogItemsAction,
+  moveBacklogItemAction, prioritizeBacklogAction,
   saveCycleAction, setCycleStatusAction, deleteCycleAction,
   addItemsToCycleAction, removeCycleItemAction, promoteCycleAction,
-  resolveScopeAlertAction, generateBacklogAction, scopeCheckAction,
+  resolveScopeAlertAction, alertToChangeRequestAction, generateBacklogAction, scopeCheckAction,
   deliveryStakeholderSummaryAction, cycleLessonsAction, frameworkHealthAction,
 } from "./actions";
 
@@ -58,6 +59,8 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const promoteSelected = () => start(async () => { await promoteBacklogItemsAction({ projectId, ids: [...sel] }); setSel(new Set()); router.refresh(); });
   const promoteAll = () => start(async () => { await promoteBacklogItemsAction({ projectId }); setSel(new Set()); router.refresh(); });
   const gen = () => start(async () => { await generateBacklogAction({ projectId, locale }); router.refresh(); });
+  const prioritize = () => start(async () => { await prioritizeBacklogAction({ projectId, locale }); router.refresh(); });
+  const move = (id: string, direction: "up" | "down") => start(async () => { await moveBacklogItemAction({ projectId, id, direction }); router.refresh(); });
 
   return (
     <div className="space-y-4">
@@ -68,6 +71,9 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
             <button onClick={() => setView("list")} className={`rounded-md px-2 py-1 ${view === "list" ? "bg-muted font-medium text-foreground" : "text-muted-foreground"}`}>{isEs ? "Lista" : "List"}</button>
             <button onClick={() => setView("milestone")} className={`rounded-md px-2 py-1 ${view === "milestone" ? "bg-muted font-medium text-foreground" : "text-muted-foreground"}`}>{isEs ? "Por hito" : "By milestone"}</button>
           </div>
+          <button onClick={prioritize} disabled={pending || items.length === 0} title={isEs ? "Reordena y reasigna prioridad según valor, riesgo y alineación al charter" : "Reorders and reassigns priority by value, risk and charter alignment"} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListOrdered className="h-4 w-4" />}{isEs ? "Priorizar con IA" : "Prioritize with AI"}
+          </button>
           <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
           </button>
@@ -117,7 +123,17 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
                     <td className="px-3 py-2 text-muted-foreground">{String(it.item_type ?? "—")}</td>
                     <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span></td>
                     <td className="px-3 py-2 text-muted-foreground">{promoted ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "En Workboard" : "On Workboard"}</span> : String(it.status ?? "—")}</td>
-                    <td className="px-3 py-2 text-right"><button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button></td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-end gap-1">
+                        {view === "milestone" && !promoted && (
+                          <>
+                            <button onClick={() => move(String(it.id), "up")} disabled={pending} title={isEs ? "Subir" : "Move up"} className="text-muted-foreground hover:text-foreground disabled:opacity-40"><ArrowUp className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => move(String(it.id), "down")} disabled={pending} title={isEs ? "Bajar" : "Move down"} className="text-muted-foreground hover:text-foreground disabled:opacity-40"><ArrowDown className="h-3.5 w-3.5" /></button>
+                          </>
+                        )}
+                        <button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </td>
                   </tr>
                 </Fragment>
               );
@@ -240,6 +256,7 @@ export function AiHealthTab({ projectId, locale, alerts }: { projectId: string; 
   const sum = () => start(async () => { const r = await deliveryStakeholderSummaryAction({ projectId, locale }); setSummary(r.summary || ""); });
   const hp = () => start(async () => { const r = await frameworkHealthAction({ projectId, locale }); setHealth(r.recommendation || ""); });
   const resolve = (id: string, status: "resolved" | "dismissed") => start(async () => { await resolveScopeAlertAction({ projectId, id, status }); router.refresh(); });
+  const toChangeRequest = (id: string) => start(async () => { await alertToChangeRequestAction({ projectId, alertId: id, locale }); router.refresh(); });
 
   const SEV: Record<string, string> = { high: "text-red-500", medium: "text-amber-500", low: "text-muted-foreground" };
 
@@ -257,6 +274,7 @@ export function AiHealthTab({ projectId, locale, alerts }: { projectId: string; 
               <li key={String(a.id)} className="flex items-start justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/20">
                 <span className="flex items-start gap-2"><AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${SEV[String(a.severity)] ?? "text-amber-500"}`} /><span><span className="text-foreground">{String(a.detection_reason)}</span>{a.recommendation ? <span className="block text-[11px] text-muted-foreground">→ {String(a.recommendation)}</span> : null}</span></span>
                 <span className="flex shrink-0 gap-1">
+                  <button onClick={() => toChangeRequest(String(a.id))} disabled={pending} title={isEs ? "Convertir en solicitud de cambio" : "Convert to change request"} className="text-brand-600 hover:opacity-80 dark:text-brand-400"><GitPullRequestArrow className="h-4 w-4" /></button>
                   <button onClick={() => resolve(String(a.id), "resolved")} disabled={pending} title={isEs ? "Resolver" : "Resolve"} className="text-green-600 hover:opacity-80"><CheckCircle2 className="h-4 w-4" /></button>
                   <button onClick={() => resolve(String(a.id), "dismissed")} disabled={pending} title={isEs ? "Descartar" : "Dismiss"} className="text-muted-foreground hover:text-red-500"><XCircle className="h-4 w-4" /></button>
                 </span>

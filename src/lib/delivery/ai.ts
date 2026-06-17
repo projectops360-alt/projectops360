@@ -141,6 +141,40 @@ export async function generateCycleLessons(org: OrgContext, projectId: string, c
   return { wentWell: a("wentWell"), wentWrong: a("wentWrong"), improvements: a("improvements") };
 }
 
+// ── F. AI backlog prioritization ────────────────────────────────────────────
+
+export interface PrioritizedItem { id: string; priority: string; rationale: string; }
+
+/** Rank the (non-promoted) backlog by value, risk, dependencies and charter
+ *  alignment. Returns items in priority order (first = highest). */
+export async function prioritizeBacklog(org: OrgContext, projectId: string, locale: Locale): Promise<PrioritizedItem[]> {
+  const supabase = createAdminClient();
+  const scope = await charterScope(supabase, org.organizationId, projectId);
+  const { data: items } = await supabase.from("project_backlog_items")
+    .select("id, title, item_type, priority, business_value, linked_charter_objective, linked_milestone_id, linked_risk_id")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).neq("status", "promoted").limit(150);
+  const rows = (items ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return [];
+  const lang = locale === "es" ? "español" : "English";
+
+  const list = rows.map((it) => `- id:${String(it.id)} | "${String(it.title)}" | type:${String(it.item_type ?? "")} | current:${String(it.priority ?? "")}${it.linked_risk_id ? " | linked-to-risk" : ""}${it.linked_charter_objective ? ` | obj:${String(it.linked_charter_objective)}` : ""}`).join("\n");
+  const prompt = [
+    `You are a delivery lead prioritizing a project BACKLOG. Respond in ${lang}.`,
+    "Rank items by business value, risk mitigation, dependency order (enablers first) and alignment to the charter. Items linked to risks or charter objectives usually rank higher; vague or unaligned items rank lower.",
+    'Return ONLY JSON: { "ranking": [ { "id": "<exact id>", "priority": "High|Medium|Low", "rationale": "<short>" } ] }. Include EVERY id exactly once, ordered from highest to lowest priority.',
+    "", "=== CHARTER SCOPE ===", scope || "(charter not filled — infer)", "", "=== BACKLOG ITEMS ===", list,
+  ].join("\n");
+
+  const json = await runJson(org, projectId, prompt);
+  const validIds = new Set(rows.map((r) => String(r.id)));
+  return arr(json?.ranking).map((x) => {
+    const o = x as Record<string, unknown>;
+    const pr = str(o.priority);
+    const priority = pr === "High" || pr === "Medium" || pr === "Low" ? pr : "Medium";
+    return { id: str(o.id), priority, rationale: str(o.rationale) };
+  }).filter((r) => validIds.has(r.id));
+}
+
 // ── E. Framework health / change recommendation ─────────────────────────────
 
 export async function recommendFrameworkHealth(org: OrgContext, projectId: string, locale: Locale): Promise<string> {
