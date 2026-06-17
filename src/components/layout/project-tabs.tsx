@@ -15,6 +15,7 @@ import {
   FileBarChart,
   CalendarClock,
   ShieldCheck,
+  Layers,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -53,6 +54,12 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]/charter",
     icon: ShieldCheck,
     matchPattern: "/projects/[projectId]/charter",
+  },
+  {
+    titleKey: "deliveryFramework",
+    href: "/projects/[projectId]/delivery",
+    icon: Layers,
+    matchPattern: "/projects/[projectId]/delivery",
   },
   {
     titleKey: "executionMap",

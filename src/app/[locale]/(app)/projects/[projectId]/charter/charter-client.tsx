@@ -11,7 +11,7 @@ import { Link } from "@/i18n/navigation";
 import {
   FileText, ShieldCheck, Sparkles, Save, Loader2, AlertTriangle, CheckCircle2,
   Send, Stamp, XCircle, History, ScrollText, Target, ClipboardCheck, Landmark, Info,
-  Users, GitBranch, Gavel, PenLine, BrainCircuit, ArrowRight, Printer,
+  Users, GitBranch, Gavel, PenLine, BrainCircuit, ArrowRight, Printer, Layers,
 } from "lucide-react";
 import {
   CHARTER_SECTIONS, CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES,
@@ -201,6 +201,10 @@ export function CharterClient({ locale, projectId, projectName, charter, version
             <Link href={`/projects/${projectId}/charter/print`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
               <Printer className="h-4 w-4" />{isEs ? "Imprimir / PDF" : "Print / PDF"}
+            </Link>
+            <Link href={`/projects/${projectId}/delivery?setup=true`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${locked ? "bg-brand-600 text-white hover:bg-brand-700" : "border border-border text-foreground hover:bg-muted"}`}>
+              <Layers className="h-4 w-4" />{isEs ? "Marco de ejecución" : "Delivery framework"}{locked && <ArrowRight className="h-3.5 w-3.5" />}
             </Link>
             <button onClick={() => setShowHistory((v) => !v)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
