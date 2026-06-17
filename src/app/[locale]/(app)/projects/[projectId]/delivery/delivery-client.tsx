@@ -16,7 +16,8 @@ import {
   VENDOR_DEP, DELIVERY_METHODS, FRAMEWORK_STATUS_META, MEETING_RHYTHM, label, type DeliveryMethod, type Opt,
 } from "@/lib/delivery/config";
 import { recommendFrameworkAction, saveFrameworkAction, activateFrameworkAction, type FrameworkConfig } from "./actions";
-import { BacklogTab, CyclesTab, BoardTab, AiHealthTab } from "./delivery-tabs";
+import { BacklogTab, CyclesTab, AiHealthTab } from "./delivery-tabs";
+import { Link } from "@/i18n/navigation";
 
 interface Props {
   locale: string;
@@ -48,7 +49,6 @@ const TABS = [
   { key: "overview", es: "Resumen", en: "Overview" },
   { key: "backlog", es: "Backlog", en: "Backlog" },
   { key: "cycles", es: "Ciclos", en: "Cycles" },
-  { key: "board", es: "Tablero", en: "Board" },
   { key: "ai", es: "IA y Salud", en: "AI & Health" },
 ];
 
@@ -93,7 +93,6 @@ export function DeliveryClient(p: Props) {
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
       {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
       {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} />}
-      {tab === "board" && <BoardTab projectId={p.projectId} locale={p.locale} columns={p.boardColumns} items={p.backlog} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>
   );
@@ -238,15 +237,19 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Board template */}
-        <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground"><Columns3 className="h-4 w-4 text-brand-500" />{isEs ? "Tablero" : "Board"}</h3>
-          {p.boardColumns.length === 0 ? <p className="text-xs text-muted-foreground">—</p> : (
+        {/* Single execution board → Workboard */}
+        <Link href={`/projects/${p.projectId}/workboard`} className="group rounded-xl border border-border bg-card p-5 transition-colors hover:border-brand-500/40 hover:bg-muted/30">
+          <h3 className="mb-1 flex items-center justify-between gap-1.5 text-sm font-semibold text-foreground">
+            <span className="flex items-center gap-1.5"><Columns3 className="h-4 w-4 text-brand-500" />{isEs ? "Tablero de ejecución" : "Execution board"}</span>
+            <span className="text-xs font-normal text-brand-600 group-hover:underline dark:text-brand-400">{isEs ? "Abrir Workboard →" : "Open Workboard →"}</span>
+          </h3>
+          <p className="mb-2 text-[11px] text-muted-foreground">{isEs ? "El trabajo se ejecuta en el Workboard único. Columnas recomendadas para este marco:" : "Work is executed on the single Workboard. Recommended columns for this framework:"}</p>
+          {p.boardColumns.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {p.boardColumns.map((c) => <span key={String(c.id)} className="inline-flex items-center rounded-md border border-border bg-muted/30 px-2 py-1 text-xs text-foreground">{String(c.name)}</span>)}
             </div>
           )}
-        </div>
+        </Link>
         {/* Meeting rhythm */}
         <div className="rounded-xl border border-border bg-card p-5">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground"><CalendarClock className="h-4 w-4 text-brand-500" />{isEs ? "Ritmo de reuniones sugerido" : "Suggested meeting rhythm"}</h3>
@@ -258,7 +261,7 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
 
       <p className="flex items-center gap-1.5 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0" />
-        {isEs ? "Usa las pestañas Backlog, Ciclos, Tablero e IA para ejecutar bajo este marco." : "Use the Backlog, Cycles, Board and AI tabs to execute under this framework."}
+        {isEs ? "Flujo: define el Backlog → promueve a tarea → ejecuta en el Workboard. Usa Ciclos e IA para planear y controlar." : "Flow: define the Backlog → promote to task → execute on the Workboard. Use Cycles and AI to plan and control."}
       </p>
     </div>
   );

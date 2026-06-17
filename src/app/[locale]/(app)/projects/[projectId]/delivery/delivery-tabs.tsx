@@ -8,11 +8,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Loader2, Sparkles, Play, CheckCircle2, AlertTriangle, XCircle, Lightbulb,
-  MessageSquareText, Activity,
+  MessageSquareText, Activity, Send,
 } from "lucide-react";
 import { BACKLOG_ITEM_TYPES } from "@/lib/delivery/config";
 import {
-  saveBacklogItemAction, setBacklogStatusAction, deleteBacklogItemAction,
+  saveBacklogItemAction, deleteBacklogItemAction, promoteBacklogItemAction,
   saveCycleAction, setCycleStatusAction, deleteCycleAction,
   resolveScopeAlertAction, generateBacklogAction, scopeCheckAction,
   deliveryStakeholderSummaryAction, cycleLessonsAction, frameworkHealthAction,
@@ -33,12 +33,13 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
 
   const add = () => { if (!f.title.trim()) return; start(async () => { await saveBacklogItemAction({ projectId, item: { ...f, linked_milestone_id: f.linked_milestone_id || null, linked_risk_id: f.linked_risk_id || null } }); setF(empty); router.refresh(); }); };
   const del = (id: string) => start(async () => { await deleteBacklogItemAction({ projectId, id }); router.refresh(); });
+  const promote = (id: string) => start(async () => { await promoteBacklogItemAction({ projectId, id }); router.refresh(); });
   const gen = () => start(async () => { await generateBacklogAction({ projectId, locale }); router.refresh(); });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{isEs ? "Backlog del proyecto: el trabajo a ejecutar, alineado al charter." : "Project backlog: the work to execute, aligned to the charter."}</p>
+        <p className="text-xs text-muted-foreground">{isEs ? "Backlog de planeación: define el trabajo (alineado al charter) y promuévelo a tarea para ejecutarlo en el Workboard." : "Planning backlog: define the work (aligned to the charter) and promote it to a task to execute it on the Workboard."}</p>
         <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
         </button>
@@ -50,15 +51,25 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
             <tr><th className="px-3 py-2 text-left">{isEs ? "Item" : "Item"}</th><th className="px-3 py-2 text-left">{isEs ? "Tipo" : "Type"}</th><th className="px-3 py-2 text-left">{isEs ? "Prioridad" : "Priority"}</th><th className="px-3 py-2 text-left">{isEs ? "Estado" : "Status"}</th><th className="px-3 py-2"></th></tr>
           </thead>
           <tbody>
-            {items.map((it) => (
-              <tr key={String(it.id)} className="border-t border-border/50 align-top">
+            {items.map((it) => {
+              const promoted = String(it.status) === "promoted";
+              return (
+              <tr key={String(it.id)} className={`border-t border-border/50 align-top ${promoted ? "opacity-60" : ""}`}>
                 <td className="px-3 py-2"><div className="font-medium text-foreground">{String(it.title)}</div>{it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}</td>
                 <td className="px-3 py-2 text-muted-foreground">{String(it.item_type ?? "—")}</td>
                 <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span></td>
-                <td className="px-3 py-2 text-muted-foreground">{String(it.status ?? "—")}</td>
-                <td className="px-3 py-2 text-right"><button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-3 py-2 text-muted-foreground">{promoted ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "En Workboard" : "On Workboard"}</span> : String(it.status ?? "—")}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {!promoted && (
+                      <button onClick={() => promote(String(it.id))} disabled={pending} title={isEs ? "Promover a tarea (Workboard)" : "Promote to task (Workboard)"} className="inline-flex items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300"><Send className="h-3 w-3" />{isEs ? "A tarea" : "To task"}</button>
+                    )}
+                    <button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </td>
               </tr>
-            ))}
+              );
+            })}
             {items.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">{isEs ? "Backlog vacío. Agrega items o genéralos con IA." : "Empty backlog. Add items or generate with AI."}</td></tr>}
           </tbody>
         </table>
@@ -125,49 +136,6 @@ export function CyclesTab({ projectId, locale, cycles }: { projectId: string; lo
         <input className={`${inp} lg:col-span-2`} placeholder={isEs ? "Meta del ciclo" : "Cycle goal"} value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} />
         <input type="date" className={inp} value={f.start_date} onChange={(e) => setF({ ...f, start_date: e.target.value })} />
         <button onClick={add} disabled={pending} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{isEs ? "Crear ciclo" : "Create cycle"}</button>
-      </div>
-    </div>
-  );
-}
-
-// ── Board ───────────────────────────────────────────────────────────────────
-
-export function BoardTab({ projectId, locale, columns, items }: { projectId: string; locale: string; columns: Record<string, unknown>[]; items: Record<string, unknown>[] }) {
-  const isEs = locale === "es";
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const cols = columns.length ? columns : [{ name: "Backlog" }, { name: "In Progress" }, { name: "Done" }];
-  const colNames = cols.map((c) => String(c.name));
-  const norm = (s: string) => s.toLowerCase().trim();
-  const itemsFor = (col: string) => items.filter((it) => norm(String(it.status ?? "backlog")) === norm(col) || (norm(String(it.status ?? "backlog")) === "backlog" && norm(col) === norm(colNames[0])));
-  const move = (id: string, status: string) => start(async () => { await setBacklogStatusAction({ projectId, id, status }); router.refresh(); });
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">{isEs ? "Tablero adaptado al marco. Mueve los items entre columnas." : "Board adapted to the framework. Move items across columns."}</p>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {colNames.map((col) => {
-          const list = itemsFor(col);
-          return (
-            <div key={col} className="w-60 shrink-0 rounded-xl border border-border bg-muted/20 p-2">
-              <div className="mb-2 flex items-center justify-between px-1"><span className="text-xs font-semibold text-foreground">{col}</span><span className="rounded-full bg-muted px-1.5 text-[10px] text-muted-foreground">{list.length}</span></div>
-              <div className="space-y-1.5">
-                {list.map((it) => (
-                  <div key={String(it.id)} className="rounded-lg border border-border bg-card p-2">
-                    <p className="text-xs font-medium text-foreground">{String(it.title)}</p>
-                    <div className="mt-1 flex items-center justify-between gap-1">
-                      <span className={`rounded px-1 py-0.5 text-[9px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span>
-                      <select disabled={pending} value={col} onChange={(e) => move(String(it.id), e.target.value)} className="rounded border border-border bg-background px-1 py-0.5 text-[10px] text-muted-foreground">
-                        {colNames.map((cn) => <option key={cn} value={cn}>{cn}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                ))}
-                {list.length === 0 && <p className="px-1 py-2 text-[10px] text-muted-foreground">—</p>}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

@@ -160,6 +160,33 @@ export async function deleteBacklogItemAction(input: { projectId: string; id: st
   return error ? { error: "unexpected" } : {};
 }
 
+const PRIORITY_MAP: Record<string, string> = { High: "p1", Medium: "p2", Low: "p3" };
+
+/** Promote a backlog item into a real execution task (Workboard). Unifies the
+ *  planning backlog with the single execution board. */
+export async function promoteBacklogItemAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { data: item } = await c.supabase.from("project_backlog_items").select("*").eq("id", input.id).eq("organization_id", c.org.organizationId).is("deleted_at", null).maybeSingle();
+  if (!item) return { error: "not_found" };
+  const it = item as Record<string, unknown>;
+
+  const { error } = await c.supabase.from("roadmap_tasks").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    title: String(it.title), description: (it.description as string) || null,
+    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+    milestone_id: (it.linked_milestone_id as string) || null,
+    acceptance_criteria: (it.acceptance_criteria as string) || null,
+    order_index: 0, metadata: { origin: "delivery_backlog", backlog_item_id: input.id },
+  });
+  if (error) return { error: "unexpected" };
+
+  // Mark the backlog item as promoted (kept for traceability).
+  await c.supabase.from("project_backlog_items").update({ status: "promoted" }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "item_promoted", `Backlog item promoted to task: ${String(it.title)}`);
+  return {};
+}
+
 // ── Execution cycles ────────────────────────────────────────────────────────
 
 export interface CycleInput {
