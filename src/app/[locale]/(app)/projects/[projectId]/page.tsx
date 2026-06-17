@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, I18nField, TraceableEntityType, Milestone, RoadmapTask } from "@/types/database";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Layers } from "lucide-react";
 import { ProjectAiSummarySection } from "./project-detail-client";
 import { Link as I18nLink } from "@/i18n/navigation";
 import { ProjectHeaderClient } from "./project-header-client";
@@ -14,6 +14,7 @@ import type { AiCommSummaryTranslations } from "@/components/ai";
 import { ProjectDashboard } from "./dashboard-client";
 import { computeRoadmapProgress } from "@/lib/roadmap/progress";
 import { CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES, computeCharterCompletion, CHARTER_FIELDS, type CharterStatus, type CharterFieldKey } from "@/lib/charter/fields";
+import { DELIVERY_METHODS, type DeliveryMethod } from "@/lib/delivery/config";
 import type {
   DashboardData,
   DashboardTranslations,
@@ -65,6 +66,17 @@ export default async function ProjectDetailPage({
   const charterCompletion = charterRow
     ? computeCharterCompletion(charterRow as Partial<Record<CharterFieldKey, string>>).pct
     : 0;
+
+  // Delivery framework (Command Center strip).
+  const { data: fwRow } = await supabase
+    .from("project_delivery_frameworks").select("delivery_method, status")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle();
+  const [{ count: openAlerts }, { data: activeCycle }] = await Promise.all([
+    supabase.from("project_scope_creep_alerts").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "open"),
+    supabase.from("project_execution_cycles").select("name").eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "active").is("deleted_at", null).limit(1).maybeSingle(),
+  ]);
+  const fwMethod = (fwRow as { delivery_method?: string } | null)?.delivery_method ?? null;
+  const fwMethodLabel = fwMethod ? (locale === "es" ? DELIVERY_METHODS[fwMethod as DeliveryMethod]?.es : DELIVERY_METHODS[fwMethod as DeliveryMethod]?.en) : null;
 
   const lang = locale as Locale;
   const title = getI18nValue(project.title_i18n, lang) || project.slug;
@@ -497,6 +509,29 @@ export default async function ProjectDetailPage({
         </div>
         <ArrowLeft className="h-4 w-4 rotate-180 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </I18nLink>
+
+      {/* Delivery Framework status strip */}
+      {fwMethodLabel && (
+        <I18nLink
+          href={`/projects/${projectId}/delivery`}
+          className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <Layers className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">
+                {lang === "es" ? "Marco de Ejecución" : "Delivery Framework"}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">· {fwMethodLabel}</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {activeCycle ? `${lang === "es" ? "Ciclo activo" : "Active cycle"}: ${(activeCycle as { name: string }).name}` : (lang === "es" ? "Sin ciclo activo" : "No active cycle")}
+                {openAlerts ? ` · ${openAlerts} ${lang === "es" ? "alertas de scope creep" : "scope creep alerts"}` : ""}
+              </p>
+            </div>
+          </div>
+          {openAlerts ? <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{openAlerts}</span> : <ArrowLeft className="h-4 w-4 rotate-180 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+        </I18nLink>
+      )}
 
       {/* AI Communication Summary */}
       <ProjectAiSummarySection

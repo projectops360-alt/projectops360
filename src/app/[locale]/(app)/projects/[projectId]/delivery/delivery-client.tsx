@@ -16,6 +16,7 @@ import {
   VENDOR_DEP, DELIVERY_METHODS, FRAMEWORK_STATUS_META, MEETING_RHYTHM, label, type DeliveryMethod, type Opt,
 } from "@/lib/delivery/config";
 import { recommendFrameworkAction, saveFrameworkAction, activateFrameworkAction, type FrameworkConfig } from "./actions";
+import { BacklogTab, CyclesTab, BoardTab, AiHealthTab } from "./delivery-tabs";
 
 interface Props {
   locale: string;
@@ -26,6 +27,12 @@ interface Props {
   boardColumns: Record<string, unknown>[];
   events: Record<string, unknown>[];
   charterGoal: string | null;
+  charterObjectives: string | null;
+  backlog: Record<string, unknown>[];
+  cycles: Record<string, unknown>[];
+  alerts: Record<string, unknown>[];
+  milestones: Record<string, unknown>[];
+  risks: Record<string, unknown>[];
   startSetup: boolean;
 }
 
@@ -37,6 +44,14 @@ const TONE: Record<string, string> = {
 };
 const sel = "w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
+const TABS = [
+  { key: "overview", es: "Resumen", en: "Overview" },
+  { key: "backlog", es: "Backlog", en: "Backlog" },
+  { key: "cycles", es: "Ciclos", en: "Cycles" },
+  { key: "board", es: "Tablero", en: "Board" },
+  { key: "ai", es: "IA y Salud", en: "AI & Health" },
+];
+
 export function DeliveryClient(p: Props) {
   const isEs = p.locale === "es";
   const router = useRouter();
@@ -44,12 +59,44 @@ export function DeliveryClient(p: Props) {
   const fw = p.framework;
   const configured = !!fw && fw.status !== "draft" && !!fw.delivery_method;
   const [mode, setMode] = useState<"overview" | "wizard">(configured && !p.startSetup ? "overview" : "wizard");
+  const [tab, setTab] = useState("overview");
 
-  if (mode === "overview" && configured) {
-    return <Overview p={p} isEs={isEs} onReconfigure={() => setMode("wizard")} pending={pending}
-      onActivate={() => start(async () => { await activateFrameworkAction({ projectId: p.projectId }); router.refresh(); })} />;
+  if (mode === "wizard" || !configured) {
+    return <Wizard p={p} isEs={isEs} pending={pending} start={start} router={router} onDone={() => setMode("overview")} />;
   }
-  return <Wizard p={p} isEs={isEs} pending={pending} start={start} router={router} onDone={() => setMode("overview")} />;
+
+  return (
+    <div className="space-y-5">
+      <Header p={p} isEs={isEs} actions={
+        <div className="flex flex-wrap items-center gap-2">
+          {fw!.status !== "active" && (
+            <button onClick={() => start(async () => { await activateFrameworkAction({ projectId: p.projectId }); router.refresh(); })} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}{isEs ? "Activar ejecución" : "Activate execution"}
+            </button>
+          )}
+          <button onClick={() => setMode("wizard")} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
+            <Settings2 className="h-4 w-4" />{isEs ? "Reconfigurar" : "Reconfigure"}
+          </button>
+        </div>
+      } />
+
+      <div className="flex gap-1 overflow-x-auto rounded-lg border border-border bg-muted/30 p-1">
+        {TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+            {isEs ? t.es : t.en}
+            {t.key === "ai" && p.alerts.length > 0 && <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">{p.alerts.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
+      {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
+      {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} />}
+      {tab === "board" && <BoardTab projectId={p.projectId} locale={p.locale} columns={p.boardColumns} items={p.backlog} />}
+      {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
+    </div>
+  );
 }
 
 // ── Wizard ──────────────────────────────────────────────────────────────────
@@ -163,7 +210,7 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
 
 // ── Overview ────────────────────────────────────────────────────────────────
 
-function Overview({ p, isEs, onReconfigure, onActivate, pending }: { p: Props; isEs: boolean; onReconfigure: () => void; onActivate: () => void; pending: boolean }) {
+function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
   const fw = p.framework!;
   const method = fw.delivery_method as DeliveryMethod;
   const m = DELIVERY_METHODS[method];
@@ -172,19 +219,6 @@ function Overview({ p, isEs, onReconfigure, onActivate, pending }: { p: Props; i
 
   return (
     <div className="space-y-5">
-      <Header p={p} isEs={isEs} actions={
-        <div className="flex flex-wrap items-center gap-2">
-          {fw.status !== "active" && (
-            <button onClick={onActivate} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}{isEs ? "Activar ejecución" : "Activate execution"}
-            </button>
-          )}
-          <button onClick={onReconfigure} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
-            <Settings2 className="h-4 w-4" />{isEs ? "Reconfigurar" : "Reconfigure"}
-          </button>
-        </div>
-      } />
-
       {/* Method headline */}
       <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-5 dark:border-brand-900 dark:bg-brand-950/20">
         <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{isEs ? "Método de entrega" : "Delivery method"}</p>
@@ -224,7 +258,7 @@ function Overview({ p, isEs, onReconfigure, onActivate, pending }: { p: Props; i
 
       <p className="flex items-center gap-1.5 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0" />
-        {isEs ? "Próximamente: Backlog del proyecto, Ciclos de ejecución y Tablero interactivo conectados a este marco." : "Coming next: Project Backlog, Execution Cycles and an interactive Board connected to this framework."}
+        {isEs ? "Usa las pestañas Backlog, Ciclos, Tablero e IA para ejecutar bajo este marco." : "Use the Backlog, Cycles, Board and AI tabs to execute under this framework."}
       </p>
     </div>
   );
