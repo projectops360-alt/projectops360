@@ -187,6 +187,36 @@ export async function promoteBacklogItemAction(input: { projectId: string; id: s
   return {};
 }
 
+/** Promote several backlog items into tasks at once. ids empty = promote all
+ *  non-promoted items. */
+export async function promoteBacklogItemsAction(input: { projectId: string; ids?: string[] }): Promise<{ error?: string; count?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+
+  let q = c.supabase.from("project_backlog_items").select("*")
+    .eq("project_id", input.projectId).eq("organization_id", c.org.organizationId)
+    .is("deleted_at", null).neq("status", "promoted");
+  if (input.ids && input.ids.length > 0) q = q.in("id", input.ids);
+  const { data: items } = await q;
+  const rows = (items ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return { count: 0 };
+
+  const { error } = await c.supabase.from("roadmap_tasks").insert(rows.map((it, i) => ({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    title: String(it.title), description: (it.description as string) || null,
+    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+    milestone_id: (it.linked_milestone_id as string) || null,
+    acceptance_criteria: (it.acceptance_criteria as string) || null,
+    order_index: i, metadata: { origin: "delivery_backlog", backlog_item_id: it.id },
+  })));
+  if (error) return { error: "unexpected" };
+
+  await c.supabase.from("project_backlog_items").update({ status: "promoted" })
+    .in("id", rows.map((r) => String(r.id))).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "items_promoted", `${rows.length} backlog item(s) promoted to tasks`);
+  return { count: rows.length };
+}
+
 // ── Execution cycles ────────────────────────────────────────────────────────
 
 export interface CycleInput {
