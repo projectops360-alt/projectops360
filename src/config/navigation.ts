@@ -12,6 +12,7 @@ import {
   BarChart3,
   Users,
   Settings,
+  CreditCard,
 } from "lucide-react";
 
 export type NavItem = {
@@ -38,5 +39,6 @@ export const sidebarNav: NavItem[] = [
 ];
 
 export const bottomNav: NavItem[] = [
+  { title: "billing", href: "/organization/billing", icon: CreditCard },
   { title: "settings", href: "/settings", icon: Settings },
 ];
