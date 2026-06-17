@@ -31,6 +31,7 @@ interface Props {
   charterObjectives: string | null;
   backlog: Record<string, unknown>[];
   cycles: Record<string, unknown>[];
+  cycleItems: Record<string, unknown>[];
   alerts: Record<string, unknown>[];
   milestones: Record<string, unknown>[];
   risks: Record<string, unknown>[];
@@ -92,7 +93,7 @@ export function DeliveryClient(p: Props) {
 
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
       {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
-      {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} />}
+      {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={p.backlog} cycleItems={p.cycleItems} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>
   );

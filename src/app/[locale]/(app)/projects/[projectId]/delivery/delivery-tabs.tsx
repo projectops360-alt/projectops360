@@ -4,7 +4,7 @@
 // Delivery Framework tabs: Project Backlog · Execution Cycles · Board · AI.
 // ============================================================================
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Loader2, Sparkles, Play, CheckCircle2, AlertTriangle, XCircle, Lightbulb,
@@ -14,6 +14,7 @@ import { BACKLOG_ITEM_TYPES } from "@/lib/delivery/config";
 import {
   saveBacklogItemAction, deleteBacklogItemAction, promoteBacklogItemsAction,
   saveCycleAction, setCycleStatusAction, deleteCycleAction,
+  addItemsToCycleAction, removeCycleItemAction, promoteCycleAction,
   resolveScopeAlertAction, generateBacklogAction, scopeCheckAction,
   deliveryStakeholderSummaryAction, cycleLessonsAction, frameworkHealthAction,
 } from "./actions";
@@ -31,6 +32,21 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const empty = { title: "", description: "", item_type: "Task", priority: "Medium", linked_charter_objective: "", linked_milestone_id: "", linked_risk_id: "" };
   const [f, setF] = useState(empty);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<"list" | "milestone">("list");
+
+  // Milestone lookup + order, to group/sort the backlog by phase.
+  const msOrder = new Map(milestones.map((m, i) => [String(m.id), i]));
+  const msName = (id: unknown): string | undefined => {
+    const m = milestones.find((x) => String(x.id) === String(id));
+    return m ? String(m.title) : undefined;
+  };
+  const ordered = view === "milestone"
+    ? [...items].sort((a, b) => {
+        const oa = msOrder.get(String(a.linked_milestone_id)) ?? 999;
+        const ob = msOrder.get(String(b.linked_milestone_id)) ?? 999;
+        return oa !== ob ? oa - ob : Number(a.position ?? 0) - Number(b.position ?? 0);
+      })
+    : items;
 
   const pending_ids = items.filter((it) => String(it.status) !== "promoted").map((it) => String(it.id));
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -47,9 +63,15 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">{isEs ? "Backlog de planeación: define el trabajo (alineado al charter) y promuévelo a tarea para ejecutarlo en el Workboard." : "Planning backlog: define the work (aligned to the charter) and promote it to a task to execute it on the Workboard."}</p>
-        <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-border p-0.5 text-xs">
+            <button onClick={() => setView("list")} className={`rounded-md px-2 py-1 ${view === "list" ? "bg-muted font-medium text-foreground" : "text-muted-foreground"}`}>{isEs ? "Lista" : "List"}</button>
+            <button onClick={() => setView("milestone")} className={`rounded-md px-2 py-1 ${view === "milestone" ? "bg-muted font-medium text-foreground" : "text-muted-foreground"}`}>{isEs ? "Por hito" : "By milestone"}</button>
+          </div>
+          <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
+          </button>
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -74,24 +96,33 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
           <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-2 text-left"><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label={isEs ? "Seleccionar todas" : "Select all"} className="h-3.5 w-3.5 accent-brand-600" /></th>
-              <th className="px-3 py-2 text-left">{isEs ? "Item" : "Item"}</th><th className="px-3 py-2 text-left">{isEs ? "Tipo" : "Type"}</th><th className="px-3 py-2 text-left">{isEs ? "Prioridad" : "Priority"}</th><th className="px-3 py-2 text-left">{isEs ? "Estado" : "Status"}</th><th className="px-3 py-2"></th>
+              <th className="px-3 py-2 text-left">{isEs ? "Item" : "Item"}</th><th className="px-3 py-2 text-left">{isEs ? "Hito" : "Milestone"}</th><th className="px-3 py-2 text-left">{isEs ? "Tipo" : "Type"}</th><th className="px-3 py-2 text-left">{isEs ? "Prioridad" : "Priority"}</th><th className="px-3 py-2 text-left">{isEs ? "Estado" : "Status"}</th><th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {items.map((it) => {
+            {ordered.map((it, idx) => {
               const promoted = String(it.status) === "promoted";
+              const mid = String(it.linked_milestone_id ?? "");
+              const prevMid = idx > 0 ? String(ordered[idx - 1].linked_milestone_id ?? "") : null;
+              const showHeader = view === "milestone" && mid !== prevMid;
               return (
-              <tr key={String(it.id)} className={`border-t border-border/50 align-top ${promoted ? "opacity-60" : ""}`}>
-                <td className="px-3 py-2">{!promoted && <input type="checkbox" checked={sel.has(String(it.id))} onChange={() => toggle(String(it.id))} className="h-3.5 w-3.5 accent-brand-600" />}</td>
-                <td className="px-3 py-2"><div className="font-medium text-foreground">{String(it.title)}</div>{it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}</td>
-                <td className="px-3 py-2 text-muted-foreground">{String(it.item_type ?? "—")}</td>
-                <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span></td>
-                <td className="px-3 py-2 text-muted-foreground">{promoted ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "En Workboard" : "On Workboard"}</span> : String(it.status ?? "—")}</td>
-                <td className="px-3 py-2 text-right"><button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button></td>
-              </tr>
+                <Fragment key={String(it.id)}>
+                  {showHeader && (
+                    <tr className="bg-muted/30"><td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">{msName(it.linked_milestone_id) ?? (isEs ? "Sin hito" : "No milestone")}</td></tr>
+                  )}
+                  <tr className={`border-t border-border/50 align-top ${promoted ? "opacity-60" : ""}`}>
+                    <td className="px-3 py-2">{!promoted && <input type="checkbox" checked={sel.has(String(it.id))} onChange={() => toggle(String(it.id))} className="h-3.5 w-3.5 accent-brand-600" />}</td>
+                    <td className="px-3 py-2"><div className="font-medium text-foreground">{String(it.title)}</div>{it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{msName(it.linked_milestone_id) ?? "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{String(it.item_type ?? "—")}</td>
+                    <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span></td>
+                    <td className="px-3 py-2 text-muted-foreground">{promoted ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "En Workboard" : "On Workboard"}</span> : String(it.status ?? "—")}</td>
+                    <td className="px-3 py-2 text-right"><button onClick={() => del(String(it.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button></td>
+                  </tr>
+                </Fragment>
               );
             })}
-            {items.length === 0 && <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-muted-foreground">{isEs ? "Backlog vacío. Agrega items o genéralos con IA." : "Empty backlog. Add items or generate with AI."}</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-xs text-muted-foreground">{isEs ? "Backlog vacío. Agrega items o genéralos con IA." : "Empty backlog. Add items or generate with AI."}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -111,40 +142,74 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
 
 // ── Cycles ──────────────────────────────────────────────────────────────────
 
-export function CyclesTab({ projectId, locale, cycles }: { projectId: string; locale: string; cycles: Record<string, unknown>[] }) {
+export function CyclesTab({ projectId, locale, cycles, backlog, cycleItems }: { projectId: string; locale: string; cycles: Record<string, unknown>[]; backlog: Record<string, unknown>[]; cycleItems: Record<string, unknown>[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
   const empty = { name: "", cycle_type: "iteration", goal: "", start_date: "", end_date: "" };
   const [f, setF] = useState(empty);
 
+  const backlogById = new Map(backlog.map((b) => [String(b.id), b]));
+  const itemsOfCycle = (cycleId: string) => cycleItems.filter((ci) => String(ci.cycle_id) === cycleId);
+  const availableForCycle = (cycleId: string) => {
+    const inThis = new Set(itemsOfCycle(cycleId).map((ci) => String(ci.backlog_item_id)));
+    return backlog.filter((b) => String(b.status) !== "promoted" && !inThis.has(String(b.id)));
+  };
+
   const add = () => { if (!f.name.trim()) return; start(async () => { await saveCycleAction({ projectId, cycle: f }); setF(empty); router.refresh(); }); };
   const setStatus = (id: string, status: string) => start(async () => { await setCycleStatusAction({ projectId, id, status }); router.refresh(); });
   const del = (id: string) => start(async () => { await deleteCycleAction({ projectId, id }); router.refresh(); });
   const lessons = (id: string) => start(async () => { await cycleLessonsAction({ projectId, cycleId: id, locale }); router.refresh(); });
+  const addItem = (cycleId: string, itemId: string) => { if (!itemId) return; start(async () => { await addItemsToCycleAction({ projectId, cycleId, ids: [itemId] }); router.refresh(); }); };
+  const removeItem = (id: string) => start(async () => { await removeCycleItemAction({ projectId, id }); router.refresh(); });
+  const promoteCycle = (cycleId: string) => start(async () => { await promoteCycleAction({ projectId, cycleId }); router.refresh(); });
 
   const ST_CLS: Record<string, string> = { planned: "bg-muted text-muted-foreground", active: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300", review: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300", completed: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300", canceled: "bg-muted text-muted-foreground" };
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted-foreground">{isEs ? "Ciclos de ejecución: las iteraciones/fases en que se entrega el trabajo." : "Execution cycles: the iterations/phases in which work is delivered."}</p>
+      <p className="text-xs text-muted-foreground">{isEs ? "Ciclos / sprints: crea el ciclo, mete los items del backlog y promuévelos al Workboard (quedan agrupados por sprint)." : "Cycles / sprints: create a cycle, add backlog items and promote them to the Workboard (grouped by sprint)."}</p>
       <div className="space-y-2">
         {cycles.map((c) => {
           const status = String(c.status);
+          const cid = String(c.id);
+          const its = itemsOfCycle(cid);
+          const avail = availableForCycle(cid);
           return (
-            <div key={String(c.id)} className="rounded-xl border border-border bg-card p-4">
+            <div key={cid} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2"><span className="font-semibold text-foreground">{String(c.name)}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${ST_CLS[status] ?? "bg-muted text-muted-foreground"}`}>{status}</span></div>
+                  <div className="flex items-center gap-2"><span className="font-semibold text-foreground">{String(c.name)}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${ST_CLS[status] ?? "bg-muted text-muted-foreground"}`}>{status}</span><span className="text-[10px] text-muted-foreground">{its.length} {isEs ? "items" : "items"}</span></div>
                   {c.goal ? <p className="mt-0.5 text-xs text-muted-foreground">{String(c.goal)}</p> : null}
                   {c.lessons_learned_notes ? <p className="mt-1 whitespace-pre-line rounded bg-muted/40 p-2 text-[11px] text-muted-foreground">{String(c.lessons_learned_notes)}</p> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {status === "planned" && <button onClick={() => setStatus(String(c.id), "active")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"><Play className="h-3 w-3" />{isEs ? "Iniciar" : "Start"}</button>}
-                  {status === "active" && <button onClick={() => setStatus(String(c.id), "completed")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"><CheckCircle2 className="h-3 w-3" />{isEs ? "Completar" : "Complete"}</button>}
-                  <button onClick={() => lessons(String(c.id))} disabled={pending} title={isEs ? "Lecciones aprendidas con IA" : "AI lessons learned"} className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"><Lightbulb className="h-3 w-3" /></button>
-                  <button onClick={() => del(String(c.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+                  {its.length > 0 && <button onClick={() => promoteCycle(cid)} disabled={pending} title={isEs ? "Promover items del ciclo al Workboard" : "Promote cycle items to the Workboard"} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"><Send className="h-3 w-3" />{isEs ? "Al Workboard" : "To Workboard"}</button>}
+                  {status === "planned" && <button onClick={() => setStatus(cid, "active")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"><Play className="h-3 w-3" />{isEs ? "Iniciar" : "Start"}</button>}
+                  {status === "active" && <button onClick={() => setStatus(cid, "completed")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"><CheckCircle2 className="h-3 w-3" />{isEs ? "Completar" : "Complete"}</button>}
+                  <button onClick={() => lessons(cid)} disabled={pending} title={isEs ? "Lecciones aprendidas con IA" : "AI lessons learned"} className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"><Lightbulb className="h-3 w-3" /></button>
+                  <button onClick={() => del(cid)} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
                 </div>
+              </div>
+
+              {/* Cycle items */}
+              <div className="mt-3 space-y-1">
+                {its.map((ci) => {
+                  const bi = backlogById.get(String(ci.backlog_item_id));
+                  return (
+                    <div key={String(ci.id)} className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1 text-xs">
+                      <span className="truncate text-foreground">{bi ? String(bi.title) : (isEs ? "(item)" : "(item)")}</span>
+                      <button onClick={() => removeItem(String(ci.id))} className="text-muted-foreground hover:text-red-500"><XCircle className="h-3.5 w-3.5" /></button>
+                    </div>
+                  );
+                })}
+                {avail.length > 0 && (
+                  <select disabled={pending} value="" onChange={(e) => { addItem(cid, e.target.value); }} className="mt-1 w-full rounded-lg border border-dashed border-border bg-background px-2.5 py-1.5 text-xs text-muted-foreground focus:border-brand-500 focus:outline-none">
+                    <option value="">{isEs ? "+ Agregar item del backlog…" : "+ Add backlog item…"}</option>
+                    {avail.map((b) => <option key={String(b.id)} value={String(b.id)}>{String(b.title)}</option>)}
+                  </select>
+                )}
+                {its.length === 0 && avail.length === 0 && <p className="text-[11px] text-muted-foreground">{isEs ? "Sin items disponibles. Genera o agrega items en el Backlog." : "No items available. Generate or add items in the Backlog."}</p>}
               </div>
             </div>
           );

@@ -258,6 +258,60 @@ export async function deleteCycleAction(input: { projectId: string; id: string }
   return error ? { error: "unexpected" } : {};
 }
 
+/** Assign backlog items to a cycle (sprint). Skips items already in the cycle. */
+export async function addItemsToCycleAction(input: { projectId: string; cycleId: string; ids: string[] }): Promise<{ error?: string; count?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!input.ids?.length) return { count: 0 };
+  const { data: existing } = await c.supabase.from("project_cycle_items").select("backlog_item_id").eq("cycle_id", input.cycleId).eq("organization_id", c.org.organizationId);
+  const have = new Set((existing ?? []).map((r) => String((r as { backlog_item_id: string }).backlog_item_id)));
+  const fresh = input.ids.filter((id) => !have.has(id));
+  if (fresh.length === 0) return { count: 0 };
+  const { error } = await c.supabase.from("project_cycle_items").insert(fresh.map((id) => ({
+    organization_id: c.org.organizationId, project_id: input.projectId, cycle_id: input.cycleId, backlog_item_id: id,
+  })));
+  return error ? { error: "unexpected" } : { count: fresh.length };
+}
+
+export async function removeCycleItemAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("project_cycle_items").delete().eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Promote all of a cycle's backlog items to Workboard tasks, tagging them with
+ *  the cycle name as the sprint so the Workboard sprint filter groups them. */
+export async function promoteCycleAction(input: { projectId: string; cycleId: string }): Promise<{ error?: string; count?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { data: cycle } = await c.supabase.from("project_execution_cycles").select("name").eq("id", input.cycleId).eq("organization_id", c.org.organizationId).maybeSingle();
+  if (!cycle) return { error: "not_found" };
+  const sprintName = String((cycle as { name: string }).name);
+
+  const { data: citems } = await c.supabase.from("project_cycle_items").select("backlog_item_id").eq("cycle_id", input.cycleId).eq("organization_id", c.org.organizationId);
+  const ids = (citems ?? []).map((r) => String((r as { backlog_item_id: string }).backlog_item_id));
+  if (ids.length === 0) return { count: 0 };
+
+  const { data: items } = await c.supabase.from("project_backlog_items").select("*").in("id", ids).eq("organization_id", c.org.organizationId).is("deleted_at", null).neq("status", "promoted");
+  const rows = (items ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return { count: 0 };
+
+  const { error } = await c.supabase.from("roadmap_tasks").insert(rows.map((it, i) => ({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    title: String(it.title), description: (it.description as string) || null,
+    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+    milestone_id: (it.linked_milestone_id as string) || null, sprint_name: sprintName,
+    acceptance_criteria: (it.acceptance_criteria as string) || null,
+    order_index: i, metadata: { origin: "delivery_cycle", backlog_item_id: it.id, cycle_id: input.cycleId },
+  })));
+  if (error) return { error: "unexpected" };
+
+  await c.supabase.from("project_backlog_items").update({ status: "promoted" }).in("id", rows.map((r) => String(r.id))).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "cycle_promoted", `Cycle "${sprintName}" promoted ${rows.length} item(s) to the Workboard`);
+  return { count: rows.length };
+}
+
 // ── Scope creep alerts ──────────────────────────────────────────────────────
 
 export async function resolveScopeAlertAction(input: { projectId: string; id: string; status: "resolved" | "dismissed" }): Promise<{ error?: string }> {

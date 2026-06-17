@@ -44,6 +44,10 @@ export default async function DeliveryPage({
     supabase.from("risks").select("id, title").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).limit(50),
   ]);
 
+  const { data: cycleItemsData } = await supabase
+    .from("project_cycle_items").select("id, cycle_id, backlog_item_id")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId);
+
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   const defaultProjectType = mapProjectType(project.project_type);
   const charter = charterRes.data as { project_goal?: string; objectives?: string } | null;
@@ -61,6 +65,7 @@ export default async function DeliveryPage({
       charterObjectives={charter?.objectives ?? null}
       backlog={(backlogRes.data ?? []) as Record<string, unknown>[]}
       cycles={(cyclesRes.data ?? []) as Record<string, unknown>[]}
+      cycleItems={(cycleItemsData ?? []) as Record<string, unknown>[]}
       alerts={(alertsRes.data ?? []) as Record<string, unknown>[]}
       milestones={(milestonesRes.data ?? []) as Record<string, unknown>[]}
       risks={(risksRes.data ?? []) as Record<string, unknown>[]}
