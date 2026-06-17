@@ -273,7 +273,7 @@ export function CharterClient({ locale, projectId, projectName, charter, version
                 <li key={v.id} className="flex items-center justify-between gap-3 border-b border-border/40 py-1.5 last:border-0">
                   <span className="font-medium text-foreground">v{v.version}</span>
                   <span className="flex-1 truncate text-muted-foreground">{v.change_reason ?? "—"}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString(isEs ? "es-ES" : "en-US")}</span>
+                  <span suppressHydrationWarning className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleDateString(isEs ? "es-ES" : "en-US", { timeZone: "UTC" })}</span>
                 </li>
               ))}
             </ul>

@@ -23,7 +23,7 @@ interface Props {
 
 export function CharterPrintClient({ locale, projectId, projectName, charter, roles, rules, approvals, signoffs }: Props) {
   const isEs = locale === "es";
-  const today = new Date().toLocaleDateString(isEs ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric" });
+  const today = new Date().toLocaleDateString(isEs ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
   const status = (charter.status as CharterStatus) ?? "draft";
   const meta = CHARTER_STATUS_META[status];
   const v = (k: string) => { const x = charter[k]; return x && String(x).trim() ? String(x) : null; };

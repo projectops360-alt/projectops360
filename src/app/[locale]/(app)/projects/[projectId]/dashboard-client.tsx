@@ -540,9 +540,9 @@ export function ProjectDashboard({
               <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
                 {currentMilestone.start_date && currentMilestone.target_date && (
                   <span>
-                    {new Date(currentMilestone.start_date).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+                    {new Date(currentMilestone.start_date).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" })}
                     {" — "}
-                    {new Date(currentMilestone.target_date).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+                    {new Date(currentMilestone.target_date).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" })}
                   </span>
                 )}
                 <span>{currentMilestoneProgress.doneTasks}/{currentMilestoneProgress.totalTasks} {locale === "es" ? "tareas" : "tasks"} · {currentMilestoneProgress.progressPercent}%</span>
@@ -676,7 +676,7 @@ export function ProjectDashboard({
                           {item.status && <StatusDot status={item.status} />}
                           {item.date && (
                             <span className="text-[10px] text-muted-foreground">
-                              · {new Date(item.date).toLocaleDateString(locale, { month: "short", day: "numeric" })}
+                              · {new Date(item.date).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" })}
                             </span>
                           )}
                         </div>
