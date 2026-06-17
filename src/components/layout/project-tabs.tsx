@@ -62,16 +62,16 @@ const TAB_ITEMS: TabItem[] = [
     matchPattern: "/projects/[projectId]/delivery",
   },
   {
-    titleKey: "executionMap",
-    href: "/projects/[projectId]/execution-map",
-    icon: Map,
-    matchPattern: "/projects/[projectId]/execution-map",
-  },
-  {
     titleKey: "workboard",
     href: "/projects/[projectId]/workboard",
     icon: Columns3,
     matchPattern: "/projects/[projectId]/workboard",
+  },
+  {
+    titleKey: "executionMap",
+    href: "/projects/[projectId]/execution-map",
+    icon: Map,
+    matchPattern: "/projects/[projectId]/execution-map",
   },
   {
     titleKey: "laborCapacity",
