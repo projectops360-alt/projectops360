@@ -5,6 +5,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency } from "@/types/database";
 import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
+import { workboardColumnLabels, type DeliveryMethod } from "@/lib/delivery/config";
 import { WorkboardClient } from "./workboard-dynamic";
 
 // Force dynamic rendering — workboard data changes frequently
@@ -62,6 +63,17 @@ export default async function WorkboardPage({
 
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
 
+  // Adapt the Workboard column labels to the project's delivery framework
+  // (the single board stays operating on TaskStatus; only labels change).
+  const { data: fwRow } = await supabase
+    .from("project_delivery_frameworks").select("delivery_method, project_type")
+    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle();
+  const columnOverrides = workboardColumnLabels(
+    (fwRow as { delivery_method?: string } | null)?.delivery_method as DeliveryMethod | null ?? null,
+    (fwRow as { project_type?: string } | null)?.project_type ?? null,
+    locale === "es",
+  );
+
   const milestones = milestonesResult.data;
   const tasks = tasksResult.data;
   if (!tasks) {
@@ -92,15 +104,15 @@ export default async function WorkboardPage({
         empty: t("empty"),
         dragHint: t("dragHint"),
         columns: {
-          not_started: t("columns.not_started"),
-          prompt_ready: t("columns.prompt_ready"),
-          sent_to_ai: t("columns.sent_to_ai"),
-          in_progress: t("columns.in_progress"),
-          implemented: t("columns.implemented"),
-          tested: t("columns.tested"),
-          done: t("columns.done"),
-          blocked: t("columns.blocked"),
-          deferred: t("columns.deferred"),
+          not_started: columnOverrides.not_started ?? t("columns.not_started"),
+          prompt_ready: columnOverrides.prompt_ready ?? t("columns.prompt_ready"),
+          sent_to_ai: columnOverrides.sent_to_ai ?? t("columns.sent_to_ai"),
+          in_progress: columnOverrides.in_progress ?? t("columns.in_progress"),
+          implemented: columnOverrides.implemented ?? t("columns.implemented"),
+          tested: columnOverrides.tested ?? t("columns.tested"),
+          done: columnOverrides.done ?? t("columns.done"),
+          blocked: columnOverrides.blocked ?? t("columns.blocked"),
+          deferred: columnOverrides.deferred ?? t("columns.deferred"),
         },
         priorityLabels: {
           p1: t("priorityLabels.p1"),
@@ -147,15 +159,15 @@ export default async function WorkboardPage({
           moveWith: t("statusChange.moveWith"),
           cancel: t("statusChange.cancel"),
           statusLabels: {
-            not_started: t("columns.not_started"),
-            prompt_ready: t("columns.prompt_ready"),
-            sent_to_ai: t("columns.sent_to_ai"),
-            in_progress: t("columns.in_progress"),
-            implemented: t("columns.implemented"),
-            tested: t("columns.tested"),
-            done: t("columns.done"),
-            blocked: t("columns.blocked"),
-            deferred: t("columns.deferred"),
+            not_started: columnOverrides.not_started ?? t("columns.not_started"),
+            prompt_ready: columnOverrides.prompt_ready ?? t("columns.prompt_ready"),
+            sent_to_ai: columnOverrides.sent_to_ai ?? t("columns.sent_to_ai"),
+            in_progress: columnOverrides.in_progress ?? t("columns.in_progress"),
+            implemented: columnOverrides.implemented ?? t("columns.implemented"),
+            tested: columnOverrides.tested ?? t("columns.tested"),
+            done: columnOverrides.done ?? t("columns.done"),
+            blocked: columnOverrides.blocked ?? t("columns.blocked"),
+            deferred: columnOverrides.deferred ?? t("columns.deferred"),
           },
         },
         taskForm: {
@@ -170,15 +182,15 @@ export default async function WorkboardPage({
             unexpected: tTaskForm("errors.unexpected"),
           },
           statusLabels: {
-            not_started: t("columns.not_started"),
-            prompt_ready: t("columns.prompt_ready"),
-            sent_to_ai: t("columns.sent_to_ai"),
-            in_progress: t("columns.in_progress"),
-            implemented: t("columns.implemented"),
-            tested: t("columns.tested"),
-            done: t("columns.done"),
-            blocked: t("columns.blocked"),
-            deferred: t("columns.deferred"),
+            not_started: columnOverrides.not_started ?? t("columns.not_started"),
+            prompt_ready: columnOverrides.prompt_ready ?? t("columns.prompt_ready"),
+            sent_to_ai: columnOverrides.sent_to_ai ?? t("columns.sent_to_ai"),
+            in_progress: columnOverrides.in_progress ?? t("columns.in_progress"),
+            implemented: columnOverrides.implemented ?? t("columns.implemented"),
+            tested: columnOverrides.tested ?? t("columns.tested"),
+            done: columnOverrides.done ?? t("columns.done"),
+            blocked: columnOverrides.blocked ?? t("columns.blocked"),
+            deferred: columnOverrides.deferred ?? t("columns.deferred"),
           },
           priorityLabels: {
             p1: t("priorityLabels.p1"),

@@ -150,3 +150,81 @@ export const label = (opts: Opt[], value: string | null | undefined, isEs: boole
   const o = opts.find((x) => x.value === value);
   return o ? (isEs ? o.es : o.en) : (value ?? "—");
 };
+
+// ── Workboard column labels adapted to the framework ────────────────────────
+// The single Workboard keeps operating on TaskStatus; only the column LABELS
+// are relabeled to the method/project-type terminology (drag&drop and
+// dependencies stay intact). Keyed by TaskStatus string.
+
+type StatusLabels = Record<string, { es: string; en: string }>;
+
+const COLUMN_PROFILES: Record<string, StatusLabels> = {
+  construction: {
+    not_started: { es: "Planificado", en: "Planned" },
+    prompt_ready: { es: "Listo para campo", en: "Ready for Field" },
+    sent_to_ai: { es: "Asignado", en: "Assigned" },
+    in_progress: { es: "En progreso", en: "In Progress" },
+    implemented: { es: "Inspección requerida", en: "Inspection Required" },
+    tested: { es: "Aprobado", en: "Approved" },
+    done: { es: "Cerrado", en: "Closed" },
+    blocked: { es: "Retrabajo requerido", en: "Rework Required" },
+  },
+  data_bi: {
+    not_started: { es: "Solicitado", en: "Requested" },
+    prompt_ready: { es: "Requisitos", en: "Requirements" },
+    sent_to_ai: { es: "Exploración de datos", en: "Data Exploration" },
+    in_progress: { es: "Desarrollo", en: "Development" },
+    implemented: { es: "Validación", en: "Validation" },
+    tested: { es: "UAT", en: "UAT" },
+    done: { es: "Publicado", en: "Published" },
+  },
+  erp: {
+    not_started: { es: "Requisito", en: "Requirement" },
+    prompt_ready: { es: "Configuración", en: "Configuration" },
+    sent_to_ai: { es: "En configuración", en: "Configuring" },
+    in_progress: { es: "Pruebas", en: "Testing" },
+    implemented: { es: "UAT", en: "UAT" },
+    tested: { es: "Capacitación", en: "Training" },
+    done: { es: "Completado", en: "Completed" },
+  },
+  kanban: {
+    not_started: { es: "Solicitado", en: "Requested" },
+    prompt_ready: { es: "Triage", en: "Triage" },
+    sent_to_ai: { es: "Listo", en: "Ready" },
+    in_progress: { es: "En progreso", en: "In Progress" },
+    implemented: { es: "En revisión", en: "In Review" },
+    tested: { es: "Validación", en: "Validation" },
+    done: { es: "Hecho", en: "Done" },
+  },
+  hybrid: {
+    not_started: { es: "Propuesto", en: "Proposed" },
+    prompt_ready: { es: "Aprobado", en: "Approved" },
+    sent_to_ai: { es: "Listo", en: "Ready" },
+    in_progress: { es: "En progreso", en: "In Progress" },
+    implemented: { es: "En validación", en: "In Validation" },
+    tested: { es: "Revisión de stakeholders", en: "Stakeholder Review" },
+    done: { es: "Hecho", en: "Done" },
+  },
+};
+
+/** Profile id for the workboard column relabeling, given method + project type. */
+function columnProfileFor(method: DeliveryMethod | null, projectType: string | null): string | null {
+  if (projectType === "construction") return "construction";
+  if (projectType === "data_bi") return "data_bi";
+  if (projectType === "erp") return "erp";
+  if (method === "kanban") return "kanban";
+  if (method === "hybrid") return "hybrid";
+  return null; // generic → keep default workboard labels
+}
+
+/** Returns TaskStatus→label overrides for the Workboard (empty = keep defaults). */
+export function workboardColumnLabels(
+  method: DeliveryMethod | null, projectType: string | null, isEs: boolean,
+): Record<string, string> {
+  const profile = columnProfileFor(method, projectType);
+  if (!profile) return {};
+  const map = COLUMN_PROFILES[profile];
+  const out: Record<string, string> = {};
+  for (const [status, v] of Object.entries(map)) out[status] = isEs ? v.es : v.en;
+  return out;
+}
