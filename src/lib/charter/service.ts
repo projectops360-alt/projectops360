@@ -28,31 +28,22 @@ export interface ProjectCharter {
   [key: string]: unknown; // the many text section columns
 }
 
-/** Idempotently create an empty draft charter for a project. Returns the id. */
+/** Idempotently create an empty draft charter for a project. Returns the id.
+ *  Race-safe: uses an upsert that ignores duplicates (UNIQUE project_id), so
+ *  concurrent requests (e.g. Next prefetch + real navigation) never collide. */
 export async function createCharterForProject(
   supabase: Supabase, organizationId: string, projectId: string, userId: string, title: string | null,
 ): Promise<string | null> {
-  // UNIQUE (project_id) makes this safe to call once at creation.
-  const { data, error } = await supabase
+  await supabase
     .from("project_charters")
-    .insert({
-      organization_id: organizationId,
-      project_id: projectId,
-      title,
-      version: 1,
-      status: "draft",
-      created_by: userId,
-    })
-    .select("id")
-    .maybeSingle();
+    .upsert(
+      { organization_id: organizationId, project_id: projectId, title, version: 1, status: "draft", created_by: userId },
+      { onConflict: "project_id", ignoreDuplicates: true },
+    );
 
-  if (error) {
-    // Already exists (unique violation) — fetch the existing one.
-    const { data: existing } = await supabase
-      .from("project_charters").select("id")
-      .eq("project_id", projectId).eq("organization_id", organizationId).maybeSingle();
-    return existing?.id ?? null;
-  }
+  const { data } = await supabase
+    .from("project_charters").select("id")
+    .eq("project_id", projectId).eq("organization_id", organizationId).is("deleted_at", null).maybeSingle();
   return data?.id ?? null;
 }
 

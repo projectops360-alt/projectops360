@@ -22,17 +22,25 @@ export default async function CharterPage({
 
   const org = await getOrgContext();
   const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data: project } = await supabase
+  // Verify the project with the admin client (scoped by org) to avoid any
+  // RLS/session race on the first soft navigation.
+  const { data: project } = await admin
     .from("projects").select("id, slug, title_i18n")
-    .eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single();
+    .eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle();
   if (!project) notFound();
 
   // Always ensure a charter exists (covers projects created before this module).
-  const admin = createAdminClient();
+  // Race-safe upsert + refetch; retry once before giving up so a transient
+  // concurrent create (Next prefetch + real nav) never produces a 404.
+  const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   let charter = await getCharterByProject(admin, org.organizationId, projectId);
   if (!charter) {
-    const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
+    await createCharterForProject(admin, org.organizationId, projectId, org.userId, projectName);
+    charter = await getCharterByProject(admin, org.organizationId, projectId);
+  }
+  if (!charter) {
     await createCharterForProject(admin, org.organizationId, projectId, org.userId, projectName);
     charter = await getCharterByProject(admin, org.organizationId, projectId);
   }
@@ -45,8 +53,6 @@ export default async function CharterPage({
     supabase.from("project_approval_matrix").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
     supabase.from("project_signoffs").select("*").eq("charter_id", charter.id).order("created_at"),
   ]);
-
-  const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
 
   return (
     <CharterClient
