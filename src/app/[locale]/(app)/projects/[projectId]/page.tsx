@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, I18nField, TraceableEntityType, Milestone, RoadmapTask } from "@/types/database";
-import { ArrowLeft, ShieldCheck, Layers } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Layers, Users } from "lucide-react";
 import { ProjectAiSummarySection } from "./project-detail-client";
 import { Link as I18nLink } from "@/i18n/navigation";
 import { ProjectHeaderClient } from "./project-header-client";
@@ -77,6 +77,10 @@ export default async function ProjectDetailPage({
   ]);
   const fwMethod = (fwRow as { delivery_method?: string } | null)?.delivery_method ?? null;
   const fwMethodLabel = fwMethod ? (locale === "es" ? DELIVERY_METHODS[fwMethod as DeliveryMethod]?.es : DELIVERY_METHODS[fwMethod as DeliveryMethod]?.en) : null;
+
+  // Team & Roles (Command Center strip).
+  const { getProjectTeam, computeTeamCompleteness } = await import("@/lib/team-roles/service");
+  const teamComp = computeTeamCompleteness(await getProjectTeam(org, projectId));
 
   const lang = locale as Locale;
   const title = getI18nValue(project.title_i18n, lang) || project.slug;
@@ -532,6 +536,30 @@ export default async function ProjectDetailPage({
           {openAlerts ? <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{openAlerts}</span> : <ArrowLeft className="h-4 w-4 rotate-180 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
         </I18nLink>
       )}
+
+      {/* Team & Roles status strip */}
+      <I18nLink
+        href={`/projects/${projectId}/team`}
+        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <Users className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {lang === "es" ? "Equipo y Roles" : "Team & Roles"}
+              <span className="ml-2 text-xs font-normal text-muted-foreground">· {teamComp.totalMembers} {lang === "es" ? "miembros" : "members"}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {teamComp.missingCritical.length > 0
+                ? (lang === "es" ? `Faltan roles: ${teamComp.missingCritical.join(", ")}` : `Missing roles: ${teamComp.missingCritical.join(", ")}`)
+                : !teamComp.hasApprover
+                  ? (lang === "es" ? "Falta aprobador asignado" : "No approver assigned")
+                  : (lang === "es" ? "Equipo completo" : "Team complete")}
+            </p>
+          </div>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold text-white ${teamComp.score >= 80 ? "bg-green-500" : teamComp.score >= 50 ? "bg-amber-500" : "bg-red-500"}`}>{teamComp.score}%</span>
+      </I18nLink>
 
       {/* AI Communication Summary */}
       <ProjectAiSummarySection

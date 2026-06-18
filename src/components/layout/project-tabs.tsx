@@ -16,6 +16,7 @@ import {
   CalendarClock,
   ShieldCheck,
   Layers,
+  Users,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -60,6 +61,12 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]/delivery",
     icon: Layers,
     matchPattern: "/projects/[projectId]/delivery",
+  },
+  {
+    titleKey: "teamRoles",
+    href: "/projects/[projectId]/team",
+    icon: Users,
+    matchPattern: "/projects/[projectId]/team",
   },
   {
     titleKey: "workboard",

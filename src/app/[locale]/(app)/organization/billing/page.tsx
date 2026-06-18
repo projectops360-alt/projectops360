@@ -48,11 +48,16 @@ export default async function BillingPage({ params }: { params: Promise<{ locale
           </div>
           <h1 className="mt-1 text-2xl font-bold text-foreground">{orgName}</h1>
         </div>
-        {canManagePlans && (
-          <Link href="/organization/plans" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
-            <Settings2 className="h-4 w-4" />{isEs ? "Administrar planes y precios" : "Manage plans & pricing"}
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/organization/members" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"><Users className="h-4 w-4" />{isEs ? "Miembros" : "Members"}</Link>
+          <Link href="/organization/teams" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">{isEs ? "Equipos" : "Teams"}</Link>
+          <Link href="/organization/external-contacts" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">{isEs ? "Contactos" : "Contacts"}</Link>
+          {canManagePlans && (
+            <Link href="/organization/plans" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              <Settings2 className="h-4 w-4" />{isEs ? "Planes y precios" : "Plans & pricing"}
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Current plan */}
