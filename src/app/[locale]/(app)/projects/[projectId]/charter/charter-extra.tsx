@@ -24,6 +24,31 @@ export type TeamMember = { name: string; role: string; govRole: string };
 const peopleOf = (team: TeamMember[]): string[] => [...new Set(team.map((m) => m.name).filter(Boolean))];
 const rolesOf = (team: TeamMember[]): string[] => [...new Set(team.flatMap((m) => [m.role, m.govRole]).filter(Boolean))];
 
+// Authority level = decision power of the role (closed scale → dropdown).
+const AUTHORITY_LEVELS: { es: string; en: string }[] = [
+  { es: "Decisión final", en: "Final decision" },
+  { es: "Aprobar", en: "Approve" },
+  { es: "Recomendar", en: "Recommend" },
+  { es: "Revisar", en: "Review" },
+  { es: "Consultado (asesor)", en: "Consulted (advisory)" },
+  { es: "Ejecutar", en: "Execute" },
+  { es: "Informado", en: "Informed" },
+];
+// Responsibility = what the role is accountable for (common ones; editable).
+const RESPONSIBILITY_SUGGESTIONS: { es: string; en: string }[] = [
+  { es: "Patrocinio y financiamiento", en: "Sponsorship & funding" },
+  { es: "Dirección estratégica", en: "Strategic direction" },
+  { es: "Gestión del proyecto", en: "Project management" },
+  { es: "Liderazgo de entrega", en: "Delivery leadership" },
+  { es: "Ejecución del trabajo", en: "Work execution" },
+  { es: "Aseguramiento de calidad", en: "Quality assurance" },
+  { es: "Gestión de riesgos", en: "Risk management" },
+  { es: "Control de cambios", en: "Change control" },
+  { es: "Comunicación con stakeholders", en: "Stakeholder communication" },
+  { es: "Aprobación de presupuesto", en: "Budget approval" },
+  { es: "Aceptación de entregables", en: "Deliverable acceptance" },
+];
+
 function AddBtn({ onClick, pending, label }: { onClick: () => void; pending: boolean; label: string }) {
   return (
     <button onClick={onClick} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50">
@@ -69,8 +94,12 @@ export function RolesTab({ projectId, locale, roles, teamMembers = [] }: { proje
         <select className={inputCls} value={f.role_name} onChange={(e) => setF({ ...f, role_name: e.target.value })}>{ROLE_OPTIONS.map((o) => <option key={o}>{o}</option>)}</select>
         <input className={inputCls} list="charter-people-roles" placeholder={isEs ? "Persona (del equipo)" : "Person (from team)"} value={f.person_name} onChange={(e) => setF({ ...f, person_name: e.target.value })} />
         <datalist id="charter-people-roles">{people.map((p) => <option key={p} value={p} />)}</datalist>
-        <input className={inputCls} placeholder={isEs ? "Responsabilidad" : "Responsibility"} value={f.responsibility} onChange={(e) => setF({ ...f, responsibility: e.target.value })} />
-        <input className={inputCls} placeholder={isEs ? "Autoridad" : "Authority"} value={f.authority_level} onChange={(e) => setF({ ...f, authority_level: e.target.value })} />
+        <input className={inputCls} list="charter-responsibilities" placeholder={isEs ? "Responsabilidad" : "Responsibility"} value={f.responsibility} onChange={(e) => setF({ ...f, responsibility: e.target.value })} />
+        <datalist id="charter-responsibilities">{RESPONSIBILITY_SUGGESTIONS.map((o) => <option key={o.en} value={isEs ? o.es : o.en} />)}</datalist>
+        <select className={inputCls} value={f.authority_level} onChange={(e) => setF({ ...f, authority_level: e.target.value })}>
+          <option value="">{isEs ? "Autoridad…" : "Authority…"}</option>
+          {AUTHORITY_LEVELS.map((o) => <option key={o.en} value={isEs ? o.es : o.en}>{isEs ? o.es : o.en}</option>)}
+        </select>
         <AddBtn onClick={add} pending={pending} label={isEs ? "Agregar" : "Add"} />
       </div>
     </div>
