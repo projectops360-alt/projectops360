@@ -60,7 +60,7 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
       <div id="charter-report-print" className="space-y-6 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         {/* Header */}
         <header className="border-b border-border pb-5">
-          <Image src="/logo-report.png" alt="Project Ops 360°" width={358} height={473} className="mb-4 h-24 w-auto" priority />
+          <Image src="/logo-report.png" alt="Project Ops 360°" width={358} height={473} className="mb-4 h-32 w-auto" priority />
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">{isEs ? "Acta de Constitución del Proyecto (Project Charter)" : "Project Charter"}</p>
