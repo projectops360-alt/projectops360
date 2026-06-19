@@ -38,6 +38,7 @@ interface Props {
   rules: Record<string, unknown>[];
   approvals: Record<string, unknown>[];
   signoffs: Record<string, unknown>[];
+  teamMembers: { name: string; role: string; govRole: string }[];
   onboarding: boolean;
 }
 
@@ -62,7 +63,7 @@ const TONE_BADGE: Record<string, string> = {
   red: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
 };
 
-export function CharterClient({ locale, projectId, projectName, charter, versions, roles, rules, approvals, signoffs, onboarding }: Props) {
+export function CharterClient({ locale, projectId, projectName, charter, versions, roles, rules, approvals, signoffs, teamMembers, onboarding }: Props) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -100,6 +101,19 @@ export function CharterClient({ locale, projectId, projectName, charter, version
     () => CHARTER_SECTIONS.find((s) => s.fields.some((f) => f.required && !values[f.key]?.trim())) ?? null,
     [values],
   );
+
+  // Governance readiness gate (in addition to text completion): a charter is
+  // only submittable when Roles, the Approval Matrix and Sign-Off all have
+  // content. Governance Rules are recommended but non-blocking.
+  const govBlockers = useMemo(() => {
+    const b: { key: string; es: string; en: string }[] = [];
+    if (roles.length === 0) b.push({ key: "roles", es: "Roles", en: "Roles" });
+    if (approvals.length === 0) b.push({ key: "approvals", es: "Matriz de Aprobación", en: "Approval Matrix" });
+    if (signoffs.length === 0) b.push({ key: "signoff", es: "Firmas", en: "Sign-Off" });
+    return b;
+  }, [roles, approvals, signoffs]);
+  const readyToSubmit = completion.pct === 100 && govBlockers.length === 0;
+  const govRulesWarning = rules.length === 0;
 
   function goTo(sectionKey: string) {
     setActiveKey(sectionKey);
@@ -171,8 +185,8 @@ export function CharterClient({ locale, projectId, projectName, charter, version
               </button>
             )}
             {canSubmit && (
-              <button onClick={doSubmit} disabled={pending || completion.pct < 100}
-                title={completion.pct < 100 ? (isEs ? "Completa los campos requeridos primero" : "Complete required fields first") : ""}
+              <button onClick={doSubmit} disabled={pending || !readyToSubmit}
+                title={!readyToSubmit ? (isEs ? "Completa los campos requeridos y la gobernanza (roles, matriz de aprobación, firmas)" : "Complete required fields and governance (roles, approval matrix, sign-off)") : ""}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50">
                 <Send className="h-4 w-4" />{isEs ? "Enviar a aprobación" : "Submit for approval"}
               </button>
@@ -229,6 +243,26 @@ export function CharterClient({ locale, projectId, projectName, charter, version
               )}
             </p>
           )}
+          {/* Governance readiness — fields complete but governance sections empty */}
+          {completion.missing.length === 0 && govBlockers.length > 0 && (
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              {isEs ? "Gobernanza incompleta — antes de aprobar, completa:" : "Governance incomplete — before approval, complete:"}
+              {govBlockers.map((b) => (
+                <button key={b.key} onClick={() => goTo(b.key)} className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 font-semibold underline underline-offset-2 hover:opacity-80 dark:bg-amber-950/40">
+                  {isEs ? b.es : b.en}<ArrowRight className="h-3 w-3" />
+                </button>
+              ))}
+            </p>
+          )}
+          {/* Non-blocking recommendation */}
+          {readyToSubmit && govRulesWarning && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              {isEs ? "Recomendado: define Reglas de Gobernanza (no obligatorio para enviar)." : "Recommended: define Governance Rules (not required to submit)."}
+              <button onClick={() => goTo("governance_rules")} className="font-medium underline underline-offset-2 hover:opacity-80">{isEs ? "Ir" : "Go"}</button>
+            </p>
+          )}
         </div>
 
         {/* Locked-charter execution note — with a direct CTA to the next step */}
@@ -243,8 +277,13 @@ export function CharterClient({ locale, projectId, projectName, charter, version
                 className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700">
                 {isEs ? `Completar «${firstIncompleteSection.es}»` : `Complete "${firstIncompleteSection.en}"`}<ArrowRight className="h-3 w-3" />
               </button>
+            ) : canSubmit && govBlockers.length > 0 ? (
+              <button onClick={() => goTo(govBlockers[0].key)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700">
+                {isEs ? `Completar «${govBlockers[0].es}»` : `Complete "${govBlockers[0].en}"`}<ArrowRight className="h-3 w-3" />
+              </button>
             ) : canSubmit ? (
-              <button onClick={doSubmit} disabled={pending}
+              <button onClick={doSubmit} disabled={pending || !readyToSubmit}
                 className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50">
                 {isEs ? "Enviar a aprobación" : "Submit for approval"}<ArrowRight className="h-3 w-3" />
               </button>
@@ -377,10 +416,10 @@ export function CharterClient({ locale, projectId, projectName, charter, version
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-card p-5">
-            {activeKey === "roles" && <RolesTab projectId={projectId} locale={locale} roles={roles} />}
-            {activeKey === "approvals" && <ApprovalMatrixTab projectId={projectId} locale={locale} approvals={approvals} />}
-            {activeKey === "governance_rules" && <GovernanceRulesTab projectId={projectId} locale={locale} rules={rules} />}
-            {activeKey === "signoff" && <SignoffTab projectId={projectId} locale={locale} signoffs={signoffs} />}
+            {activeKey === "roles" && <RolesTab projectId={projectId} locale={locale} roles={roles} teamMembers={teamMembers} />}
+            {activeKey === "approvals" && <ApprovalMatrixTab projectId={projectId} locale={locale} approvals={approvals} teamMembers={teamMembers} />}
+            {activeKey === "governance_rules" && <GovernanceRulesTab projectId={projectId} locale={locale} rules={rules} teamMembers={teamMembers} />}
+            {activeKey === "signoff" && <SignoffTab projectId={projectId} locale={locale} signoffs={signoffs} teamMembers={teamMembers} />}
           </div>
         )}
       </div>

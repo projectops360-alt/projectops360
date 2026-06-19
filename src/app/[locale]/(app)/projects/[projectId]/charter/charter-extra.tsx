@@ -18,6 +18,12 @@ import { ROLE_OPTIONS, RULE_TYPES, APPROVAL_AREAS } from "@/lib/charter/fields";
 const inputCls = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 const cell = (v: unknown) => (v ? String(v) : "—");
 
+// People + roles pulled from the Project Team & Roles Center, suggested in the
+// charter governance sections so you reuse who's already on the project.
+export type TeamMember = { name: string; role: string; govRole: string };
+const peopleOf = (team: TeamMember[]): string[] => [...new Set(team.map((m) => m.name).filter(Boolean))];
+const rolesOf = (team: TeamMember[]): string[] => [...new Set(team.flatMap((m) => [m.role, m.govRole]).filter(Boolean))];
+
 function AddBtn({ onClick, pending, label }: { onClick: () => void; pending: boolean; label: string }) {
   return (
     <button onClick={onClick} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50">
@@ -28,10 +34,11 @@ function AddBtn({ onClick, pending, label }: { onClick: () => void; pending: boo
 
 // ── Roles ───────────────────────────────────────────────────────────────────
 
-export function RolesTab({ projectId, locale, roles }: { projectId: string; locale: string; roles: Record<string, unknown>[] }) {
+export function RolesTab({ projectId, locale, roles, teamMembers = [] }: { projectId: string; locale: string; roles: Record<string, unknown>[]; teamMembers?: TeamMember[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
+  const people = peopleOf(teamMembers);
   const [f, setF] = useState({ role_name: ROLE_OPTIONS[0], person_name: "", responsibility: "", authority_level: "", decision_rights: "" });
   const add = () => { if (!f.role_name.trim()) return; start(async () => { await saveCharterRoleAction({ projectId, ...f }); setF({ role_name: ROLE_OPTIONS[0], person_name: "", responsibility: "", authority_level: "", decision_rights: "" }); router.refresh(); }); };
   const del = (id: string) => start(async () => { await deleteCharterChildAction({ projectId, table: "project_charter_roles", id }); router.refresh(); });
@@ -60,7 +67,8 @@ export function RolesTab({ projectId, locale, roles }: { projectId: string; loca
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <select className={inputCls} value={f.role_name} onChange={(e) => setF({ ...f, role_name: e.target.value })}>{ROLE_OPTIONS.map((o) => <option key={o}>{o}</option>)}</select>
-        <input className={inputCls} placeholder={isEs ? "Persona" : "Person"} value={f.person_name} onChange={(e) => setF({ ...f, person_name: e.target.value })} />
+        <input className={inputCls} list="charter-people-roles" placeholder={isEs ? "Persona (del equipo)" : "Person (from team)"} value={f.person_name} onChange={(e) => setF({ ...f, person_name: e.target.value })} />
+        <datalist id="charter-people-roles">{people.map((p) => <option key={p} value={p} />)}</datalist>
         <input className={inputCls} placeholder={isEs ? "Responsabilidad" : "Responsibility"} value={f.responsibility} onChange={(e) => setF({ ...f, responsibility: e.target.value })} />
         <input className={inputCls} placeholder={isEs ? "Autoridad" : "Authority"} value={f.authority_level} onChange={(e) => setF({ ...f, authority_level: e.target.value })} />
         <AddBtn onClick={add} pending={pending} label={isEs ? "Agregar" : "Add"} />
@@ -71,10 +79,11 @@ export function RolesTab({ projectId, locale, roles }: { projectId: string; loca
 
 // ── Governance rules ────────────────────────────────────────────────────────
 
-export function GovernanceRulesTab({ projectId, locale, rules }: { projectId: string; locale: string; rules: Record<string, unknown>[] }) {
+export function GovernanceRulesTab({ projectId, locale, rules, teamMembers = [] }: { projectId: string; locale: string; rules: Record<string, unknown>[]; teamMembers?: TeamMember[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
+  const suggestions = [...new Set([...rolesOf(teamMembers), ...peopleOf(teamMembers)])];
   const [f, setF] = useState({ rule_type: RULE_TYPES[0], rule_name: "", description: "", required_approval_role: "", escalation_role: "" });
   const add = () => { if (!f.rule_name.trim()) return; start(async () => { await saveGovernanceRuleAction({ projectId, ...f }); setF({ rule_type: RULE_TYPES[0], rule_name: "", description: "", required_approval_role: "", escalation_role: "" }); router.refresh(); }); };
   const del = (id: string) => start(async () => { await deleteCharterChildAction({ projectId, table: "project_governance_rules", id }); router.refresh(); });
@@ -104,8 +113,9 @@ export function GovernanceRulesTab({ projectId, locale, rules }: { projectId: st
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <select className={inputCls} value={f.rule_type} onChange={(e) => setF({ ...f, rule_type: e.target.value })}>{RULE_TYPES.map((o) => <option key={o}>{o}</option>)}</select>
         <input className={inputCls} placeholder={isEs ? "Nombre de la regla" : "Rule name"} value={f.rule_name} onChange={(e) => setF({ ...f, rule_name: e.target.value })} />
-        <input className={inputCls} placeholder={isEs ? "Rol que aprueba" : "Approval role"} value={f.required_approval_role} onChange={(e) => setF({ ...f, required_approval_role: e.target.value })} />
-        <input className={inputCls} placeholder={isEs ? "Rol de escalamiento" : "Escalation role"} value={f.escalation_role} onChange={(e) => setF({ ...f, escalation_role: e.target.value })} />
+        <input className={inputCls} list="charter-gov-roles" placeholder={isEs ? "Rol que aprueba" : "Approval role"} value={f.required_approval_role} onChange={(e) => setF({ ...f, required_approval_role: e.target.value })} />
+        <input className={inputCls} list="charter-gov-roles" placeholder={isEs ? "Rol de escalamiento" : "Escalation role"} value={f.escalation_role} onChange={(e) => setF({ ...f, escalation_role: e.target.value })} />
+        <datalist id="charter-gov-roles">{suggestions.map((p) => <option key={p} value={p} />)}</datalist>
         <AddBtn onClick={add} pending={pending} label={isEs ? "Agregar" : "Add"} />
       </div>
     </div>
@@ -114,10 +124,11 @@ export function GovernanceRulesTab({ projectId, locale, rules }: { projectId: st
 
 // ── Approval matrix ─────────────────────────────────────────────────────────
 
-export function ApprovalMatrixTab({ projectId, locale, approvals }: { projectId: string; locale: string; approvals: Record<string, unknown>[] }) {
+export function ApprovalMatrixTab({ projectId, locale, approvals, teamMembers = [] }: { projectId: string; locale: string; approvals: Record<string, unknown>[]; teamMembers?: TeamMember[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
+  const approvers = [...new Set([...peopleOf(teamMembers), ...rolesOf(teamMembers)])];
   const [f, setF] = useState({ approval_area: APPROVAL_AREAS[0], approval_required_from: "", threshold_type: "", threshold_value: "", required_response_time: "" });
   const add = () => start(async () => { await saveApprovalRuleAction({ projectId, ...f }); setF({ approval_area: APPROVAL_AREAS[0], approval_required_from: "", threshold_type: "", threshold_value: "", required_response_time: "" }); router.refresh(); });
   const del = (id: string) => start(async () => { await deleteCharterChildAction({ projectId, table: "project_approval_matrix", id }); router.refresh(); });
@@ -146,7 +157,8 @@ export function ApprovalMatrixTab({ projectId, locale, approvals }: { projectId:
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         <select className={inputCls} value={f.approval_area} onChange={(e) => setF({ ...f, approval_area: e.target.value })}>{APPROVAL_AREAS.map((o) => <option key={o}>{o}</option>)}</select>
-        <input className={inputCls} placeholder={isEs ? "Aprobado por" : "Approved by"} value={f.approval_required_from} onChange={(e) => setF({ ...f, approval_required_from: e.target.value })} />
+        <input className={inputCls} list="charter-approvers" placeholder={isEs ? "Aprobado por (del equipo)" : "Approved by (from team)"} value={f.approval_required_from} onChange={(e) => setF({ ...f, approval_required_from: e.target.value })} />
+        <datalist id="charter-approvers">{approvers.map((p) => <option key={p} value={p} />)}</datalist>
         <input className={inputCls} placeholder={isEs ? "Umbral (ej. >10%)" : "Threshold (e.g. >10%)"} value={f.threshold_value} onChange={(e) => setF({ ...f, threshold_value: e.target.value })} />
         <input className={inputCls} placeholder={isEs ? "Tiempo de respuesta" : "Response time"} value={f.required_response_time} onChange={(e) => setF({ ...f, required_response_time: e.target.value })} />
         <AddBtn onClick={add} pending={pending} label={isEs ? "Agregar" : "Add"} />
@@ -157,11 +169,12 @@ export function ApprovalMatrixTab({ projectId, locale, approvals }: { projectId:
 
 // ── Sign-off ────────────────────────────────────────────────────────────────
 
-export function SignoffTab({ projectId, locale, signoffs }: { projectId: string; locale: string; signoffs: Record<string, unknown>[] }) {
+export function SignoffTab({ projectId, locale, signoffs, teamMembers = [] }: { projectId: string; locale: string; signoffs: Record<string, unknown>[]; teamMembers?: TeamMember[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [role, setRole] = useState(ROLE_OPTIONS[0]);
+  const people = peopleOf(teamMembers);
+  const [role, setRole] = useState(people[0] ?? ROLE_OPTIONS[0]);
   const request = () => start(async () => { await saveSignoffAction({ projectId, signer_role: role, status: "pending" }); router.refresh(); });
   const sign = (id: string, status: "approved" | "rejected") => {
     const comments = status === "rejected" ? (window.prompt(isEs ? "Comentario:" : "Comment:") ?? undefined) : undefined;
@@ -199,7 +212,16 @@ export function SignoffTab({ projectId, locale, signoffs }: { projectId: string;
         {signoffs.length === 0 && <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">{isEs ? "Sin firmas solicitadas." : "No sign-offs requested."}</p>}
       </div>
       <div className="flex gap-2">
-        <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value)}>{ROLE_OPTIONS.map((o) => <option key={o}>{o}</option>)}</select>
+        <select className={inputCls} value={role} onChange={(e) => setRole(e.target.value)}>
+          {people.length > 0 && (
+            <optgroup label={isEs ? "Equipo del proyecto" : "Project team"}>
+              {people.map((p) => <option key={`p-${p}`} value={p}>{p}</option>)}
+            </optgroup>
+          )}
+          <optgroup label={isEs ? "Roles" : "Roles"}>
+            {ROLE_OPTIONS.map((o) => <option key={`r-${o}`} value={o}>{o}</option>)}
+          </optgroup>
+        </select>
         <AddBtn onClick={request} pending={pending} label={isEs ? "Solicitar firma" : "Request sign-off"} />
       </div>
     </div>

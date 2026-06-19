@@ -62,13 +62,29 @@ export async function updateCharterAction(input: {
 
 const transition = z.object({ projectId: z.string().uuid(), notes: z.string().max(2000).optional() });
 
-/** Draft / Revision → Pending Approval. */
-export async function submitCharterAction(input: { projectId: string }): Promise<{ error?: string }> {
+/** Draft / Revision → Pending Approval.
+ *  Readiness gate: required text fields complete AND governance defined
+ *  (≥1 role, ≥1 approval-matrix rule, ≥1 sign-off requested). */
+export async function submitCharterAction(input: { projectId: string }): Promise<{ error?: string; missing?: string[] }> {
   const org = await authed();
   if (!org) return { error: "not_authenticated" };
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
   if (!charter) return { error: "no_charter" };
+
+  const { computeCharterCompletion } = await import("@/lib/charter/fields");
+  const completion = computeCharterCompletion(charter as Partial<Record<CharterFieldKey, string>>);
+  const [{ count: roleCount }, { count: apprCount }, { count: signCount }] = await Promise.all([
+    supabase.from("project_charter_roles").select("id", { count: "exact", head: true }).eq("charter_id", charter.id).is("deleted_at", null),
+    supabase.from("project_approval_matrix").select("id", { count: "exact", head: true }).eq("charter_id", charter.id).is("deleted_at", null),
+    supabase.from("project_signoffs").select("id", { count: "exact", head: true }).eq("charter_id", charter.id),
+  ]);
+  const missing: string[] = [];
+  if (completion.pct < 100) missing.push("fields");
+  if ((roleCount ?? 0) === 0) missing.push("roles");
+  if ((apprCount ?? 0) === 0) missing.push("approvals");
+  if ((signCount ?? 0) === 0) missing.push("signoffs");
+  if (missing.length > 0) return { error: "not_ready", missing };
 
   await supabase.from("project_charters")
     .update({ status: "pending_approval" })

@@ -46,13 +46,21 @@ export default async function CharterPage({
   }
   if (!charter) notFound();
 
-  const [versionsRes, rolesRes, rulesRes, approvalsRes, signoffsRes] = await Promise.all([
+  const [versionsRes, rolesRes, rulesRes, approvalsRes, signoffsRes, teamRes] = await Promise.all([
     supabase.from("project_charter_versions").select("id, version, change_reason, created_at").eq("charter_id", charter.id).order("version", { ascending: false }).limit(25),
     supabase.from("project_charter_roles").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
     supabase.from("project_governance_rules").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
     supabase.from("project_approval_matrix").select("*").eq("charter_id", charter.id).is("deleted_at", null).order("created_at"),
     supabase.from("project_signoffs").select("*").eq("charter_id", charter.id).order("created_at"),
+    admin.from("project_team_members").select("display_name, project_role, governance_role")
+      .eq("project_id", projectId).eq("organization_id", org.organizationId).neq("status", "removed"),
   ]);
+
+  // People + roles from the Project Team & Roles Center, to suggest in the
+  // charter governance sections (roles / approvals / sign-off).
+  const teamMembers = ((teamRes.data ?? []) as Record<string, unknown>[])
+    .map((r) => ({ name: (r.display_name as string) || "", role: (r.project_role as string) || "", govRole: (r.governance_role as string) || "" }))
+    .filter((m) => m.name || m.role);
 
   return (
     <CharterClient
@@ -65,6 +73,7 @@ export default async function CharterPage({
       rules={(rulesRes.data ?? []) as Record<string, unknown>[]}
       approvals={(approvalsRes.data ?? []) as Record<string, unknown>[]}
       signoffs={(signoffsRes.data ?? []) as Record<string, unknown>[]}
+      teamMembers={teamMembers}
       onboarding={onboard === "true"}
     />
   );
