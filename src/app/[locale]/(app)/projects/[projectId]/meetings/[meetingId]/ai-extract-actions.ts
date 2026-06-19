@@ -102,7 +102,7 @@ export async function extractDecisionsFromMeetingAction(input: {
   try {
     const result = await runAi(org, {
       promptType: "decision_analysis",
-      templateVars: { title, content },
+      templateVars: { title, content, language: lang === "es" ? "Spanish" : "English" },
       sourceType: "meeting",
       sourceId: input.meetingId,
     });

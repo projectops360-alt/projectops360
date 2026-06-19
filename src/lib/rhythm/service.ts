@@ -55,7 +55,7 @@ export async function generateMeetingSummary(
     const { runAi } = await import("@/lib/ai/service");
     const result = await runAi(org, {
       promptType: "summary",
-      templateVars: { title, content: content.slice(0, 12000) },
+      templateVars: { title, content: content.slice(0, 12000), language: locale === "es" ? "Spanish" : "English" },
       sourceType: "meeting",
       sourceId: meetingId,
     });
@@ -177,7 +177,7 @@ export async function syncMeetingToMemory(
   // Fire-and-forget: classify + vector-index each new memory item.
   void import("@/lib/memory/service").then(({ processMemoryItem }) => {
     for (const row of inserted ?? []) {
-      processMemoryItem(org, row.id, { runClassification: true }).catch(() => {});
+      processMemoryItem(org, row.id, { runClassification: true, locale }).catch(() => {});
     }
   });
 

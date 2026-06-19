@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProjectOps 360° — Operational Intelligence for Project-Driven Organizations</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark: #1a1f2e;
+    --dark-deep: #12151f;
+    --dark-surface: #1e2333;
+    --dark-border: #2a2f42;
+    --green-900: #2d3a1e;
+    --green-800: #3d5a1e;
+    --green-700: #4a6f23;
+    --green-600: #5a8728;
+    --green-500: #6b9f3c;
+    --green-400: #7fb34a;
+    --green-300: #96c46a;
+    --green-200: #b5d89a;
+    --green-100: #dcedc8;
+    --green-50: #f1f8e9;
+    --green-glow: rgba(107, 159, 60, 0.12);
+    --amber: #d4a017;
+    --amber-light: #e6b422;
+    --emerald: #3d8b37;
+    --red-muted: #c0392b;
+    --white: #ffffff;
+    --gray-50: #fafbfc;
+    --gray-100: #f4f5f7;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--gray-800);
+    background: var(--white);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 100;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--gray-200);
+    transition: all 0.3s;
+  }
+  nav.scrolled { box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 72px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+  .logo-svg { height: 40px; width: auto; }
+  .logo-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+    letter-spacing: -0.5px;
+  }
+  .logo-text .ops { color: var(--green-500); }
+  .logo-text .deg { color: var(--green-400); font-weight: 800; }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    list-style: none;
+  }
+  .nav-links a {
+    text-decoration: none;
+    color: var(--gray-600);
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+    letter-spacing: -0.1px;
+  }
+  .nav-links a:hover { color: var(--green-600); }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    letter-spacing: -0.1px;
+  }
+  .btn-primary {
+    background: var(--green-600);
+    color: white;
+    box-shadow: 0 2px 8px rgba(90, 135, 40, 0.3);
+  }
+  .btn-primary:hover {
+    background: var(--green-700);
+    box-shadow: 0 4px 16px rgba(90, 135, 40, 0.4);
+    transform: translateY(-1px);
+  }
+  .btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+  }
+  .btn-secondary:hover { background: var(--gray-200); }
+  .btn-outline {
+    background: transparent;
+    color: var(--green-600);
+    border: 2px solid var(--green-500);
+  }
+  .btn-outline:hover {
+    background: var(--green-600);
+    color: white;
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--gray-600);
+    padding: 10px 16px;
+  }
+  .btn-ghost:hover { color: var(--green-600); }
+  .btn-large { padding: 14px 32px; font-size: 15px; border-radius: 10px; }
+  .btn-white {
+    background: white;
+    color: var(--gray-900);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .btn-white:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+  .btn-dark {
+    background: var(--dark);
+    color: white;
+  }
+  .btn-dark:hover { background: var(--gray-800); }
+
+  /* ─── HERO ─── */
+  .hero {
+    padding: 150px 2rem 100px;
+    background: var(--gray-50);
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -300px;
+    right: -200px;
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(107,159,60,0.06) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .hero-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--green-glow);
+    border: 1px solid rgba(107,159,60,0.2);
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green-700);
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .hero-badge .dot {
+    width: 6px;
+    height: 6px;
+    background: var(--green-500);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1.12;
+    color: var(--gray-900);
+    letter-spacing: -1.5px;
+    margin-bottom: 1.25rem;
+  }
+  .hero h1 .accent {
+    color: var(--green-600);
+  }
+  .hero-subtitle {
+    font-size: 17px;
+    color: var(--gray-500);
+    line-height: 1.75;
+    margin-bottom: 2rem;
+    max-width: 500px;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 2.5rem;
+  }
+  .hero-trust {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-200);
+  }
+  .hero-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--gray-500);
+  }
+  .hero-trust-item svg {
+    width: 16px;
+    height: 16px;
+    color: var(--green-500);
+  }
+
+  /* Dashboard mock */
+  .hero-visual { position: relative; }
+  .dashboard-mock {
+    background: var(--dark);
+    border-radius: 12px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05);
+    overflow: hidden;
+    transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+    transition: transform 0.5s;
+  }
+  .dashboard-mock:hover {
+    transform: perspective(1200px) rotateY(-1deg) rotateX(1deg);
+  }
+  .dash-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--dark-border);
+  }
+  .dash-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dd-r { background: #ff5f57; }
+  .dd-y { background: #febc2e; }
+  .dd-g { background: #28c840; }
+  .dash-url {
+    margin-left: 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--gray-400);
+    font-family: 'JetBrains Mono', monospace;
+    flex: 1;
+  }
+  .dash-body {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .dash-card {
+    background: var(--dark-surface);
+    border: 1px solid var(--dark-border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .dash-card-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray-400);
+    margin-bottom: 6px;
+  }
+  .dash-card-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: -1px;
+  }
+  .dash-card-value.green { color: var(--green-400); }
+  .dash-card-value.light-green { color: var(--green-300); }
+  .dash-card-value.amber { color: var(--amber); }
+  .dash-card-change {
+    font-size: 11px;
+    color: var(--green-400);
+    margin-top: 4px;
+  }
+  .dash-card-change.neutral { color: var(--gray-400); }
+  .dash-chart {
+    grid-column: 1 / -1;
+    background: var(--dark-surface);
+    border: 1px solid var(--dark-border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 120px;
+    overflow: hidden;
+  }
+  .dash-chart-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray-400);
+    margin-bottom: 10px;
+  }
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    height: 70px;
+  }
+  .chart-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    background: var(--green-700);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .chart-bar:hover { opacity: 1; }
+  .chart-bar.accent { background: var(--green-400); opacity: 0.85; }
+
+  /* ─── LOGOS ─── */
+  .logos-section {
+    padding: 50px 2rem;
+    border-bottom: 1px solid var(--gray-100);
+    background: var(--white);
+  }
+  .logos-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .logos-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--gray-400);
+    margin-bottom: 1.5rem;
+  }
+  .logos-grid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3.5rem;
+    flex-wrap: wrap;
+    opacity: 0.35;
+  }
+  .logos-grid .fake-logo {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-600);
+    letter-spacing: -0.5px;
+  }
+
+  /* ─── SECTION COMMON ─── */
+  section { padding: 100px 2rem; }
+  .section-inner { max-width: 1200px; margin: 0 auto; }
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--green-600);
+    margin-bottom: 1rem;
+  }
+  .section-label::before {
+    content: '';
+    width: 20px;
+    height: 2px;
+    background: var(--green-500);
+    border-radius: 2px;
+  }
+  .section-title {
+    font-size: 38px;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: -1.2px;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+  }
+  .section-subtitle {
+    font-size: 17px;
+    color: var(--gray-500);
+    max-width: 560px;
+    line-height: 1.7;
+  }
+  .section-header { margin-bottom: 3.5rem; }
+  .section-header.center {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ─── FEATURES ─── */
+  .features-section { background: var(--white); }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .feature-card {
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--green-500);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .feature-card:hover {
+    border-color: var(--green-300);
+    box-shadow: 0 12px 32px rgba(107,159,60,0.08);
+    transform: translateY(-3px);
+  }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    background: var(--green-50);
+  }
+  .feature-icon svg {
+    width: 22px;
+    height: 22px;
+    color: var(--green-600);
+    stroke: var(--green-600);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .feature-card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.2px;
+  }
+  .feature-card p {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.65;
+  }
+
+  /* ─── HOW IT WORKS ─── */
+  .how-section { background: var(--gray-50); border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+    position: relative;
+  }
+  .steps::before {
+    content: '';
+    position: absolute;
+    top: 28px;
+    left: 12.5%;
+    right: 12.5%;
+    height: 2px;
+    background: var(--gray-200);
+  }
+  .step { text-align: center; position: relative; }
+  .step-number {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--green-600);
+    margin: 0 auto 1.25rem;
+    position: relative;
+    z-index: 1;
+    transition: all 0.25s;
+  }
+  .step:hover .step-number {
+    background: var(--green-600);
+    color: white;
+    border-color: var(--green-600);
+    box-shadow: 0 6px 20px rgba(90,135,40,0.3);
+  }
+  .step h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 0.5rem;
+  }
+  .step p {
+    font-size: 13px;
+    color: var(--gray-500);
+    line-height: 1.6;
+  }
+
+  /* ─── METRICS ─── */
+  .metrics-section {
+    background: var(--dark);
+    padding: 70px 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .metrics-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(107,159,60,0.1) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .metrics-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+  .metric { text-align: center; }
+  .metric-value {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    margin-bottom: 0.25rem;
+    color: var(--green-400);
+  }
+  .metric-value.v2 { color: var(--green-300); }
+  .metric-value.v3 { color: var(--green-200); }
+  .metric-value.v4 { color: var(--amber-light); }
+  .metric-label {
+    font-size: 14px;
+    color: var(--gray-400);
+    font-weight: 500;
+  }
+
+  /* ─── PRICING ─── */
+  .pricing-section { background: var(--white); }
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .pricing-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 2.5rem;
+    background: var(--white);
+    transition: all 0.25s;
+    position: relative;
+  }
+  .pricing-card.featured {
+    border-color: var(--green-500);
+    box-shadow: 0 16px 48px rgba(107,159,60,0.12);
+    transform: scale(1.03);
+  }
+  .pricing-card.featured .popular-badge {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--green-600);
+    color: white;
+    padding: 5px 20px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .pricing-plan {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--green-600);
+    margin-bottom: 0.75rem;
+  }
+  .pricing-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 0.5rem;
+  }
+  .pricing-price .currency { font-size: 22px; font-weight: 700; color: var(--gray-900); }
+  .pricing-price .amount { font-size: 48px; font-weight: 800; color: var(--gray-900); letter-spacing: -2px; line-height: 1; }
+  .pricing-price .period { font-size: 15px; color: var(--gray-400); font-weight: 500; }
+  .pricing-desc { font-size: 14px; color: var(--gray-500); margin-bottom: 2rem; line-height: 1.6; }
+  .pricing-features { list-style: none; margin-bottom: 2rem; }
+  .pricing-features li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--gray-600);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .pricing-features li:last-child { border-bottom: none; }
+  .pricing-features li .check { color: var(--green-500); font-size: 15px; font-weight: 700; }
+  .pricing-card .btn { width: 100%; }
+
+  /* ─── TESTIMONIALS ─── */
+  .testimonials-section { background: var(--gray-50); border-top: 1px solid var(--gray-200); }
+  .testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+  .testimonial-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 2rem;
+    border: 1px solid var(--gray-200);
+    transition: all 0.25s;
+  }
+  .testimonial-card:hover {
+    box-shadow: 0 12px 32px rgba(0,0,0,0.05);
+    transform: translateY(-3px);
+  }
+  .stars { color: var(--amber); font-size: 14px; margin-bottom: 1rem; letter-spacing: 2px; }
+  .testimonial-text {
+    font-size: 14px;
+    color: var(--gray-600);
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+  }
+  .testimonial-author { display: flex; align-items: center; gap: 12px; }
+  .testimonial-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: white;
+    background: var(--green-600);
+  }
+  .ta-2 { background: var(--green-700); }
+  .ta-3 { background: var(--green-800); }
+  .testimonial-name { font-size: 14px; font-weight: 700; color: var(--gray-900); }
+  .testimonial-role { font-size: 12px; color: var(--gray-400); }
+
+  /* ─── CTA ─── */
+  .cta-section {
+    background: var(--dark);
+    padding: 100px 2rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-section::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(107,159,60,0.08) 0%, transparent 60%);
+    border-radius: 50%;
+  }
+  .cta-inner {
+    max-width: 650px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .cta-section h2 {
+    font-size: 38px;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -1.2px;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+  }
+  .cta-section h2 .accent { color: var(--green-400); }
+  .cta-section p {
+    font-size: 17px;
+    color: var(--gray-400);
+    margin-bottom: 2.5rem;
+    line-height: 1.7;
+  }
+  .cta-actions { display: flex; gap: 1rem; justify-content: center; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    background: var(--dark-deep);
+    padding: 60px 2rem 30px;
+    border-top: 1px solid var(--dark-border);
+  }
+  .footer-inner { max-width: 1200px; margin: 0 auto; }
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 3rem;
+    margin-bottom: 3rem;
+  }
+  .footer-brand p {
+    font-size: 14px;
+    color: var(--gray-500);
+    line-height: 1.7;
+    max-width: 280px;
+    margin-top: 1rem;
+  }
+  .footer-col h4 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--gray-400);
+    margin-bottom: 1.25rem;
+  }
+  .footer-col ul { list-style: none; }
+  .footer-col ul li { margin-bottom: 0.6rem; }
+  .footer-col ul a {
+    font-size: 14px;
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-col ul a:hover { color: var(--green-400); }
+  .footer-bottom {
+    border-top: 1px solid var(--dark-border);
+    padding-top: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-bottom p { font-size: 13px; color: var(--gray-500); }
+  .footer-bottom-links { display: flex; gap: 1.5rem; }
+  .footer-bottom-links a { font-size: 13px; color: var(--gray-500); text-decoration: none; }
+  .footer-bottom-links a:hover { color: var(--gray-300); }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 1024px) {
+    .hero-inner { grid-template-columns: 1fr; }
+    .hero-visual { display: none; }
+    .hero h1 { font-size: 40px; }
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .steps::before { display: none; }
+    .pricing-grid { grid-template-columns: 1fr; max-width: 420px; margin: 0 auto; }
+    .pricing-card.featured { transform: none; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .testimonials-grid { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+    .footer-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 30px; letter-spacing: -1px; }
+    .hero-subtitle { font-size: 15px; }
+    .section-title { font-size: 28px; }
+    .features-grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+    .hero-actions { flex-direction: column; align-items: stretch; }
+    .cta-actions { flex-direction: column; align-items: center; }
+    .cta-section h2 { font-size: 28px; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .metric-value { font-size: 34px; }
+    .footer-grid { grid-template-columns: 1fr; }
+    .hero-trust { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ NAV ═══════ -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <!-- Logo SVG: 4 icons (brain, chat, checklist, worker) -->
+      <svg class="logo-svg" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+        <rect x="24" y="1" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+        <rect x="1" y="24" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+        <rect x="24" y="24" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+        <!-- Brain/Head -->
+        <circle cx="10.5" cy="8" r="4" stroke="#6b9f3c" stroke-width="1.5" fill="none"/>
+        <path d="M8 12 C8 14 10.5 15 10.5 15 C10.5 15 13 14 13 12" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <!-- Chat bubble -->
+        <rect x="28" y="5" width="11" height="8" rx="2" stroke="#6b9f3c" stroke-width="1.5" fill="none"/>
+        <path d="M31 16 L33 13" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <line x1="30" y1="8" x2="37" y2="8" stroke="#6b9f3c" stroke-width="1" opacity="0.6"/>
+        <line x1="30" y1="10.5" x2="35" y2="10.5" stroke="#6b9f3c" stroke-width="1" opacity="0.6"/>
+        <!-- Checklist -->
+        <rect x="5" y="28" width="4" height="4" rx="0.8" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <path d="M6 30.5 L7.5 32 L9.5 28.5" stroke="#6b9f3c" stroke-width="1.2" fill="none"/>
+        <line x1="12" y1="30" x2="17" y2="30" stroke="#6b9f3c" stroke-width="1.3"/>
+        <rect x="5" y="35" width="4" height="4" rx="0.8" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <line x1="12" y1="37" x2="17" y2="37" stroke="#6b9f3c" stroke-width="1.3"/>
+        <!-- Worker -->
+        <circle cx="33.5" cy="30" r="3" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <path d="M30 39 C30 36 33.5 35 33.5 35 C33.5 35 37 36 37 39" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+        <path d="M31 28.5 L33.5 26 L36 28.5" stroke="#6b9f3c" stroke-width="1.2" fill="none"/>
+      </svg>
+      <div class="logo-text">Project <span class="ops">Ops</span> <span class="deg">360°</span></div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how">How It Works</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#" class="btn btn-ghost">Log In</a></li>
+      <li><a href="#" class="btn btn-primary">Request a Demo</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ═══════ HERO ═══════ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <div class="dot"></div>
+        Enterprise-Ready Platform
+      </div>
+      <h1>
+        Operational Intelligence for<br>
+        <span class="accent">Project-Driven Organizations</span>
+      </h1>
+      <p class="hero-subtitle">
+        Unify planning, execution, risk management, and workforce analytics
+        into a single command center. Full visibility. Zero blind spots.
+      </p>
+      <div class="hero-actions">
+        <a href="#" class="btn btn-primary btn-large">Request a Demo</a>
+        <a href="#" class="btn btn-secondary btn-large">View Platform Overview</a>
+      </div>
+      <div class="hero-trust">
+        <div class="hero-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          SOC 2 Compliant
+        </div>
+        <div class="hero-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          99.9% Uptime SLA
+        </div>
+        <div class="hero-trust-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          End-to-End Encryption
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="dashboard-mock">
+        <div class="dash-toolbar">
+          <div class="dash-dot dd-r"></div>
+          <div class="dash-dot dd-y"></div>
+          <div class="dash-dot dd-g"></div>
+          <div class="dash-url">app.projectops360.com/command-center</div>
+        </div>
+        <div class="dash-body">
+          <div class="dash-card">
+            <div class="dash-card-label">Active Programs</div>
+            <div class="dash-card-value light-green">24</div>
+            <div class="dash-card-change">+3 this quarter</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-label">On-Time Delivery</div>
+            <div class="dash-card-value green">94%</div>
+            <div class="dash-card-change">+6pp vs prior quarter</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-label">Budget Utilization</div>
+            <div class="dash-card-value amber">67%</div>
+            <div class="dash-card-change neutral">Within forecast range</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-label">Risk Index</div>
+            <div class="dash-card-value" style="color:var(--green-300)">Low</div>
+            <div class="dash-card-change neutral">2 items under review</div>
+          </div>
+          <div class="dash-chart">
+            <div class="dash-chart-label">Portfolio Velocity — Last 12 Weeks</div>
+            <div class="chart-bars">
+              <div class="chart-bar" style="height:45%"></div>
+              <div class="chart-bar" style="height:60%"></div>
+              <div class="chart-bar" style="height:52%"></div>
+              <div class="chart-bar accent" style="height:75%"></div>
+              <div class="chart-bar" style="height:68%"></div>
+              <div class="chart-bar" style="height:80%"></div>
+              <div class="chart-bar accent" style="height:72%"></div>
+              <div class="chart-bar" style="height:88%"></div>
+              <div class="chart-bar" style="height:65%"></div>
+              <div class="chart-bar accent" style="height:92%"></div>
+              <div class="chart-bar" style="height:85%"></div>
+              <div class="chart-bar accent" style="height:95%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ LOGOS ═══════ -->
+<div class="logos-section">
+  <div class="logos-inner">
+    <div class="logos-label">Trusted by leading organizations worldwide</div>
+    <div class="logos-grid">
+      <div class="fake-logo">Meridian</div>
+      <div class="fake-logo">Arctura</div>
+      <div class="fake-logo">Pulsewave</div>
+      <div class="fake-logo">NorthVane</div>
+      <div class="fake-logo">Stratum</div>
+      <div class="fake-logo">Coreshift</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ FEATURES ═══════ -->
+<section class="features-section" id="features">
+  <div class="section-inner">
+    <div class="section-header center">
+      <div class="section-label">Capabilities</div>
+      <h2 class="section-title">Enterprise-grade project operations.<br>One platform.</h2>
+      <p class="section-subtitle">
+        Six integrated modules that replace fragmented tools with a single
+        operational layer across your entire project portfolio.
+      </p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <h3>Portfolio Planning</h3>
+        <p>Roadmaps, programs, and milestones in a unified timeline. Align strategic objectives with execution across your entire portfolio.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Workflow Automation</h3>
+        <p>Configure conditional pipelines for approvals, handoffs, and escalations. Reduce manual overhead by up to 60%.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3>Risk Intelligence</h3>
+        <p>AI-driven risk scoring identifies blockers before they impact delivery. Quantified risk assessments with mitigation recommendations.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Resource Management</h3>
+        <p>Real-time capacity planning and utilization analytics. Identify bottlenecks and rebalance workloads before they escalate.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+        </div>
+        <h3>Executive Dashboards</h3>
+        <p>Real-time portfolio views with drill-down granularity. From C-level summaries to individual deliverables in two clicks.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <h3>Enterprise Integrations</h3>
+        <p>Bi-directional sync with Jira, Azure DevOps, ServiceNow, SAP, and 60+ enterprise tools. Single source of truth.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ HOW IT WORKS ═══════ -->
+<section class="how-section" id="how">
+  <div class="section-inner">
+    <div class="section-header center">
+      <div class="section-label">Implementation</div>
+      <h2 class="section-title">Operational in weeks, not months</h2>
+      <p class="section-subtitle">
+        A structured onboarding process backed by dedicated implementation specialists.
+        No disruption to current operations.
+      </p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <h3>Discover</h3>
+        <p>We audit your current tools, workflows, and pain points to design a tailored rollout plan.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <h3>Integrate</h3>
+        <p>Connect your existing ecosystem — Jira, Azure DevOps, SAP — with guided bi-directional sync.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <h3>Configure</h3>
+        <p>Define governance rules, approval chains, risk thresholds, and reporting hierarchies.</p>
+      </div>
+      <div class="step">
+        <div class="step-number">4</div>
+        <h3>Operate</h3>
+        <p>Go live with full visibility. Dedicated CSM and ongoing optimization support.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ METRICS ═══════ -->
+<section class="metrics-section">
+  <div class="metrics-grid">
+    <div class="metric">
+      <div class="metric-value">38%</div>
+      <div class="metric-label">Faster delivery cycles</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value v2">4.2x</div>
+      <div class="metric-label">Cross-team visibility</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value v3">91%</div>
+      <div class="metric-label">On-time delivery rate</div>
+    </div>
+    <div class="metric">
+      <div class="metric-value v4">$2.1M</div>
+      <div class="metric-label">Avg. annual cost reduction</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ PRICING ═══════ -->
+<section class="pricing-section" id="pricing">
+  <div class="section-inner">
+    <div class="section-header center">
+      <div class="section-label">Pricing</div>
+      <h2 class="section-title">Transparent pricing. No surprises.</h2>
+      <p class="section-subtitle">
+        Plans designed for teams of every size. Start with what you need, scale when you're ready.
+      </p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <div class="pricing-plan">Team</div>
+        <div class="pricing-price">
+          <span class="currency">$</span>
+          <span class="amount">0</span>
+          <span class="period">/month</span>
+        </div>
+        <p class="pricing-desc">For small teams exploring structured project operations.</p>
+        <ul class="pricing-features">
+          <li><span class="check">&#10003;</span> Up to 5 team members</li>
+          <li><span class="check">&#10003;</span> 3 active projects</li>
+          <li><span class="check">&#10003;</span> Standard dashboards</li>
+          <li><span class="check">&#10003;</span> Slack & GitHub integration</li>
+          <li><span class="check">&#10003;</span> Community support</li>
+        </ul>
+        <a href="#" class="btn btn-outline">Get Started</a>
+      </div>
+      <div class="pricing-card featured">
+        <div class="popular-badge">Recommended</div>
+        <div class="pricing-plan">Business</div>
+        <div class="pricing-price">
+          <span class="currency">$</span>
+          <span class="amount">29</span>
+          <span class="period">/user/month</span>
+        </div>
+        <p class="pricing-desc">For organizations that need automation, analytics, and governance.</p>
+        <ul class="pricing-features">
+          <li><span class="check">&#10003;</span> Unlimited members</li>
+          <li><span class="check">&#10003;</span> Unlimited projects</li>
+          <li><span class="check">&#10003;</span> Workflow automation</li>
+          <li><span class="check">&#10003;</span> AI risk intelligence</li>
+          <li><span class="check">&#10003;</span> 60+ integrations</li>
+          <li><span class="check">&#10003;</span> Priority support</li>
+        </ul>
+        <a href="#" class="btn btn-primary">Start 14-Day Trial</a>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-plan">Enterprise</div>
+        <div class="pricing-price">
+          <span class="amount" style="font-size:34px;">Custom</span>
+        </div>
+        <p class="pricing-desc">For enterprises requiring SSO, compliance, and dedicated infrastructure.</p>
+        <ul class="pricing-features">
+          <li><span class="check">&#10003;</span> Everything in Business</li>
+          <li><span class="check">&#10003;</span> SSO / SAML / SCIM</li>
+          <li><span class="check">&#10003;</span> Advanced audit trails</li>
+          <li><span class="check">&#10003;</span> Custom SLA</li>
+          <li><span class="check">&#10003;</span> Dedicated CSM</li>
+          <li><span class="check">&#10003;</span> On-premise deployment</li>
+        </ul>
+        <a href="#" class="btn btn-dark">Contact Sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ TESTIMONIALS ═══════ -->
+<section class="testimonials-section">
+  <div class="section-inner">
+    <div class="section-header center">
+      <div class="section-label">Client Results</div>
+      <h2 class="section-title">Trusted by project leaders worldwide</h2>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text">"We consolidated Jira, Monday, and three reporting spreadsheets into ProjectOps 360°. Our PMO finally operates from a single source of truth."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">MR</div>
+          <div>
+            <div class="testimonial-name">María Reyes</div>
+            <div class="testimonial-role">VP of Engineering, Arctura</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text">"Risk Intelligence alone prevented two critical deadline misses last quarter. It identified dependency conflicts we had completely overlooked."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar ta-2">DK</div>
+          <div>
+            <div class="testimonial-name">Daniel Kim</div>
+            <div class="testimonial-role">COO, NorthVane</div>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+        <p class="testimonial-text">"Implementation took three weeks, not six months. Our board now receives real-time portfolio views instead of outdated monthly reports."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar ta-3">SC</div>
+          <div>
+            <div class="testimonial-name">Sophie Chen</div>
+            <div class="testimonial-role">Head of PMO, Stratum</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ CTA ═══════ -->
+<section class="cta-section">
+  <div class="cta-inner">
+    <h2>
+      Ready to transform your<br>
+      <span class="accent">project operations?</span>
+    </h2>
+    <p>
+      Join leading organizations that have replaced fragmented tools with a single
+      operational command center. See the platform in action.
+    </p>
+    <div class="cta-actions">
+      <a href="#" class="btn btn-primary btn-large">Request a Demo</a>
+      <a href="#" class="btn btn-white btn-large">Download Whitepaper</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ FOOTER ═══════ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <svg class="logo-svg" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+            <rect x="24" y="1" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+            <rect x="1" y="24" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+            <rect x="24" y="24" width="19" height="19" rx="4" stroke="#6b9f3c" stroke-width="1.8" fill="none"/>
+            <circle cx="10.5" cy="8" r="4" stroke="#6b9f3c" stroke-width="1.5" fill="none"/>
+            <path d="M8 12 C8 14 10.5 15 10.5 15 C10.5 15 13 14 13 12" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <rect x="28" y="5" width="11" height="8" rx="2" stroke="#6b9f3c" stroke-width="1.5" fill="none"/>
+            <path d="M31 16 L33 13" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <line x1="30" y1="8" x2="37" y2="8" stroke="#6b9f3c" stroke-width="1" opacity="0.6"/>
+            <line x1="30" y1="10.5" x2="35" y2="10.5" stroke="#6b9f3c" stroke-width="1" opacity="0.6"/>
+            <rect x="5" y="28" width="4" height="4" rx="0.8" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <path d="M6 30.5 L7.5 32 L9.5 28.5" stroke="#6b9f3c" stroke-width="1.2" fill="none"/>
+            <line x1="12" y1="30" x2="17" y2="30" stroke="#6b9f3c" stroke-width="1.3"/>
+            <rect x="5" y="35" width="4" height="4" rx="0.8" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <line x1="12" y1="37" x2="17" y2="37" stroke="#6b9f3c" stroke-width="1.3"/>
+            <circle cx="33.5" cy="30" r="3" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <path d="M30 39 C30 36 33.5 35 33.5 35 C33.5 35 37 36 37 39" stroke="#6b9f3c" stroke-width="1.3" fill="none"/>
+            <path d="M31 28.5 L33.5 26 L36 28.5" stroke="#6b9f3c" stroke-width="1.2" fill="none"/>
+          </svg>
+          <div class="logo-text" style="color:white;">Project <span class="ops">Ops</span> <span class="deg">360°</span></div>
+        </a>
+        <p>The operational intelligence platform for project-driven organizations. Plan, execute, measure — from one command center.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Platform</h4>
+        <ul>
+          <li><a href="#">Features</a></li>
+          <li><a href="#">Pricing</a></li>
+          <li><a href="#">Integrations</a></li>
+          <li><a href="#">Security</a></li>
+          <li><a href="#">Changelog</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Press</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Documentation</a></li>
+          <li><a href="#">API Reference</a></li>
+          <li><a href="#">Whitepapers</a></li>
+          <li><a href="#">Status</a></li>
+          <li><a href="#">Support</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 ProjectOps 360°. All rights reserved.</p>
+      <div class="footer-bottom-links">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Cookie Preferences</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const nav = document.getElementById('navbar');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 20);
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.feature-card, .step, .pricing-card, .testimonial-card, .metric').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>

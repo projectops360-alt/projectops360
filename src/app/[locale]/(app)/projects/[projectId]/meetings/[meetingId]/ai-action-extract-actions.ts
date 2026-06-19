@@ -98,7 +98,7 @@ export async function extractActionItemsAction(input: {
   try {
     const result = await runAi(org, {
       promptType: "action_extraction",
-      templateVars: { title, content },
+      templateVars: { title, content, language: lang === "es" ? "Spanish" : "English" },
       sourceType: "meeting",
       sourceId: input.meetingId,
     });

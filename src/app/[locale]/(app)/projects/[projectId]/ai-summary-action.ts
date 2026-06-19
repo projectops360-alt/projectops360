@@ -95,7 +95,7 @@ export async function summarizeCommunicationHistoryAction(input: {
   try {
     const result = await runAi(org, {
       promptType: "communication_history_summary",
-      templateVars: { communications: communicationsText, decisions: decisionsText },
+      templateVars: { communications: communicationsText, decisions: decisionsText, language: lang === "es" ? "Spanish" : "English" },
       sourceType: "project",
       sourceId: input.projectId,
     });

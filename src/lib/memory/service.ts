@@ -13,7 +13,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
-import type { MemoryClassification, MemorySentiment, MemoryUrgency } from "@/types/database";
+import type { Locale, MemoryClassification, MemorySentiment, MemoryUrgency } from "@/types/database";
 import { runAi } from "@/lib/ai/service";
 import { generateAndStoreEmbedding } from "@/lib/embeddings/generate";
 
@@ -92,7 +92,7 @@ function parseClassification(raw: Record<string, unknown> | null): {
 export async function processMemoryItem(
   org: OrgContext,
   itemId: string,
-  options: { runClassification?: boolean } = {},
+  options: { runClassification?: boolean; locale?: Locale } = {},
 ): Promise<void> {
   const runClassification = options.runClassification !== false;
   const supabase = createAdminClient();
@@ -126,6 +126,7 @@ export async function processMemoryItem(
           author: item.author_name ?? "",
           participants: Array.isArray(item.participants) ? item.participants.join(", ") : "",
           content: [item.summary, item.content].filter(Boolean).join("\n\n") || item.title || "",
+          language: options.locale === "es" ? "Spanish" : "English",
         },
         sourceType: "memory",
         sourceId: itemId,

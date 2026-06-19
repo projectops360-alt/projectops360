@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
-import type { Locale, MemorySourceType } from "@/types/database";
+import type { MemorySourceType } from "@/types/database";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ export async function createMemoryItemAction(
   // Fire-and-forget: AI classification + vector indexing. The item is already
   // saved; pipeline failures only update ai_status / index_status.
   void import("@/lib/memory/service").then(({ processMemoryItem }) =>
-    processMemoryItem(org, item.id, { runClassification: d.runAi }).catch(() => {}),
+    processMemoryItem(org, item.id, { runClassification: d.runAi, locale: d.locale === "es" ? "es" : "en" }).catch(() => {}),
   );
 
   revalidatePath(`/${d.locale}/projects/${d.projectId}/memory`, "page");
@@ -210,7 +210,7 @@ export async function updateMemoryItemAction(
 
   // Fire-and-forget: re-index (and re-classify if requested).
   void import("@/lib/memory/service").then(({ processMemoryItem }) =>
-    processMemoryItem(org, d.memoryItemId, { runClassification: d.runAi }).catch(() => {}),
+    processMemoryItem(org, d.memoryItemId, { runClassification: d.runAi, locale: d.locale === "es" ? "es" : "en" }).catch(() => {}),
   );
 
   revalidatePath(`/${d.locale}/projects/${d.projectId}/memory`, "page");
@@ -288,7 +288,7 @@ export async function reclassifyMemoryItemAction(input: {
   if (error) return { error: "unexpected" };
 
   void import("@/lib/memory/service").then(({ processMemoryItem }) =>
-    processMemoryItem(org, input.memoryItemId, { runClassification: true }).catch(() => {}),
+    processMemoryItem(org, input.memoryItemId, { runClassification: true, locale: input.locale === "es" ? "es" : "en" }).catch(() => {}),
   );
 
   revalidatePath(`/${input.locale}/projects/${input.projectId}/memory`, "page");

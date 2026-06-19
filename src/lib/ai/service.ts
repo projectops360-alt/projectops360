@@ -88,7 +88,15 @@ export async function runAi(
 
   // ── Step 1: Build prompts ────────────────────────────────────────────────
   const systemPrompt = template.systemPrompt;
-  const userPrompt = renderTemplate(template.userPromptTemplate, input.templateVars);
+  let userPrompt = renderTemplate(template.userPromptTemplate, input.templateVars);
+  // Locale enforcement: when the caller passes a `language` var, force the model
+  // to write ALL output in the UI language regardless of the source content's
+  // language. (Custom prompts embed their own language instruction and don't
+  // pass `language`, so this never double-applies to them.)
+  const language = input.templateVars.language;
+  if (language) {
+    userPrompt += `\n\nIMPORTANT: Regardless of the language of the input content above, write ALL output text fields (summaries, titles, descriptions, recommendations, etc.) in ${language}.`;
+  }
   const model = input.model ?? template.defaultModel;
 
   const inputSnapshot: Record<string, unknown> = {
