@@ -70,6 +70,7 @@ const createTaskSchema = z.object({
   progress: z.coerce.number().int().min(0).max(100).default(0),
   assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
   assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
+  project_team_member_id: z.string().uuid("invalid_team_member").nullable().optional(),
   predecessor_ids: z.array(z.string().uuid()).max(50).optional().default([]),
   material_ids: z.array(z.string().uuid()).max(200).optional().default([]),
   new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional().default([]),
@@ -101,6 +102,7 @@ const updateTaskSchema = z.object({
   progress: z.coerce.number().int().min(0).max(100).default(0),
   assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
   assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
+  project_team_member_id: z.string().uuid("invalid_team_member").nullable().optional(),
   predecessor_ids: z.array(z.string().uuid()).max(50).optional(),
   material_ids: z.array(z.string().uuid()).max(200).optional(),
   new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional(),
@@ -134,6 +136,24 @@ async function resolveAssignmentType(
   }
   if (assignedTo) return "person";
   return null;
+}
+
+/** Resolve the effective owner when a Project Team member is chosen. Keeps the
+ *  legacy assigned_to (a workspace user) in sync so reports/labor still see an
+ *  assignee, while project_team_member_id holds the real Team & Roles link. */
+async function resolveTeamAssignment(
+  supabase: ReturnType<typeof createAdminClient>,
+  projectTeamMemberId: string | null | undefined,
+  fallbackUser: string | null | undefined,
+  fallbackResource: string | null | undefined,
+): Promise<{ teamMemberId: string | null; assignedTo: string | null; assignedResourceId: string | null }> {
+  if (!projectTeamMemberId) {
+    return { teamMemberId: null, assignedTo: fallbackUser ?? null, assignedResourceId: fallbackResource ?? null };
+  }
+  const { data } = await supabase.from("project_team_members").select("user_id").eq("id", projectTeamMemberId).maybeSingle();
+  const userId = (data?.user_id as string | null) ?? null;
+  // Owner = the team member; mirror its user into assigned_to (if internal).
+  return { teamMemberId: projectTeamMemberId, assignedTo: userId, assignedResourceId: null };
 }
 
 // ── Task planning sync (predecessors + required materials) ────────────────────────
@@ -277,6 +297,7 @@ export async function getTaskFormOptionsAction(input: {
   error?: string;
   people?: { id: string; name: string }[];
   resources?: { id: string; name: string; resource_type: string }[];
+  teamMembers?: { id: string; name: string; role: string | null }[];
   tasks?: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials?: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies?: { predecessor_id: string; successor_id: string; dependency_type: string }[];
@@ -292,7 +313,7 @@ export async function getTaskFormOptionsAction(input: {
   }
 
   const supabase = createAdminClient();
-  const [peopleRes, resourcesRes, tasksRes, materialsRes, depsRes] = await Promise.all([
+  const [peopleRes, resourcesRes, teamRes, tasksRes, materialsRes, depsRes] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, display_name")
@@ -305,6 +326,12 @@ export async function getTaskFormOptionsAction(input: {
       .in("resource_type", [...ASSIGNABLE_RESOURCE_TYPES])
       .is("deleted_at", null)
       .order("name", { ascending: true }),
+    supabase
+      .from("project_team_members")
+      .select("id, display_name, project_role, user_id")
+      .eq("project_id", input.projectId)
+      .eq("organization_id", org.organizationId)
+      .neq("status", "removed"),
     supabase
       .from("roadmap_tasks")
       .select("id, title, milestone_id, start_date, end_date, order_index")
@@ -326,12 +353,24 @@ export async function getTaskFormOptionsAction(input: {
       .eq("organization_id", org.organizationId),
   ]);
 
+  const nameByUser = new Map((peopleRes.data ?? []).map((p) => [p.id, p.display_name || ""]));
+  const teamMembers = ((teamRes.data ?? []) as { id: string; display_name: string | null; project_role: string | null; user_id: string | null }[])
+    .map((m) => ({
+      id: m.id,
+      name: m.display_name || (m.user_id ? nameByUser.get(m.user_id) || "" : "") || m.project_role || "",
+      role: m.project_role,
+      assignable: !!(m.display_name || m.user_id), // skip pure unassigned role placeholders
+    }))
+    .filter((m) => m.assignable && m.name)
+    .map(({ id, name, role }) => ({ id, name, role }));
+
   return {
     people: (peopleRes.data ?? []).map((p) => ({
       id: p.id,
       name: p.display_name || "—",
     })),
     resources: resourcesRes.data ?? [],
+    teamMembers,
     tasks: tasksRes.data ?? [],
     materials: materialsRes.data ?? [],
     dependencies: depsRes.data ?? [],
@@ -585,6 +624,7 @@ export async function createTaskAction(input: {
   progress?: number;
   assigned_to?: string | null;
   assigned_resource_id?: string | null;
+  project_team_member_id?: string | null;
   predecessor_ids?: string[];
   material_ids?: string[];
   new_materials?: string[];
@@ -633,6 +673,8 @@ export async function createTaskAction(input: {
     }
   }
 
+  const own = await resolveTeamAssignment(supabase, data.project_team_member_id, data.assigned_to, data.assigned_resource_id);
+
   const { data: task, error: insertError } = await supabase
     .from("roadmap_tasks")
     .insert({
@@ -655,9 +697,10 @@ export async function createTaskAction(input: {
       start_date: data.start_date || null,
       end_date: data.end_date || null,
       progress: data.progress,
-      assigned_to: data.assigned_to ?? null,
-      assigned_resource_id: data.assigned_resource_id ?? null,
-      assignment_type: await resolveAssignmentType(supabase, data.assigned_to, data.assigned_resource_id),
+      assigned_to: own.assignedTo,
+      assigned_resource_id: own.assignedResourceId,
+      project_team_member_id: own.teamMemberId,
+      assignment_type: await resolveAssignmentType(supabase, own.assignedTo, own.assignedResourceId),
       project_id: data.projectId,
       organization_id: org.organizationId,
     })
@@ -734,6 +777,7 @@ export async function updateTaskAction(input: {
   progress?: number;
   assigned_to?: string | null;
   assigned_resource_id?: string | null;
+  project_team_member_id?: string | null;
   predecessor_ids?: string[];
   material_ids?: string[];
   new_materials?: string[];
@@ -778,10 +822,12 @@ export async function updateTaskAction(input: {
     progress: data.progress,
   };
   if (data.order_index !== undefined) updateData.order_index = data.order_index;
-  if (data.assigned_to !== undefined || data.assigned_resource_id !== undefined) {
-    updateData.assigned_to = data.assigned_to ?? null;
-    updateData.assigned_resource_id = data.assigned_resource_id ?? null;
-    updateData.assignment_type = await resolveAssignmentType(supabase, data.assigned_to, data.assigned_resource_id);
+  if (data.assigned_to !== undefined || data.assigned_resource_id !== undefined || data.project_team_member_id !== undefined) {
+    const own = await resolveTeamAssignment(supabase, data.project_team_member_id, data.assigned_to, data.assigned_resource_id);
+    updateData.assigned_to = own.assignedTo;
+    updateData.assigned_resource_id = own.assignedResourceId;
+    updateData.project_team_member_id = own.teamMemberId;
+    updateData.assignment_type = await resolveAssignmentType(supabase, own.assignedTo, own.assignedResourceId);
   }
 
   const { error: updateError } = await supabase

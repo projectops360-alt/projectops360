@@ -94,6 +94,7 @@ const PLANNING_LABELS: Record<Locale, {
   sectionPlanning: string;
   assignee: string;
   assigneeNone: string;
+  assigneeTeam: string;
   assigneeUsers: string;
   assigneeResources: string;
   addPerson: string;
@@ -117,6 +118,7 @@ const PLANNING_LABELS: Record<Locale, {
     sectionPlanning: "Assignment & prerequisites",
     assignee: "Assigned to",
     assigneeNone: "Unassigned",
+    assigneeTeam: "Project team",
     assigneeUsers: "Workspace users",
     assigneeResources: "Project people & crews",
     addPerson: "+ Add new person…",
@@ -140,6 +142,7 @@ const PLANNING_LABELS: Record<Locale, {
     sectionPlanning: "Asignación y prerrequisitos",
     assignee: "Asignado a",
     assigneeNone: "Sin asignar",
+    assigneeTeam: "Equipo del proyecto",
     assigneeUsers: "Usuarios del workspace",
     assigneeResources: "Personas y cuadrillas del proyecto",
     addPerson: "+ Agregar persona…",
@@ -164,6 +167,7 @@ const PLANNING_LABELS: Record<Locale, {
 interface TaskFormOptions {
   people: { id: string; name: string }[];
   resources: { id: string; name: string; resource_type: string }[];
+  teamMembers: { id: string; name: string; role: string | null }[];
   tasks: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies: { predecessor_id: string; successor_id: string; dependency_type: string }[];
@@ -249,6 +253,7 @@ export function TaskFormDialog({
     sectionPlanning: t.fields.sectionPlanning ?? planningLabels.sectionPlanning,
     assignee: t.fields.assignee ?? planningLabels.assignee,
     assigneeNone: t.fields.assigneeNone ?? planningLabels.assigneeNone,
+    assigneeTeam: planningLabels.assigneeTeam,
     assigneeUsers: planningLabels.assigneeUsers,
     assigneeResources: planningLabels.assigneeResources,
     addPerson: planningLabels.addPerson,
@@ -278,14 +283,17 @@ export function TaskFormDialog({
   const [selectedPredecessors, setSelectedPredecessors] = useState<Set<string>>(new Set());
   const [materialDraft, setMaterialDraft] = useState("");
 
-  // Assignee: 'user:<id>' | 'resource:<id>' | '' — controlled so the
-  // quick-add flow can select the freshly created resource.
+  // Assignee: 'team:<id>' | 'user:<id>' | 'resource:<id>' | '' — controlled so
+  // the quick-add flow can select the freshly created resource. Project team
+  // members take precedence (the real Team & Roles link).
   const [assigneeValue, setAssigneeValue] = useState<string>(
-    isEdit && task?.assigned_to
-      ? `user:${task.assigned_to}`
-      : isEdit && task?.assigned_resource_id
-        ? `resource:${task.assigned_resource_id}`
-        : "",
+    isEdit && (task as { project_team_member_id?: string | null })?.project_team_member_id
+      ? `team:${(task as { project_team_member_id?: string | null }).project_team_member_id}`
+      : isEdit && task?.assigned_to
+        ? `user:${task.assigned_to}`
+        : isEdit && task?.assigned_resource_id
+          ? `resource:${task.assigned_resource_id}`
+          : "",
   );
   const [addingPerson, setAddingPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState("");
@@ -299,6 +307,7 @@ export function TaskFormDialog({
       setOptions({
         people: res.people ?? [],
         resources: res.resources ?? [],
+        teamMembers: res.teamMembers ?? [],
         tasks: res.tasks ?? [],
         materials: res.materials ?? [],
         dependencies: res.dependencies ?? [],
@@ -396,6 +405,7 @@ export function TaskFormDialog({
     const endDate = (formData.get("end_date") as string) || "";
     const progress = parseInt(formData.get("progress") as string) || 0;
     const assigneeRaw = (formData.get("assigned_to") as string) || "";
+    const teamMemberId = assigneeRaw.startsWith("team:") ? assigneeRaw.slice(5) : null;
     const assignedTo = assigneeRaw.startsWith("user:") ? assigneeRaw.slice(5) : null;
     const assignedResourceId = assigneeRaw.startsWith("resource:") ? assigneeRaw.slice(9) : null;
     const predecessorIds = [...selectedPredecessors];
@@ -431,6 +441,7 @@ export function TaskFormDialog({
         blocker_reason: blockerReason,
         assigned_to: assignedTo,
         assigned_resource_id: assignedResourceId,
+        project_team_member_id: teamMemberId,
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
@@ -462,6 +473,7 @@ export function TaskFormDialog({
         blocker_reason: blockerReason,
         assigned_to: assignedTo,
         assigned_resource_id: assignedResourceId,
+        project_team_member_id: teamMemberId,
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
@@ -678,6 +690,13 @@ export function TaskFormDialog({
                       disabled={isPending}
                     >
                       <option value="">{tp.assigneeNone}</option>
+                      {options.teamMembers.length > 0 && (
+                        <optgroup label={tp.assigneeTeam}>
+                          {options.teamMembers.map((m) => (
+                            <option key={m.id} value={`team:${m.id}`}>{m.name}{m.role ? ` — ${m.role}` : ""}</option>
+                          ))}
+                        </optgroup>
+                      )}
                       {options.people.length > 0 && (
                         <optgroup label={tp.assigneeUsers}>
                           {options.people.map((p) => (
