@@ -14,10 +14,12 @@ import {
   AlertTriangle, CheckCircle2, XCircle, Trophy, Lightbulb, Wrench, ClipboardList,
   Flag, Archive,
 } from "lucide-react";
+import { printWithFilename, docFilename } from "@/lib/print-document";
 import type { CloseoutMetrics, CloseoutReadiness, CloseoutNarrative, MilestoneDuration, ReadinessCheck } from "@/lib/rhythm/closeout";
 
 interface Props {
   locale: string;
+  projectId: string;
   projectName: string;
   metrics: CloseoutMetrics;
   readiness: CloseoutReadiness;
@@ -29,7 +31,7 @@ interface Props {
 }
 
 export function CloseoutReportClient({
-  locale, projectName, metrics: m, readiness, milestoneDurations, archive, narrative, executiveSummary, generatedAt,
+  locale, projectId, projectName, metrics: m, readiness, milestoneDurations, archive, narrative, executiveSummary, generatedAt,
 }: Props) {
   const isEs = locale === "es";
   const today = new Date().toLocaleDateString(isEs ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -50,7 +52,7 @@ export function CloseoutReportClient({
           <h1 className="text-lg font-bold text-foreground">{isEs ? "Reporte de Cierre" : "Closeout Report"}</h1>
           <p className="text-xs text-muted-foreground">{isEs ? "Métricas en vivo. El resumen y las lecciones se generan al completar la reunión de Cierre." : "Live metrics. Narrative is generated when the Closing meeting is completed."}</p>
         </div>
-        <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+        <button type="button" onClick={() => printWithFilename(docFilename("Closeout", "CLS", projectId))} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
           <Download className="h-4 w-4" />{isEs ? "Descargar PDF" : "Download PDF"}
         </button>
       </div>

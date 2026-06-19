@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Download, AlertTriangle, Check, Loader2 } from "lucide-react";
 import { updateBudgetLineAction } from "./actions";
+import { printWithFilename, docFilename } from "@/lib/print-document";
 
 export interface BudgetLine {
   id: string;
@@ -127,7 +128,7 @@ export function BudgetReportClient({
         </div>
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={() => printWithFilename(docFilename("Budget", "BUD", projectId))}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           <Download className="h-4 w-4" />

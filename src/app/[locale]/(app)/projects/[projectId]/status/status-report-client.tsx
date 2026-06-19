@@ -13,6 +13,7 @@ import Image from "next/image";
 import { Download, CheckCircle2, Loader2, Circle, AlertTriangle, OctagonAlert, Package, CalendarDays, ListChecks, User, Users, UserPlus, Play, ArrowUpRight } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { ProjectStatusReport, PhaseState, PhaseStatus, DailyActionType } from "@/lib/execution/status-report";
+import { printWithFilename, docFilename } from "@/lib/print-document";
 
 const L = {
   en: {
@@ -129,7 +130,8 @@ function PhaseIcon({ phase }: { phase: PhaseStatus }) {
   return <Circle className="h-5 w-5 text-gray-300 dark:text-gray-600" />;
 }
 
-export function StatusReportClient({ report, locale, charterContext }: { report: ProjectStatusReport; locale: Locale; charterContext?: { goal: string | null; status: string | null } }) {
+export function StatusReportClient({ report, projectId, locale, charterContext }: { report: ProjectStatusReport; projectId: string; locale: Locale; charterContext?: { goal: string | null; status: string | null } }) {
+  const pdfName = docFilename("StatusReport", "STA", projectId, (report.generatedAt ?? "").slice(0, 10).replace(/-/g, ""));
   const t = L[locale] ?? L.en;
   const i18n = (f: { en?: string; es?: string }) => f[locale] ?? f.en ?? "";
   const fmtDate = (iso: string | null) =>
@@ -147,7 +149,7 @@ export function StatusReportClient({ report, locale, charterContext }: { report:
       <div className="mb-4 flex items-center justify-end print:hidden">
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={() => printWithFilename(pdfName)}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
         >
           <Download className="h-4 w-4" />

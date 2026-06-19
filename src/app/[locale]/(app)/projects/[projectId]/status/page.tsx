@@ -95,6 +95,7 @@ export default async function ProjectStatusPage({
   return (
     <StatusReportClient
       report={report}
+      projectId={projectId}
       locale={locale as Locale}
       charterContext={charterCtx ? { goal: (charterCtx as { project_goal: string | null }).project_goal, status: (charterCtx as { status: string | null }).status } : undefined}
     />

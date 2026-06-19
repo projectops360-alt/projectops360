@@ -49,6 +49,7 @@ export default async function CloseoutPage({
   return (
     <CloseoutReportClient
       locale={locale}
+      projectId={projectId}
       projectName={projectName}
       metrics={metrics}
       readiness={readiness}

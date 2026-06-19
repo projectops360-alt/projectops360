@@ -9,6 +9,7 @@ import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { Download, ArrowLeft } from "lucide-react";
 import { CHARTER_SECTIONS, CHARTER_STATUS_META, type CharterStatus } from "@/lib/charter/fields";
+import { printWithFilename, shortId } from "@/lib/print-document";
 
 interface Props {
   locale: string;
@@ -28,8 +29,10 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
   const meta = CHARTER_STATUS_META[status];
   const v = (k: string) => { const x = charter[k]; return x && String(x).trim() ? String(x) : null; };
   // Folio / acta number — deterministic from the charter id + version.
-  const shortId = String(charter.id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase();
-  const folio = `${isEs ? "ACTA" : "CHR"}-${shortId}-V${(charter.version as number) ?? 1}`;
+  // Canonical document code (CHR) so the on-page folio matches the PDF filename.
+  const version = (charter.version as number) ?? 1;
+  const folio = `CHR-${shortId(charter.id as string)}-V${version}`;
+  const fileName = `Pops360-Charter-${folio}`;
 
   // Signature blocks: any defined sponsor/PM/steering roles + a client line.
   const sigRoles = [
@@ -49,7 +52,7 @@ export function CharterPrintClient({ locale, projectId, projectName, charter, ro
         <Link href={`/projects/${projectId}/charter`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />{isEs ? "Volver al Charter" : "Back to Charter"}
         </Link>
-        <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+        <button type="button" onClick={() => printWithFilename(fileName)} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
           <Download className="h-4 w-4" />{isEs ? "Descargar PDF" : "Download PDF"}
         </button>
       </div>
