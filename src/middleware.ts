@@ -89,6 +89,20 @@ export async function middleware(request: NextRequest) {
   );
   const locale = localeMatch ? localeMatch[1] : routing.defaultLocale;
 
+  // Anonymous visitors hitting the site root see the marketing landing instead
+  // of being bounced to /login. The root is "/" (default locale) or "/<locale>".
+  const pathWithoutLocale =
+    pathname.replace(new RegExp(`^/(${routing.locales.join("|")})`), "") || "/";
+  if (!user && pathWithoutLocale === "/") {
+    const landingUrl = request.nextUrl.clone();
+    landingUrl.pathname = "/landing";
+    const redirectResponse = NextResponse.redirect(landingUrl);
+    finalResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {});
+    });
+    return redirectResponse;
+  }
+
   if (!user && !pathIsPublic) {
     // Unauthenticated user accessing a protected route → redirect to login
     const loginUrl = request.nextUrl.clone();
