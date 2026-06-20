@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Check } from "lucide-react";
 import { Reveal } from "./reveal";
+import { useAuthPaths } from "./auth-links";
 
 type Plan = { key: string; period: "perMonth" | "perUserMonth" | "none"; featured?: boolean };
 
@@ -15,6 +16,7 @@ const PLANS: Plan[] = [
 
 export function Pricing() {
   const { t } = useTranslation();
+  const auth = useAuthPaths();
   return (
     <section id="pricing" className="relative overflow-hidden bg-[#0A1611] px-6 py-24 md:px-10">
       <div
@@ -68,7 +70,7 @@ export function Pricing() {
                 </ul>
 
                 <a
-                  href="#cta"
+                  href={`${auth.signup}?plan=${plan.key}`}
                   className={`mt-7 inline-flex min-h-[46px] items-center justify-center rounded-full px-5 text-[14px] font-bold transition-colors ${
                     featured
                       ? "bg-[#3CE5A4] text-[#06231a] hover:bg-[#34d99a]"

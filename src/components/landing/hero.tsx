@@ -5,9 +5,11 @@ import { LandingNav } from "./nav";
 import { ExecutionMap } from "./execution-map";
 import { LogosStrip } from "./logos-strip";
 import { Reveal } from "./reveal";
+import { useAuthPaths } from "./auth-links";
 
 export function Hero() {
   const { t } = useTranslation();
+  const auth = useAuthPaths();
   return (
     <section className="relative overflow-hidden bg-[#07120D]">
       {/* decorative layers */}
@@ -53,7 +55,7 @@ export function Hero() {
 
         <Reveal index={3} className="flex flex-wrap justify-center gap-[14px]">
           <a
-            href="#cta"
+            href={auth.signup}
             className="inline-flex items-center gap-2.5 rounded-full bg-[#3CE5A4] px-[30px] py-[17px] text-[16px] font-extrabold text-[#06231a] shadow-[0_18px_38px_-12px_rgba(60,229,164,.65)] transition-transform hover:-translate-y-0.5"
           >
             {t("hero.ctaPrimary")} <span className="text-[18px]">→</span>

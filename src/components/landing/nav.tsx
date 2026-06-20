@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { LogoStage } from "./logo-stage";
 import { LanguageSwitcher } from "./language-switcher";
+import { useAuthPaths } from "./auth-links";
 
 const LINKS = [
   { key: "nav.features", href: "#capabilities" },
@@ -12,6 +13,7 @@ const LINKS = [
 
 export function LandingNav() {
   const { t } = useTranslation();
+  const auth = useAuthPaths();
   return (
     <nav className="relative z-10 mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-6 py-5 md:px-10 md:py-6">
       <a href="#" className="flex items-center" aria-label="ProjectOps 360°">
@@ -28,11 +30,11 @@ export function LandingNav() {
 
       <div className="flex items-center gap-3 md:gap-[18px]">
         <LanguageSwitcher />
-        <a href="#" className="hidden text-[15px] font-semibold text-[#D6E2DA] transition-colors hover:text-white sm:inline">
+        <a href={auth.login} className="hidden text-[15px] font-semibold text-[#D6E2DA] transition-colors hover:text-white sm:inline">
           {t("nav.signIn")}
         </a>
         <a
-          href="#cta"
+          href={auth.signup}
           className="inline-flex items-center rounded-full bg-[#3CE5A4] px-[22px] py-3 text-[15px] font-bold text-[#06231a] shadow-[0_10px_24px_-8px_rgba(60,229,164,.6)] transition-transform hover:-translate-y-px"
         >
           {t("nav.requestAccess")}

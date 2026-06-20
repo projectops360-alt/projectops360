@@ -2,9 +2,11 @@
 
 import { useTranslation } from "react-i18next";
 import { Reveal } from "./reveal";
+import { useAuthPaths } from "./auth-links";
 
 export function FinalCta() {
   const { t } = useTranslation();
+  const auth = useAuthPaths();
   return (
     <section className="bg-[#07120D] px-6 pb-24 md:px-10">
       <Reveal
@@ -30,13 +32,13 @@ export function FinalCta() {
           <p className="mx-auto mb-[38px] max-w-[520px] text-[18px] leading-[1.55] text-[#A9BAB1]">{t("cta.desc")}</p>
           <div className="flex flex-wrap justify-center gap-[14px]">
             <a
-              href="#"
+              href={auth.signup}
               className="inline-flex items-center gap-2.5 rounded-full bg-[#3CE5A4] px-8 py-[17px] text-[16px] font-extrabold text-[#06231a] shadow-[0_18px_38px_-12px_rgba(60,229,164,.6)] transition-transform hover:-translate-y-0.5"
             >
               {t("cta.primary")} <span className="text-[18px]">→</span>
             </a>
             <a
-              href="#"
+              href={auth.login}
               className="inline-flex items-center gap-2.5 rounded-full border-[1.5px] border-white/20 px-7 py-[17px] text-[16px] font-bold text-white transition-colors hover:bg-white/[0.06]"
             >
               {t("cta.secondary")}
