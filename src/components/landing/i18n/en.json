@@ -99,6 +99,21 @@
       "blindspots": "blind spots. Risk, capacity and status in a single command center."
     }
   },
+  "comms": {
+    "eyebrow": "Communication",
+    "title": "Communication control across the ",
+    "titleAccent": "project lifecycle.",
+    "lead": "ProjectOps 360° helps teams manage and preserve project-related communication across email, meetings, Microsoft Teams, Slack, comments, updates, and other channels.",
+    "channelsLabel": "Across your channels",
+    "channels": ["Email", "Meetings", "Microsoft Teams", "Slack", "Comments", "Updates"],
+    "connectedLabel": "Every relevant conversation becomes part of the project record — connected to",
+    "connected": ["Milestones", "Tasks", "Risks", "Issues", "Decisions", "Owners", "Outcomes"],
+    "memoryLabel": "A reliable communication memory that answers",
+    "answers": ["What was discussed", "What was decided", "Who was involved", "What is pending", "What requires action"],
+    "closingPre": "With AI, ProjectOps 360° turns scattered communication into ",
+    "closingAccent": "structured project intelligence",
+    "closingPost": "."
+  },
   "industries": {
     "eyebrow": "For every industry",
     "title": "Built for real-world projects, ",

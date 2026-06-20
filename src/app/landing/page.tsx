@@ -2,6 +2,7 @@ import { Hero } from "@/components/landing/hero";
 import { Capabilities } from "@/components/landing/capabilities";
 import { Methodology } from "@/components/landing/methodology";
 import { Industries } from "@/components/landing/industries";
+import { Comms } from "@/components/landing/comms";
 import { AiSection } from "@/components/landing/ai-section";
 import { Quote } from "@/components/landing/quote";
 import { About } from "@/components/landing/about";
@@ -17,6 +18,7 @@ export default function LandingPage() {
         <Capabilities />
         <Methodology />
         <Industries />
+        <Comms />
         <AiSection />
         <Quote />
         <About />

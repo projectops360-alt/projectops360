@@ -99,6 +99,21 @@
       "blindspots": "puntos ciegos. Riesgo, capacidad y estado en un solo centro de control."
     }
   },
+  "comms": {
+    "eyebrow": "Comunicación",
+    "title": "Control de la comunicación en todo el ",
+    "titleAccent": "ciclo del proyecto.",
+    "lead": "ProjectOps 360° ayuda a los equipos a gestionar y preservar la comunicación del proyecto en correo, reuniones, Microsoft Teams, Slack, comentarios, actualizaciones y otros canales.",
+    "channelsLabel": "En tus canales",
+    "channels": ["Correo", "Reuniones", "Microsoft Teams", "Slack", "Comentarios", "Actualizaciones"],
+    "connectedLabel": "Cada conversación relevante pasa a formar parte del registro del proyecto — conectada a",
+    "connected": ["Hitos", "Tareas", "Riesgos", "Incidencias", "Decisiones", "Responsables", "Resultados"],
+    "memoryLabel": "Una memoria de comunicación confiable que responde",
+    "answers": ["Qué se habló", "Qué se decidió", "Quién participó", "Qué está pendiente", "Qué requiere acción"],
+    "closingPre": "Con IA, ProjectOps 360° convierte la comunicación dispersa en ",
+    "closingAccent": "inteligencia de proyecto estructurada",
+    "closingPost": "."
+  },
   "industries": {
     "eyebrow": "Para cualquier industria",
     "title": "Hecho para proyectos del mundo real, ",
