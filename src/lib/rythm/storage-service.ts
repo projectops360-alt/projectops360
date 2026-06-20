@@ -8,7 +8,7 @@
 // ============================================================================
 
 import { createClient } from "@/lib/supabase/client";
-import { registerRythmAudioAction } from "@/app/[locale]/(app)/projects/[projectId]/rythm/actions";
+import { registerRythmAudioAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/audio-actions";
 import {
   RYTHM_AUDIO_BUCKET,
   RYTHM_MAX_AUDIO_BYTES,

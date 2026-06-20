@@ -5,9 +5,6 @@ import { useTranslations } from "next-intl";
 import { Mic, Pause, Play, Square, Save, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { RythmRecorder as Recorder, isRecordingSupported } from "@/lib/rythm/recording-service";
 import { saveBrowserRecording } from "@/lib/rythm/storage-service";
-import {
-  updateRythmMeetingStatusAction,
-} from "@/app/[locale]/(app)/projects/[projectId]/rythm/actions";
 
 interface RythmRecorderProps {
   projectId: string;
@@ -33,9 +30,13 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
 
   const recorderRef = useRef<Recorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lowTicksRef = useRef(0);
 
   const [uiState, setUiState] = useState<UiState>("idle");
   const [seconds, setSeconds] = useState(0);
+  const [level, setLevel] = useState(0);
+  const [lowSignal, setLowSignal] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedMime, setRecordedMime] = useState<string>("audio/webm");
@@ -52,6 +53,7 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       recorderRef.current?.dispose();
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
@@ -68,6 +70,33 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
     }
   }
 
+  // Live mic-level meter: polls the recorder's RMS level each frame so the user
+  // can SEE whether sound is reaching the microphone (catches a muted/wrong device).
+  function startMeter() {
+    lowTicksRef.current = 0;
+    setLowSignal(false);
+    const tick = () => {
+      const lvl = recorderRef.current?.getLevel() ?? 0;
+      setLevel(lvl);
+      if (lvl < 0.02) {
+        lowTicksRef.current += 1;
+        if (lowTicksRef.current > 180) setLowSignal(true); // ~3s of silence
+      } else {
+        lowTicksRef.current = 0;
+        setLowSignal(false);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+  function stopMeter() {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setLevel(0);
+  }
+
   async function handleStart() {
     setError(null);
     try {
@@ -77,8 +106,7 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
       setSeconds(0);
       setUiState("recording");
       startTimer();
-      // Status logic: recording starts → meeting status = recording.
-      void updateRythmMeetingStatusAction({ projectId, meetingId, status: "recording" });
+      startMeter();
     } catch (err) {
       console.error(err);
       setError(tErr("micPermission"));
@@ -89,17 +117,20 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
   function handlePause() {
     recorderRef.current?.pause();
     stopTimer();
+    stopMeter();
     setUiState("paused");
   }
 
   function handleResume() {
     recorderRef.current?.resume();
     startTimer();
+    startMeter();
     setUiState("recording");
   }
 
   async function handleStop() {
     stopTimer();
+    stopMeter();
     const recorder = recorderRef.current;
     if (!recorder) return;
     try {
@@ -180,6 +211,29 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
       )}
       {uiState === "paused" && (
         <div className="mt-3 text-sm text-amber-600">{t("paused")}</div>
+      )}
+
+      {/* Live mic-level meter */}
+      {isActive && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            <Mic className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-[width] duration-75 ${
+                  lowSignal ? "bg-amber-400" : "bg-brand-500"
+                }`}
+                style={{ width: `${Math.round(level * 100)}%` }}
+              />
+            </div>
+          </div>
+          {lowSignal && uiState === "recording" && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-600">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t("noSignal")}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Preview */}

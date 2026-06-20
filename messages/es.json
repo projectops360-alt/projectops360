@@ -31,7 +31,6 @@
     "laborCapacity": "Capacidad Laboral",
     "drawingIntelligence": "BIM",
     "rhythm": "Ritmo",
-    "rythm": "Rythm",
     "statusReport": "Estado"
   },
   "drawingIntelligence": {
@@ -2073,6 +2072,7 @@
       "stop": "Detener",
       "save": "Guardar grabación",
       "discard": "Descartar",
+      "noSignal": "No está llegando sonido al micrófono. Verifica que el micro correcto esté seleccionado y sin silenciar.",
       "unsupported": "Este navegador no admite la grabación de audio. Carga un archivo de audio en su lugar."
     },
     "uploader": {

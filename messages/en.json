@@ -31,7 +31,6 @@
     "laborCapacity": "Labor Capacity",
     "drawingIntelligence": "BIM",
     "rhythm": "Rhythm",
-    "rythm": "Rythm",
     "statusReport": "Status"
   },
   "drawingIntelligence": {
@@ -2073,6 +2072,7 @@
       "stop": "Stop",
       "save": "Save Recording",
       "discard": "Discard",
+      "noSignal": "No sound is reaching the microphone. Check that the right mic is selected and not muted.",
       "unsupported": "Audio recording is not supported in this browser. Please upload an audio file instead."
     },
     "uploader": {

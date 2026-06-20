@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   Layers,
   Users,
-  Mic,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -106,12 +105,6 @@ const TAB_ITEMS: TabItem[] = [
     href: "/projects/[projectId]/rhythm",
     icon: CalendarClock,
     matchPattern: "/projects/[projectId]/rhythm",
-  },
-  {
-    titleKey: "rythm",
-    href: "/projects/[projectId]/rythm",
-    icon: Mic,
-    matchPattern: "/projects/[projectId]/rythm",
   },
   {
     titleKey: "statusReport",

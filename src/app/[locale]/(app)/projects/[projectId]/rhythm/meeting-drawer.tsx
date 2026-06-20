@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   X, Save, Sparkles, CheckCircle2, Loader2, Plus, Trash2, Scale, ListChecks,
-  Users, BrainCircuit, Calendar, Target, Flag, Video, FileBarChart,
+  Users, BrainCircuit, Calendar, Target, Flag, Video, FileBarChart, AudioLines,
 } from "lucide-react";
 import {
   updateMeetingAction, addMeetingDecisionAction, addMeetingActionItemAction,
@@ -12,6 +12,7 @@ import {
   generateSummaryAction, completeMeetingAction,
 } from "./actions";
 import { TypeBadge, StatusBadge } from "./rhythm-badges";
+import { RythmAudioPanel } from "@/components/rythm";
 import type { EventView, StakeholderOption } from "./types";
 import type { AgendaSection } from "@/types/database";
 
@@ -131,6 +132,12 @@ export function MeetingDrawer({
               <p className="text-sm text-foreground">{m.summary}</p>
             </section>
           )}
+
+          {/* Audio & recording (Rythm) */}
+          <section>
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><AudioLines className="h-3.5 w-3.5" />{isEs ? "Audio y grabación" : "Audio & recording"}</h3>
+            <RythmAudioPanel projectId={projectId} meetingId={m.id} locale={locale} />
+          </section>
 
           {/* Agenda builder */}
           <section>

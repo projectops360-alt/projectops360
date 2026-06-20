@@ -49,6 +49,10 @@ export class RythmRecorder {
   private stream: MediaStream | null = null;
   private chunks: Blob[] = [];
   private mimeType = "";
+  // Web Audio nodes used only to expose a live input level (mic meter).
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private levelBuffer: Uint8Array<ArrayBuffer> | null = null;
   state: RecorderState = "idle";
 
   getMimeType(): string {
@@ -59,13 +63,16 @@ export class RythmRecorder {
     if (!isRecordingSupported()) {
       throw new Error("recording_unsupported");
     }
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Disable processing that can zero-out a weak signal; keeps real audio.
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
     this.mimeType = pickSupportedMimeType();
     this.chunks = [];
 
-    this.mediaRecorder = this.mimeType
-      ? new MediaRecorder(this.stream, { mimeType: this.mimeType })
-      : new MediaRecorder(this.stream);
+    const options: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
+    if (this.mimeType) options.mimeType = this.mimeType;
+    this.mediaRecorder = new MediaRecorder(this.stream, options);
 
     // Capture the actual negotiated type (browser may override our preference).
     this.mimeType = this.mediaRecorder.mimeType || this.mimeType || "audio/webm";
@@ -74,8 +81,39 @@ export class RythmRecorder {
       if (event.data && event.data.size > 0) this.chunks.push(event.data);
     };
 
+    this.setupLevelMeter(this.stream);
+
     this.mediaRecorder.start(1000); // gather data every second
     this.state = "recording";
+  }
+
+  /** 0..1 instantaneous input level (RMS). 0 ⇒ no signal reaching the mic. */
+  getLevel(): number {
+    if (!this.analyser || !this.levelBuffer) return 0;
+    this.analyser.getByteTimeDomainData(this.levelBuffer);
+    let sumSquares = 0;
+    for (let i = 0; i < this.levelBuffer.length; i++) {
+      const deviation = (this.levelBuffer[i] - 128) / 128; // -1..1
+      sumSquares += deviation * deviation;
+    }
+    const rms = Math.sqrt(sumSquares / this.levelBuffer.length);
+    return Math.min(1, rms * 3); // scale up so normal speech fills the bar
+  }
+
+  private setupLevelMeter(stream: MediaStream): void {
+    try {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.audioContext = new Ctx();
+      const source = this.audioContext.createMediaStreamSource(stream);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 512;
+      this.levelBuffer = new Uint8Array(new ArrayBuffer(this.analyser.fftSize));
+      source.connect(this.analyser); // analyser NOT connected to destination (no echo)
+    } catch {
+      this.analyser = null; // metering is best-effort; never block recording
+    }
   }
 
   pause(): void {
@@ -129,5 +167,11 @@ export class RythmRecorder {
       this.stream.getTracks().forEach((track) => track.stop());
       this.stream = null;
     }
+    if (this.audioContext) {
+      void this.audioContext.close().catch(() => {});
+      this.audioContext = null;
+    }
+    this.analyser = null;
+    this.levelBuffer = null;
   }
 }
