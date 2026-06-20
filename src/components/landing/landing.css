@@ -106,6 +106,16 @@
   background-size: 42px 42px;
 }
 
+/* Stage-lit logo: the app wordmark filled with a top-down gradient (bright at
+   top → dark/black at bottom) via CSS mask, so it reads as dark letters hit by
+   a spotlight from above. Pair with a soft glow element above it. */
+.lp-logo-stage {
+  background: linear-gradient(180deg, #ffffff 0%, #8ff0c8 22%, #1d4a39 62%, #0a2018 100%);
+  -webkit-mask: url("/logo-full.png") center / contain no-repeat;
+  mask: url("/logo-full.png") center / contain no-repeat;
+  filter: drop-shadow(0 1px 10px rgba(60, 229, 164, 0.22));
+}
+
 /* clipped gradient text (hero accent lines) */
 .lp-grad-text {
   background: linear-gradient(100deg, #3ce5a4, #1fb587 72%);
