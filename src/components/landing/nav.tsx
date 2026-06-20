@@ -7,7 +7,6 @@ import { LanguageSwitcher } from "./language-switcher";
 const LINKS = [
   { key: "nav.features", href: "#capabilities" },
   { key: "nav.methodology", href: "#methodology" },
-  { key: "nav.teams", href: "#capabilities" },
   { key: "nav.pricing", href: "#pricing" },
 ] as const;
 

@@ -3,7 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { LogoStage } from "./logo-stage";
 
-const LINKS = ["nav.features", "nav.methodology", "nav.teams", "nav.pricing", "footer.privacy"] as const;
+const LINKS = ["nav.features", "nav.methodology", "nav.pricing", "footer.privacy"] as const;
 
 export function Footer() {
   const { t } = useTranslation();
