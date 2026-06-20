@@ -99,6 +99,45 @@
       "blindspots": "puntos ciegos. Riesgo, capacidad y estado en un solo centro de control."
     }
   },
+  "pricing": {
+    "eyebrow": "Precios",
+    "title": "Precios simples que ",
+    "titleAccent": "escalan contigo.",
+    "subtitle": "Paga por usuario interno. Los stakeholders externos participan siempre gratis.",
+    "mostPopular": "★ Más popular",
+    "perMonth": "/mes",
+    "perUserMonth": "/usuario/mes",
+    "plans": {
+      "personal": {
+        "name": "Personal",
+        "price": "$0",
+        "desc": "Para validar proyectos, estudiantes o fundadores.",
+        "features": ["Workspace personal", "Proyectos limitados", "Charter básico", "Créditos IA limitados"],
+        "cta": "Comenzar gratis"
+      },
+      "team": {
+        "name": "Team",
+        "price": "$29",
+        "desc": "Para startups y equipos pequeños con visibilidad compartida.",
+        "features": ["Workspace de empresa", "Equipos reusables", "Roles y permisos", "Acceso básico stakeholders"],
+        "cta": "Probar 14 días"
+      },
+      "business": {
+        "name": "Business / PMO",
+        "price": "$99",
+        "desc": "Para equipos serios que necesitan gobernanza e inteligencia.",
+        "features": ["Gobernanza avanzada", "Detección de desvíos", "Reportes ejecutivos", "Memoria de proyecto ilimitada"],
+        "cta": "Contratar ahora"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Custom",
+        "desc": "Para empresas reguladas y grandes implementaciones.",
+        "features": ["Límites personalizados", "SSO y auditoría", "Integraciones avanzadas", "Soporte dedicado"],
+        "cta": "Hablar con ventas"
+      }
+    }
+  },
   "ai": {
     "eyebrow": "Inteligencia de decisión",
     "title": "Tu criterio de proyecto. ",
