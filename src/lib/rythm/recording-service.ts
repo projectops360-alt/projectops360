@@ -137,6 +137,11 @@ export class RythmRecorder {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioContext = new Ctx();
+      // A context created off a user gesture can still start suspended; resume so
+      // the analyser actually receives samples (otherwise the meter reads 0).
+      if (this.audioContext.state === "suspended") {
+        void this.audioContext.resume().catch(() => {});
+      }
       const source = this.audioContext.createMediaStreamSource(stream);
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 512;
