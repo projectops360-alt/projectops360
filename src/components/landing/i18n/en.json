@@ -163,6 +163,19 @@
     "sharper": "It gives you better visibility, faster analysis, and stronger decision support — so your judgment becomes sharper, not less important.",
     "closing": "ProjectOps 360° helps you lead projects with intelligence, control, and confidence."
   },
+  "about": {
+    "eyebrow": "Who we are",
+    "title": "Project managers deserve ",
+    "titleAccent": "better.",
+    "statNumber": "50+",
+    "statLabel": "years of combined project management experience",
+    "belief": "ProjectOps 360° was born from a simple belief: project managers deserve better than disconnected tools, scattered communication, and dashboards that only show problems after they happen.",
+    "team": "Our team brings together technology, software development, construction knowledge, and more than 50 years of combined project management experience.",
+    "seen": "We have seen how difficult it is to manage uncertainty, people, changes, risks, pressure, and decisions across complex projects. We also know that successful project execution depends on human judgment — not automation alone.",
+    "building": "That is why we are building ProjectOps 360° as an AI-powered project operating system that supports project leaders without replacing them.",
+    "aiHelps": "AI helps surface what changed, what is blocked, what needs attention, and what decisions may be required.",
+    "control": "The project manager remains in control."
+  },
   "quote": {
     "pre": "“We replaced four tools with one. For the first time, leadership and delivery are looking at the ",
     "accent": "same source of truth",

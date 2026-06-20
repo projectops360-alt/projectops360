@@ -4,6 +4,7 @@ import { Methodology } from "@/components/landing/methodology";
 import { Industries } from "@/components/landing/industries";
 import { AiSection } from "@/components/landing/ai-section";
 import { Quote } from "@/components/landing/quote";
+import { About } from "@/components/landing/about";
 import { Pricing } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
@@ -18,6 +19,7 @@ export default function LandingPage() {
         <Industries />
         <AiSection />
         <Quote />
+        <About />
         <Pricing />
         <FinalCta />
       </main>

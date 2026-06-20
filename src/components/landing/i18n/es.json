@@ -163,6 +163,19 @@
     "sharper": "Te da mejor visibilidad, análisis más rápido y mayor soporte a la decisión — para que tu criterio sea más agudo, no menos importante.",
     "closing": "ProjectOps 360° te ayuda a liderar proyectos con inteligencia, control y confianza."
   },
+  "about": {
+    "eyebrow": "Quiénes somos",
+    "title": "Los project managers merecen algo ",
+    "titleAccent": "mejor.",
+    "statNumber": "50+",
+    "statLabel": "años combinados de experiencia en gestión de proyectos",
+    "belief": "ProjectOps 360° nació de una creencia simple: los project managers merecen algo mejor que herramientas desconectadas, comunicación dispersa y dashboards que solo muestran los problemas después de que ocurren.",
+    "team": "Nuestro equipo reúne tecnología, desarrollo de software, conocimiento de construcción y más de 50 años combinados de experiencia en gestión de proyectos.",
+    "seen": "Hemos visto lo difícil que es gestionar la incertidumbre, las personas, los cambios, los riesgos, la presión y las decisiones en proyectos complejos. También sabemos que la ejecución exitosa depende del criterio humano — no solo de la automatización.",
+    "building": "Por eso estamos construyendo ProjectOps 360° como un sistema operativo de proyectos potenciado por IA que apoya a los líderes de proyecto sin reemplazarlos.",
+    "aiHelps": "La IA ayuda a revelar qué cambió, qué está bloqueado, qué necesita atención y qué decisiones podrían requerirse.",
+    "control": "El project manager mantiene el control."
+  },
   "quote": {
     "pre": "“Reemplazamos cuatro herramientas por una. Por primera vez, dirección y ejecución miran la ",
     "accent": "misma fuente de verdad",
