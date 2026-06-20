@@ -1,12 +1,12 @@
 "use client";
 
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
 // Decorative product preview with SAMPLE data. Card labels/titles are i18n;
 // the numbers (%, tasks, footer stats) are illustrative, per the handoff.
 
 type Variant = "current" | "normal" | "amber";
-
 type Card = { key: string; pct: number; tasks: string; variant: Variant };
 
 const CARDS: Card[] = [
@@ -18,11 +18,37 @@ const CARDS: Card[] = [
   { key: "reporting", pct: 88, tasks: "7/8", variant: "normal" },
 ];
 
-function ring(pct: number, accent: string, inner: string) {
-  return {
-    outer: { background: `conic-gradient(${accent} ${pct}%, rgba(255,255,255,.07) 0)` },
-    inner: { background: inner },
-  };
+function MapCard({ c, className = "" }: { c: Card; className?: string }) {
+  const { t } = useTranslation();
+  const accent = c.variant === "amber" ? "#E2A33C" : "#3CE5A4";
+  const innerBg = c.variant === "amber" ? "#15110B" : "#101A15";
+  const labelColor = c.variant === "current" ? "#3CE5A4" : c.variant === "amber" ? "#E2A33C" : "#6F8278";
+  const titleColor = c.variant === "amber" ? "#F5E9D4" : c.variant === "current" ? "#fff" : "#E7EFEA";
+  const tasksColor = c.variant === "amber" ? "#E2A33C" : c.variant === "current" ? "#3CE5A4" : "#E7EFEA";
+  const cardStyle =
+    c.variant === "current"
+      ? { background: "linear-gradient(160deg, #15241D, #0E1512)", border: "1px solid rgba(60,229,164,.4)", boxShadow: "0 10px 30px -16px rgba(60,229,164,.5)" }
+      : c.variant === "amber"
+        ? { background: "linear-gradient(160deg, #1E1A12, #13110C)", border: "1px solid rgba(226,163,60,.35)" }
+        : { background: "linear-gradient(160deg, #13201A, #0E1512)", border: "1px solid rgba(60,229,164,.12)" };
+  return (
+    <div className={`rounded-[14px] p-[14px] ${className}`} style={cardStyle}>
+      <div className="mb-[9px] text-[8px] font-extrabold tracking-[.08em]" style={{ color: labelColor }}>
+        {t(`executionMap.cards.${c.key}.label`)}
+      </div>
+      <div className="mb-[11px] text-[12px] font-bold leading-[1.2]" style={{ color: titleColor }}>
+        {t(`executionMap.cards.${c.key}.title`)}
+      </div>
+      <div className="mb-[9px] flex h-[42px] w-[42px] items-center justify-center rounded-full" style={{ background: `conic-gradient(${accent} ${c.pct}%, rgba(255,255,255,.07) 0)` }}>
+        <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full text-[8.5px] font-extrabold text-white" style={{ background: innerBg }}>
+          {c.pct}%
+        </div>
+      </div>
+      <div className="text-[12.5px] font-extrabold" style={{ color: tasksColor }}>
+        {c.tasks}
+      </div>
+    </div>
+  );
 }
 
 export function ExecutionMap() {
@@ -49,39 +75,21 @@ export function ExecutionMap() {
         </span>
       </div>
 
-      {/* 6-card grid */}
-      <div className="grid grid-cols-2 gap-[11px] sm:grid-cols-3 lg:grid-cols-6">
-        {CARDS.map((c) => {
-          const accent = c.variant === "amber" ? "#E2A33C" : "#3CE5A4";
-          const innerBg = c.variant === "amber" ? "#15110B" : "#101A15";
-          const labelColor = c.variant === "current" ? "#3CE5A4" : c.variant === "amber" ? "#E2A33C" : "#6F8278";
-          const titleColor = c.variant === "amber" ? "#F5E9D4" : c.variant === "current" ? "#fff" : "#E7EFEA";
-          const r = ring(c.pct, accent, innerBg);
-          const cardStyle =
-            c.variant === "current"
-              ? { background: "linear-gradient(160deg, #15241D, #0E1512)", border: "1px solid rgba(60,229,164,.4)", boxShadow: "0 10px 30px -16px rgba(60,229,164,.5)" }
-              : c.variant === "amber"
-                ? { background: "linear-gradient(160deg, #1E1A12, #13110C)", border: "1px solid rgba(226,163,60,.35)" }
-                : { background: "linear-gradient(160deg, #13201A, #0E1512)", border: "1px solid rgba(60,229,164,.12)" };
-          return (
-            <div key={c.key} className="rounded-[14px] p-[14px]" style={cardStyle}>
-              <div className="mb-[9px] text-[8px] font-extrabold tracking-[.08em]" style={{ color: labelColor }}>
-                {t(`executionMap.cards.${c.key}.label`)}
-              </div>
-              <div className="mb-[11px] text-[12px] font-bold leading-[1.2]" style={{ color: titleColor }}>
-                {t(`executionMap.cards.${c.key}.title`)}
-              </div>
-              <div className="mb-[9px] flex h-[42px] w-[42px] items-center justify-center rounded-full" style={r.outer}>
-                <div className="flex h-[31px] w-[31px] items-center justify-center rounded-full text-[8.5px] font-extrabold text-white" style={r.inner}>
-                  {c.pct}%
-                </div>
-              </div>
-              <div className="text-[12.5px] font-extrabold" style={{ color: c.variant === "amber" ? "#E2A33C" : c.variant === "current" ? "#3CE5A4" : "#E7EFEA" }}>
-                {c.tasks}
-              </div>
-            </div>
-          );
-        })}
+      {/* connected flow row (Celonis-style) — large screens */}
+      <div className="hidden items-stretch lg:flex">
+        {CARDS.map((c, i) => (
+          <Fragment key={c.key}>
+            <MapCard c={c} className="flex-1" />
+            {i < CARDS.length - 1 && <div className="lp-connector" aria-hidden />}
+          </Fragment>
+        ))}
+      </div>
+
+      {/* stacked grid — small / medium screens */}
+      <div className="grid grid-cols-2 gap-[11px] sm:grid-cols-3 lg:hidden">
+        {CARDS.map((c) => (
+          <MapCard key={c.key} c={c} />
+        ))}
       </div>
 
       {/* footer */}

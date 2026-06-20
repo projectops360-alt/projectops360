@@ -55,6 +55,30 @@
 @keyframes lp-gridDrift { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
 @keyframes lp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 @keyframes lp-dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.9); } }
+@keyframes lp-flow { to { background-position: 16px 0; } }
+
+/* Celonis-style flow connector between Execution Map nodes */
+.lp-connector {
+  position: relative;
+  align-self: center;
+  flex: 0 0 30px;
+  height: 2px;
+  background-image: linear-gradient(90deg, rgba(60, 229, 164, 0.9) 0 7px, transparent 7px 16px);
+  background-size: 16px 2px;
+  background-repeat: repeat-x;
+  animation: lp-flow 0.7s linear infinite;
+  box-shadow: 0 0 8px rgba(60, 229, 164, 0.45);
+}
+.lp-connector::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left: 7px solid rgba(60, 229, 164, 0.95);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
 
 .lp-anim-float { animation: lp-floatY 8s ease-in-out infinite; }
 .lp-anim-glow { animation: lp-glowPulse 7s infinite; }
@@ -96,7 +120,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot { animation: none !important; }
+  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot, .lp-connector { animation: none !important; }
   .lp-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .lp-root { scroll-behavior: auto; }
 }
