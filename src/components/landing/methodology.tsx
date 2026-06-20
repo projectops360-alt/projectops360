@@ -37,11 +37,8 @@ export function Methodology() {
 
         {/* pipeline */}
         <Reveal className="relative mb-[14px] grid grid-cols-2 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
-          {/* dashed connector (desktop only) */}
-          <div
-            className="absolute left-[8%] right-[8%] top-[13px] hidden h-0.5 lg:block"
-            style={{ background: "repeating-linear-gradient(90deg, rgba(60,229,164,.5) 0 8px, transparent 8px 16px)" }}
-          />
+          {/* flowing dashed connector (desktop only) — movement from phase to phase */}
+          <div className="lp-flowline absolute left-[8%] right-[8%] top-[13px] hidden h-0.5 lg:block" aria-hidden />
           {NODES.map((n) => {
             const border = n.variant === "green" ? "#3CE5A4" : n.variant === "amber" ? "#E2A33C" : "rgba(60,229,164,.4)";
             const halo = n.variant === "green" ? "0 0 0 5px rgba(60,229,164,.12)" : n.variant === "amber" ? "0 0 0 5px rgba(226,163,60,.12)" : "none";

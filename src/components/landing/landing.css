@@ -57,6 +57,12 @@
 @keyframes lp-dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.9); } }
 @keyframes lp-flow { to { background-position: 16px 0; } }
 
+/* flowing dashed line (methodology pipeline connector) */
+.lp-flowline {
+  background-image: repeating-linear-gradient(90deg, rgba(60, 229, 164, 0.55) 0 8px, transparent 8px 16px);
+  animation: lp-flow 0.7s linear infinite;
+}
+
 /* Celonis-style flow connector between Execution Map nodes */
 .lp-connector {
   position: relative;
@@ -120,7 +126,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot, .lp-connector { animation: none !important; }
+  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot, .lp-connector, .lp-flowline { animation: none !important; }
   .lp-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .lp-root { scroll-behavior: auto; }
 }
