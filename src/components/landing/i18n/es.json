@@ -1,0 +1,215 @@
+{
+  "nav": {
+    "features": "Funciones",
+    "methodology": "Metodología",
+    "teams": "Equipos",
+    "pricing": "Precios",
+    "signIn": "Iniciar sesión",
+    "requestAccess": "Solicitar acceso"
+  },
+  "hero": {
+    "badge": "Beta privada · Plataforma de ejecución",
+    "title": "Inteligencia operativa para ",
+    "titleAccent": "organizaciones orientadas a proyectos",
+    "lede": "Unifica la planificación, la ejecución, la gestión de riesgos y la analítica de equipos en un solo centro de control. ",
+    "ledeStrong": "Visibilidad total. Cero puntos ciegos.",
+    "ctaPrimary": "Solicitar acceso anticipado",
+    "ctaSecondary": "Ver cómo funciona",
+    "trust": {
+      "charterTitle": "Charter y gobernanza",
+      "charterDesc": "Objetivos y aprobaciones claras",
+      "frameworkTitle": "Framework híbrido",
+      "frameworkDesc": "Ágil, Waterfall o a medida",
+      "memoryTitle": "Memoria viva",
+      "memoryDesc": "Decisiones siempre buscables"
+    }
+  },
+  "executionMap": {
+    "title": "Mapa de ejecución",
+    "live": "En vivo",
+    "currentPhase": "FASE ACTUAL",
+    "tasks": "TAREAS",
+    "activeMemory": "Memoria activa",
+    "nodes": {
+      "charter": "Charter y Gobernanza",
+      "framework": "Marco Adaptativo",
+      "plan": "Plan y Equipo",
+      "execution": "Ejecución",
+      "memory": "Memoria Viva",
+      "reporting": "Reporting"
+    },
+    "stats": {
+      "decisions": "Decisiones",
+      "risks": "Riesgos",
+      "traceability": "Trazabilidad"
+    }
+  },
+  "socialProof": {
+    "title": "Equipos en nuestra beta privada"
+  },
+  "features": {
+    "kicker": "Capacidades",
+    "title": "Contexto, ejecución y ",
+    "titleAccent": "memoria",
+    "titleEnd": " en un solo lugar",
+    "subtitle": "Project Ops 360° no olvida nada. Cada reunión, cambio y decisión queda registrado como inteligencia de proyecto.",
+    "items": {
+      "memory": {
+        "title": "Memoria de proyecto",
+        "desc": "Decisiones, actas y lecciones aprendidas se vuelven conocimiento buscable. Tu proyecto nunca olvida el \"por qué\"."
+      },
+      "governance": {
+        "title": "Gobernanza y charter",
+        "desc": "Define alcance, aprobaciones, matriz RACI y criterios de éxito antes de empezar. Todo alineado desde el día uno."
+      },
+      "framework": {
+        "title": "Framework adaptativo",
+        "desc": "La IA recomienda el mejor enfoque (Ágil, Waterfall o Híbrido) según la incertidumbre y los stakeholders."
+      },
+      "teams": {
+        "title": "Equipos y roles",
+        "desc": "Arma equipos con miembros internos, proveedores y externos. Permisos específicos y un RACI visible para todos."
+      },
+      "command": {
+        "title": "Centro de mando",
+        "desc": "Vista unificada de salud, bloqueos, riesgos, aprobaciones y alertas de desvío de alcance en tiempo real."
+      },
+      "reporting": {
+        "title": "Reporting inteligente",
+        "desc": "Genera reportes en lenguaje de negocio que conectan el progreso con la estrategia original. Sin tecnicismos."
+      }
+    }
+  },
+  "workflow": {
+    "kicker": "Flujo de trabajo",
+    "title": "De la idea a la entrega con ",
+    "titleAccent": "auditoría total",
+    "subtitle": "Diseñado para PMOs, consultoras y equipos de datos que necesitan claridad, rendición de cuentas y adaptabilidad.",
+    "steps": {
+      "create": {
+        "title": "Crea el proyecto",
+        "desc": "Inicia en tu espacio personal o de empresa. La facturación y miembros se gestionan a nivel de workspace."
+      },
+      "charter": {
+        "title": "Define el charter",
+        "desc": "Captura objetivos, alcance, entregables, restricciones y el flujo de aprobaciones."
+      },
+      "framework": {
+        "title": "Elige el framework",
+        "desc": "La IA recomienda el mejor enfoque (Ágil, Waterfall o Híbrido) según tu proyecto."
+      },
+      "team": {
+        "title": "Arma el equipo",
+        "desc": "Añade internos, equipos completos, vendors y stakeholders con roles y permisos claros."
+      },
+      "execute": {
+        "title": "Ejecuta, reporta y aprende",
+        "desc": "Cada tarea, reunión, riesgo y cambio queda grabado en la memoria del proyecto."
+      }
+    }
+  },
+  "testimonial": {
+    "quote": "Por fin dejamos de buscar el porqué de cada decisión en hilos de correo. La memoria del proyecto se volvió nuestra única fuente de verdad.",
+    "name": "María Restrepo",
+    "role": "Directora de PMO · NorthPeak"
+  },
+  "teams": {
+    "kicker": "Para organizaciones reales",
+    "title": "Flexible para fundadores, robusto para ",
+    "titleAccent": "empresas globales",
+    "subtitle": "La facturación es por workspace. Los stakeholders externos participan sin necesidad de ser usuarios de pago.",
+    "items": {
+      "solo": {
+        "title": "Solo PM / Fundador",
+        "desc": "Gestiona proyectos personales, backlog y planificación con IA sin complejidades corporativas."
+      },
+      "small": {
+        "title": "Equipos pequeños",
+        "desc": "Crea equipos reusables, asigna roles y haz seguimiento de múltiples proyectos activos."
+      },
+      "pmo": {
+        "title": "PMO / Empresa",
+        "desc": "Gobernanza, reportes a stakeholders, flujos de aprobación y detección de desvíos."
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "desc": "Auditoría, SSO, permisos avanzados, integraciones y retención de datos para entornos regulados."
+      }
+    }
+  },
+  "pricing": {
+    "kicker": "Precios transparentes",
+    "title": "Elige el plan que ",
+    "titleAccent": "impulse tu operación",
+    "subtitle": "Escala desde el autónomo hasta la multinacional. Pago por usuarios internos.",
+    "mostPopular": "★ Más popular",
+    "perMonth": "/mes",
+    "perUserMonth": "/usuario/mes",
+    "plans": {
+      "personal": {
+        "name": "Personal",
+        "price": "$0",
+        "desc": "Para validar proyectos, estudiantes o fundadores.",
+        "features": ["Workspace personal", "Proyectos limitados", "Charter básico", "Créditos IA limitados"],
+        "cta": "Comenzar gratis"
+      },
+      "team": {
+        "name": "Team",
+        "price": "$39",
+        "desc": "Para startups y equipos pequeños con visibilidad compartida.",
+        "features": ["Workspace de empresa", "Equipos reusables", "Roles y permisos", "Acceso básico stakeholders"],
+        "cta": "Probar 14 días"
+      },
+      "business": {
+        "name": "Business / PMO",
+        "price": "$99",
+        "desc": "Para equipos serios que necesitan gobernanza e inteligencia.",
+        "features": ["Gobernanza avanzada", "Detección de desvíos", "Reportes ejecutivos", "Memoria de proyecto ilimitada"],
+        "cta": "Contratar ahora"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Custom",
+        "desc": "Para empresas reguladas y grandes implementaciones.",
+        "features": ["Límites personalizados", "SSO y auditoría", "Integraciones avanzadas", "Soporte dedicado"],
+        "cta": "Hablar con ventas"
+      }
+    }
+  },
+  "security": {
+    "title": "Listo para entornos regulados",
+    "desc": "SSO, registro de auditoría y retención de datos configurable.",
+    "badges": ["SSO / SAML", "Registro de auditoría", "Roles granulares", "Cifrado en reposo"]
+  },
+  "faq": {
+    "title": "Preguntas frecuentes",
+    "items": [
+      {
+        "q": "¿Cómo funciona la facturación por workspace?",
+        "a": "Pagas solo por usuarios internos del workspace. Los stakeholders externos participan, comentan y aprueban sin ocupar una licencia de pago."
+      },
+      {
+        "q": "¿Qué es exactamente la \"memoria de proyecto\"?",
+        "a": "Un registro buscable de toda decisión, riesgo, acta y cambio, vinculado a su contexto. Cuando alguien pregunta \"¿por qué decidimos esto?\", la respuesta está a un buscador de distancia."
+      },
+      {
+        "q": "¿Puedo combinar Ágil y Waterfall en el mismo proyecto?",
+        "a": "Sí. El framework adaptativo permite enfoques híbridos por fase, y la IA sugiere el más adecuado según la incertidumbre y los stakeholders."
+      },
+      {
+        "q": "¿Cuándo estará disponible públicamente?",
+        "a": "Estamos en beta privada con un grupo reducido de equipos. Solicita acceso anticipado y te avisamos en cuanto liberemos tu cupo."
+      }
+    ]
+  },
+  "cta": {
+    "eyebrow": "Project Ops 360°",
+    "title": "Dale a tu proyecto una base, un equipo y memoria que no se borra",
+    "desc": "Únete a la beta privada de la plataforma de ejecución que entiende el contexto de tu negocio.",
+    "button": "Solicitar acceso anticipado"
+  },
+  "footer": {
+    "copyright": "© 2026 Project Ops 360° · Hecho con precisión para PMOs",
+    "tags": "Gobernanza · Memoria · Reporting"
+  }
+}

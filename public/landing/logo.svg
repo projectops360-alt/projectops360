@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 332 64" role="img" aria-label="Project Ops 360°">
+  
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M46 20 a 14 14 0 1 0 6 5" stroke="#2A9D8F" stroke-width="4.4"></path>
+    <path d="M25 32 l5 5 9 -11" stroke="#1B4D3D" stroke-width="4.4"></path>
+  </g>
+  <text x="64" y="42" font-size="30" letter-spacing="-0.5"><tspan fill="#2A9D8F">Project</tspan><tspan fill="#16302a"> Ops 360</tspan><tspan fill="#2A9D8F">°</tspan></text>
+</svg>

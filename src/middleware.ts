@@ -37,6 +37,14 @@ function getLoginPath(locale: string): string {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ── Public marketing landing ──
+  // /landing lives OUTSIDE the [locale] segment and manages its own EN/ES via
+  // react-i18next. Bypass next-intl rewriting + the auth guard entirely so it
+  // renders for anyone (authenticated or not).
+  if (pathname === "/landing" || pathname.startsWith("/landing/")) {
+    return NextResponse.next();
+  }
+
   // ── Step 1: Handle internationalization routing ──
   const intlResponse = intlMiddleware(request);
 
