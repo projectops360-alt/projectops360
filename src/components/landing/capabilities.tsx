@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { BarChart3, ClipboardCheck, Database, LayoutGrid, RefreshCw, ShieldAlert, type LucideIcon } from "lucide-react";
+import { BarChart3, ClipboardCheck, Database, LayoutGrid, Network, RefreshCw, Ruler, ShieldAlert, Upload, type LucideIcon } from "lucide-react";
 import { Reveal } from "./reveal";
 
 const ITEMS: { key: string; Icon: LucideIcon }[] = [
@@ -11,6 +11,9 @@ const ITEMS: { key: string; Icon: LucideIcon }[] = [
   { key: "risk", Icon: ShieldAlert },
   { key: "workforce", Icon: BarChart3 },
   { key: "executionMap", Icon: LayoutGrid },
+  { key: "drawing", Icon: Ruler },
+  { key: "import", Icon: Upload },
+  { key: "living", Icon: Network },
 ];
 
 export function Capabilities() {

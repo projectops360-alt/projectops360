@@ -67,6 +67,18 @@
       "executionMap": {
         "title": "Execution map",
         "desc": "A live command center across every phase, task and milestone. Full visibility, zero blind spots."
+      },
+      "drawing": {
+        "title": "Drawing & BIM intelligence",
+        "desc": "Extract quantities and takeoffs from drawings and BIM models automatically — no manual counting."
+      },
+      "import": {
+        "title": "Import from anywhere",
+        "desc": "Bring existing projects in from Excel, CSV, JSON, Word or PDF in minutes — AI structures the work for you."
+      },
+      "living": {
+        "title": "Living projects",
+        "desc": "Tasks, milestones and dependencies stay connected in a living graph that updates as work moves."
       }
     }
   },

@@ -67,6 +67,18 @@
       "executionMap": {
         "title": "Mapa de ejecución",
         "desc": "Un centro de control en vivo de cada fase, tarea e hito. Visibilidad total, cero puntos ciegos."
+      },
+      "drawing": {
+        "title": "Inteligencia de planos y BIM",
+        "desc": "Extrae cantidades y mediciones (takeoff) de planos y modelos BIM automáticamente — sin conteo manual."
+      },
+      "import": {
+        "title": "Importa desde cualquier lugar",
+        "desc": "Trae proyectos existentes desde Excel, CSV, JSON, Word o PDF en minutos — la IA estructura el trabajo por ti."
+      },
+      "living": {
+        "title": "Proyectos vivos",
+        "desc": "Tareas, hitos y dependencias quedan conectados en un grafo vivo que se actualiza al avanzar el trabajo."
       }
     }
   },
