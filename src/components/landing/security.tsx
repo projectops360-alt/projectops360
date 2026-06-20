@@ -8,7 +8,7 @@ export function Security() {
   const badges = t("security.badges", { returnObjects: true }) as string[];
   return (
     <section className="border-b border-[#eef2f3] bg-[#f7faf9]">
-      <div className="mx-auto flex max-w-[1180px] flex-col items-start justify-between gap-8 px-6 py-[64px] md:flex-row md:items-center">
+      <div className="mx-auto flex max-w-[1800px] flex-col items-start justify-between gap-8 px-6 py-[64px] md:flex-row md:items-center">
         <div className="flex items-start gap-4">
           <span className="inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] bg-[#ecf6f4] text-[#2A9D8F]">
             <ShieldCheck size={24} strokeWidth={1.7} />

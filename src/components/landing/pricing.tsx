@@ -16,7 +16,7 @@ export function Pricing() {
   const { t } = useTranslation();
   return (
     <section id="pricing" className="border-b border-[#eef2f3] bg-white">
-      <div className="mx-auto max-w-[1180px] px-6 py-[84px]">
+      <div className="mx-auto max-w-[1800px] px-6 py-[84px]">
         <div className="mx-auto mb-[46px] max-w-[640px] text-center">
           <div className="mb-3 text-[12.5px] font-bold uppercase tracking-[.08em] text-[#2A9D8F]">{t("pricing.kicker")}</div>
           <h2 className="lp-head text-[clamp(30px,3.6vw,44px)] leading-[1.1] tracking-[-.03em] text-[#1B4D3D]">

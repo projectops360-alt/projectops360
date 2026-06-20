@@ -15,7 +15,7 @@ export function Hero() {
   return (
     <section
       id="hero-grid"
-      className="mx-auto grid max-w-[1180px] items-center gap-[60px] px-6 pb-14 pt-20 lg:grid-cols-[1fr_1.08fr]"
+      className="mx-auto grid max-w-[1800px] items-center gap-[60px] px-6 pb-14 pt-20 lg:grid-cols-[1fr_1.08fr]"
     >
       <div>
         <div className="mb-6 inline-flex items-center gap-[9px] rounded-full border border-[#2a9d8f]/[0.18] bg-[#ecf6f4] px-3.5 py-[5px] pl-[11px] text-[12.5px] font-semibold text-[#1B4D3D]">

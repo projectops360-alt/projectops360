@@ -8,7 +8,7 @@ export function Workflow() {
   const { t } = useTranslation();
   return (
     <section id="workflow" className="border-b border-[#eef2f3] bg-white">
-      <div className="mx-auto grid max-w-[1180px] gap-12 px-6 py-[84px] lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="mx-auto grid max-w-[1800px] gap-12 px-6 py-[84px] lg:grid-cols-[0.9fr_1.1fr]">
         <div className="self-start lg:sticky lg:top-[90px]">
           <div className="mb-3 text-[12.5px] font-bold uppercase tracking-[.08em] text-[#2A9D8F]">{t("workflow.kicker")}</div>
           <h2 className="lp-head text-[clamp(30px,3.6vw,44px)] leading-[1.1] tracking-[-.03em] text-[#1B4D3D]">

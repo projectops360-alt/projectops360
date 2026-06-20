@@ -1,7 +1,7 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslation } from "react-i18next";
-import { LandingLogo } from "./logo";
 import { LanguageSwitcher } from "./language-switcher";
 
 const LINKS = [
@@ -15,9 +15,9 @@ export function LandingNav() {
   const { t } = useTranslation();
   return (
     <nav className="sticky top-0 z-50 border-b border-[#e8eef0] bg-white/[0.86] backdrop-blur-[10px]">
-      <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4 px-6 py-[13px]">
+      <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-6 py-[13px]">
         <a href="#" className="flex items-center" aria-label="Project Ops 360°">
-          <LandingLogo className="h-8 w-auto" />
+          <Image src="/logo-full.png" alt="Project Ops 360°" width={320} height={111} className="h-9 w-auto" priority />
         </a>
 
         <div className="hidden items-center gap-[30px] text-[14.5px] font-medium text-[#5b6e6e] md:flex">

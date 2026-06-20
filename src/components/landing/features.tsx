@@ -16,7 +16,7 @@ export function Features() {
   const { t } = useTranslation();
   return (
     <section id="features" className="border-b border-[#eef2f3] bg-[#f7faf9]">
-      <div className="mx-auto max-w-[1180px] px-6 py-[84px]">
+      <div className="mx-auto max-w-[1800px] px-6 py-[84px]">
         <div className="mb-[46px] max-w-[760px]">
           <div className="mb-3 text-[12.5px] font-bold uppercase tracking-[.08em] text-[#2A9D8F]">{t("features.kicker")}</div>
           <h2 className="lp-head text-[clamp(30px,3.6vw,44px)] leading-[1.1] tracking-[-.03em] text-[#1B4D3D]">

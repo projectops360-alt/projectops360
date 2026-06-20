@@ -7,7 +7,7 @@ export function FinalCta() {
   const { t } = useTranslation();
   return (
     <section id="cta" className="bg-white">
-      <div className="mx-auto max-w-[1180px] px-6 py-[84px]">
+      <div className="mx-auto max-w-[1800px] px-6 py-[84px]">
         <div
           className="flex flex-col items-start justify-between gap-8 rounded-3xl px-8 py-12 md:flex-row md:items-center md:px-14"
           style={{ background: "linear-gradient(135deg, #1B4D3D, #26715b)" }}
