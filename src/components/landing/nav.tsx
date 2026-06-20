@@ -16,7 +16,7 @@ export function LandingNav() {
   return (
     <nav className="relative z-10 mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-6 py-5 md:px-10 md:py-6">
       <a href="#" className="flex items-center" aria-label="ProjectOps 360°">
-        <Image src="/logo-3d.webp" alt="ProjectOps 360°" width={1344} height={768} className="h-28 w-auto mix-blend-screen md:h-36" priority />
+        <Image src="/logo-full.png" alt="ProjectOps 360°" width={2953} height={1024} className="h-16 w-auto brightness-0 invert md:h-[72px]" priority />
       </a>
 
       <div className="hidden items-center gap-9 text-[15px] font-semibold text-[#B8C7BF] lg:flex">

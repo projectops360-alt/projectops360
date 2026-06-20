@@ -10,7 +10,7 @@ export function Footer() {
   return (
     <footer className="border-t border-white/[0.06] bg-[#07120D] px-6 py-[54px] md:px-10">
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-6">
-        <Image src="/logo-3d.webp" alt="ProjectOps 360°" width={1344} height={768} className="h-16 w-auto mix-blend-screen" />
+        <Image src="/logo-full.png" alt="ProjectOps 360°" width={2953} height={1024} className="h-11 w-auto brightness-0 invert" />
         <div className="flex flex-wrap gap-x-[30px] gap-y-2 text-[14px] font-semibold text-[#7E9389]">
           {LINKS.map((k) => (
             <a key={k} href="#" className="transition-colors hover:text-white">

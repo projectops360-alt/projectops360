@@ -87,6 +87,17 @@
       "blindspots": "blind spots. Risk, capacity and status in a single command center."
     }
   },
+  "ai": {
+    "eyebrow": "Decision intelligence",
+    "title": "Your project judgment. ",
+    "titleAccent": "Powered by AI.",
+    "lead": "ProjectOps 360° is built for project managers who want more than task tracking.",
+    "body": "AI works across the system to help you define scope, structure work, detect risk, summarize communication, preserve project memory, and recommend the next best action.",
+    "chips": ["Define scope", "Structure work", "Detect risk", "Summarize communication", "Preserve project memory", "Next best action"],
+    "noReplace": "But AI does not replace your expertise.",
+    "sharper": "It gives you better visibility, faster analysis, and stronger decision support — so your judgment becomes sharper, not less important.",
+    "closing": "ProjectOps 360° helps you lead projects with intelligence, control, and confidence."
+  },
   "quote": {
     "pre": "“We replaced four tools with one. For the first time, leadership and delivery are looking at the ",
     "accent": "same source of truth",

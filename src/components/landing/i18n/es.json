@@ -87,6 +87,17 @@
       "blindspots": "puntos ciegos. Riesgo, capacidad y estado en un solo centro de control."
     }
   },
+  "ai": {
+    "eyebrow": "Inteligencia de decisión",
+    "title": "Tu criterio de proyecto. ",
+    "titleAccent": "Potenciado por IA.",
+    "lead": "ProjectOps 360° está hecho para project managers que quieren más que seguimiento de tareas.",
+    "body": "La IA trabaja en todo el sistema para ayudarte a definir el alcance, estructurar el trabajo, detectar riesgos, resumir la comunicación, preservar la memoria del proyecto y recomendar la siguiente mejor acción.",
+    "chips": ["Definir alcance", "Estructurar el trabajo", "Detectar riesgos", "Resumir comunicación", "Preservar memoria", "Siguiente mejor acción"],
+    "noReplace": "Pero la IA no reemplaza tu experiencia.",
+    "sharper": "Te da mejor visibilidad, análisis más rápido y mayor soporte a la decisión — para que tu criterio sea más agudo, no menos importante.",
+    "closing": "ProjectOps 360° te ayuda a liderar proyectos con inteligencia, control y confianza."
+  },
   "quote": {
     "pre": "“Reemplazamos cuatro herramientas por una. Por primera vez, dirección y ejecución miran la ",
     "accent": "misma fuente de verdad",
