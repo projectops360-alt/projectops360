@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const intlMiddleware = createMiddleware(routing);
 
 // Paths that do NOT require authentication
-const publicPaths = ["/login", "/signup", "/auth/callback"];
+const publicPaths = ["/login", "/signup", "/auth/callback", "/navigator-preview"];
 
 /**
  * Check if a pathname is a public (unauthenticated) path.
@@ -37,11 +37,17 @@ function getLoginPath(locale: string): string {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // ── Public marketing landing ──
-  // /landing lives OUTSIDE the [locale] segment and manages its own EN/ES via
-  // react-i18next. Bypass next-intl rewriting + the auth guard entirely so it
-  // renders for anyone (authenticated or not).
-  if (pathname === "/landing" || pathname.startsWith("/landing/")) {
+  // ── Routes OUTSIDE the [locale] segment ──
+  // /landing (marketing) and /navigator-preview (temporary Navigator harness)
+  // live outside [locale]. next-intl would otherwise rewrite them to
+  // /en/<path> (which doesn't exist) and 404. Bypass next-intl rewriting + the
+  // auth guard so they render directly for anyone.
+  if (
+    pathname === "/landing" ||
+    pathname.startsWith("/landing/") ||
+    pathname === "/navigator-preview" ||
+    pathname.startsWith("/navigator-preview/")
+  ) {
     return NextResponse.next();
   }
 

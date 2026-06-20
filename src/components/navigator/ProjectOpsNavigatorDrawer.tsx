@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { X, Compass, Map as MapIcon } from "lucide-react";
@@ -47,8 +48,22 @@ export function ProjectOpsNavigatorDrawer({ open, onClose }: ProjectOpsNavigator
 
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const showMeHowRef = useRef<HTMLElement>(null);
   const panelId = useId();
   const [showMeHow, setShowMeHow] = useState(false);
+
+  // Portal target — only available after mount (and lets the fixed overlay
+  // escape the header's backdrop-filter containing block).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // The "Show me how" toggle lives in the footer but reveals the step-by-step
+  // up in the body — scroll it into view so the user sees it appear.
+  useEffect(() => {
+    if (showMeHow) {
+      showMeHowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [showMeHow]);
 
   // Reset "Show me how" whenever the contextual module changes.
   const moduleKey: ModuleKey = getCurrentNavigatorModule(pathname);
@@ -79,7 +94,7 @@ export function ProjectOpsNavigatorDrawer({ open, onClose }: ProjectOpsNavigator
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const projectId = extractProjectId(pathname);
   const { content, guidance } = getNavigatorContent(language, moduleKey);
@@ -109,7 +124,7 @@ export function ProjectOpsNavigatorDrawer({ open, onClose }: ProjectOpsNavigator
   }
   const canNavigateTo = (target: ModuleKey) => Boolean(getModuleRoute(target, projectId));
 
-  return (
+  const overlay = (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
       onClick={(e) => {
@@ -219,7 +234,7 @@ export function ProjectOpsNavigatorDrawer({ open, onClose }: ProjectOpsNavigator
 
               {/* Section 4 — Show me how (collapsible step-by-step) */}
               {showMeHow && guidance.whatToDoFirst.length > 0 && (
-                <section className="mb-5 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+                <section ref={showMeHowRef} className="mb-5 scroll-mt-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
                   <h3 className="text-sm font-semibold text-foreground">{chrome.showMeHowTitle}</h3>
                   <ol className="mt-2 space-y-2">
                     {guidance.whatToDoFirst.map((step, i) => (
@@ -262,4 +277,6 @@ export function ProjectOpsNavigatorDrawer({ open, onClose }: ProjectOpsNavigator
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }
