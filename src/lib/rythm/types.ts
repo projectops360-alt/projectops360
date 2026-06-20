@@ -1,17 +1,20 @@
 // ============================================================================
-// Rythm audio capture — shared types
+// Rythm audio capture + processing — shared types
 // ============================================================================
 // Audio/transcripts/jobs attach to the Rhythm Center meetings (public.meetings).
 // Mirrors columns in:
 //   supabase/migrations/20260725000000_rythm_meeting_intelligence.sql
 //   supabase/migrations/20260726000000_rythm_audio_into_rhythm.sql
+//   supabase/migrations/20260727000000_rythm_processing_readiness.sql
 // ============================================================================
 
-export type RythmAudioSource = "browser_recording" | "manual_upload";
+export type RythmAudioSource = "browser_recording" | "screen_recording" | "manual_upload";
 
 export type RythmAudioStatus =
   | "uploaded"
   | "ready_for_transcription"
+  | "queued"
+  | "processing"
   | "transcribing"
   | "transcribed"
   | "failed";
@@ -19,7 +22,32 @@ export type RythmAudioStatus =
 export type RythmTranscriptStatus = "pending" | "processing" | "completed" | "failed";
 
 export type RythmJobType = "transcription" | "summary" | "embedding";
-export type RythmJobStatus = "queued" | "running" | "completed" | "failed";
+export type RythmJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+/** Rythm processing lifecycle on the meeting (meetings.rythm_status). */
+export type RythmMeetingStatus =
+  | "draft"
+  | "recording"
+  | "audio_uploaded"
+  | "ready_for_transcription"
+  | "transcribing_pending"
+  | "transcribing"
+  | "transcribed"
+  | "summary_pending"
+  | "summary_ready"
+  | "failed";
+
+export type RythmActivityAction =
+  | "meeting_created"
+  | "recording_started"
+  | "recording_stopped"
+  | "audio_uploaded"
+  | "audio_prepared"
+  | "transcription_queued"
+  | "job_retried"
+  | "job_cancelled"
+  | "audio_deleted"
+  | "validation_failed";
 
 /** Camel-cased view of a project_rythm_audio_files row. */
 export interface RythmAudioFile {
@@ -34,6 +62,25 @@ export interface RythmAudioFile {
   durationSeconds: number | null;
   source: RythmAudioSource;
   status: RythmAudioStatus;
+  createdAt: string;
+}
+
+/** Camel-cased view of a project_rythm_processing_jobs row. */
+export interface RythmProcessingJob {
+  id: string;
+  meetingId: string;
+  audioFileId: string | null;
+  projectId: string;
+  jobType: RythmJobType;
+  provider: string | null;
+  status: RythmJobStatus;
+  priority: number;
+  attempts: number;
+  maxAttempts: number;
+  errorMessage: string | null;
+  metadata: Record<string, unknown>;
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
 }
 
@@ -54,7 +101,7 @@ export interface RegisterRythmAudioInput {
 
 export const RYTHM_AUDIO_BUCKET = "meeting-audio";
 
-/** Hard ceiling for a single audio asset (matches UI copy). */
+/** Hard ceiling for a single audio asset (matches UI copy + validation). */
 export const RYTHM_MAX_AUDIO_BYTES = 500 * 1024 * 1024; // 500 MB
 
 /** Accepted upload extensions / mime hints. */
@@ -70,4 +117,21 @@ export const RYTHM_ACCEPTED_MIME = [
   "audio/m4a",
   "audio/webm",
   "video/mp4", // some .mp4 audio recordings report a video container
+  "video/webm", // screen + system-audio recordings
 ];
+
+/** Mime types accepted for transcription queueing (validation gate). */
+export const RYTHM_TRANSCRIBE_MIME = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/webm",
+  "video/mp4",
+  "video/webm", // screen recordings (extension over the base spec list)
+];
+
+/** Planned transcription provider — wired in a later phase (no API call yet). */
+export const RYTHM_TRANSCRIBE_PROVIDER = "assemblyai";

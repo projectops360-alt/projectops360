@@ -9,8 +9,9 @@ import {
   meetingBelongsToProject,
   listAudioFiles,
   registerAudioFile,
-  createProcessingJob,
 } from "@/lib/rythm/meeting-service";
+import { setMeetingRythmStatus, deleteAudioAsset } from "@/lib/rythm/processing-service";
+import { logRythmActivity } from "@/lib/rythm/activity-log";
 import type { RythmAudioFile } from "@/lib/rythm/types";
 
 // ── Schemas ────────────────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ const registerAudioSchema = z.object({
   fileType: z.string().min(1).max(120),
   fileSize: z.number().int().nonnegative().optional().nullable(),
   durationSeconds: z.number().int().nonnegative().optional().nullable(),
-  source: z.enum(["browser_recording", "manual_upload"]),
+  source: z.enum(["browser_recording", "screen_recording", "manual_upload"]),
 });
 
 function firstError(error: z.ZodError): string {
@@ -58,8 +59,8 @@ export async function listRythmAudioAction(input: {
 // ── registerRythmAudioAction ───────────────────────────────────────────────────
 // Called by rythmStorageService AFTER the object lands in the bucket.
 // Inserts the audio row (status=ready_for_transcription) and enqueues a queued
-// transcription job. The Rhythm Center owns the meeting's own status, so we do
-// NOT touch meetings.meeting_status here.
+// The asset lands as status='uploaded'. Transcription is NOT auto-queued — the
+// user explicitly prepares + queues it (see processing-actions.ts).
 
 export async function registerRythmAudioAction(input: {
   projectId: string;
@@ -69,7 +70,7 @@ export async function registerRythmAudioAction(input: {
   fileType: string;
   fileSize?: number | null;
   durationSeconds?: number | null;
-  source: "browser_recording" | "manual_upload";
+  source: "browser_recording" | "screen_recording" | "manual_upload";
 }): Promise<{ audioFileId?: string; error?: string }> {
   let org;
   try {
@@ -95,17 +96,18 @@ export async function registerRythmAudioAction(input: {
 
     const audio = await registerAudioFile(supabase, org.organizationId, org.userId, parsed.data);
 
-    // Enqueue the transcription job (no worker drains it yet — see TODO below).
-    // TODO(Rythm): a background worker consumes queued 'transcription' jobs,
-    // calls AssemblyAI, writes project_rythm_transcripts, then enqueues
-    // 'summary' (OpenAI) + 'embedding' jobs to feed Project Memory.
-    await createProcessingJob(supabase, org.organizationId, {
+    // Reflect capture on the meeting's Rythm lifecycle (separate from the
+    // Rhythm Center's own meeting_status).
+    await setMeetingRythmStatus(supabase, org.organizationId, parsed.data.meetingId, "audio_uploaded");
+
+    await logRythmActivity(supabase, org.organizationId, {
+      projectId: parsed.data.projectId,
       meetingId: parsed.data.meetingId,
       audioFileId: audio.id,
-      projectId: parsed.data.projectId,
-      jobType: "transcription",
+      action: "audio_uploaded",
+      details: { source: parsed.data.source, file_name: parsed.data.fileName },
+      userId: org.userId,
     });
-
     await logAudit({
       org,
       projectId: parsed.data.projectId,
@@ -143,38 +145,26 @@ export async function deleteRythmAudioAction(input: {
 
   const supabase = await createClient();
   try {
-    const { data: audio, error } = await supabase
-      .from("project_rythm_audio_files")
-      .select("storage_bucket, storage_path, project_id, meeting_id")
-      .eq("organization_id", org.organizationId)
-      .eq("id", parsed.data.audioFileId)
-      .maybeSingle();
+    const result = await deleteAudioAsset(supabase, org.organizationId, parsed.data.audioFileId);
+    if (!result.ok || !result.projectId) return { error: result.errorKey ?? "delete_failed" };
 
-    if (error || !audio) return { error: "audio_not_found" };
-
-    // Remove the object first (best-effort — never block the row delete on it).
-    const { error: removeError } = await supabase.storage
-      .from(audio.storage_bucket)
-      .remove([audio.storage_path]);
-    if (removeError) console.error("delete audio object failed:", removeError.message);
-
-    const { error: deleteError } = await supabase
-      .from("project_rythm_audio_files")
-      .delete()
-      .eq("organization_id", org.organizationId)
-      .eq("id", parsed.data.audioFileId);
-    if (deleteError) return { error: "delete_failed" };
-
+    await logRythmActivity(supabase, org.organizationId, {
+      projectId: result.projectId,
+      meetingId: result.meetingId,
+      audioFileId: parsed.data.audioFileId,
+      action: "audio_deleted",
+      userId: org.userId,
+    });
     await logAudit({
       org,
-      projectId: audio.project_id,
+      projectId: result.projectId,
       action: "delete",
       entityType: "rythm_audio_file",
       entityId: parsed.data.audioFileId,
-      metadata: { meeting_id: audio.meeting_id },
+      metadata: { meeting_id: result.meetingId },
     });
 
-    revalidatePath(`/projects/${audio.project_id}/rhythm`);
+    revalidatePath(`/projects/${result.projectId}/rhythm`);
     return { ok: true };
   } catch (err) {
     console.error("deleteRythmAudioAction failed:", err);

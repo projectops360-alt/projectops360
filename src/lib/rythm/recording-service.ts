@@ -13,12 +13,26 @@ const PREFERRED_MIME_TYPES = [
   "audio/wav",
 ];
 
+const PREFERRED_SCREEN_MIME_TYPES = [
+  "video/webm;codecs=vp8,opus",
+  "video/webm;codecs=vp9,opus",
+  "video/webm",
+];
+
 export function pickSupportedMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "audio/webm";
   for (const type of PREFERRED_MIME_TYPES) {
     if (MediaRecorder.isTypeSupported(type)) return type;
   }
   return ""; // let the browser choose its default
+}
+
+function pickScreenMimeType(): string {
+  if (typeof MediaRecorder === "undefined") return "video/webm";
+  for (const type of PREFERRED_SCREEN_MIME_TYPES) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return "";
 }
 
 export function isRecordingSupported(): boolean {
@@ -28,6 +42,16 @@ export function isRecordingSupported(): boolean {
     typeof MediaRecorder !== "undefined"
   );
 }
+
+export function isScreenRecordingSupported(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices?.getDisplayMedia &&
+    typeof MediaRecorder !== "undefined"
+  );
+}
+
+export type RecordingMode = "microphone" | "screen";
 
 export interface AudioInputDevice {
   deviceId: string;
@@ -87,23 +111,34 @@ export class RythmRecorder {
     return this.mimeType || "audio/webm";
   }
 
-  async start(deviceId?: string): Promise<void> {
-    if (!isRecordingSupported()) {
-      throw new Error("recording_unsupported");
+  async start(options?: { deviceId?: string; mode?: RecordingMode }): Promise<void> {
+    const mode = options?.mode ?? "microphone";
+
+    if (mode === "screen") {
+      if (!isScreenRecordingSupported()) throw new Error("recording_unsupported");
+      // System audio capture depends on browser/OS support; audio:true requests it.
+      this.stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      // If the user stops sharing from the browser chrome, end the recording stream.
+      this.stream.getVideoTracks().forEach((track) => {
+        track.onended = () => this.mediaRecorder?.state !== "inactive" && this.mediaRecorder?.stop();
+      });
+      this.mimeType = pickScreenMimeType();
+    } else {
+      if (!isRecordingSupported()) throw new Error("recording_unsupported");
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      };
+      if (options?.deviceId) audioConstraints.deviceId = { exact: options.deviceId };
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      this.mimeType = pickSupportedMimeType();
     }
-    const audioConstraints: MediaTrackConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    };
-    if (deviceId) audioConstraints.deviceId = { exact: deviceId };
-    this.stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-    this.mimeType = pickSupportedMimeType();
     this.chunks = [];
 
-    const options: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
-    if (this.mimeType) options.mimeType = this.mimeType;
-    this.mediaRecorder = new MediaRecorder(this.stream, options);
+    const recorderOptions: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
+    if (this.mimeType) recorderOptions.mimeType = this.mimeType;
+    this.mediaRecorder = new MediaRecorder(this.stream, recorderOptions);
 
     // Capture the actual negotiated type (browser may override our preference).
     this.mimeType = this.mediaRecorder.mimeType || this.mimeType || "audio/webm";

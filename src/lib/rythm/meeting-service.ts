@@ -112,7 +112,7 @@ export async function registerAudioFile(
       file_size: input.fileSize ?? null,
       duration_seconds: input.durationSeconds ?? null,
       source: input.source,
-      status: "ready_for_transcription",
+      status: "uploaded",
       created_by: userId,
     })
     .select(AUDIO_COLS)

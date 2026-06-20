@@ -18,14 +18,24 @@ import {
 
 // ── Path + filename helpers ───────────────────────────────────────────────────
 
-/** projects/{projectId}/rythm/{meetingId}/{timestamp}.{ext} */
+/** Sanitises a filename for use inside a storage object key. */
+export function safeFileName(name: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 120);
+  return cleaned || "audio";
+}
+
+/** projects/{projectId}/rythm/{meetingId}/assets/{timestamp}-{safeFileName} */
 export function buildRythmAudioPath(
   projectId: string,
   meetingId: string,
-  extension: string,
+  fileName: string,
 ): string {
-  const ext = extension.replace(/^\./, "").toLowerCase() || "webm";
-  return `projects/${projectId}/rythm/${meetingId}/${Date.now()}.${ext}`;
+  return `projects/${projectId}/rythm/${meetingId}/assets/${Date.now()}-${safeFileName(fileName)}`;
 }
 
 export function extensionFromFileName(fileName: string): string {
@@ -72,15 +82,13 @@ async function uploadBlob(params: {
   blob: Blob;
   fileName: string;
   contentType: string;
-  extension: string;
   source: RythmAudioSource;
   durationSeconds?: number | null;
 }): Promise<UploadResult> {
-  const { projectId, meetingId, blob, fileName, contentType, extension, source, durationSeconds } =
-    params;
+  const { projectId, meetingId, blob, fileName, contentType, source, durationSeconds } = params;
 
   const supabase = createClient();
-  const storagePath = buildRythmAudioPath(projectId, meetingId, extension);
+  const storagePath = buildRythmAudioPath(projectId, meetingId, fileName);
 
   const { error: uploadError } = await supabase.storage
     .from(RYTHM_AUDIO_BUCKET)
@@ -120,28 +128,32 @@ export async function uploadRythmAudio(
   const validation = validateAudioFile(file);
   if (!validation.ok) return validation;
 
-  const extension = extensionFromFileName(file.name) || extensionFromMime(file.type);
   return uploadBlob({
     projectId,
     meetingId,
     blob: file,
     fileName: file.name,
     contentType: file.type || "application/octet-stream",
-    extension,
     source: "manual_upload",
   });
 }
 
-/** Persist a browser MediaRecorder recording (RythmRecorder). */
+/** Persist a MediaRecorder recording — microphone or screen + system audio. */
 export async function saveBrowserRecording(
   projectId: string,
   meetingId: string,
   blob: Blob,
-  opts?: { durationSeconds?: number | null; mimeType?: string },
+  opts?: {
+    durationSeconds?: number | null;
+    mimeType?: string;
+    source?: Extract<RythmAudioSource, "browser_recording" | "screen_recording">;
+  },
 ): Promise<UploadResult> {
   const mime = opts?.mimeType || blob.type || "audio/webm";
   const extension = extensionFromMime(mime);
-  const fileName = `recording-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
+  const source = opts?.source ?? "browser_recording";
+  const prefix = source === "screen_recording" ? "screen-recording" : "recording";
+  const fileName = `${prefix}-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
 
   return uploadBlob({
     projectId,
@@ -149,8 +161,7 @@ export async function saveBrowserRecording(
     blob,
     fileName,
     contentType: mime,
-    extension,
-    source: "browser_recording",
+    source,
     durationSeconds: opts?.durationSeconds ?? null,
   });
 }

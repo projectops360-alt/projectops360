@@ -2075,6 +2075,9 @@
       "noSignal": "No está llegando sonido al micrófono. Verifica que el micro correcto esté seleccionado y sin silenciar.",
       "micLabel": "Micrófono",
       "micDefault": "Predeterminado del sistema",
+      "modeMicrophone": "Grabar Micrófono",
+      "modeScreen": "Grabar Pantalla + Audio del Sistema",
+      "screenWarning": "La captura del audio del sistema depende del navegador y del sistema operativo.",
       "unsupported": "Este navegador no admite la grabación de audio. Carga un archivo de audio en su lugar."
     },
     "uploader": {
@@ -2098,8 +2101,10 @@
       "field_participants": "Participantes",
       "field_created": "Creada",
       "audioRecords": "Registros de audio",
+      "meetingAssets": "Activos de la Reunión",
       "noAudio": "Aún no hay audio capturado para esta reunión.",
       "source_browser_recording": "Grabación en navegador",
+      "source_screen_recording": "Grabación de pantalla",
       "source_manual_upload": "Archivo cargado",
       "play": "Reproducir",
       "delete": "Eliminar",
@@ -2129,7 +2134,68 @@
       "sign_failed": "No se pudo cargar el audio. Inténtalo de nuevo.",
       "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo.",
       "delete_failed": "No se pudo eliminar el archivo de audio. Inténtalo de nuevo.",
-      "deleteFailed": "No se pudo eliminar el archivo de audio. Inténtalo de nuevo."
+      "deleteFailed": "No se pudo eliminar el archivo de audio. Inténtalo de nuevo.",
+      "screenPermission": "Se canceló o denegó la compartición de pantalla. Inténtalo de nuevo.",
+      "errorMissingStorage": "Este archivo no tiene audio almacenado. Vuelve a grabar o subir.",
+      "errorMissingFileName": "Falta el nombre del archivo.",
+      "errorMissingFileType": "Falta el tipo de archivo.",
+      "errorMissingLinks": "Este audio no está vinculado a una reunión/proyecto.",
+      "errorBadStatus": "Este audio no está en un estado que pueda transcribirse.",
+      "prepare_failed": "No se pudo preparar el audio. Inténtalo de nuevo.",
+      "queue_failed": "No se pudo encolar la transcripción. Inténtalo de nuevo.",
+      "retry_failed": "No se pudo reintentar el trabajo. Inténtalo de nuevo.",
+      "cancel_failed": "No se pudo cancelar el trabajo. Inténtalo de nuevo.",
+      "job_not_found": "Trabajo no encontrado.",
+      "job_not_failed": "Solo se pueden reintentar trabajos fallidos.",
+      "job_not_cancellable": "Este trabajo ya no se puede cancelar.",
+      "max_attempts_reached": "Se alcanzó el máximo de intentos.",
+      "list_failed": "No se pudo cargar la cola. Inténtalo de nuevo."
+    },
+    "audioStatus": {
+      "uploaded": "Cargado",
+      "ready_for_transcription": "Listo para transcribir",
+      "queued": "En cola",
+      "processing": "Procesando",
+      "transcribing": "Procesando",
+      "transcribed": "Transcripción lista",
+      "failed": "Fallido"
+    },
+    "jobStatus": {
+      "queued": "En cola",
+      "running": "Ejecutando",
+      "completed": "Completado",
+      "failed": "Fallido",
+      "cancelled": "Cancelado"
+    },
+    "actions": {
+      "prepare": "Preparar para transcribir",
+      "queue": "Encolar transcripción",
+      "retry": "Reintentar",
+      "delete": "Eliminar"
+    },
+    "queue": {
+      "title": "Cola de Procesamiento",
+      "empty": "Aún no hay trabajos de procesamiento.",
+      "provider": "Proveedor",
+      "attempts": "Intentos",
+      "created": "Creado",
+      "started": "Iniciado",
+      "completed": "Completado",
+      "error": "Error",
+      "cancel": "Cancelar",
+      "jobType_transcription": "Transcripción",
+      "jobType_summary": "Resumen",
+      "jobType_embedding": "Embedding"
+    },
+    "intelligence": {
+      "title": "Inteligencia de la Reunión",
+      "waiting": "Esperando la transcripción.",
+      "transcript": "Transcripción",
+      "summary": "Resumen",
+      "actionItems": "Acciones",
+      "decisions": "Decisiones",
+      "risks": "Riesgos",
+      "blockers": "Bloqueos"
     }
   }
 }

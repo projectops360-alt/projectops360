@@ -2075,6 +2075,9 @@
       "noSignal": "No sound is reaching the microphone. Check that the right mic is selected and not muted.",
       "micLabel": "Microphone",
       "micDefault": "System default",
+      "modeMicrophone": "Record Microphone",
+      "modeScreen": "Record Screen + System Audio",
+      "screenWarning": "System audio capture depends on browser and operating system support.",
       "unsupported": "Audio recording is not supported in this browser. Please upload an audio file instead."
     },
     "uploader": {
@@ -2098,8 +2101,10 @@
       "field_participants": "Participants",
       "field_created": "Created",
       "audioRecords": "Audio records",
+      "meetingAssets": "Meeting Assets",
       "noAudio": "No audio captured for this meeting yet.",
       "source_browser_recording": "Browser recording",
+      "source_screen_recording": "Screen recording",
       "source_manual_upload": "Uploaded file",
       "play": "Play",
       "delete": "Delete",
@@ -2129,7 +2134,68 @@
       "sign_failed": "Could not load the audio. Please try again.",
       "playFailed": "Could not play the audio. Please try again.",
       "delete_failed": "Could not delete the audio file. Please try again.",
-      "deleteFailed": "Could not delete the audio file. Please try again."
+      "deleteFailed": "Could not delete the audio file. Please try again.",
+      "screenPermission": "Screen sharing was cancelled or denied. Please try again.",
+      "errorMissingStorage": "This file has no stored audio. Re-record or re-upload it.",
+      "errorMissingFileName": "The file name is missing.",
+      "errorMissingFileType": "The file type is missing.",
+      "errorMissingLinks": "This audio is not linked to a meeting/project.",
+      "errorBadStatus": "This audio is not in a state that can be transcribed.",
+      "prepare_failed": "Could not prepare the audio. Please try again.",
+      "queue_failed": "Could not queue transcription. Please try again.",
+      "retry_failed": "Could not retry the job. Please try again.",
+      "cancel_failed": "Could not cancel the job. Please try again.",
+      "job_not_found": "Job not found.",
+      "job_not_failed": "Only failed jobs can be retried.",
+      "job_not_cancellable": "This job can no longer be cancelled.",
+      "max_attempts_reached": "Maximum attempts reached.",
+      "list_failed": "Could not load the queue. Please try again."
+    },
+    "audioStatus": {
+      "uploaded": "Uploaded",
+      "ready_for_transcription": "Ready for Transcription",
+      "queued": "Queued",
+      "processing": "Processing",
+      "transcribing": "Processing",
+      "transcribed": "Transcript Ready",
+      "failed": "Failed"
+    },
+    "jobStatus": {
+      "queued": "Queued",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "prepare": "Prepare for Transcription",
+      "queue": "Queue Transcription",
+      "retry": "Retry",
+      "delete": "Delete"
+    },
+    "queue": {
+      "title": "Processing Queue",
+      "empty": "No processing jobs yet.",
+      "provider": "Provider",
+      "attempts": "Attempts",
+      "created": "Created",
+      "started": "Started",
+      "completed": "Completed",
+      "error": "Error",
+      "cancel": "Cancel",
+      "jobType_transcription": "Transcription",
+      "jobType_summary": "Summary",
+      "jobType_embedding": "Embedding"
+    },
+    "intelligence": {
+      "title": "Meeting Intelligence",
+      "waiting": "Waiting for transcription.",
+      "transcript": "Transcript",
+      "summary": "Summary",
+      "actionItems": "Action Items",
+      "decisions": "Decisions",
+      "risks": "Risks",
+      "blockers": "Blockers"
     }
   }
 }

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
-import { Mic, Pause, Play, Square, Save, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { Mic, Pause, Play, Square, Save, Trash2, Loader2, AlertCircle, MonitorUp } from "lucide-react";
 import {
   RythmRecorder as Recorder,
   isRecordingSupported,
+  isScreenRecordingSupported,
   listAudioInputDevices,
   type AudioInputDevice,
+  type RecordingMode,
 } from "@/lib/rythm/recording-service";
 import { saveBrowserRecording } from "@/lib/rythm/storage-service";
 
@@ -48,6 +50,8 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
+  const [mode, setMode] = useState<RecordingMode>("microphone");
+  const screenSupported = isScreenRecordingSupported();
 
   // Capability detection without a setState-in-effect: server renders optimistic
   // (true); the client snapshot resolves after hydration with no mismatch.
@@ -119,17 +123,17 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
     setError(null);
     try {
       const recorder = new Recorder();
-      await recorder.start(deviceId || undefined);
+      await recorder.start({ deviceId: deviceId || undefined, mode });
       recorderRef.current = recorder;
       setSeconds(0);
       setUiState("recording");
       startTimer();
       startMeter();
       // Permission is now granted → re-list devices with real labels.
-      void loadDevices(false);
+      if (mode === "microphone") void loadDevices(false);
     } catch (err) {
       console.error(err);
-      setError(tErr("micPermission"));
+      setError(mode === "screen" ? tErr("screenPermission") : tErr("micPermission"));
       setUiState("idle");
     }
   }
@@ -185,6 +189,7 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
     const result = await saveBrowserRecording(projectId, meetingId, recordedBlob, {
       durationSeconds: seconds,
       mimeType: recordedMime,
+      source: mode === "screen" ? "screen_recording" : "browser_recording",
     });
 
     if (!result.ok) {
@@ -261,9 +266,47 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
         <audio controls src={previewUrl} className="mt-4 w-full" />
       )}
 
-      {/* Microphone picker (idle only) — lets the user switch away from a
+      {/* Mode toggle (idle only): microphone vs screen + system audio */}
+      {uiState === "idle" && screenSupported && (
+        <div className="mt-4">
+          <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode("microphone")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "microphone"
+                  ? "bg-brand-600 text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Mic className="h-3.5 w-3.5" />
+              {t("modeMicrophone")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("screen")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "screen"
+                  ? "bg-brand-600 text-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MonitorUp className="h-3.5 w-3.5" />
+              {t("modeScreen")}
+            </button>
+          </div>
+          {mode === "screen" && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t("screenWarning")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Microphone picker (idle + mic mode) — lets the user switch away from a
           silent/wrong default input device. */}
-      {uiState === "idle" && devices.length > 0 && (
+      {uiState === "idle" && mode === "microphone" && devices.length > 0 && (
         <div className="mt-4">
           <label className="mb-1 block text-xs font-medium text-muted-foreground">
             {t("micLabel")}
