@@ -110,10 +110,10 @@
    top → dark/black at bottom) via CSS mask, so it reads as dark letters hit by
    a spotlight from above. Pair with a soft glow element above it. */
 .lp-logo-stage {
-  background: linear-gradient(180deg, #ffffff 0%, #8ff0c8 22%, #1d4a39 62%, #0a2018 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #d7fbee 30%, #79dcbb 66%, #44bd94 100%);
   -webkit-mask: url("/logo-full.png") center / contain no-repeat;
   mask: url("/logo-full.png") center / contain no-repeat;
-  filter: drop-shadow(0 1px 10px rgba(60, 229, 164, 0.22));
+  filter: drop-shadow(0 2px 14px rgba(60, 229, 164, 0.3));
 }
 
 /* clipped gradient text (hero accent lines) */
