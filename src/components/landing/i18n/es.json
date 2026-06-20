@@ -99,6 +99,20 @@
       "blindspots": "puntos ciegos. Riesgo, capacidad y estado en un solo centro de control."
     }
   },
+  "industries": {
+    "eyebrow": "Para cualquier industria",
+    "title": "Hecho para proyectos del mundo real, ",
+    "titleAccent": "no solo equipos de software.",
+    "lead": "ProjectOps 360° está diseñado para cualquier proyecto donde importen la claridad, la coordinación, el control de riesgos, la comunicación y la disciplina de ejecución.",
+    "tags": ["Construcción", "Ingeniería", "Operaciones", "Implementación tecnológica", "Transformación de negocio", "Manufactura", "Software"],
+    "predictiveTitle": "Predictivo y controlado",
+    "predictive": ["Planificación predictiva", "Aprobaciones", "Documentación", "Control estricto"],
+    "agileTitle": "Ágil y adaptable",
+    "agile": ["Coordinación ágil", "Decisiones rápidas", "Ajustes en campo", "Resolución de incidencias", "Comunicación continua"],
+    "closingPre": "ProjectOps 360° soporta ambos — en ",
+    "closingAccent": "un solo sistema operativo de proyectos inteligente",
+    "closingPost": "."
+  },
   "pricing": {
     "eyebrow": "Precios",
     "title": "Precios simples que ",

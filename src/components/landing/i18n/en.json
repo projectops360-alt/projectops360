@@ -99,6 +99,20 @@
       "blindspots": "blind spots. Risk, capacity and status in a single command center."
     }
   },
+  "industries": {
+    "eyebrow": "For every industry",
+    "title": "Built for real-world projects, ",
+    "titleAccent": "not just software teams.",
+    "lead": "ProjectOps 360° is designed for any project where clarity, coordination, risk control, communication, and execution discipline matter.",
+    "tags": ["Construction", "Engineering", "Operations", "Technology implementation", "Business transformation", "Manufacturing", "Software delivery"],
+    "predictiveTitle": "Predictive & controlled",
+    "predictive": ["Predictive planning", "Approvals", "Documentation", "Strict control"],
+    "agileTitle": "Agile & adaptive",
+    "agile": ["Agile coordination", "Fast decisions", "Field adjustments", "Issue resolution", "Continuous communication"],
+    "closingPre": "ProjectOps 360° supports both — in ",
+    "closingAccent": "one intelligent project operating system",
+    "closingPost": "."
+  },
   "pricing": {
     "eyebrow": "Pricing",
     "title": "Simple pricing that ",
