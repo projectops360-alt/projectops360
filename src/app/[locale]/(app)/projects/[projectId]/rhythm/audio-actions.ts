@@ -123,6 +123,65 @@ export async function registerRythmAudioAction(input: {
   }
 }
 
+// ── deleteRythmAudioAction ─────────────────────────────────────────────────────
+// Removes the private storage object and its metadata row. Processing jobs that
+// reference the audio file cascade away; transcripts keep their row (audio_file_id
+// is set null).
+
+export async function deleteRythmAudioAction(input: {
+  audioFileId: string;
+}): Promise<{ ok?: boolean; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+
+  const parsed = z.object({ audioFileId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: "invalid_input" };
+
+  const supabase = await createClient();
+  try {
+    const { data: audio, error } = await supabase
+      .from("project_rythm_audio_files")
+      .select("storage_bucket, storage_path, project_id, meeting_id")
+      .eq("organization_id", org.organizationId)
+      .eq("id", parsed.data.audioFileId)
+      .maybeSingle();
+
+    if (error || !audio) return { error: "audio_not_found" };
+
+    // Remove the object first (best-effort — never block the row delete on it).
+    const { error: removeError } = await supabase.storage
+      .from(audio.storage_bucket)
+      .remove([audio.storage_path]);
+    if (removeError) console.error("delete audio object failed:", removeError.message);
+
+    const { error: deleteError } = await supabase
+      .from("project_rythm_audio_files")
+      .delete()
+      .eq("organization_id", org.organizationId)
+      .eq("id", parsed.data.audioFileId);
+    if (deleteError) return { error: "delete_failed" };
+
+    await logAudit({
+      org,
+      projectId: audio.project_id,
+      action: "delete",
+      entityType: "rythm_audio_file",
+      entityId: parsed.data.audioFileId,
+      metadata: { meeting_id: audio.meeting_id },
+    });
+
+    revalidatePath(`/projects/${audio.project_id}/rhythm`);
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteRythmAudioAction failed:", err);
+    return { error: "delete_failed" };
+  }
+}
+
 // ── getRythmAudioUrlAction ─────────────────────────────────────────────────────
 // Issues a short-lived signed URL so the browser can play a private object.
 

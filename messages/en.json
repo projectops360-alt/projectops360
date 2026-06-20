@@ -2102,6 +2102,8 @@
       "source_browser_recording": "Browser recording",
       "source_manual_upload": "Uploaded file",
       "play": "Play",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this audio file? This cannot be undone.",
       "transcriptSoonTitle": "Transcription coming soon",
       "transcriptSoonBody": "Once audio is captured, Rythm will transcribe the conversation here. The transcription engine is connected in a later phase.",
       "summarySoonTitle": "AI summary coming soon",
@@ -2125,7 +2127,9 @@
       "errorTooLarge": "The file is too large (max 500 MB).",
       "errorUnsupportedType": "Unsupported file type. Use MP3, WAV, M4A, MP4 or WEBM.",
       "sign_failed": "Could not load the audio. Please try again.",
-      "playFailed": "Could not play the audio. Please try again."
+      "playFailed": "Could not play the audio. Please try again.",
+      "delete_failed": "Could not delete the audio file. Please try again.",
+      "deleteFailed": "Could not delete the audio file. Please try again."
     }
   }
 }
