@@ -31,6 +31,7 @@
     "laborCapacity": "Labor Capacity",
     "drawingIntelligence": "BIM",
     "rhythm": "Rhythm",
+    "rythm": "Rythm",
     "statusReport": "Status"
   },
   "drawingIntelligence": {
@@ -2023,6 +2024,106 @@
         "workface": "Workface Board"
       },
       "empty": "No upcoming activities match the current filters."
+    }
+  },
+  "rythm": {
+    "status": {
+      "draft": "Draft",
+      "recording": "Recording",
+      "audio_uploaded": "Audio uploaded",
+      "ready_for_transcription": "Ready to transcribe",
+      "transcribing": "Transcribing",
+      "transcribed": "Transcribed",
+      "summary_ready": "Summary ready",
+      "failed": "Failed"
+    },
+    "dashboard": {
+      "title": "Rythm — Meeting Intelligence",
+      "subtitle": "Capture in-person meetings, video calls and uploaded recordings, then turn them into searchable project memory.",
+      "newMeeting": "New Meeting",
+      "uploadAudio": "Upload Audio",
+      "empty": "No meetings captured yet. Start recording or upload audio to create project memory."
+    },
+    "form": {
+      "newMeetingTitle": "New Meeting",
+      "close": "Close",
+      "title": "Title",
+      "titlePlaceholder": "e.g. Weekly coordination meeting",
+      "meetingType": "Meeting type",
+      "type_in_person": "In-person meeting",
+      "type_video_call": "Video call",
+      "type_uploaded_audio": "Uploaded audio",
+      "platform": "Platform",
+      "platformPlaceholder": "Zoom, Teams, Meet…",
+      "url": "Meeting link",
+      "date": "Date & time",
+      "participants": "Participants",
+      "participantPlaceholder": "Add a participant name",
+      "remove": "Remove",
+      "cancel": "Cancel",
+      "create": "Create Meeting"
+    },
+    "recorder": {
+      "title": "Record audio",
+      "recording": "Recording…",
+      "paused": "Paused",
+      "start": "Start Recording",
+      "pause": "Pause",
+      "resume": "Resume",
+      "stop": "Stop",
+      "save": "Save Recording",
+      "discard": "Discard",
+      "unsupported": "Audio recording is not supported in this browser. Please upload an audio file instead."
+    },
+    "uploader": {
+      "title": "Upload audio",
+      "hint": "Upload an existing recording of this meeting.",
+      "choose": "Choose an audio file",
+      "formats": "MP3, WAV, M4A, MP4 or WEBM · up to 500 MB",
+      "uploading": "Uploading…"
+    },
+    "detail": {
+      "back": "Back to meetings",
+      "tab_overview": "Overview",
+      "tab_audio": "Audio",
+      "tab_transcript": "Transcript",
+      "tab_summary": "Summary",
+      "field_type": "Type",
+      "field_date": "Date",
+      "field_platform": "Platform",
+      "field_url": "Meeting link",
+      "openLink": "Open link",
+      "field_participants": "Participants",
+      "field_created": "Created",
+      "audioRecords": "Audio records",
+      "noAudio": "No audio captured for this meeting yet.",
+      "source_browser_recording": "Browser recording",
+      "source_manual_upload": "Uploaded file",
+      "play": "Play",
+      "transcriptSoonTitle": "Transcription coming soon",
+      "transcriptSoonBody": "Once audio is captured, Rythm will transcribe the conversation here. The transcription engine is connected in a later phase.",
+      "summarySoonTitle": "AI summary coming soon",
+      "summarySoonBody": "Rythm will summarize each meeting into decisions, action items and project memory here. The summary engine is connected in a later phase."
+    },
+    "errors": {
+      "titleRequired": "A title is required.",
+      "create_failed": "Could not create the meeting. Please try again.",
+      "register_failed": "Audio uploaded but could not be registered. Please try again.",
+      "update_failed": "Could not update the meeting.",
+      "not_authenticated": "Your session expired. Please sign in again.",
+      "meeting_not_found": "Meeting not found.",
+      "audio_not_found": "Audio file not found.",
+      "invalid_input": "Some fields are invalid.",
+      "micPermission": "Microphone access was denied. Please allow it and try again.",
+      "recordingFailed": "Recording failed. Please try again.",
+      "uploadFailed": "Upload failed. Please try again.",
+      "errorUploadFailed": "Upload failed. Please try again.",
+      "errorRegisterFailed": "Could not register the audio file. Please try again.",
+      "errorEmptyFile": "The selected file is empty.",
+      "errorTooLarge": "The file is too large (max 500 MB).",
+      "errorUnsupportedType": "Unsupported file type. Use MP3, WAV, M4A, MP4 or WEBM.",
+      "sign_failed": "Could not load the audio. Please try again.",
+      "playFailed": "Could not play the audio. Please try again."
     }
   }
 }

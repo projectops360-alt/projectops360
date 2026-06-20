@@ -31,6 +31,7 @@
     "laborCapacity": "Capacidad Laboral",
     "drawingIntelligence": "BIM",
     "rhythm": "Ritmo",
+    "rythm": "Rythm",
     "statusReport": "Estado"
   },
   "drawingIntelligence": {
@@ -2023,6 +2024,106 @@
         "workface": "Tablero de Frente"
       },
       "empty": "Sin actividades próximas que coincidan con los filtros actuales."
+    }
+  },
+  "rythm": {
+    "status": {
+      "draft": "Borrador",
+      "recording": "Grabando",
+      "audio_uploaded": "Audio cargado",
+      "ready_for_transcription": "Listo para transcribir",
+      "transcribing": "Transcribiendo",
+      "transcribed": "Transcrito",
+      "summary_ready": "Resumen listo",
+      "failed": "Fallido"
+    },
+    "dashboard": {
+      "title": "Rythm — Inteligencia de Reuniones",
+      "subtitle": "Captura reuniones presenciales, videollamadas y grabaciones cargadas, y conviértelas en memoria de proyecto consultable.",
+      "newMeeting": "Nueva reunión",
+      "uploadAudio": "Cargar audio",
+      "empty": "Aún no se han capturado reuniones. Comienza a grabar o carga un audio para crear memoria del proyecto."
+    },
+    "form": {
+      "newMeetingTitle": "Nueva reunión",
+      "close": "Cerrar",
+      "title": "Título",
+      "titlePlaceholder": "p. ej. Reunión de coordinación semanal",
+      "meetingType": "Tipo de reunión",
+      "type_in_person": "Reunión presencial",
+      "type_video_call": "Videollamada",
+      "type_uploaded_audio": "Audio cargado",
+      "platform": "Plataforma",
+      "platformPlaceholder": "Zoom, Teams, Meet…",
+      "url": "Enlace de la reunión",
+      "date": "Fecha y hora",
+      "participants": "Participantes",
+      "participantPlaceholder": "Agrega el nombre de un participante",
+      "remove": "Quitar",
+      "cancel": "Cancelar",
+      "create": "Crear reunión"
+    },
+    "recorder": {
+      "title": "Grabar audio",
+      "recording": "Grabando…",
+      "paused": "En pausa",
+      "start": "Iniciar grabación",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "stop": "Detener",
+      "save": "Guardar grabación",
+      "discard": "Descartar",
+      "unsupported": "Este navegador no admite la grabación de audio. Carga un archivo de audio en su lugar."
+    },
+    "uploader": {
+      "title": "Cargar audio",
+      "hint": "Carga una grabación existente de esta reunión.",
+      "choose": "Elige un archivo de audio",
+      "formats": "MP3, WAV, M4A, MP4 o WEBM · hasta 500 MB",
+      "uploading": "Cargando…"
+    },
+    "detail": {
+      "back": "Volver a reuniones",
+      "tab_overview": "Resumen",
+      "tab_audio": "Audio",
+      "tab_transcript": "Transcripción",
+      "tab_summary": "Resumen IA",
+      "field_type": "Tipo",
+      "field_date": "Fecha",
+      "field_platform": "Plataforma",
+      "field_url": "Enlace de la reunión",
+      "openLink": "Abrir enlace",
+      "field_participants": "Participantes",
+      "field_created": "Creada",
+      "audioRecords": "Registros de audio",
+      "noAudio": "Aún no hay audio capturado para esta reunión.",
+      "source_browser_recording": "Grabación en navegador",
+      "source_manual_upload": "Archivo cargado",
+      "play": "Reproducir",
+      "transcriptSoonTitle": "Transcripción próximamente",
+      "transcriptSoonBody": "Una vez capturado el audio, Rythm transcribirá la conversación aquí. El motor de transcripción se conecta en una fase posterior.",
+      "summarySoonTitle": "Resumen con IA próximamente",
+      "summarySoonBody": "Rythm resumirá cada reunión en decisiones, acciones y memoria del proyecto aquí. El motor de resumen se conecta en una fase posterior."
+    },
+    "errors": {
+      "titleRequired": "Se requiere un título.",
+      "create_failed": "No se pudo crear la reunión. Inténtalo de nuevo.",
+      "register_failed": "El audio se cargó pero no se pudo registrar. Inténtalo de nuevo.",
+      "update_failed": "No se pudo actualizar la reunión.",
+      "not_authenticated": "Tu sesión expiró. Inicia sesión de nuevo.",
+      "meeting_not_found": "Reunión no encontrada.",
+      "audio_not_found": "Archivo de audio no encontrado.",
+      "invalid_input": "Algunos campos no son válidos.",
+      "micPermission": "Se denegó el acceso al micrófono. Permítelo e inténtalo de nuevo.",
+      "recordingFailed": "La grabación falló. Inténtalo de nuevo.",
+      "uploadFailed": "La carga falló. Inténtalo de nuevo.",
+      "errorUploadFailed": "La carga falló. Inténtalo de nuevo.",
+      "errorRegisterFailed": "No se pudo registrar el archivo de audio. Inténtalo de nuevo.",
+      "errorEmptyFile": "El archivo seleccionado está vacío.",
+      "errorTooLarge": "El archivo es demasiado grande (máx. 500 MB).",
+      "errorUnsupportedType": "Tipo de archivo no admitido. Usa MP3, WAV, M4A, MP4 o WEBM.",
+      "sign_failed": "No se pudo cargar el audio. Inténtalo de nuevo.",
+      "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo."
     }
   }
 }
