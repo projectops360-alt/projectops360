@@ -9,34 +9,26 @@
   },
   "hero": {
     "badge": "Private beta · Execution platform",
-    "title": "Operational Intelligence for ",
-    "titleAccent": "Project-Driven Organizations",
-    "lede": "Unify planning, execution, risk management, and workforce analytics into a single command center. ",
-    "ledeStrong": "Full visibility. Zero blind spots.",
+    "title1": "Operational",
+    "title2": "intelligence for",
+    "titleAccent1": "project-driven",
+    "titleAccent2": "organizations.",
+    "subhead": "Unify planning, execution, risk and workforce analytics into a single command center. ",
+    "subheadStrong": "Full visibility. Zero blind spots.",
     "ctaPrimary": "Request early access",
-    "ctaSecondary": "See how it works",
-    "trust": {
-      "charterTitle": "Charter & governance",
-      "charterDesc": "Clear objectives and approvals",
-      "frameworkTitle": "Hybrid framework",
-      "frameworkDesc": "Agile, Waterfall, or custom",
-      "memoryTitle": "Living memory",
-      "memoryDesc": "Always-searchable decisions"
-    }
+    "ctaSecondary": "See how it works"
   },
   "executionMap": {
     "title": "Execution Map",
     "live": "Live",
-    "currentPhase": "CURRENT PHASE",
-    "tasks": "TASKS",
-    "activeMemory": "Active memory",
-    "nodes": {
-      "charter": "Charter & Governance",
-      "framework": "Adaptive Framework",
-      "plan": "Plan & Team",
-      "execution": "Execution",
-      "memory": "Living Memory",
-      "reporting": "Reporting"
+    "activeMemory": "Active memory · always searchable",
+    "cards": {
+      "charter": { "label": "CURRENT", "title": "Charter & Gov." },
+      "framework": { "label": "PHASE 02", "title": "Framework" },
+      "plan": { "label": "PHASE 03", "title": "Plan & Team" },
+      "execution": { "label": "ACTIVE", "title": "Execution" },
+      "memory": { "label": "PHASE 05", "title": "Living Memory" },
+      "reporting": { "label": "PHASE 06", "title": "Reporting" }
     },
     "stats": {
       "decisions": "Decisions",
@@ -44,172 +36,74 @@
       "traceability": "Traceability"
     }
   },
-  "socialProof": {
+  "logos": {
     "title": "Teams in our private beta"
   },
-  "features": {
-    "kicker": "Capabilities",
-    "title": "Context, execution, and ",
-    "titleAccent": "memory",
-    "titleEnd": " in one place",
-    "subtitle": "Project Ops 360° forgets nothing. Every meeting, change, and decision is logged as project intelligence.",
+  "capabilities": {
+    "eyebrow": "Capabilities",
+    "title": "Context, execution and memory — in one place.",
+    "supporting": "Everything a project-driven organization needs to plan, run and remember its work — without switching tools.",
     "items": {
-      "memory": {
-        "title": "Project Memory",
-        "desc": "Decisions, minutes, and lessons learned become searchable knowledge. Your project never forgets the \"why\"."
-      },
-      "governance": {
-        "title": "Governance & Charter",
-        "desc": "Define scope, approvals, a RACI matrix, and success criteria before you start. Everything aligned from day one."
-      },
-      "framework": {
-        "title": "Adaptive Framework",
-        "desc": "AI recommends the best approach (Agile, Waterfall, or Hybrid) based on uncertainty and stakeholders."
-      },
-      "teams": {
-        "title": "Teams & Roles",
-        "desc": "Build teams with internal members, vendors, and externals. Specific permissions and a RACI everyone can see."
-      },
-      "command": {
-        "title": "Command Center",
-        "desc": "A unified view of health, blockers, risks, approvals, and scope-drift alerts in real time."
-      },
-      "reporting": {
-        "title": "Smart Reporting",
-        "desc": "Generate business-language reports that connect progress to the original strategy. No jargon."
-      }
-    }
-  },
-  "workflow": {
-    "kicker": "Workflow",
-    "title": "From idea to delivery with ",
-    "titleAccent": "full auditability",
-    "subtitle": "Built for PMOs, consultancies, and data teams that need clarity, accountability, and adaptability.",
-    "steps": {
-      "create": {
-        "title": "Create the project",
-        "desc": "Start in your personal or company space. Billing and members are managed at the workspace level."
-      },
       "charter": {
-        "title": "Define the charter",
-        "desc": "Capture objectives, scope, deliverables, constraints, and the approval flow."
+        "title": "Charter & governance",
+        "desc": "Clear objectives, scope and approvals. Every project starts with an auditable charter."
       },
       "framework": {
-        "title": "Choose the framework",
-        "desc": "AI recommends the best approach (Agile, Waterfall, or Hybrid) for your project."
+        "title": "Hybrid framework",
+        "desc": "Agile, Waterfall or fully custom — run each phase in the methodology it actually needs."
       },
-      "team": {
-        "title": "Build the team",
-        "desc": "Add internals, full teams, vendors, and stakeholders with clear roles and permissions."
+      "memory": {
+        "title": "Living memory",
+        "desc": "Every decision, risk and approval stays searchable forever. Onboarding takes minutes."
       },
-      "execute": {
-        "title": "Execute, report, and learn",
-        "desc": "Every task, meeting, risk, and change is recorded in the project memory."
+      "risk": {
+        "title": "Risk radar",
+        "desc": "Surface risks before they bite. Live exposure scoring across every active project."
+      },
+      "workforce": {
+        "title": "Workforce analytics",
+        "desc": "Capacity, load and velocity per team. Know who's stretched before they burn out."
+      },
+      "executionMap": {
+        "title": "Execution map",
+        "desc": "A live command center across every phase, task and milestone. Full visibility, zero blind spots."
       }
     }
   },
-  "testimonial": {
-    "quote": "We finally stopped digging through email threads for the reasoning behind every decision. The project memory became our single source of truth.",
-    "name": "María Restrepo",
+  "methodology": {
+    "eyebrow": "Methodology",
+    "title": "One framework. Every methodology your projects need.",
+    "nodes": {
+      "charter": { "title": "Charter", "sub": "Governance" },
+      "framework": { "title": "Framework", "sub": "Agile / Waterfall" },
+      "plan": { "title": "Plan & Team", "sub": "Capacity" },
+      "execution": { "title": "Execution", "sub": "In progress" },
+      "memory": { "title": "Living Memory", "sub": "Searchable" },
+      "reporting": { "title": "Reporting", "sub": "Traceability" }
+    },
+    "stats": {
+      "traceability": "average traceability across active programs in private beta.",
+      "decisions": "decisions captured and kept searchable in living memory.",
+      "blindspots": "blind spots. Risk, capacity and status in a single command center."
+    }
+  },
+  "quote": {
+    "pre": "“We replaced four tools with one. For the first time, leadership and delivery are looking at the ",
+    "accent": "same source of truth",
+    "post": ".”",
+    "name": "Daniela Ortiz",
     "role": "Head of PMO · NorthPeak"
   },
-  "teams": {
-    "kicker": "For real organizations",
-    "title": "Flexible for founders, robust for ",
-    "titleAccent": "global enterprises",
-    "subtitle": "Billing is per workspace. External stakeholders participate without needing to be paid users.",
-    "items": {
-      "solo": {
-        "title": "Solo PM / Founder",
-        "desc": "Manage personal projects, backlog, and planning with AI—no corporate complexity."
-      },
-      "small": {
-        "title": "Small Teams",
-        "desc": "Create reusable teams, assign roles, and track multiple active projects."
-      },
-      "pmo": {
-        "title": "PMO / Company",
-        "desc": "Governance, stakeholder reporting, approval flows, and drift detection."
-      },
-      "enterprise": {
-        "title": "Enterprise",
-        "desc": "Auditing, SSO, advanced permissions, integrations, and data retention for regulated environments."
-      }
-    }
-  },
-  "pricing": {
-    "kicker": "Transparent pricing",
-    "title": "Choose the plan that ",
-    "titleAccent": "powers your operation",
-    "subtitle": "Scale from solo to multinational. Pay per internal user.",
-    "mostPopular": "★ Most popular",
-    "perMonth": "/mo",
-    "perUserMonth": "/user/mo",
-    "plans": {
-      "personal": {
-        "name": "Personal",
-        "price": "$0",
-        "desc": "For validating projects, students, or founders.",
-        "features": ["Personal workspace", "Limited projects", "Basic charter", "Limited AI credits"],
-        "cta": "Start free"
-      },
-      "team": {
-        "name": "Team",
-        "price": "$39",
-        "desc": "For startups and small teams with shared visibility.",
-        "features": ["Company workspace", "Reusable teams", "Roles and permissions", "Basic stakeholder access"],
-        "cta": "Try 14 days"
-      },
-      "business": {
-        "name": "Business / PMO",
-        "price": "$99",
-        "desc": "For serious teams that need governance and intelligence.",
-        "features": ["Advanced governance", "Drift detection", "Executive reports", "Unlimited project memory"],
-        "cta": "Get started"
-      },
-      "enterprise": {
-        "name": "Enterprise",
-        "price": "Custom",
-        "desc": "For regulated companies and large rollouts.",
-        "features": ["Custom limits", "SSO and auditing", "Advanced integrations", "Dedicated support"],
-        "cta": "Talk to sales"
-      }
-    }
-  },
-  "security": {
-    "title": "Ready for regulated environments",
-    "desc": "SSO, audit log, and configurable data retention.",
-    "badges": ["SSO / SAML", "Audit log", "Granular roles", "Encryption at rest"]
-  },
-  "faq": {
-    "title": "Frequently asked questions",
-    "items": [
-      {
-        "q": "How does per-workspace billing work?",
-        "a": "You pay only for internal workspace users. External stakeholders participate, comment, and approve without taking up a paid license."
-      },
-      {
-        "q": "What exactly is the \"project memory\"?",
-        "a": "A searchable record of every decision, risk, minute, and change, linked to its context. When someone asks \"why did we decide this?\", the answer is one search away."
-      },
-      {
-        "q": "Can I combine Agile and Waterfall in the same project?",
-        "a": "Yes. The adaptive framework supports hybrid approaches per phase, and AI suggests the best fit based on uncertainty and stakeholders."
-      },
-      {
-        "q": "When will it be publicly available?",
-        "a": "We are in private beta with a small group of teams. Request early access and we will notify you as soon as we open your spot."
-      }
-    ]
-  },
   "cta": {
-    "eyebrow": "Project Ops 360°",
-    "title": "Give your project a foundation, a team, and memory that never fades",
-    "desc": "Join the private beta of the execution platform that understands your business context.",
-    "button": "Request early access"
+    "badge": "Private beta · limited seats",
+    "title1": "Bring full visibility to",
+    "title2": "every project you run.",
+    "desc": "Join the teams running planning, execution and risk from a single command center.",
+    "primary": "Request early access",
+    "secondary": "Book a walkthrough"
   },
   "footer": {
-    "copyright": "© 2026 Project Ops 360° · Built with precision for PMOs",
-    "tags": "Governance · Memory · Reporting"
+    "privacy": "Privacy",
+    "copyright": "© 2026 ProjectOps 360°"
   }
 }

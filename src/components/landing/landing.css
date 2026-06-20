@@ -1,87 +1,102 @@
 /* ==========================================================================
-   Project Ops 360° — marketing landing (scoped). Design tokens, fonts and the
-   Execution Map animation from the handoff. Everything is scoped under .lp-root
-   so it never leaks into the app's theme.
+   ProjectOps 360° — marketing landing (scoped). "Dark Command Center" redesign.
+   Design tokens, fonts and animations from the handoff. Everything is scoped
+   under .lp-root so it never leaks into the app's theme.
    ========================================================================== */
 
 .lp-root {
-  /* palette */
-  --lp-green: #2a9d8f;
-  --lp-green-dark: #1b4d3d;
-  --lp-green-grad-end: #26715b;
-  --lp-green-soft: #ecf6f4;
-  --lp-text: #16302a;
-  --lp-muted: #5b6e6e;
-  --lp-faint: #94a5a2;
-  --lp-surface: #ffffff;
-  --lp-surface-alt: #f7faf9;
-  --lp-surface-alt2: #fafcfb;
-  --lp-border: #e8eef0;
-  --lp-border-light: #eef2f3;
-  --lp-amber: #eab857;
-  /* execution map (dark panel) */
-  --lp-map-accent: #34d9a6;
-  --lp-map-text: #e7f1ee;
-  --lp-map-muted: #6f857f;
+  /* darks */
+  --lp-forest: #07120d;
+  --lp-method-dark: #0a1611;
+  --lp-panel-a: #0e1512;
+  --lp-panel-b: #0a0f0c;
+  --lp-ring-inner: #101a15;
+  /* greens */
+  --lp-green-deep: #0c3a2a;
+  --lp-green-deeper: #06231a;
+  --lp-emerald: #1fb587;
+  --lp-mint: #3ce5a4;
+  /* amber */
+  --lp-amber: #e2a33c;
+  /* light section */
+  --lp-light-bg: #f6f8f6;
+  --lp-card-border: #e7ece8;
+  --lp-icon-tile: #eaf6f0;
+  --lp-ink: #10271e;
+  --lp-muted-light: #5c6b62;
+  --lp-muted-light2: #7b877f;
+  /* dark muted */
+  --lp-muted-dark: #a9bab1;
+  --lp-muted-dark2: #b8c7bf;
+  --lp-muted-dark3: #6f8278;
+  --lp-muted-dark4: #7e9389;
+  --lp-muted-dark5: #5e7269;
 
-  font-family: var(--font-jakarta), -apple-system, BlinkMacSystemFont, sans-serif;
-  color: var(--lp-text);
-  background: var(--lp-surface);
-  line-height: 1.6;
+  font-family: var(--font-hanken), system-ui, sans-serif;
+  background: var(--lp-forest);
+  color: #fff;
   -webkit-font-smoothing: antialiased;
-}
-
-.lp-root .lp-head {
-  font-family: var(--font-space-grotesk), var(--font-jakarta), sans-serif;
-}
-
-/* in-page smooth scrolling for the nav anchors */
-.lp-root {
+  text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
 }
 
-/* ── Execution Map animations ───────────────────────────────────────────── */
-@keyframes lp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-@keyframes lp-flowx { to { background-position: 14px 0, 0 0; } }
-@keyframes lp-flowy { to { background-position: 0 14px, 0 0; } }
-@keyframes lp-glow {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(52, 217, 166, 0.4), 0 0 18px rgba(42, 157, 143, 0.28); }
-  50% { box-shadow: 0 0 0 1px rgba(52, 217, 166, 0.85), 0 0 30px rgba(42, 157, 143, 0.5); }
+.lp-root .lp-display {
+  font-family: var(--font-bricolage), var(--font-hanken), sans-serif;
 }
-@keyframes lp-node { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
 
-.lp-anim-pulse { animation: lp-pulse 2.4s ease-in-out infinite; }
-.lp-anim-flowx { animation: lp-flowx 0.7s linear infinite; }
-.lp-anim-flowy { animation: lp-flowy 0.7s linear infinite; }
-.lp-anim-glow { animation: lp-glow 2.6s ease-in-out infinite; }
-.lp-anim-node { animation: lp-node 2s ease-in-out infinite; }
-
-/* the marching-ants connector wires */
-.lp-wire-x {
-  background-image:
-    linear-gradient(90deg, rgba(52, 217, 166, 0.95) 0 6px, transparent 6px 14px),
-    linear-gradient(rgba(52, 217, 166, 0.18), rgba(52, 217, 166, 0.18));
-  background-size: 14px 2px, 100% 2px;
-  background-repeat: repeat-x, no-repeat;
-  box-shadow: 0 0 6px rgba(52, 217, 166, 0.4);
+.lp-root ::selection {
+  background: var(--lp-mint);
+  color: var(--lp-green-deeper);
 }
-.lp-wire-y {
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes lp-floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes lp-glowPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes lp-gridDrift { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
+@keyframes lp-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes lp-dotPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.9); } }
+
+.lp-anim-float { animation: lp-floatY 8s ease-in-out infinite; }
+.lp-anim-glow { animation: lp-glowPulse 7s infinite; }
+.lp-anim-grid { animation: lp-gridDrift 9s linear infinite; }
+.lp-anim-blink { animation: lp-blink 1.6s infinite; }
+.lp-anim-dot { animation: lp-glowPulse 2s infinite; }
+
+/* faint grid overlay used in hero + CTA card */
+.lp-grid-overlay {
   background-image:
-    linear-gradient(180deg, rgba(52, 217, 166, 0.95) 0 6px, transparent 6px 14px),
-    linear-gradient(rgba(52, 217, 166, 0.18), rgba(52, 217, 166, 0.18));
-  background-size: 2px 14px, 2px 100%;
-  background-repeat: repeat-y, no-repeat;
-  box-shadow: 0 0 6px rgba(52, 217, 166, 0.4);
+    linear-gradient(rgba(60, 229, 164, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 229, 164, 0.045) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+.lp-grid-overlay-cta {
+  background-image:
+    linear-gradient(rgba(60, 229, 164, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 229, 164, 0.05) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+
+/* clipped gradient text (hero accent lines) */
+.lp-grad-text {
+  background: linear-gradient(100deg, #3ce5a4, #1fb587 72%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Scroll reveal ──────────────────────────────────────────────────────── */
+.lp-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.lp-reveal.lp-reveal-in {
+  opacity: 1;
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-anim-pulse, .lp-anim-flowx, .lp-anim-flowy, .lp-anim-glow, .lp-anim-node {
-    animation: none !important;
-  }
+  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot { animation: none !important; }
+  .lp-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .lp-root { scroll-behavior: auto; }
 }
-
-/* Responsive scale of the fixed-size Execution Map canvas */
-@media (max-width: 1120px) { .lp-exec-scale { transform: scale(0.82); } }
-@media (max-width: 980px) { .lp-exec-scale { transform: scale(0.64); transform-origin: top center; } }
-@media (max-width: 760px) { .lp-exec-scale { transform: scale(0.78); transform-origin: top center; } }

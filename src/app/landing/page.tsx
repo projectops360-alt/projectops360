@@ -1,30 +1,18 @@
-import { LandingNav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { SocialProof } from "@/components/landing/social-proof";
-import { Features } from "@/components/landing/features";
-import { Workflow } from "@/components/landing/workflow";
-import { Testimonial } from "@/components/landing/testimonial";
-import { Teams } from "@/components/landing/teams";
-import { Pricing } from "@/components/landing/pricing";
-import { Security } from "@/components/landing/security";
-import { Faq } from "@/components/landing/faq";
+import { Capabilities } from "@/components/landing/capabilities";
+import { Methodology } from "@/components/landing/methodology";
+import { Quote } from "@/components/landing/quote";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 
 export default function LandingPage() {
   return (
     <>
-      <LandingNav />
+      <Hero />
       <main>
-        <Hero />
-        <SocialProof />
-        <Features />
-        <Workflow />
-        <Testimonial />
-        <Teams />
-        <Pricing />
-        <Security />
-        <Faq />
+        <Capabilities />
+        <Methodology />
+        <Quote />
         <FinalCta />
       </main>
       <Footer />

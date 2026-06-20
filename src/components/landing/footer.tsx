@@ -1,14 +1,24 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslation } from "react-i18next";
+
+const LINKS = ["nav.features", "nav.methodology", "nav.teams", "nav.pricing", "footer.privacy"] as const;
 
 export function Footer() {
   const { t } = useTranslation();
   return (
-    <footer className="border-t border-[#e8eef0] bg-white">
-      <div className="mx-auto flex max-w-[1800px] flex-col items-center justify-between gap-3 px-6 py-8 text-[13px] text-[#94a5a2] sm:flex-row">
-        <span>{t("footer.copyright")}</span>
-        <span>{t("footer.tags")}</span>
+    <footer className="border-t border-white/[0.06] bg-[#07120D] px-6 py-[54px] md:px-10">
+      <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-6">
+        <Image src="/logo-3d.webp" alt="ProjectOps 360°" width={1344} height={768} className="h-10 w-auto rounded-lg" />
+        <div className="flex flex-wrap gap-x-[30px] gap-y-2 text-[14px] font-semibold text-[#7E9389]">
+          {LINKS.map((k) => (
+            <a key={k} href="#" className="transition-colors hover:text-white">
+              {t(k)}
+            </a>
+          ))}
+        </div>
+        <div className="text-[13px] text-[#5E7269]">{t("footer.copyright")}</div>
       </div>
     </footer>
   );

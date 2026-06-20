@@ -1,73 +1,79 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
-import { ArrowRight, Brain, ClipboardCheck, Play, RefreshCw, type LucideIcon } from "lucide-react";
+import { LandingNav } from "./nav";
 import { ExecutionMap } from "./execution-map";
-
-const TRUST: { Icon: LucideIcon; title: string; desc: string }[] = [
-  { Icon: ClipboardCheck, title: "hero.trust.charterTitle", desc: "hero.trust.charterDesc" },
-  { Icon: RefreshCw, title: "hero.trust.frameworkTitle", desc: "hero.trust.frameworkDesc" },
-  { Icon: Brain, title: "hero.trust.memoryTitle", desc: "hero.trust.memoryDesc" },
-];
+import { LogosStrip } from "./logos-strip";
+import { Reveal } from "./reveal";
 
 export function Hero() {
   const { t } = useTranslation();
   return (
-    <section
-      id="hero-grid"
-      className="mx-auto grid max-w-[1800px] items-center gap-[60px] px-6 pb-14 pt-20 lg:grid-cols-[1fr_1.08fr]"
-    >
-      <div>
-        <div className="mb-6 inline-flex items-center gap-[9px] rounded-full border border-[#2a9d8f]/[0.18] bg-[#ecf6f4] px-3.5 py-[5px] pl-[11px] text-[12.5px] font-semibold text-[#1B4D3D]">
-          <span className="lp-anim-pulse h-[7px] w-[7px] rounded-full bg-[#2A9D8F]" />
+    <section className="relative overflow-hidden bg-[#07120D]">
+      {/* decorative layers */}
+      <div className="lp-grid-overlay lp-anim-grid pointer-events-none absolute inset-0" />
+      <div
+        className="lp-anim-glow pointer-events-none absolute left-1/2 top-[-160px] h-[580px] w-[900px] -translate-x-1/2 blur-[34px]"
+        style={{ background: "radial-gradient(ellipse, rgba(31,181,135,.38), transparent 64%)" }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "linear-gradient(180deg, transparent 60%, #07120D)" }}
+      />
+
+      <LandingNav />
+
+      {/* hero copy */}
+      <div className="relative mx-auto max-w-[1100px] px-6 pt-[70px] text-center md:px-10">
+        <Reveal index={0} className="mb-[34px] inline-flex items-center gap-[9px] rounded-full border border-[#3CE5A4]/30 bg-[#3CE5A4]/10 px-4 py-2 text-[13.5px] font-bold text-[#3CE5A4]">
+          <span className="lp-anim-dot h-2 w-2 rounded-full bg-[#3CE5A4]" />
           {t("hero.badge")}
-        </div>
+        </Reveal>
 
-        <h1 className="lp-head mb-[22px] text-[clamp(40px,5vw,62px)] font-bold leading-[1.04] tracking-[-.035em] text-[#1B4D3D]">
-          {t("hero.title")}
-          <span className="text-[#2A9D8F]">{t("hero.titleAccent")}</span>
-        </h1>
+        <Reveal index={1}>
+          <h1 className="lp-display m-0 mb-7 text-[clamp(40px,8vw,82px)] font-extrabold leading-[0.96] tracking-[-.03em] text-white">
+            {t("hero.title1")}
+            <br />
+            {t("hero.title2")}
+            <br />
+            <span className="lp-grad-text">
+              {t("hero.titleAccent1")}
+              <br />
+              {t("hero.titleAccent2")}
+            </span>
+          </h1>
+        </Reveal>
 
-        <p className="mb-[30px] max-w-[520px] text-[18px] leading-[1.65] text-[#5b6e6e]">
-          {t("hero.lede")}
-          <strong className="font-semibold text-[#16302a]">{t("hero.ledeStrong")}</strong>
-        </p>
+        <Reveal index={2}>
+          <p className="mx-auto mb-[38px] max-w-[620px] text-[20px] leading-[1.55] text-[#A9BAB1]">
+            {t("hero.subhead")}
+            <strong className="font-bold text-white">{t("hero.subheadStrong")}</strong>
+          </p>
+        </Reveal>
 
-        <div className="mb-10 flex flex-wrap gap-3">
+        <Reveal index={3} className="flex flex-wrap justify-center gap-[14px]">
           <a
             href="#cta"
-            className="inline-flex min-h-[50px] items-center gap-2 rounded-full bg-[#2A9D8F] px-[26px] text-[15px] font-semibold text-white transition-colors hover:bg-[#1B4D3D]"
+            className="inline-flex items-center gap-2.5 rounded-full bg-[#3CE5A4] px-[30px] py-[17px] text-[16px] font-extrabold text-[#06231a] shadow-[0_18px_38px_-12px_rgba(60,229,164,.65)] transition-transform hover:-translate-y-0.5"
           >
-            {t("hero.ctaPrimary")}
-            <ArrowRight size={17} />
+            {t("hero.ctaPrimary")} <span className="text-[18px]">→</span>
           </a>
           <a
-            href="#workflow"
-            className="inline-flex min-h-[50px] items-center gap-[9px] rounded-full border border-[#dfe6e8] bg-white px-6 text-[15px] font-semibold text-[#16302a] transition-colors hover:border-[#c7d3d4]"
+            href="#capabilities"
+            className="inline-flex items-center gap-[11px] rounded-full border-[1.5px] border-white/[0.18] px-7 py-[17px] text-[16px] font-bold text-white transition-colors hover:border-white/30 hover:bg-white/[0.06]"
           >
-            <Play size={16} fill="currentColor" stroke="none" />
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#3CE5A4]/[0.16] text-[10px] text-[#3CE5A4]">▶</span>
             {t("hero.ctaSecondary")}
           </a>
-        </div>
-
-        <div className="grid max-w-[640px] grid-cols-1 gap-[18px] border-t border-[#e8eef0] pt-[26px] sm:grid-cols-3">
-          {TRUST.map((item) => (
-            <div key={item.title} className="flex items-start gap-[11px]">
-              <span className="mt-px flex-shrink-0 text-[#2A9D8F]">
-                <item.Icon size={20} strokeWidth={1.7} />
-              </span>
-              <div>
-                <strong className="block text-[14px] text-[#16302a]">{t(item.title)}</strong>
-                <span className="text-[13px] leading-[1.4] text-[#5b6e6e]">{t(item.desc)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        </Reveal>
       </div>
 
-      <div>
+      {/* wide product mockup */}
+      <Reveal index={4} className="relative mx-auto mt-[50px] max-w-[1040px] px-6 md:px-10">
         <ExecutionMap />
-      </div>
+      </Reveal>
+
+      <LogosStrip />
     </section>
   );
 }
