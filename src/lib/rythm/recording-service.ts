@@ -29,6 +29,34 @@ export function isRecordingSupported(): boolean {
   );
 }
 
+export interface AudioInputDevice {
+  deviceId: string;
+  label: string;
+}
+
+/**
+ * Lists available audio input devices. Device labels are only exposed by the
+ * browser after a microphone permission grant, so when `unlock` is true we open
+ * a throwaway stream first to reveal real labels. Without it, labels may be
+ * blank (we fall back to "Microphone N").
+ */
+export async function listAudioInputDevices(unlock = false): Promise<AudioInputDevice[]> {
+  if (!isRecordingSupported()) return [];
+  let temp: MediaStream | null = null;
+  if (unlock) {
+    try {
+      temp = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      /* permission denied — enumerate anyway (labels will be blank) */
+    }
+  }
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  temp?.getTracks().forEach((t) => t.stop());
+  return devices
+    .filter((d) => d.kind === "audioinput")
+    .map((d, i) => ({ deviceId: d.deviceId, label: d.label || `Microphone ${i + 1}` }));
+}
+
 export type RecorderState = "idle" | "recording" | "paused" | "stopped";
 
 export interface RecordingResult {
@@ -59,14 +87,17 @@ export class RythmRecorder {
     return this.mimeType || "audio/webm";
   }
 
-  async start(): Promise<void> {
+  async start(deviceId?: string): Promise<void> {
     if (!isRecordingSupported()) {
       throw new Error("recording_unsupported");
     }
-    // Disable processing that can zero-out a weak signal; keeps real audio.
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
+    const audioConstraints: MediaTrackConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+    if (deviceId) audioConstraints.deviceId = { exact: deviceId };
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
     this.mimeType = pickSupportedMimeType();
     this.chunks = [];
 

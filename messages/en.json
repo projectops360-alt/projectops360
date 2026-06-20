@@ -2073,6 +2073,8 @@
       "save": "Save Recording",
       "discard": "Discard",
       "noSignal": "No sound is reaching the microphone. Check that the right mic is selected and not muted.",
+      "micLabel": "Microphone",
+      "micDefault": "System default",
       "unsupported": "Audio recording is not supported in this browser. Please upload an audio file instead."
     },
     "uploader": {

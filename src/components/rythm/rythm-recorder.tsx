@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { Mic, Pause, Play, Square, Save, Trash2, Loader2, AlertCircle } from "lucide-react";
-import { RythmRecorder as Recorder, isRecordingSupported } from "@/lib/rythm/recording-service";
+import {
+  RythmRecorder as Recorder,
+  isRecordingSupported,
+  listAudioInputDevices,
+  type AudioInputDevice,
+} from "@/lib/rythm/recording-service";
 import { saveBrowserRecording } from "@/lib/rythm/storage-service";
 
 interface RythmRecorderProps {
@@ -41,6 +46,8 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedMime, setRecordedMime] = useState<string>("audio/webm");
   const [error, setError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<AudioInputDevice[]>([]);
+  const [deviceId, setDeviceId] = useState<string>("");
 
   // Capability detection without a setState-in-effect: server renders optimistic
   // (true); the client snapshot resolves after hydration with no mismatch.
@@ -50,7 +57,18 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
     () => true,
   );
 
+  const loadDevices = useCallback(async (unlock: boolean) => {
+    try {
+      setDevices(await listAudioInputDevices(unlock));
+    } catch {
+      /* enumeration is best-effort */
+    }
+  }, []);
+
   useEffect(() => {
+    // Enumerate inputs on mount (labels may be blank until permission granted).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadDevices(false);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -58,7 +76,7 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadDevices]);
 
   function startTimer() {
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -101,12 +119,14 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
     setError(null);
     try {
       const recorder = new Recorder();
-      await recorder.start();
+      await recorder.start(deviceId || undefined);
       recorderRef.current = recorder;
       setSeconds(0);
       setUiState("recording");
       startTimer();
       startMeter();
+      // Permission is now granted → re-list devices with real labels.
+      void loadDevices(false);
     } catch (err) {
       console.error(err);
       setError(tErr("micPermission"));
@@ -239,6 +259,28 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
       {/* Preview */}
       {uiState === "preview" && previewUrl && (
         <audio controls src={previewUrl} className="mt-4 w-full" />
+      )}
+
+      {/* Microphone picker (idle only) — lets the user switch away from a
+          silent/wrong default input device. */}
+      {uiState === "idle" && devices.length > 0 && (
+        <div className="mt-4">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            {t("micLabel")}
+          </label>
+          <select
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            <option value="">{t("micDefault")}</option>
+            {devices.map((d) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
 
       {error && (

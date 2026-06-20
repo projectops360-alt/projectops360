@@ -2073,6 +2073,8 @@
       "save": "Guardar grabación",
       "discard": "Descartar",
       "noSignal": "No está llegando sonido al micrófono. Verifica que el micro correcto esté seleccionado y sin silenciar.",
+      "micLabel": "Micrófono",
+      "micDefault": "Predeterminado del sistema",
       "unsupported": "Este navegador no admite la grabación de audio. Carga un archivo de audio en su lugar."
     },
     "uploader": {
