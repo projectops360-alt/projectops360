@@ -154,7 +154,9 @@
     "accent": "misma fuente de verdad",
     "post": ".”",
     "name": "Daniela Ortiz",
-    "role": "Directora de PMO · NorthPeak"
+    "role": "Directora de PMO · NorthPeak",
+    "replacesLabel": "Cuatro herramientas, una plataforma",
+    "replaces": ["Planificación", "Entrega", "Memoria de proyecto", "Reportes"]
   },
   "cta": {
     "badge": "Beta privada · cupos limitados",
