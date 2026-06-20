@@ -22,16 +22,19 @@ export default async function DeliveryPage({
 
   const org = await getOrgContext();
   const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data: project } = await supabase
-    .from("projects").select("id, slug, title_i18n, project_type")
-    .eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single();
+  // Project lookup and framework resolution are independent — fan them out,
+  // then fan the remaining per-project reads out in a single Promise.all
+  // (cycle items + live task status counts were previously sequential).
+  const [projectResult, framework] = await Promise.all([
+    supabase.from("projects").select("id, slug, title_i18n, project_type").eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single(),
+    getFrameworkByProject(admin, org.organizationId, projectId),
+  ]);
+  const project = projectResult.data;
   if (!project) notFound();
 
-  const admin = createAdminClient();
-  const framework = await getFrameworkByProject(admin, org.organizationId, projectId);
-
-  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes] = await Promise.all([
+  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes] = await Promise.all([
     framework
       ? supabase.from("project_board_columns").select("id, name, position, is_done_column, wip_limit").eq("framework_id", framework.id).order("position")
       : Promise.resolve({ data: [] }),
@@ -42,16 +45,13 @@ export default async function DeliveryPage({
     supabase.from("project_scope_creep_alerts").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "open").order("created_at", { ascending: false }),
     supabase.from("milestones").select("id, title").eq("project_id", projectId).is("deleted_at", null).order("order_index"),
     supabase.from("risks").select("id, title").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).limit(50),
+    supabase.from("project_cycle_items").select("id, cycle_id, backlog_item_id").eq("project_id", projectId).eq("organization_id", org.organizationId),
+    supabase.from("roadmap_tasks").select("status").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
   ]);
 
-  const { data: cycleItemsData } = await supabase
-    .from("project_cycle_items").select("id, cycle_id, backlog_item_id")
-    .eq("project_id", projectId).eq("organization_id", org.organizationId);
-
+  const cycleItemsData = cycleItemsRes.data;
   // Live task counts per status — powers the WIP badges and adaptive metrics.
-  const { data: taskRows } = await supabase
-    .from("roadmap_tasks").select("status")
-    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null);
+  const taskRows = taskRowsRes.data;
   const taskStatusCounts: Record<string, number> = {};
   for (const r of (taskRows ?? []) as { status: string }[]) {
     taskStatusCounts[r.status] = (taskStatusCounts[r.status] ?? 0) + 1;

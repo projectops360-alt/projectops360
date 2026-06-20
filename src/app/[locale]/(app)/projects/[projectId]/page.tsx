@@ -40,25 +40,54 @@ export default async function ProjectDetailPage({
   const org = await getOrgContext();
   const supabase = await createClient();
 
-  // Fetch the project, scoped to the user's organization
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, slug, title_i18n, description_i18n, status, project_type, start_date, target_end_date, created_at, updated_at")
-    .eq("id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .single();
+  // Project + charter + delivery framework + team + scope-creep alerts + active
+  // cycle are all independent (they only depend on projectId/org, not on each
+  // other), so we fan them out in a single Promise.all instead of running them
+  // sequentially. notFound() is validated afterwards.
+  const [
+    projectResult,
+    charterResult,
+    fwResult,
+    openAlertsResult,
+    activeCycleResult,
+    teamComp,
+  ] = await Promise.all([
+    // Project (scoped to the user's organization)
+    supabase
+      .from("projects")
+      .select("id, slug, title_i18n, description_i18n, status, project_type, start_date, target_end_date, created_at, updated_at")
+      .eq("id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .single(),
+    // Charter status (governance health for the Command Center).
+    supabase
+      .from("project_charters")
+      .select(`status, version, ${CHARTER_FIELDS.map((f) => f.key).join(", ")}`)
+      .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null)
+      .maybeSingle(),
+    // Delivery framework (Command Center strip).
+    supabase
+      .from("project_delivery_frameworks").select("delivery_method, status")
+      .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle(),
+    // Open scope-creep alerts count.
+    supabase.from("project_scope_creep_alerts").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "open"),
+    // Active execution cycle.
+    supabase.from("project_execution_cycles").select("name").eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "active").is("deleted_at", null).limit(1).maybeSingle(),
+    // Team & Roles (Command Center strip) — dynamic import keeps it out of the
+    // initial bundle; runs concurrently with the DB queries above.
+    (async () => {
+      const { getProjectTeam, computeTeamCompleteness } = await import("@/lib/team-roles/service");
+      return computeTeamCompleteness(await getProjectTeam(org, projectId));
+    })(),
+  ]);
 
+  const project = projectResult.data;
   if (!project) {
     notFound();
   }
 
-  // Charter status (governance health for the Command Center).
-  const { data: charterRowRaw } = await supabase
-    .from("project_charters")
-    .select(`status, version, ${CHARTER_FIELDS.map((f) => f.key).join(", ")}`)
-    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null)
-    .maybeSingle();
+  const charterRowRaw = charterResult.data;
   const charterRow = charterRowRaw as Record<string, unknown> | null;
   const charterStatus = (charterRow?.status as CharterStatus | undefined) ?? null;
   const charterMeta = charterStatus ? CHARTER_STATUS_META[charterStatus] : null;
@@ -67,20 +96,11 @@ export default async function ProjectDetailPage({
     ? computeCharterCompletion(charterRow as Partial<Record<CharterFieldKey, string>>).pct
     : 0;
 
-  // Delivery framework (Command Center strip).
-  const { data: fwRow } = await supabase
-    .from("project_delivery_frameworks").select("delivery_method, status")
-    .eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).maybeSingle();
-  const [{ count: openAlerts }, { data: activeCycle }] = await Promise.all([
-    supabase.from("project_scope_creep_alerts").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "open"),
-    supabase.from("project_execution_cycles").select("name").eq("project_id", projectId).eq("organization_id", org.organizationId).eq("status", "active").is("deleted_at", null).limit(1).maybeSingle(),
-  ]);
+  const fwRow = fwResult.data;
+  const openAlerts = openAlertsResult.count;
+  const activeCycle = activeCycleResult.data;
   const fwMethod = (fwRow as { delivery_method?: string } | null)?.delivery_method ?? null;
   const fwMethodLabel = fwMethod ? (locale === "es" ? DELIVERY_METHODS[fwMethod as DeliveryMethod]?.es : DELIVERY_METHODS[fwMethod as DeliveryMethod]?.en) : null;
-
-  // Team & Roles (Command Center strip).
-  const { getProjectTeam, computeTeamCompleteness } = await import("@/lib/team-roles/service");
-  const teamComp = computeTeamCompleteness(await getProjectTeam(org, projectId));
 
   const lang = locale as Locale;
   const title = getI18nValue(project.title_i18n, lang) || project.slug;

@@ -217,6 +217,84 @@ export async function promoteBacklogItemsAction(input: { projectId: string; ids?
   return { count: rows.length };
 }
 
+// ── Milestones (schedule backbone) ──────────────────────────────────────────
+
+const MS_ICONS = ["setup", "shield_database", "users", "notebook", "link", "sparkles", "chart", "loop", "check_circle", "rocket"];
+/** Pick a valid icon: honor the AI's choice if known, else a sensible phase
+ *  default (start→setup, end→rocket, middle→rotating set). */
+function safeIcon(key: string, i: number, n: number): string {
+  if (MS_ICONS.includes(key)) return key;
+  if (i === 0) return "setup";
+  if (i === n - 1) return "rocket";
+  return ["notebook", "users", "chart", "loop", "link"][i % 5];
+}
+
+async function nextMilestoneOrder(c: NonNullable<Awaited<ReturnType<typeof ctx>>>, projectId: string): Promise<number> {
+  const { data } = await c.supabase.from("milestones").select("order_index")
+    .eq("project_id", projectId).eq("organization_id", c.org.organizationId).is("deleted_at", null)
+    .order("order_index", { ascending: false }).limit(1);
+  return data && data.length > 0 ? Number((data[0] as { order_index: number }).order_index) + 1 : 0;
+}
+
+/** AI: generate the milestone backbone from the charter and, when a backlog
+ *  already exists, organize those items into the new phases — all in one click. */
+export async function generateMilestonesAction(input: { projectId: string; locale: string }): Promise<{ error?: string; count?: number; assigned?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { generateMilestones } = await import("@/lib/delivery/ai");
+  const ms = await generateMilestones(c.org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
+  if (ms.length === 0) return { error: "ai_failed" };
+
+  const base = await nextMilestoneOrder(c, input.projectId);
+
+  // Build a title→id map of the current (non-promoted) backlog for assignment.
+  const { data: backlog } = await c.supabase.from("project_backlog_items").select("id, title")
+    .eq("project_id", input.projectId).eq("organization_id", c.org.organizationId).is("deleted_at", null).neq("status", "promoted");
+  const byTitle = new Map((backlog ?? []).map((b) => [String((b as { title: string }).title).trim().toLowerCase(), String((b as { id: string }).id)]));
+
+  let created = 0, assigned = 0;
+  for (let i = 0; i < ms.length; i++) {
+    const m = ms[i];
+    const { data: row, error } = await c.supabase.from("milestones").insert({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: m.title, description: m.description || null, status: "planned",
+      icon_key: safeIcon(m.icon_key, i, ms.length), order_index: base + i, progress_percent: 0,
+    }).select("id").single();
+    if (error || !row) continue;
+    created++;
+    const milestoneId = String((row as { id: string }).id);
+    const ids = m.item_titles.map((t) => byTitle.get(t.trim().toLowerCase())).filter((x): x is string => Boolean(x));
+    if (ids.length > 0) {
+      await c.supabase.from("project_backlog_items").update({ linked_milestone_id: milestoneId }).in("id", ids).eq("organization_id", c.org.organizationId);
+      assigned += ids.length;
+    }
+  }
+  if (created === 0) return { error: "unexpected" };
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "milestones_generated", `AI generated ${created} milestone(s)${assigned ? `, organized ${assigned} backlog item(s)` : ""}`);
+  return { count: created, assigned };
+}
+
+/** Quick-create one milestone (placed at the end of the backbone). */
+export async function createMilestoneInlineAction(input: { projectId: string; title: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!input.title.trim()) return { error: "title_required" };
+  const order = await nextMilestoneOrder(c, input.projectId);
+  const { error } = await c.supabase.from("milestones").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    title: input.title.trim(), status: "planned", icon_key: "setup", order_index: order, progress_percent: 0,
+  });
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Assign or clear a backlog item's milestone inline (from the backlog table). */
+export async function setBacklogMilestoneAction(input: { projectId: string; id: string; milestoneId: string | null }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("project_backlog_items").update({ linked_milestone_id: input.milestoneId || null }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
 // ── Execution cycles ────────────────────────────────────────────────────────
 
 export interface CycleInput {

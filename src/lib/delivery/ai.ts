@@ -66,6 +66,44 @@ export async function generateBacklogFromCharter(org: OrgContext, projectId: str
   }).filter((i) => i.title);
 }
 
+// ── A2. Generate milestone backbone from charter (+ organize the backlog) ────
+
+export interface GeneratedMilestone { title: string; description: string; icon_key: string; item_titles: string[]; }
+
+/** Propose the project's milestone backbone (sequential phases) from the charter
+ *  scope, and — when a backlog already exists — map each existing item to the
+ *  milestone it belongs to (by exact title), so one click both creates the
+ *  phases and organizes the backlog into them. */
+export async function generateMilestones(org: OrgContext, projectId: string, locale: Locale): Promise<GeneratedMilestone[]> {
+  const supabase = createAdminClient();
+  const fw = await getFrameworkByProject(supabase, org.organizationId, projectId);
+  const scope = await charterScope(supabase, org.organizationId, projectId);
+  const info = await projectInfo(supabase, org.organizationId, projectId, locale);
+  const { data: items } = await supabase.from("project_backlog_items")
+    .select("title").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).neq("status", "promoted").limit(150);
+  const titles = (items ?? []).map((i) => (i as { title: string }).title).filter(Boolean);
+  const lang = locale === "es" ? "español" : "English";
+  const method = fw?.delivery_method ? DELIVERY_METHODS[fw.delivery_method as DeliveryMethod] : null;
+
+  const prompt = [
+    `You are a delivery lead defining the MILESTONE backbone (the project's phases/stages from start to finish) for execution. Respond in ${lang}.`,
+    `Propose 4-7 sequential milestones that structure the whole project, derived from the charter scope and deliverables${method ? ` and the ${method.en} delivery method` : ""}. Order them chronologically (first to last).`,
+    titles.length
+      ? "For each milestone, assign the EXISTING backlog items that belong to it by copying their EXACT titles into item_titles (each item should land in exactly one milestone; use an empty array if none fit)."
+      : "There are no backlog items yet — return item_titles as empty arrays.",
+    'Optionally set "icon_key" from: setup, notebook, users, chart, loop, link, sparkles, shield_database, check_circle, rocket.',
+    'Return ONLY JSON: { "milestones": [ { "title", "description", "icon_key", "item_titles": ["..."] } ] }.',
+    "", `PROJECT: ${info}`, "", "=== CHARTER SCOPE ===", scope || "(charter not filled — infer reasonable phases)",
+    titles.length ? `\n=== EXISTING BACKLOG ITEMS ===\n${titles.map((t) => `- ${t}`).join("\n")}` : "",
+  ].join("\n");
+
+  const json = await runJson(org, projectId, prompt);
+  return arr(json?.milestones).map((x) => {
+    const o = x as Record<string, unknown>;
+    return { title: str(o.title), description: str(o.description), icon_key: str(o.icon_key), item_titles: arr(o.item_titles).map((s) => String(s).trim()).filter(Boolean) };
+  }).filter((m) => m.title);
+}
+
 // ── B. Detect scope creep (backlog vs charter) ──────────────────────────────
 
 export interface ScopeFlag { title: string; reason: string; severity: string; recommendation: string; }

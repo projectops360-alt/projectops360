@@ -18,38 +18,22 @@ export default async function CommunicationsPage({
   const org = await getOrgContext();
   const supabase = await createClient();
 
-  // Fetch the project, scoped to the user's organization
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, slug, title_i18n")
-    .eq("id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .single();
+  // Project, communications and stakeholders are all independent (they only
+  // depend on projectId/org), so we fan them out together.
+  const [projectResult, communicationsResult, stakeholdersResult] = await Promise.all([
+    supabase.from("projects").select("id, slug, title_i18n").eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single(),
+    supabase.from("communication_items").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("item_date", { ascending: false, nullsFirst: false }),
+    supabase.from("stakeholders").select("id, name").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("name", { ascending: true }),
+  ]);
 
+  const project = projectResult.data;
   if (!project) {
     notFound();
   }
 
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
-
-  // Fetch communications for this project, ordered by date (newest first)
-  const { data: communications } = await supabase
-    .from("communication_items")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("item_date", { ascending: false, nullsFirst: false });
-
-  // Fetch stakeholders for the multi-select widget
-  const { data: stakeholders } = await supabase
-    .from("stakeholders")
-    .select("id, name")
-    .eq("project_id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("name", { ascending: true });
+  const communications = communicationsResult.data;
+  const stakeholders = stakeholdersResult.data;
 
   return (
     <CommunicationsListClient

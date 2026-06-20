@@ -1,1 +1,1 @@
-ollama launch claude --model glm-5.1:cloud
+ollama launch claude --model glm-5.2:cloud

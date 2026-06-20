@@ -139,7 +139,7 @@ export function BudgetReportClient({
       {/* Printable report */}
       <div id="budget-report-print" className="space-y-6 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         <header className="border-b border-border pb-5">
-          <Image src="/logo-3d.png" alt="Project Ops 360°" width={1344} height={768} className="mb-4 h-12 w-auto" priority />
+          <Image src="/logo-3d.webp" alt="Project Ops 360°" width={1344} height={768} className="mb-4 h-12 w-auto" />
           <p className="text-xs font-medium uppercase tracking-wide text-brand-600 dark:text-brand-400">
             {isEs ? "Estimado de presupuesto" : "Budget Estimate"}
           </p>

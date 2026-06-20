@@ -8,12 +8,13 @@ import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Loader2, Sparkles, Play, CheckCircle2, AlertTriangle, XCircle, Lightbulb,
-  MessageSquareText, Activity, Send, ArrowUp, ArrowDown, ListOrdered, GitPullRequestArrow,
+  MessageSquareText, Activity, Send, ArrowUp, ArrowDown, ListOrdered, GitPullRequestArrow, Flag,
 } from "lucide-react";
 import { BACKLOG_ITEM_TYPES } from "@/lib/delivery/config";
 import {
   saveBacklogItemAction, deleteBacklogItemAction, promoteBacklogItemsAction,
   moveBacklogItemAction, prioritizeBacklogAction,
+  generateMilestonesAction, createMilestoneInlineAction, setBacklogMilestoneAction,
   saveCycleAction, setCycleStatusAction, deleteCycleAction,
   addItemsToCycleAction, removeCycleItemAction, promoteCycleAction,
   resolveScopeAlertAction, alertToChangeRequestAction, generateBacklogAction, scopeCheckAction,
@@ -34,6 +35,7 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const [f, setF] = useState(empty);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "milestone">("list");
+  const [msTitle, setMsTitle] = useState("");
 
   // Milestone lookup + order, to group/sort the backlog by phase.
   const msOrder = new Map(milestones.map((m, i) => [String(m.id), i]));
@@ -41,6 +43,8 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
     const m = milestones.find((x) => String(x.id) === String(id));
     return m ? String(m.title) : undefined;
   };
+  const msItemCount = (id: unknown): number =>
+    items.filter((it) => String(it.linked_milestone_id ?? "") === String(id) && String(it.status) !== "promoted").length;
   const ordered = view === "milestone"
     ? [...items].sort((a, b) => {
         const oa = msOrder.get(String(a.linked_milestone_id)) ?? 999;
@@ -61,6 +65,9 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const gen = () => start(async () => { await generateBacklogAction({ projectId, locale }); router.refresh(); });
   const prioritize = () => start(async () => { await prioritizeBacklogAction({ projectId, locale }); router.refresh(); });
   const move = (id: string, direction: "up" | "down") => start(async () => { await moveBacklogItemAction({ projectId, id, direction }); router.refresh(); });
+  const genMilestones = () => start(async () => { const r = await generateMilestonesAction({ projectId, locale }); if (!r.error) setView("milestone"); router.refresh(); });
+  const addMilestone = () => { if (!msTitle.trim()) return; start(async () => { await createMilestoneInlineAction({ projectId, title: msTitle }); setMsTitle(""); router.refresh(); }); };
+  const assignMs = (id: string, milestoneId: string) => start(async () => { await setBacklogMilestoneAction({ projectId, id, milestoneId: milestoneId || null }); router.refresh(); });
 
   return (
     <div className="space-y-4">
@@ -76,6 +83,38 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
           </button>
           <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
+          </button>
+        </div>
+      </div>
+
+      {/* Milestone backbone — the project phases that structure the backlog */}
+      <div className="rounded-xl border border-border bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <Flag className="h-4 w-4 text-brand-500" />{isEs ? "Hitos del proyecto" : "Project milestones"}
+            <span className="text-xs font-normal text-muted-foreground">({milestones.length})</span>
+          </h3>
+          <button onClick={genMilestones} disabled={pending} title={isEs ? "Crea las fases del proyecto desde el charter y organiza el backlog en ellas" : "Creates the project phases from the charter and organizes the backlog into them"} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar hitos con IA" : "Generate milestones with AI"}
+          </button>
+        </div>
+        {milestones.length === 0 ? (
+          <p className="mt-2 text-xs text-muted-foreground">{isEs ? "Aún no hay hitos. Los hitos son las fases del proyecto (Diseño, Desarrollo, QA, Lanzamiento…): dan estructura al backlog y son el backbone del cronograma. Genéralos con IA desde el charter o crea el primero abajo." : "No milestones yet. Milestones are the project phases (Design, Build, QA, Launch…): they structure the backlog and form the schedule backbone. Generate them with AI from the charter or create the first below."}</p>
+        ) : (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {milestones.map((m, i) => (
+              <span key={String(m.id)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-foreground">
+                <span className="text-[10px] font-semibold text-brand-600 dark:text-brand-400">{i + 1}</span>
+                {String(m.title)}
+                <span className="rounded-full bg-background px-1.5 text-[10px] text-muted-foreground">{msItemCount(m.id)}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-2.5 flex gap-2">
+          <input className={inp} placeholder={isEs ? "Nuevo hito…" : "New milestone…"} value={msTitle} onChange={(e) => setMsTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addMilestone(); }} />
+          <button onClick={addMilestone} disabled={pending || !msTitle.trim()} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
+            <Plus className="h-4 w-4" />{isEs ? "Hito" : "Milestone"}
           </button>
         </div>
       </div>
@@ -119,7 +158,18 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
                   <tr className={`border-t border-border/50 align-top ${promoted ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2">{!promoted && <input type="checkbox" checked={sel.has(String(it.id))} onChange={() => toggle(String(it.id))} className="h-3.5 w-3.5 accent-brand-600" />}</td>
                     <td className="px-3 py-2"><div className="font-medium text-foreground">{String(it.title)}</div>{it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{msName(it.linked_milestone_id) ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      {promoted ? (
+                        <span className="text-muted-foreground">{msName(it.linked_milestone_id) ?? "—"}</span>
+                      ) : milestones.length > 0 ? (
+                        <select value={mid} onChange={(e) => assignMs(String(it.id), e.target.value)} disabled={pending} className="max-w-[180px] rounded-md border border-border bg-background px-1.5 py-1 text-xs text-foreground focus:border-brand-500 focus:outline-none">
+                          <option value="">{isEs ? "— Sin hito —" : "— No milestone —"}</option>
+                          {milestones.map((m) => <option key={String(m.id)} value={String(m.id)}>{String(m.title)}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-muted-foreground">{String(it.item_type ?? "—")}</td>
                     <td className="px-3 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${PR_CLS[String(it.priority)] ?? "bg-muted text-muted-foreground"}`}>{String(it.priority ?? "—")}</span></td>
                     <td className="px-3 py-2 text-muted-foreground">{promoted ? <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "En Workboard" : "On Workboard"}</span> : String(it.status ?? "—")}</td>

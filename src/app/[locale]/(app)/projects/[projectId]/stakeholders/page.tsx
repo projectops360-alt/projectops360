@@ -18,29 +18,19 @@ export default async function StakeholdersPage({
   const org = await getOrgContext();
   const supabase = await createClient();
 
-  // Fetch the project, scoped to the user's organization
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, slug, title_i18n")
-    .eq("id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .single();
+  // Project and stakeholders only depend on projectId/org — fan them out.
+  const [projectResult, stakeholdersResult] = await Promise.all([
+    supabase.from("projects").select("id, slug, title_i18n").eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single(),
+    supabase.from("stakeholders").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("name", { ascending: true }),
+  ]);
 
+  const project = projectResult.data;
   if (!project) {
     notFound();
   }
 
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
-
-  // Fetch stakeholders for this project
-  const { data: stakeholders } = await supabase
-    .from("stakeholders")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("name", { ascending: true });
+  const stakeholders = stakeholdersResult.data;
 
   return (
     <StakeholderListClient

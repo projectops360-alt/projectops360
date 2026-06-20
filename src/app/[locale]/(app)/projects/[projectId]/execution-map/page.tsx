@@ -25,40 +25,24 @@ export default async function ExecutionMapPage({
   const org = await getOrgContext();
   const supabase = await createClient();
 
-  // Fetch the project, scoped to the user's organization
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, slug, title_i18n")
-    .eq("id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .single();
+  // Project, milestones, tasks and dependencies only depend on projectId/org,
+  // so we fan them out together. Dependencies is wrapped to tolerate a missing
+  // table before its migration has been applied.
+  const [projectResult, milestonesResult, tasksResult, dependencies] = await Promise.all([
+    supabase.from("projects").select("id, slug, title_i18n").eq("id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).single(),
+    supabase.from("milestones").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("order_index", { ascending: true }),
+    supabase.from("roadmap_tasks").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("milestone_id", { ascending: true }).order("order_index", { ascending: true }).order("created_at", { ascending: true }),
+    Promise.resolve(supabase.from("task_dependencies").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).order("created_at", { ascending: true })).then((r) => (r.data as TaskDependency[] | null) ?? []).catch(() => [] as TaskDependency[]),
+  ]);
 
+  const project = projectResult.data;
   if (!project) {
     notFound();
   }
 
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
-
-  // Fetch milestones ordered by order_index
-  const { data: milestones } = await supabase
-    .from("milestones")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("order_index", { ascending: true });
-
-  // Fetch tasks ordered by milestone then order_index
-  const { data: tasks } = await supabase
-    .from("roadmap_tasks")
-    .select("*")
-    .eq("project_id", projectId)
-    .eq("organization_id", org.organizationId)
-    .is("deleted_at", null)
-    .order("milestone_id", { ascending: true })
-    .order("order_index", { ascending: true })
-    .order("created_at", { ascending: true });
+  const milestones = milestonesResult.data;
+  const tasks = tasksResult.data;
 
   // Compute task counts per milestone
   const taskCounts: Record<string, { total: number; done: number; inProgress: number }> = {};
@@ -85,20 +69,8 @@ export default async function ExecutionMapPage({
     (milestones ?? []) as Milestone[],
   );
 
-  // Fetch task dependencies (gracefully handle missing table during migration)
-  let dependencies: TaskDependency[] = [];
-  try {
-    const { data: depsData } = await supabase
-      .from("task_dependencies")
-      .select("*")
-      .eq("project_id", projectId)
-      .eq("organization_id", org.organizationId)
-      .order("created_at", { ascending: true });
-    dependencies = (depsData as TaskDependency[] | null) ?? [];
-  } catch {
-    // Table may not exist yet (before migration is applied)
-    dependencies = [];
-  }
+  // task_dependencies was fetched concurrently above (the `.catch` tolerates a
+  // missing table before its migration has been applied).
 
   // Sort tasks respecting dependency order (predecessors before successors),
   // grouped by milestone in milestone order_index order
