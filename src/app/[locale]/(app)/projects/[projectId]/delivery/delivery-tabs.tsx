@@ -36,6 +36,8 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "milestone">("list");
   const [msTitle, setMsTitle] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const fail = (isEs ? "Algo falló. Inténtalo de nuevo." : "Something failed. Please try again.");
 
   // Milestone lookup + order, to group/sort the backlog by phase.
   const msOrder = new Map(milestones.map((m, i) => [String(m.id), i]));
@@ -60,17 +62,23 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
 
   const add = () => { if (!f.title.trim()) return; start(async () => { await saveBacklogItemAction({ projectId, item: { ...f, linked_milestone_id: f.linked_milestone_id || null, linked_risk_id: f.linked_risk_id || null } }); setF(empty); router.refresh(); }); };
   const del = (id: string) => start(async () => { await deleteBacklogItemAction({ projectId, id }); router.refresh(); });
-  const promoteSelected = () => start(async () => { await promoteBacklogItemsAction({ projectId, ids: [...sel] }); setSel(new Set()); router.refresh(); });
-  const promoteAll = () => start(async () => { await promoteBacklogItemsAction({ projectId }); setSel(new Set()); router.refresh(); });
+  const promoteSelected = () => start(async () => { setErr(null); const r = await promoteBacklogItemsAction({ projectId, ids: [...sel] }); if (r.error) { setErr(fail); return; } setSel(new Set()); router.refresh(); });
+  const promoteAll = () => start(async () => { setErr(null); const r = await promoteBacklogItemsAction({ projectId }); if (r.error) { setErr(fail); return; } setSel(new Set()); router.refresh(); });
   const gen = () => start(async () => { await generateBacklogAction({ projectId, locale }); router.refresh(); });
   const prioritize = () => start(async () => { await prioritizeBacklogAction({ projectId, locale }); router.refresh(); });
   const move = (id: string, direction: "up" | "down") => start(async () => { await moveBacklogItemAction({ projectId, id, direction }); router.refresh(); });
-  const genMilestones = () => start(async () => { const r = await generateMilestonesAction({ projectId, locale }); if (!r.error) setView("milestone"); router.refresh(); });
+  const genMilestones = () => start(async () => { setErr(null); const r = await generateMilestonesAction({ projectId, locale }); if (r.error) { setErr(isEs ? "La IA no pudo generar hitos. Revisa que el charter tenga objetivos/alcance e inténtalo de nuevo." : "AI couldn't generate milestones. Make sure the charter has objectives/scope and try again."); return; } setView("milestone"); router.refresh(); });
   const addMilestone = () => { if (!msTitle.trim()) return; start(async () => { await createMilestoneInlineAction({ projectId, title: msTitle }); setMsTitle(""); router.refresh(); }); };
   const assignMs = (id: string, milestoneId: string) => start(async () => { await setBacklogMilestoneAction({ projectId, id, milestoneId: milestoneId || null }); router.refresh(); });
 
   return (
     <div className="space-y-4">
+      {err && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{err}</span>
+          <button onClick={() => setErr(null)} className="ml-auto text-red-500 hover:opacity-70"><XCircle className="h-4 w-4" /></button>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">{isEs ? "Backlog de planeación: define el trabajo (alineado al charter) y promuévelo a tarea para ejecutarlo en el Workboard." : "Planning backlog: define the work (aligned to the charter) and promote it to a task to execute it on the Workboard."}</p>
         <div className="flex items-center gap-2">

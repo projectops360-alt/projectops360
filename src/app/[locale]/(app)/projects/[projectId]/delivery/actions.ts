@@ -177,7 +177,7 @@ export async function promoteBacklogItemAction(input: { projectId: string; id: s
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: 0, metadata: { origin: "delivery_backlog", backlog_item_id: input.id },
+    order_index: 0, external_key: `backlog:${input.id}`,
   });
   if (error) return { error: "unexpected" };
 
@@ -207,7 +207,7 @@ export async function promoteBacklogItemsAction(input: { projectId: string; ids?
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: i, metadata: { origin: "delivery_backlog", backlog_item_id: it.id },
+    order_index: i, external_key: `backlog:${it.id}`,
   })));
   if (error) return { error: "unexpected" };
 
@@ -381,7 +381,7 @@ export async function promoteCycleAction(input: { projectId: string; cycleId: st
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null, sprint_name: sprintName,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: i, metadata: { origin: "delivery_cycle", backlog_item_id: it.id, cycle_id: input.cycleId },
+    order_index: i, external_key: `backlog:${it.id}`,
   })));
   if (error) return { error: "unexpected" };
 
