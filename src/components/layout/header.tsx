@@ -3,6 +3,7 @@
 import { Bell } from "lucide-react";
 import { UserMenu } from "@/components/layout/user-menu";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { ProjectOpsNavigatorButton } from "@/components/navigator/ProjectOpsNavigatorButton";
 import type { OrgData, UserData } from "@/components/layout/app-shell";
 import type { Locale } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -32,6 +33,9 @@ export function Header({ user, org }: HeaderProps) {
 
       {/* ── Right actions ── */}
       <div className="flex items-center gap-4">
+        {/* ── Navigator guided help ── */}
+        <ProjectOpsNavigatorButton />
+
         <button
           type="button"
           className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
