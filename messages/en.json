@@ -1447,6 +1447,8 @@
   "livingGraph": {
     "title": "Living Graph",
     "subtitle": "Process intelligence map — explore what happened, what depends on what, and what happens if something slips.",
+    "recalculate": "Recalculate",
+    "recalculateHint": "Rebuild the graph from current data (removes deleted milestones/tasks).",
     "backToExecutionMap": "Execution Map",
     "summary": "{nodes} nodes · {edges} edges · {blocked} blocked",
     "noSelection": "Select a node or edge to inspect it.",

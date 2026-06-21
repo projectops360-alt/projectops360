@@ -1447,6 +1447,8 @@
   "livingGraph": {
     "title": "Grafo Vivo",
     "subtitle": "Mapa de inteligencia del proceso — explora qué pasó, qué depende de qué y qué sucede si algo se retrasa.",
+    "recalculate": "Recalcular",
+    "recalculateHint": "Reconstruye el grafo con los datos actuales (quita milestones/tareas borrados).",
     "backToExecutionMap": "Execution Map",
     "summary": "{nodes} nodos · {edges} aristas · {blocked} bloqueados",
     "noSelection": "Selecciona un nodo o una arista para inspeccionarla.",

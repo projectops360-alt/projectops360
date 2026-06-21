@@ -33,7 +33,7 @@ import {
 } from "@xyflow/react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { Share2, MonitorSmartphone, Route, Sparkles, X } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2 } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -222,6 +222,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const router = useRouter();
   const { fitView, setCenter, getIntersectingNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [recalculating, setRecalculating] = useState(false);
+
+  async function handleRecalculate() {
+    setRecalculating(true);
+    const { refreshLivingGraphAction } = await import(
+      "@/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/actions"
+    );
+    await refreshLivingGraphAction({ projectId });
+    setRecalculating(false);
+    router.refresh();
+  }
 
   // ── State ──
   const [overlay, setOverlay] = useState<LivingGraphOverlay>("normal");
@@ -974,6 +985,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     >
       {/* Executive insight header */}
       <LivingGraphMetricsHeader health={health} />
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleRecalculate}
+          disabled={recalculating}
+          title={t("recalculateHint")}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+        >
+          {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {t("recalculate")}
+        </button>
+      </div>
 
       <LivingGraphToolbar
         overlay={overlay}
