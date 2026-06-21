@@ -603,12 +603,12 @@ export function WorkboardClient({
       {/* Toolbar */}
       <div className={`flex items-center gap-3 flex-wrap transition-opacity ${isDragging || anyResizing ? "pointer-events-none opacity-50" : ""}`}>
         {/* Filter by sprint or milestone */}
-        {(sprintOptions.length > 0 || milestoneOptions.length > 0) && (
+        {(sprintOptions.length > 0 || hasUnsprinted || milestoneOptions.length > 0 || hasNoMilestone) && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 
-            {/* Dimension switch (only when both dimensions exist) */}
-            {sprintOptions.length > 0 && milestoneOptions.length > 0 && (
+            {/* Dimension switch (when both dimensions have something to show) */}
+            {(sprintOptions.length > 0 || hasUnsprinted) && (milestoneOptions.length > 0 || hasNoMilestone) && (
               <div className="mr-1 inline-flex overflow-hidden rounded-full border border-border">
                 <button
                   type="button"

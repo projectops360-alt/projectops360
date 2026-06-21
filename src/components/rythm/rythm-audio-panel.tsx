@@ -36,7 +36,11 @@ import {
   getMeetingTranscriptAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/transcription-actions";
 import { getSpeakerDataAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/speaker-actions";
-import { getMeetingIntelligenceAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/intelligence-actions";
+import {
+  getMeetingIntelligenceAction,
+  listProjectMilestonesAction,
+  type ProjectMilestoneOption,
+} from "@/app/[locale]/(app)/projects/[projectId]/rhythm/intelligence-actions";
 import type {
   RythmAudioFile,
   RythmAudioStatus,
@@ -125,18 +129,21 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
   const [speakerMappings, setSpeakerMappings] = useState<RythmSpeakerMapping[]>([]);
   const [speakerOptions, setSpeakerOptions] = useState<RythmSpeakerOption[]>([]);
   const [intelligence, setIntelligence] = useState<RythmIntelligence | null>(null);
+  const [milestones, setMilestones] = useState<ProjectMilestoneOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [audioRes, jobsRes, transRes, intelRes] = await Promise.all([
+    const [audioRes, jobsRes, transRes, intelRes, msRes] = await Promise.all([
       listRythmAudioAction({ meetingId }),
       listProcessingJobsAction({ meetingId }),
       getMeetingTranscriptAction({ meetingId }),
       getMeetingIntelligenceAction({ meetingId }),
+      listProjectMilestonesAction({ projectId }),
     ]);
     setAudioFiles(audioRes.audioFiles ?? []);
     setJobs(jobsRes.jobs ?? []);
     setIntelligence(intelRes.intelligence ?? null);
+    setMilestones(msRes.milestones ?? []);
     const tr = transRes.transcript ?? null;
     setTranscript(tr);
 
@@ -228,6 +235,7 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
         transcript={transcript}
         intelligence={intelligence}
         ownerOptions={speakerOptions}
+        milestones={milestones}
         onChanged={load}
       />
     </div>

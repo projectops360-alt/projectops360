@@ -2255,7 +2255,9 @@
       "lowConfidence": "Baja Confianza",
       "removeItem": "Quitar elemento",
       "clearAll": "Limpiar",
-      "clearConfirm": "¿Eliminar toda la inteligencia extraída de esta reunión? No se puede deshacer."
+      "clearConfirm": "¿Eliminar toda la inteligencia extraída de esta reunión? No se puede deshacer.",
+      "destinationMilestone": "Milestone destino",
+      "noMilestoneOpt": "Sin milestone"
     },
     "transcript": {
       "title": "Transcripción",

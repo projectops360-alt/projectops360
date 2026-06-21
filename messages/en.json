@@ -2255,7 +2255,9 @@
       "lowConfidence": "Low Confidence",
       "removeItem": "Remove item",
       "clearAll": "Clear",
-      "clearConfirm": "Delete all extracted intelligence for this meeting? This cannot be undone."
+      "clearConfirm": "Delete all extracted intelligence for this meeting? This cannot be undone.",
+      "destinationMilestone": "Destination milestone",
+      "noMilestoneOpt": "No milestone"
     },
     "transcript": {
       "title": "Transcript",

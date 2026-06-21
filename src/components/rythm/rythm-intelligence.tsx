@@ -33,6 +33,7 @@ import {
   promoteActionItemToTaskAction,
   promoteDecisionAction,
   promoteRiskAction,
+  type ProjectMilestoneOption,
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/intelligence-actions";
 import type {
   RythmIntelligence,
@@ -50,6 +51,7 @@ interface Props {
   transcript: RythmTranscript | null;
   intelligence: RythmIntelligence | null;
   ownerOptions: RythmSpeakerOption[];
+  milestones: ProjectMilestoneOption[];
   onChanged: () => void;
 }
 
@@ -233,6 +235,36 @@ function Evidence({ item }: { item: IntelEvidence & { confidence?: number } }) {
   );
 }
 
+// ── Destination milestone picker ─────────────────────────────────────────────────
+
+function MilestoneSelect({
+  milestones,
+  value,
+  onChange,
+}: {
+  milestones: ProjectMilestoneOption[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const t = useTranslations("rythm.intelligence");
+  if (milestones.length === 0) return null;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      title={t("destinationMilestone")}
+      className="max-w-[150px] truncate rounded-md border border-border bg-background px-2 py-1 text-[11px] text-foreground focus:border-brand-500 focus:outline-none"
+    >
+      <option value="">{t("noMilestoneOpt")}</option>
+      {milestones.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.title}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // ── Remove a single extracted item ──────────────────────────────────────────────
 
 function DeleteX({
@@ -369,7 +401,7 @@ function GenericCard({
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
-export function RythmIntelligencePanel({ projectId, meetingId, locale, transcript, intelligence, ownerOptions, onChanged }: Props) {
+export function RythmIntelligencePanel({ projectId, meetingId, locale, transcript, intelligence, ownerOptions, milestones, onChanged }: Props) {
   const t = useTranslations("rythm.intelligence");
   const tErr = useTranslations("rythm.errors");
   const [generating, setGenerating] = useState(false);
@@ -377,6 +409,8 @@ export function RythmIntelligencePanel({ projectId, meetingId, locale, transcrip
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promoted, setPromoted] = useState<Set<string>>(new Set());
+  const [taskMilestone, setTaskMilestone] = useState<Record<number, string>>({});
+  const [applyMilestone, setApplyMilestone] = useState<string>("");
 
   async function clearAll() {
     if (!window.confirm(t("clearConfirm"))) return;
@@ -407,7 +441,7 @@ export function RythmIntelligencePanel({ projectId, meetingId, locale, transcrip
   async function applyToProject() {
     setApplying(true);
     setError(null);
-    const r = await applyIntelligenceToProjectAction({ projectId, meetingId, locale });
+    const r = await applyIntelligenceToProjectAction({ projectId, meetingId, locale, milestoneId: applyMilestone || null });
     setApplying(false);
     if (r.error) return setError(tErr.has(r.error) ? tErr(r.error) : tErr("apply_failed"));
     onChanged();
@@ -511,15 +545,18 @@ export function RythmIntelligencePanel({ projectId, meetingId, locale, transcrip
                 {t("applied")}
               </span>
             ) : (
-              <button
-                type="button"
-                onClick={applyToProject}
-                disabled={applying}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-              >
-                {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                {t("applyToProject")}
-              </button>
+              <div className="flex items-center gap-2">
+                <MilestoneSelect milestones={milestones} value={applyMilestone} onChange={setApplyMilestone} />
+                <button
+                  type="button"
+                  onClick={applyToProject}
+                  disabled={applying}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+                >
+                  {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+                  {t("applyToProject")}
+                </button>
+              </div>
             )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-brand-200/60 pt-2 dark:border-brand-900/60">
@@ -616,13 +653,18 @@ export function RythmIntelligencePanel({ projectId, meetingId, locale, transcrip
                       </span>
                       {a.due_date && <span className="text-[11px] text-muted-foreground">{a.due_date}</span>}
                     </div>
-                    <div className="mt-1.5 flex justify-end">
+                    <div className="mt-1.5 flex items-center justify-end gap-2">
+                      <MilestoneSelect
+                        milestones={milestones}
+                        value={taskMilestone[i] ?? ""}
+                        onChange={(v) => setTaskMilestone((p) => ({ ...p, [i]: v }))}
+                      />
                       <PromoteButton
                         label={t("convertToTask")}
                         promotedLabel={t("promoted")}
                         promoted={promoted.has(`action-${i}`)}
                         onClick={async () => {
-                          const r = await promoteActionItemToTaskAction({ projectId, meetingId, task: a.task, owner: a.owner, priority: a.priority, dueDate: a.due_date });
+                          const r = await promoteActionItemToTaskAction({ projectId, meetingId, task: a.task, owner: a.owner, priority: a.priority, dueDate: a.due_date, milestoneId: taskMilestone[i] || null });
                           if (!r.error) markPromoted(`action-${i}`);
                         }}
                       />

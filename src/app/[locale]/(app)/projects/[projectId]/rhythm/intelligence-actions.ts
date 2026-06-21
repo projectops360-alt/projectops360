@@ -45,6 +45,43 @@ async function meetingLinkExists(
   return false;
 }
 
+// ── listProjectMilestonesAction (for the "destination milestone" picker) ──────
+
+export interface ProjectMilestoneOption {
+  id: string;
+  title: string;
+  status: string;
+}
+
+export async function listProjectMilestonesAction(input: {
+  projectId: string;
+}): Promise<{ milestones?: ProjectMilestoneOption[]; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const parsed = z.object({ projectId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: "invalid_input" };
+
+  const supabase = await createClient();
+  try {
+    const { data, error } = await supabase
+      .from("milestones")
+      .select("id, title, status")
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", parsed.data.projectId)
+      .is("deleted_at", null)
+      .order("order_index", { ascending: true });
+    if (error) return { error: "list_failed" };
+    return { milestones: (data ?? []) as ProjectMilestoneOption[] };
+  } catch (err) {
+    console.error("listProjectMilestonesAction failed:", err);
+    return { error: "list_failed" };
+  }
+}
+
 // ── generateMeetingIntelligenceAction ───────────────────────────────────────────
 
 export async function generateMeetingIntelligenceAction(input: {
@@ -162,6 +199,7 @@ export async function promoteActionItemToTaskAction(input: {
   owner?: string;
   priority?: string;
   dueDate?: string | null;
+  milestoneId?: string | null;
 }): Promise<{ taskId?: string; error?: string }> {
   let org;
   try {
@@ -177,6 +215,7 @@ export async function promoteActionItemToTaskAction(input: {
       owner: z.string().max(200).optional(),
       priority: z.enum(["high", "medium", "low"]).optional(),
       dueDate: z.string().optional().nullable(),
+      milestoneId: z.string().uuid().optional().nullable(),
     })
     .safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
@@ -201,6 +240,7 @@ export async function promoteActionItemToTaskAction(input: {
         description: notes.join(" · "),
         status: "not_started",
         priority: PRIORITY_TO_ROADMAP[parsed.data.priority ?? "medium"] ?? "p2",
+        milestone_id: parsed.data.milestoneId ?? null,
         order_index: 0,
         created_by: org.userId,
       })
@@ -552,6 +592,7 @@ export async function applyIntelligenceToProjectAction(input: {
   projectId: string;
   meetingId: string;
   locale: string;
+  milestoneId?: string | null;
 }): Promise<{ counts?: ApplyCounts; error?: string }> {
   let org;
   try {
@@ -560,12 +601,18 @@ export async function applyIntelligenceToProjectAction(input: {
     return { error: "not_authenticated" };
   }
   const parsed = z
-    .object({ projectId: z.string().uuid(), meetingId: z.string().uuid(), locale: z.enum(["en", "es"]).default("en") })
+    .object({
+      projectId: z.string().uuid(),
+      meetingId: z.string().uuid(),
+      locale: z.enum(["en", "es"]).default("en"),
+      milestoneId: z.string().uuid().optional().nullable(),
+    })
     .safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
 
   const supabase = await createClient();
   const { projectId, meetingId, locale } = parsed.data;
+  const milestoneId = parsed.data.milestoneId ?? null;
 
   try {
     const intel = await getMeetingIntelligence(supabase, org.organizationId, meetingId);
@@ -624,6 +671,7 @@ export async function applyIntelligenceToProjectAction(input: {
           description: notes,
           status: "not_started",
           priority: PRIORITY_TO_ROADMAP[a.priority] ?? "p2",
+          milestone_id: milestoneId,
           order_index: 0,
           created_by: org.userId,
         })
