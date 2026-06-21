@@ -4,15 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   AudioLines,
-  FileText,
-  Sparkles,
   Play,
   Loader2,
   Clock,
   Trash2,
-  ListChecks,
-  Scale,
-  AlertTriangle,
   Ban,
   CheckCircle2,
   RefreshCw,
@@ -24,6 +19,7 @@ import { RythmRecorder } from "./rythm-recorder";
 import { RythmAudioUploader } from "./rythm-audio-uploader";
 import { RythmTranscriptView } from "./rythm-transcript-view";
 import { RythmSpeakerIdentification } from "./rythm-speaker-identification";
+import { RythmIntelligencePanel } from "./rythm-intelligence";
 import {
   listRythmAudioAction,
   getRythmAudioUrlAction,
@@ -40,6 +36,7 @@ import {
   getMeetingTranscriptAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/transcription-actions";
 import { getSpeakerDataAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/speaker-actions";
+import { getMeetingIntelligenceAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/intelligence-actions";
 import type {
   RythmAudioFile,
   RythmAudioStatus,
@@ -48,6 +45,7 @@ import type {
   RythmTranscript,
   RythmSpeakerMapping,
   RythmSpeakerOption,
+  RythmIntelligence,
 } from "@/lib/rythm/types";
 
 interface RythmAudioPanelProps {
@@ -126,16 +124,19 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
   const [transcript, setTranscript] = useState<RythmTranscript | null>(null);
   const [speakerMappings, setSpeakerMappings] = useState<RythmSpeakerMapping[]>([]);
   const [speakerOptions, setSpeakerOptions] = useState<RythmSpeakerOption[]>([]);
+  const [intelligence, setIntelligence] = useState<RythmIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [audioRes, jobsRes, transRes] = await Promise.all([
+    const [audioRes, jobsRes, transRes, intelRes] = await Promise.all([
       listRythmAudioAction({ meetingId }),
       listProcessingJobsAction({ meetingId }),
       getMeetingTranscriptAction({ meetingId }),
+      getMeetingIntelligenceAction({ meetingId }),
     ]);
     setAudioFiles(audioRes.audioFiles ?? []);
     setJobs(jobsRes.jobs ?? []);
+    setIntelligence(intelRes.intelligence ?? null);
     const tr = transRes.transcript ?? null;
     setTranscript(tr);
 
@@ -220,7 +221,14 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
       )}
 
       {/* Meeting Intelligence */}
-      <MeetingIntelligence />
+      <RythmIntelligencePanel
+        projectId={projectId}
+        meetingId={meetingId}
+        locale={locale}
+        transcript={transcript}
+        intelligence={intelligence}
+        onChanged={load}
+      />
     </div>
   );
 }
@@ -497,37 +505,3 @@ function ProcessingQueue({
   );
 }
 
-// ── Meeting Intelligence (placeholders) ──────────────────────────────────────
-
-function MeetingIntelligence() {
-  const t = useTranslations("rythm.intelligence");
-  const cards: { key: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { key: "transcript", icon: FileText },
-    { key: "summary", icon: Sparkles },
-    { key: "actionItems", icon: ListChecks },
-    { key: "decisions", icon: Scale },
-    { key: "risks", icon: AlertTriangle },
-    { key: "blockers", icon: Ban },
-  ];
-  return (
-    <div className="rounded-xl border border-border bg-background">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-        <Sparkles className="h-3.5 w-3.5 text-brand-600" />
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("title")}
-        </h4>
-      </div>
-      <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map(({ key, icon: Icon }) => (
-          <div key={key} className="rounded-lg border border-dashed border-border bg-muted/20 p-3">
-            <h5 className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <Icon className="h-4 w-4 text-muted-foreground" />
-              {t(key)}
-            </h5>
-            <p className="mt-1 text-xs text-muted-foreground">{t("waiting")}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

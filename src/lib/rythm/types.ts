@@ -80,7 +80,59 @@ export type RythmActivityAction =
   | "audio_deleted"
   | "validation_failed"
   | "speaker_mapping_saved"
-  | "speaker_mapping_reset";
+  | "speaker_mapping_reset"
+  | "meeting_intelligence_generated"
+  | "meeting_intelligence_regenerated"
+  | "action_item_promoted"
+  | "risk_promoted"
+  | "decision_promoted";
+
+// ── Meeting Intelligence ──────────────────────────────────────────────────────
+
+export interface IntelDecision {
+  title: string;
+  description: string;
+  owner: string;
+  confidence: number;
+}
+export interface IntelActionItem {
+  task: string;
+  owner: string;
+  due_date: string | null;
+  priority: "high" | "medium" | "low";
+  confidence: number;
+}
+export interface IntelRisk {
+  description: string;
+  impact: string;
+  owner: string;
+  confidence: number;
+}
+/** Generic item for blockers / assumptions / dependencies / milestones / commitments. */
+export interface IntelItem {
+  title?: string;
+  description?: string;
+  owner?: string;
+  due_date?: string | null;
+  confidence?: number;
+}
+
+export interface RythmIntelligence {
+  id: string;
+  meetingId: string;
+  executiveSummary: string | null;
+  decisions: IntelDecision[];
+  actionItems: IntelActionItem[];
+  risks: IntelRisk[];
+  blockers: IntelItem[];
+  assumptions: IntelItem[];
+  dependencies: IntelItem[];
+  milestones: IntelItem[];
+  commitments: IntelItem[];
+  confidenceScore: number | null;
+  model: string | null;
+  generatedAt: string;
+}
 
 /** A saved mapping of a generic speaker label to a real participant. */
 export interface RythmSpeakerMapping {

@@ -2154,7 +2154,11 @@
       "assemblyai_error": "The transcription provider returned an error.",
       "errorEmptyName": "Enter at least one participant name.",
       "save_failed": "Could not save the mapping. Please try again.",
-      "reset_failed": "Could not reset the mapping. Please try again."
+      "reset_failed": "Could not reset the mapping. Please try again.",
+      "ai_failed": "AI extraction failed. Please try again.",
+      "no_transcript": "This meeting has no completed transcript yet.",
+      "noApiKey": "The AI provider key is not configured.",
+      "promote_failed": "Could not promote the item. Please try again."
     },
     "audioStatus": {
       "uploaded": "Uploaded",
@@ -2194,13 +2198,30 @@
     },
     "intelligence": {
       "title": "Meeting Intelligence",
-      "waiting": "Waiting for transcription.",
-      "transcript": "Transcript",
-      "summary": "Summary",
-      "actionItems": "Action Items",
+      "generate": "Generate Meeting Intelligence",
+      "regenerate": "Regenerate",
+      "generateHint": "Extract decisions, action items, risks and more from this meeting's transcript.",
+      "needTranscript": "Complete a transcription first to extract meeting intelligence.",
+      "generatedAt": "Generated",
+      "confidence": "Confidence",
+      "none": "None detected.",
+      "executiveSummary": "Executive Summary",
       "decisions": "Decisions",
+      "actionItems": "Action Items",
       "risks": "Risks",
-      "blockers": "Blockers"
+      "blockers": "Blockers",
+      "dependencies": "Dependencies",
+      "milestones": "Milestones",
+      "commitments": "Commitments",
+      "assumptions": "Assumptions",
+      "impact": "Impact",
+      "convertToTask": "Convert to Project Task",
+      "promoteDecision": "Promote to Decision Register",
+      "promoteRisk": "Promote to Risk Register",
+      "promoted": "Promoted",
+      "priority_high": "High",
+      "priority_medium": "Medium",
+      "priority_low": "Low"
     },
     "transcript": {
       "title": "Transcript",

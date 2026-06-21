@@ -2154,7 +2154,11 @@
       "assemblyai_error": "El proveedor de transcripción devolvió un error.",
       "errorEmptyName": "Escribe al menos un nombre de participante.",
       "save_failed": "No se pudo guardar la asignación. Inténtalo de nuevo.",
-      "reset_failed": "No se pudo restablecer la asignación. Inténtalo de nuevo."
+      "reset_failed": "No se pudo restablecer la asignación. Inténtalo de nuevo.",
+      "ai_failed": "La extracción con IA falló. Inténtalo de nuevo.",
+      "no_transcript": "Esta reunión aún no tiene transcripción completada.",
+      "noApiKey": "La clave del proveedor de IA no está configurada.",
+      "promote_failed": "No se pudo promover el elemento. Inténtalo de nuevo."
     },
     "audioStatus": {
       "uploaded": "Cargado",
@@ -2194,13 +2198,30 @@
     },
     "intelligence": {
       "title": "Inteligencia de la Reunión",
-      "waiting": "Esperando la transcripción.",
-      "transcript": "Transcripción",
-      "summary": "Resumen",
-      "actionItems": "Acciones",
+      "generate": "Generar Inteligencia de la Reunión",
+      "regenerate": "Regenerar",
+      "generateHint": "Extrae decisiones, acciones, riesgos y más de la transcripción de esta reunión.",
+      "needTranscript": "Completa una transcripción primero para extraer la inteligencia.",
+      "generatedAt": "Generado",
+      "confidence": "Confianza",
+      "none": "No se detectó.",
+      "executiveSummary": "Resumen Ejecutivo",
       "decisions": "Decisiones",
+      "actionItems": "Acciones",
       "risks": "Riesgos",
-      "blockers": "Bloqueos"
+      "blockers": "Bloqueos",
+      "dependencies": "Dependencias",
+      "milestones": "Hitos",
+      "commitments": "Compromisos",
+      "assumptions": "Supuestos",
+      "impact": "Impacto",
+      "convertToTask": "Convertir en Tarea",
+      "promoteDecision": "Promover a Decisiones",
+      "promoteRisk": "Promover a Riesgos",
+      "promoted": "Promovido",
+      "priority_high": "Alta",
+      "priority_medium": "Media",
+      "priority_low": "Baja"
     },
     "transcript": {
       "title": "Transcripción",
