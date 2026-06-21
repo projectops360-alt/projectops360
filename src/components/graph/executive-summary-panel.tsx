@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, ListChecks } from "lucide-react";
-import type { Milestone, MilestoneStatus, RoadmapTask, Locale } from "@/types/database";
+import type { Milestone, MilestoneStatusDisplay, RoadmapTask, Locale } from "@/types/database";
+import { getComputedMilestoneStatus } from "@/lib/roadmap/progress";
 
 // Unifies the former "Flow" executive dashboard (KPIs + insights) inside the
 // Living Graph. Everything is derived from milestones + tasks — no extra data.
+// Milestone status/progress are computed LIVE from tasks (living document),
+// never the stored status, so it matches the Timeline and Living Graph nodes.
 
-const MS_STATUS_DOT: Record<MilestoneStatus, string> = {
+const MS_STATUS_DOT: Record<MilestoneStatusDisplay, string> = {
   completed: "bg-green-500",
   in_progress: "bg-brand-500",
   planned: "bg-gray-400",
   blocked: "bg-red-500",
   deferred: "bg-amber-500",
+  at_risk: "bg-orange-500",
 };
 
 function Kpi({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
@@ -37,9 +41,13 @@ export function ExecutiveSummaryPanel({
   const es = locale === "es";
   const [open, setOpen] = useState(true);
 
+  // ── Live milestone statuses (computed from tasks, like the Timeline) ──
+  const computedStatuses = new Map<string, MilestoneStatusDisplay>();
+  for (const m of milestones) computedStatuses.set(m.id, getComputedMilestoneStatus(m, tasks));
+
   // ── KPIs ──
   const totalMs = milestones.length;
-  const completedMs = milestones.filter((m) => m.status === "completed").length;
+  const completedMs = milestones.filter((m) => computedStatuses.get(m.id) === "completed").length;
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in_progress").length;
@@ -50,20 +58,24 @@ export function ExecutiveSummaryPanel({
     .reduce((sum, t) => sum + (Number(t.estimate_hours) || 0), 0);
 
   // ── Insights ──
-  const distribution: Record<MilestoneStatus, number> = {
-    completed: 0, in_progress: 0, planned: 0, blocked: 0, deferred: 0,
+  const distribution: Record<MilestoneStatusDisplay, number> = {
+    completed: 0, in_progress: 0, planned: 0, blocked: 0, deferred: 0, at_risk: 0,
   };
-  for (const m of milestones) distribution[m.status] = (distribution[m.status] ?? 0) + 1;
+  for (const m of milestones) {
+    const s = computedStatuses.get(m.id) ?? m.status;
+    distribution[s] = (distribution[s] ?? 0) + 1;
+  }
 
   const byPriority = { p1: 0, p2: 0, p3: 0 } as Record<string, number>;
   for (const t of tasks) byPriority[t.priority] = (byPriority[t.priority] ?? 0) + 1;
 
-  const statusLabel: Record<MilestoneStatus, string> = {
+  const statusLabel: Record<MilestoneStatusDisplay, string> = {
     completed: es ? "Completado" : "Completed",
     in_progress: es ? "En progreso" : "In progress",
     planned: es ? "Planeado" : "Planned",
     blocked: es ? "Bloqueado" : "Blocked",
     deferred: es ? "Diferido" : "Deferred",
+    at_risk: es ? "En riesgo" : "At risk",
   };
 
   return (
@@ -101,7 +113,7 @@ export function ExecutiveSummaryPanel({
                 {es ? "Distribución de milestones" : "Milestone distribution"}
               </p>
               <div className="space-y-1">
-                {(Object.keys(distribution) as MilestoneStatus[])
+                {(Object.keys(distribution) as MilestoneStatusDisplay[])
                   .filter((s) => distribution[s] > 0)
                   .map((s) => (
                     <div key={s} className="flex items-center gap-2 text-[11px]">

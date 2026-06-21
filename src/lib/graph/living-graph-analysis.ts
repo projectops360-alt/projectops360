@@ -702,9 +702,28 @@ export function aggregateByMilestone(
     }
     const tasksTotal = taskStatus.size;
     let tasksDone = 0;
+    let tasksStarted = 0;
     for (const status of taskStatus.values()) {
-      if (status && DONE_STATUSES.has(status.toLowerCase())) tasksDone++;
+      const s = status?.toLowerCase() ?? "";
+      if (s && DONE_STATUSES.has(s)) tasksDone++;
+      else if (s && s !== "not_started" && s !== "deferred") tasksStarted++;
     }
+
+    // Living document: derive progress + status from the tasks in real time,
+    // instead of the stored progress_percent/status which can be stale (0 / planned).
+    const anyBlocked = members.some((m) => m.isBlocked);
+    const computedProgress =
+      tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : (representative.progress ?? 0);
+    const computedStatus =
+      tasksTotal === 0
+        ? representative.status
+        : tasksDone === tasksTotal
+          ? "completed"
+          : anyBlocked
+            ? "blocked"
+            : tasksDone > 0 || tasksStarted > 0
+              ? "in_progress"
+              : "planned";
 
     milestoneNodes.push({
       ...representative,
@@ -712,7 +731,9 @@ export function aggregateByMilestone(
       nodeType: "milestone_gate",
       label: representative.milestoneLabel ?? representative.label,
       occurredAt: sorted[0].occurredAt,
-      isBlocked: members.some((m) => m.isBlocked),
+      progress: computedProgress,
+      status: computedStatus as typeof representative.status,
+      isBlocked: anyBlocked,
       riskLevel:
         members.find((m) => m.riskLevel === "high")?.riskLevel ??
         members.find((m) => m.riskLevel === "medium")?.riskLevel ??
