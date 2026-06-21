@@ -7,8 +7,11 @@ import {
   CheckCircle2, Loader2, Circle, Ban, Pause,
   FileText, Send, Code, ShieldCheck,
   ListTodo, Filter, ChevronDown, Sparkles, Copy, Check, AlertTriangle, AlertCircle, History,
-  MoreVertical, Pencil, Archive, Trash2, Link2,
+  MoreVertical, Pencil, Archive, Trash2, Link2, Plus,
 } from "lucide-react";
+
+/** Virtual milestone id used to group tasks that have no milestone (e.g. created by AI). */
+const UNASSIGNED_MILESTONE = "__unassigned__";
 import { createDependencyAction } from "@/app/[locale]/(app)/projects/[projectId]/execution-map/dependency-actions";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { recordPromptSentAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
@@ -101,6 +104,8 @@ interface TaskListByMilestoneProps {
   onArchiveTask?: (taskId: string) => Promise<void>;
   onEditMilestone?: (milestone: Milestone) => void;
   onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+  /** Create a task already linked to this milestone. */
+  onAddTask?: (milestoneId: string) => void;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────────
@@ -166,6 +171,8 @@ function MilestoneSelector({
   t,
   onEditMilestone,
   onArchiveMilestone,
+  onAddTask,
+  unassignedCount,
 }: {
   milestones: Milestone[];
   selectedId: string | null;
@@ -175,6 +182,8 @@ function MilestoneSelector({
   t: TaskListTranslations;
   onEditMilestone?: (milestone: Milestone) => void;
   onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+  onAddTask?: (milestoneId: string) => void;
+  unassignedCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -197,6 +206,16 @@ function MilestoneSelector({
               <span className="text-[10px] text-muted-foreground shrink-0">
                 {taskCounts[selected.id].done}/{taskCounts[selected.id].total}
               </span>
+            )}
+          </>
+        ) : selectedId === UNASSIGNED_MILESTONE ? (
+          <>
+            <div className="h-2.5 w-2.5 rounded-full shrink-0 bg-amber-400" />
+            <span className="font-medium text-foreground truncate">
+              {locale === "es" ? "Sin milestone" : "No milestone"}
+            </span>
+            {typeof unassignedCount === "number" && unassignedCount > 0 && (
+              <span className="text-[10px] text-muted-foreground shrink-0">{unassignedCount}</span>
             )}
           </>
         ) : (
@@ -232,6 +251,24 @@ function MilestoneSelector({
               </button>
             );
           })}
+          {typeof unassignedCount === "number" && unassignedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onSelect(selectedId === UNASSIGNED_MILESTONE ? null : UNASSIGNED_MILESTONE);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-muted/50 transition-colors border-t border-border ${
+                selectedId === UNASSIGNED_MILESTONE ? "bg-muted/30" : ""
+              }`}
+            >
+              <div className="h-2 w-2 rounded-full shrink-0 bg-amber-400" />
+              <span className="flex-1 truncate text-foreground">
+                {locale === "es" ? "Sin milestone (creadas por IA)" : "No milestone (AI-created)"}
+              </span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{unassignedCount}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -283,6 +320,16 @@ function MilestoneSelector({
         </div>
       )}
     </div>
+      {selected && onAddTask && (
+        <button
+          type="button"
+          onClick={() => onAddTask(selected.id)}
+          className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-600 px-2.5 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {locale === "es" ? "Tarea" : "Task"}
+        </button>
+      )}
     </div>
   );
 }
@@ -1118,6 +1165,7 @@ export function TaskListByMilestone({
   onArchiveTask,
   onEditMilestone,
   onArchiveMilestone,
+  onAddTask,
 }: TaskListByMilestoneProps) {
   const router = useRouter();
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(() => {
@@ -1134,10 +1182,16 @@ export function TaskListByMilestone({
     status: optimisticUpdates[task.id] ?? task.status,
   }));
 
-  // Filter tasks for selected milestone
-  const milestoneTasks = selectedMilestoneId
-    ? tasksWithOptimism.filter((t) => t.milestone_id === selectedMilestoneId)
-    : [];
+  // Tasks with no milestone (e.g. created by Rythm AI) — surfaced as their own group.
+  const unassignedCount = tasksWithOptimism.filter((t) => !t.milestone_id).length;
+
+  // Filter tasks for selected milestone (or the unassigned group)
+  const milestoneTasks =
+    selectedMilestoneId === UNASSIGNED_MILESTONE
+      ? tasksWithOptimism.filter((t) => !t.milestone_id)
+      : selectedMilestoneId
+        ? tasksWithOptimism.filter((t) => t.milestone_id === selectedMilestoneId)
+        : [];
 
   // Apply status filter
   const filteredTasks = statusFilter
@@ -1168,9 +1222,16 @@ export function TaskListByMilestone({
   });
 
   // Compute counts for filtered tasks
-  const selectedCounts = selectedMilestoneId
-    ? taskCounts[selectedMilestoneId] ?? { total: 0, done: 0, inProgress: 0 }
-    : { total: 0, done: 0, inProgress: 0 };
+  const selectedCounts =
+    selectedMilestoneId === UNASSIGNED_MILESTONE
+      ? {
+          total: unassignedCount,
+          done: milestoneTasks.filter((t) => t.status === "done").length,
+          inProgress: milestoneTasks.filter((t) => t.status === "in_progress").length,
+        }
+      : selectedMilestoneId
+        ? taskCounts[selectedMilestoneId] ?? { total: 0, done: 0, inProgress: 0 }
+        : { total: 0, done: 0, inProgress: 0 };
 
   // Compute per-status counts for the selected milestone
   const statusCounts: Record<string, number> = {};
@@ -1198,6 +1259,8 @@ export function TaskListByMilestone({
           t={t}
           onEditMilestone={onEditMilestone}
           onArchiveMilestone={onArchiveMilestone}
+          onAddTask={onAddTask}
+          unassignedCount={unassignedCount}
         />
       </div>
 

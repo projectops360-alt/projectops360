@@ -677,6 +677,7 @@ export function ExecutionMapClient({
             await archiveMilestoneAction(milestoneId, projectId);
             router.refresh();
           }}
+          onAddTask={(milestoneId) => { setEditingTask(null); setPreselectedMilestoneId(milestoneId); setShowTaskForm(true); }}
         />
       )}
 
