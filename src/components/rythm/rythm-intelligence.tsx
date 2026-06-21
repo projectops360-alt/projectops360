@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   generateMeetingIntelligenceAction,
+  applyIntelligenceToProjectAction,
   promoteActionItemToTaskAction,
   promoteDecisionAction,
   promoteRiskAction,
@@ -53,6 +54,17 @@ function Confidence({ value }: { value: number | undefined | null }) {
         <span className={cn("block h-full rounded-full", color)} style={{ width: `${pct}%` }} />
       </span>
       <span className={cn("text-[10px] font-medium tabular-nums", textColor)}>{pct}%</span>
+    </span>
+  );
+}
+
+function Impact({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs">
+      <span className="rounded-full bg-brand-600/10 px-1.5 py-0.5 font-semibold tabular-nums text-brand-700 dark:text-brand-300">
+        {value}
+      </span>
+      <span className="text-muted-foreground">{label}</span>
     </span>
   );
 }
@@ -155,8 +167,21 @@ export function RythmIntelligencePanel({
   const t = useTranslations("rythm.intelligence");
   const tErr = useTranslations("rythm.errors");
   const [generating, setGenerating] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promoted, setPromoted] = useState<Set<string>>(new Set());
+
+  async function applyToProject() {
+    setApplying(true);
+    setError(null);
+    const r = await applyIntelligenceToProjectAction({ projectId, meetingId, locale });
+    setApplying(false);
+    if (r.error) {
+      setError(tErr.has(r.error) ? tErr(r.error) : tErr("apply_failed"));
+      return;
+    }
+    onChanged();
+  }
 
   const transcriptReady = transcript?.status === "completed";
 
@@ -230,6 +255,39 @@ export function RythmIntelligencePanel({
       {error && <p className="px-4 pt-3 text-xs text-red-600">{error}</p>}
 
       <div className="space-y-3 p-4">
+        {/* Meeting Impact */}
+        <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-3 dark:border-brand-900 dark:bg-brand-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <h5 className="text-xs font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
+                {t("impactTitle")}
+              </h5>
+              <Impact label={t("decisions")} value={intelligence.decisions.length} />
+              <Impact label={t("commitments")} value={intelligence.commitments.length} />
+              <Impact label={t("actionItems")} value={intelligence.actionItems.length} />
+              <Impact label={t("risks")} value={intelligence.risks.length} />
+              <Impact label={t("dependencies")} value={intelligence.dependencies.length} />
+              <Impact label={t("milestones")} value={intelligence.milestones.length} />
+            </div>
+            {intelligence.appliedAt ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white">
+                <Check className="h-3.5 w-3.5" />
+                {t("applied")}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={applyToProject}
+                disabled={applying}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+                {t("applyToProject")}
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Executive Summary */}
         {intelligence.executiveSummary && (
           <Card icon={Sparkles} title={t("executiveSummary")}>
@@ -372,7 +430,24 @@ export function RythmIntelligencePanel({
 
           {/* Commitments */}
           <Card icon={Handshake} title={t("commitments")} count={intelligence.commitments.length}>
-            <GenericList items={intelligence.commitments} empty={t("none")} />
+            {intelligence.commitments.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t("none")}</p>
+            ) : (
+              <ul className="space-y-2">
+                {intelligence.commitments.map((c, i) => (
+                  <li key={i} className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground">{c.commitment}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {c.owner || "—"}
+                        {c.target_date ? ` · ${c.target_date}` : ""}
+                      </p>
+                    </div>
+                    <Confidence value={c.confidence} />
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
 
           {/* Blockers */}

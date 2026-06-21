@@ -2158,7 +2158,10 @@
       "ai_failed": "La extracción con IA falló. Inténtalo de nuevo.",
       "no_transcript": "Esta reunión aún no tiene transcripción completada.",
       "noApiKey": "La clave del proveedor de IA no está configurada.",
-      "promote_failed": "No se pudo promover el elemento. Inténtalo de nuevo."
+      "promote_failed": "No se pudo promover el elemento. Inténtalo de nuevo.",
+      "apply_failed": "No se pudo aplicar al proyecto. Inténtalo de nuevo.",
+      "no_intelligence": "Genera primero la inteligencia de la reunión.",
+      "already_applied": "Esta inteligencia ya fue aplicada."
     },
     "audioStatus": {
       "uploaded": "Cargado",
@@ -2198,6 +2201,9 @@
     },
     "intelligence": {
       "title": "Inteligencia de la Reunión",
+      "impactTitle": "Impacto de la Reunión",
+      "applyToProject": "Aplicar al Proyecto",
+      "applied": "Aplicado al Proyecto",
       "generate": "Generar Inteligencia de la Reunión",
       "regenerate": "Regenerar",
       "generateHint": "Extrae decisiones, acciones, riesgos y más de la transcripción de esta reunión.",

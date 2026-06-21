@@ -85,7 +85,10 @@ export type RythmActivityAction =
   | "meeting_intelligence_regenerated"
   | "action_item_promoted"
   | "risk_promoted"
-  | "decision_promoted";
+  | "decision_promoted"
+  | "milestone_promoted"
+  | "dependency_promoted"
+  | "intelligence_applied";
 
 // ── Meeting Intelligence ──────────────────────────────────────────────────────
 
@@ -108,6 +111,12 @@ export interface IntelRisk {
   owner: string;
   confidence: number;
 }
+export interface IntelCommitment {
+  commitment: string;
+  owner: string;
+  target_date: string | null;
+  confidence: number;
+}
 /** Generic item for blockers / assumptions / dependencies / milestones / commitments. */
 export interface IntelItem {
   title?: string;
@@ -124,14 +133,15 @@ export interface RythmIntelligence {
   decisions: IntelDecision[];
   actionItems: IntelActionItem[];
   risks: IntelRisk[];
+  commitments: IntelCommitment[];
   blockers: IntelItem[];
   assumptions: IntelItem[];
   dependencies: IntelItem[];
   milestones: IntelItem[];
-  commitments: IntelItem[];
   confidenceScore: number | null;
   model: string | null;
   generatedAt: string;
+  appliedAt: string | null;
 }
 
 /** A saved mapping of a generic speaker label to a real participant. */

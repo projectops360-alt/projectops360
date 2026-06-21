@@ -18,6 +18,7 @@ import type {
   IntelDecision,
   IntelActionItem,
   IntelRisk,
+  IntelCommitment,
   IntelItem,
 } from "./types";
 
@@ -30,12 +31,15 @@ const MODEL = "gpt-4o-mini";
 export interface MeetingIntelligenceContext {
   projectId: string;
   meetingId: string;
+  transcriptId: string | null;
   projectName: string;
   meetingTitle: string;
   meetingDate: string | null;
   objective: string | null;
   expectedOutcome: string | null;
   agenda: AgendaSection[];
+  notes: string;
+  participants: string[];
   attributedTranscript: string;
   hasTranscript: boolean;
 }
@@ -50,23 +54,29 @@ export async function getMeetingIntelligenceContext(
 ): Promise<MeetingIntelligenceContext | null> {
   const { data: meeting } = await supabase
     .from("meetings")
-    .select("id, event_id, objective, expected_outcome, agenda_json, project_id")
+    .select("id, event_id, objective, expected_outcome, agenda_json, notes_i18n, project_id")
     .eq("id", meetingId)
     .eq("organization_id", orgId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!meeting || meeting.project_id !== projectId) return null;
 
-  const [eventRes, projectRes, transcript, mappings] = await Promise.all([
+  const [eventRes, projectRes, attendeesRes, transcript, mappings] = await Promise.all([
     meeting.event_id
       ? supabase.from("project_events").select("title, start_datetime").eq("id", meeting.event_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("projects").select("title_i18n").eq("id", projectId).maybeSingle(),
+    supabase.from("meeting_attendees").select("name").eq("organization_id", orgId).eq("meeting_id", meetingId),
     getMeetingTranscript(supabase, orgId, meetingId),
     getSpeakerMappings(supabase, orgId, meetingId, null),
   ]);
 
   const nameByLabel = new Map(mappings.map((m) => [m.originalSpeakerLabel, m.mappedParticipantName]));
+
+  // Participants = mapped speaker names + named attendees (deduped).
+  const participantSet = new Set<string>();
+  for (const m of mappings) if (m.mappedParticipantName) participantSet.add(m.mappedParticipantName);
+  for (const a of attendeesRes.data ?? []) if (a.name) participantSet.add(a.name as string);
 
   // Build a speaker-attributed transcript ("Efraín: ...").
   let attributedTranscript = "";
@@ -81,12 +91,15 @@ export async function getMeetingIntelligenceContext(
   return {
     projectId,
     meetingId,
+    transcriptId: transcript?.id ?? null,
     projectName: getI18nValue(projectRes.data?.title_i18n as I18nField, locale) || "Project",
     meetingTitle: (eventRes.data?.title as string) || "Meeting",
     meetingDate: (eventRes.data?.start_datetime as string) ?? null,
     objective: meeting.objective ?? null,
     expectedOutcome: meeting.expected_outcome ?? null,
     agenda: (meeting.agenda_json ?? []) as AgendaSection[],
+    notes: getI18nValue(meeting.notes_i18n as I18nField, locale) || "",
+    participants: Array.from(participantSet),
     attributedTranscript,
     hasTranscript: attributedTranscript.trim().length > 0,
   };
@@ -94,39 +107,61 @@ export async function getMeetingIntelligenceContext(
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a Principal PMO intelligence engine for ProjectOps360°.
-Your job is to convert a meeting transcript into STRUCTURED, ACTIONABLE project knowledge.
-This is NOT a meeting summary feature — extract concrete project intelligence.
+const SYSTEM_PROMPT = `You are the ProjectOps360° Meeting Intelligence Engine — a PMO analyst, NOT a meeting summarizer.
+Convert a project conversation into STRUCTURED project-management intelligence. Do not over-focus on summaries.
 
-EXTRACTION PRIORITIES (in order):
-1. Explicit commitments ("I will...", "we agreed to...")
-2. Named owners (use the real participant names from the transcript)
-3. Dates and deadlines
-4. Risks
-5. Dependencies
-6. Decisions
+EXTRACT IN THIS PRIORITY ORDER (decisions first, the executive summary LAST):
+1. DECISIONS
+2. COMMITMENTS
+3. ACTION ITEMS
+4. RISKS
+5. DEPENDENCIES
+6. MILESTONES
+7. BLOCKERS
+8. ASSUMPTIONS
+9. EXECUTIVE SUMMARY (generate this last, after everything else)
 
-RULES:
-- NEVER invent information. Only extract what is supported by the transcript.
-- If you are uncertain about an item, set its "confidence" below 0.5.
-- "confidence" is a number from 0.0 to 1.0.
-- Owners must be real names mentioned in the transcript; use "" if none is stated.
-- due_date must be an ISO date "YYYY-MM-DD" or null. Never guess a date.
-- action_items.priority must be exactly "high", "medium", or "low".
-- The executive_summary is one short paragraph of factual project context (not a transcript recap).
-- Return ONLY valid JSON matching the schema. No prose, no markdown.
+WHAT COUNTS AS EACH (be generous but never fabricate):
+
+DECISION — participants agree on a direction, approve a solution, prioritize work, choose a vendor/tool/approach, or approve a timeline.
+  e.g. "We will prioritize the Rythm module." / "We will use AssemblyAI." / "Let's perform browser compatibility testing." → these MUST become decisions.
+
+COMMITMENT — someone commits to completing work, delivering something, meeting a deadline, or performing a future task.
+  e.g. "I will configure the credentials." / "We will complete integration before sprint end." / "We will finish testing next week." → these MUST become commitments.
+
+ACTION ITEM — requires an owner + an action (due date optional).
+  e.g. "Matteo will review the workflow." / "Efrain will configure credentials."
+
+RISK — compatibility, schedule, dependency, technical, or staffing risks.
+  e.g. "Browser compatibility for audio recording."
+
+DEPENDENCY — vendors, APIs, integrations, external approvals, third-party services.
+  e.g. "AssemblyAI integration."
+
+MILESTONE — sprint-completion goals, release goals, integration completion, deployment targets.
+  e.g. "Complete AssemblyAI integration before sprint end."
+
+CONFIDENCE (0.0–1.0):
+- 0.90–1.00 explicitly stated.
+- 0.70–0.89 strong inference.
+- below 0.70 possible but uncertain.
+NEVER fabricate information. Owners must be real names from the meeting; use "" if none is stated.
+Dates must be ISO "YYYY-MM-DD" or null — never guess a date.
+action_items.priority must be exactly "high", "medium", or "low".
+The executive_summary is one short factual paragraph of project context (decisions, ownership, risks) — NOT a transcript recap.
+Return ONLY valid JSON matching the schema. No prose, no markdown.
 
 OUTPUT SCHEMA:
 {
-  "executive_summary": "",
-  "decisions": [{"title":"","description":"","owner":"","confidence":0.0}],
-  "action_items": [{"task":"","owner":"","due_date":null,"priority":"high|medium|low","confidence":0.0}],
-  "risks": [{"description":"","impact":"","owner":"","confidence":0.0}],
-  "blockers": [{"description":"","owner":"","confidence":0.0}],
-  "assumptions": [{"description":"","confidence":0.0}],
-  "dependencies": [{"description":"","owner":"","confidence":0.0}],
-  "milestones": [{"title":"","due_date":null,"confidence":0.0}],
-  "commitments": [{"description":"","owner":"","confidence":0.0}]
+  "decisions": [{"title":"","description":"","owner":"","confidence":0}],
+  "commitments": [{"commitment":"","owner":"","target_date":null,"confidence":0}],
+  "action_items": [{"task":"","owner":"","due_date":null,"priority":"high|medium|low","confidence":0}],
+  "risks": [{"description":"","impact":"","owner":"","confidence":0}],
+  "dependencies": [{"description":"","owner":"","confidence":0}],
+  "milestones": [{"title":"","due_date":null,"confidence":0}],
+  "blockers": [{"description":"","owner":"","confidence":0}],
+  "assumptions": [{"description":"","confidence":0}],
+  "executive_summary": ""
 }`;
 
 function buildUserPrompt(ctx: MeetingIntelligenceContext): string {
@@ -139,9 +174,13 @@ function buildUserPrompt(ctx: MeetingIntelligenceContext): string {
     `PROJECT: ${ctx.projectName}`,
     `OBJECTIVE: ${ctx.objective ?? "(none)"}`,
     `EXPECTED OUTCOME: ${ctx.expectedOutcome ?? "(none)"}`,
+    `PARTICIPANTS: ${ctx.participants.length ? ctx.participants.join(", ") : "(unknown)"}`,
     ``,
     `AGENDA:`,
     agenda,
+    ``,
+    `MEETING NOTES:`,
+    ctx.notes || "(none)",
     ``,
     `TRANSCRIPT (speaker-attributed):`,
     ctx.attributedTranscript || "(empty)",
@@ -166,13 +205,13 @@ function arr(v: unknown): Record<string, unknown>[] {
 interface ExtractedIntelligence {
   executiveSummary: string;
   decisions: IntelDecision[];
+  commitments: IntelCommitment[];
   actionItems: IntelActionItem[];
   risks: IntelRisk[];
-  blockers: IntelItem[];
-  assumptions: IntelItem[];
   dependencies: IntelItem[];
   milestones: IntelItem[];
-  commitments: IntelItem[];
+  blockers: IntelItem[];
+  assumptions: IntelItem[];
   confidenceScore: number;
   model: string;
 }
@@ -206,21 +245,31 @@ function normalize(raw: Record<string, unknown>, model: string): ExtractedIntell
     .filter((r) => str(r.description))
     .map((r) => ({ description: str(r.description), impact: str(r.impact), owner: str(r.owner), confidence: clamp01(r.confidence) }));
 
-  const mapGeneric = (key: string) => arr(raw[key]).filter((o) => str(o.title) || str(o.description)).map(genericItem);
+  const commitments: IntelCommitment[] = arr(raw.commitments)
+    .filter((c) => str(c.commitment) || str(c.description))
+    .map((c) => ({
+      commitment: str(c.commitment) || str(c.description),
+      owner: str(c.owner),
+      target_date: isoDateOrNull(c.target_date ?? c.due_date),
+      confidence: clamp01(c.confidence),
+    }));
 
-  const all = [...decisions, ...actionItems, ...risks].map((x) => x.confidence);
+  const mapGeneric = (key: string) =>
+    arr(raw[key]).filter((o) => str(o.title) || str(o.description)).map(genericItem);
+
+  const all = [...decisions, ...commitments, ...actionItems, ...risks].map((x) => x.confidence);
   const confidenceScore = all.length ? all.reduce((s, c) => s + c, 0) / all.length : 0.5;
 
   return {
     executiveSummary: str(raw.executive_summary),
     decisions,
+    commitments,
     actionItems,
     risks,
-    blockers: mapGeneric("blockers"),
-    assumptions: mapGeneric("assumptions"),
     dependencies: mapGeneric("dependencies"),
     milestones: mapGeneric("milestones"),
-    commitments: mapGeneric("commitments"),
+    blockers: mapGeneric("blockers"),
+    assumptions: mapGeneric("assumptions"),
     confidenceScore: Math.round(confidenceScore * 100) / 100,
     model,
   };
@@ -268,6 +317,7 @@ export async function upsertIntelligence(
       confidence_score: data.confidenceScore,
       model: data.model,
       generated_at: new Date().toISOString(),
+      applied_at: null, // (re)generation resets the applied state
       created_by: userId,
     },
     { onConflict: "meeting_id" },
@@ -284,14 +334,15 @@ interface IntelRow {
   decisions: IntelDecision[] | null;
   action_items: IntelActionItem[] | null;
   risks: IntelRisk[] | null;
+  commitments: IntelCommitment[] | null;
   blockers: IntelItem[] | null;
   assumptions: IntelItem[] | null;
   dependencies: IntelItem[] | null;
   milestones: IntelItem[] | null;
-  commitments: IntelItem[] | null;
   confidence_score: number | null;
   model: string | null;
   generated_at: string;
+  applied_at: string | null;
 }
 
 export async function getMeetingIntelligence(
@@ -302,7 +353,7 @@ export async function getMeetingIntelligence(
   const { data, error } = await supabase
     .from(TABLE)
     .select(
-      "id, meeting_id, executive_summary, decisions, action_items, risks, blockers, assumptions, dependencies, milestones, commitments, confidence_score, model, generated_at",
+      "id, meeting_id, executive_summary, decisions, action_items, risks, commitments, blockers, assumptions, dependencies, milestones, confidence_score, model, generated_at, applied_at",
     )
     .eq("organization_id", orgId)
     .eq("meeting_id", meetingId)
@@ -316,14 +367,15 @@ export async function getMeetingIntelligence(
     decisions: r.decisions ?? [],
     actionItems: r.action_items ?? [],
     risks: r.risks ?? [],
+    commitments: r.commitments ?? [],
     blockers: r.blockers ?? [],
     assumptions: r.assumptions ?? [],
     dependencies: r.dependencies ?? [],
     milestones: r.milestones ?? [],
-    commitments: r.commitments ?? [],
     confidenceScore: r.confidence_score,
     model: r.model,
     generatedAt: r.generated_at,
+    appliedAt: r.applied_at,
   };
 }
 

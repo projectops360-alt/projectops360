@@ -2158,7 +2158,10 @@
       "ai_failed": "AI extraction failed. Please try again.",
       "no_transcript": "This meeting has no completed transcript yet.",
       "noApiKey": "The AI provider key is not configured.",
-      "promote_failed": "Could not promote the item. Please try again."
+      "promote_failed": "Could not promote the item. Please try again.",
+      "apply_failed": "Could not apply to project. Please try again.",
+      "no_intelligence": "Generate meeting intelligence first.",
+      "already_applied": "This intelligence has already been applied."
     },
     "audioStatus": {
       "uploaded": "Uploaded",
@@ -2198,6 +2201,9 @@
     },
     "intelligence": {
       "title": "Meeting Intelligence",
+      "impactTitle": "Meeting Impact",
+      "applyToProject": "Apply to Project",
+      "applied": "Applied to Project",
       "generate": "Generate Meeting Intelligence",
       "regenerate": "Regenerate",
       "generateHint": "Extract decisions, action items, risks and more from this meeting's transcript.",
