@@ -19,6 +19,32 @@ import type { RythmIntelligence } from "@/lib/rythm/types";
 
 const PRIORITY_TO_ROADMAP: Record<string, string> = { high: "p1", medium: "p2", low: "p3" };
 
+/** Normalised dedup key shared by bulk apply + individual promotes. */
+function dedupKey(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 160);
+}
+
+/** True if this meeting already produced an entity of targetType with this key. */
+async function meetingLinkExists(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orgId: string,
+  meetingId: string,
+  targetType: string,
+  key: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("traceability_links")
+    .select("context_i18n")
+    .eq("organization_id", orgId)
+    .eq("source_type", "meeting")
+    .eq("source_id", meetingId)
+    .eq("target_type", targetType);
+  for (const l of data ?? []) {
+    if ((l.context_i18n as Record<string, unknown> | null)?.key === key) return true;
+  }
+  return false;
+}
+
 // ── generateMeetingIntelligenceAction ───────────────────────────────────────────
 
 export async function generateMeetingIntelligenceAction(input: {
@@ -157,6 +183,10 @@ export async function promoteActionItemToTaskAction(input: {
 
   const supabase = await createClient();
   try {
+    // Idempotent: if this meeting already created this task, don't duplicate.
+    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "task", dedupKey(parsed.data.task))) {
+      return {};
+    }
     const notes: string[] = [];
     if (parsed.data.owner) notes.push(`Owner: ${parsed.data.owner}`);
     if (parsed.data.dueDate) notes.push(`Due: ${parsed.data.dueDate}`);
@@ -178,7 +208,10 @@ export async function promoteActionItemToTaskAction(input: {
       .single();
     if (error || !task) return { error: "promote_failed" };
 
-    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "task", task.id);
+    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "task", task.id, {
+      source: "rythm_intelligence",
+      key: dedupKey(parsed.data.task),
+    });
     await logRythmActivity(supabase, org.organizationId, {
       projectId: parsed.data.projectId,
       meetingId: parsed.data.meetingId,
@@ -224,6 +257,9 @@ export async function promoteDecisionAction(input: {
 
   const supabase = await createClient();
   try {
+    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "decision", dedupKey(parsed.data.title))) {
+      return {};
+    }
     const lang = parsed.data.locale;
     const { data: decision, error } = await supabase
       .from("decisions")
@@ -242,7 +278,10 @@ export async function promoteDecisionAction(input: {
       .single();
     if (error || !decision) return { error: "promote_failed" };
 
-    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "decision", decision.id);
+    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "decision", decision.id, {
+      source: "rythm_intelligence",
+      key: dedupKey(parsed.data.title),
+    });
     await logRythmActivity(supabase, org.organizationId, {
       projectId: parsed.data.projectId,
       meetingId: parsed.data.meetingId,
@@ -288,6 +327,9 @@ export async function promoteRiskAction(input: {
 
   const supabase = await createClient();
   try {
+    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "risk", dedupKey(parsed.data.description.slice(0, 200)))) {
+      return {};
+    }
     const title = parsed.data.description.slice(0, 200);
     const descParts: string[] = [];
     if (parsed.data.description.length > 200) descParts.push(parsed.data.description);
@@ -310,7 +352,10 @@ export async function promoteRiskAction(input: {
       .single();
     if (error || !risk) return { error: "promote_failed" };
 
-    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "risk", risk.id);
+    await linkMeeting(supabase, org.organizationId, org.userId, parsed.data.meetingId, "risk", risk.id, {
+      source: "rythm_intelligence",
+      key: dedupKey(parsed.data.description.slice(0, 200)),
+    });
     await logRythmActivity(supabase, org.organizationId, {
       projectId: parsed.data.projectId,
       meetingId: parsed.data.meetingId,
@@ -405,6 +450,91 @@ export async function updateItemOwnerAction(input: {
   }
 }
 
+// ── deleteIntelligenceItemAction (dismiss one extracted item) ─────────────────
+
+export async function deleteIntelligenceItemAction(input: {
+  projectId: string;
+  meetingId: string;
+  category: string;
+  index: number;
+}): Promise<{ ok?: boolean; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const parsed = z
+    .object({
+      projectId: z.string().uuid(),
+      meetingId: z.string().uuid(),
+      category: z.enum(Object.keys(CATEGORY_COLUMN) as [string, ...string[]]),
+      index: z.number().int().min(0),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: "invalid_input" };
+
+  const column = CATEGORY_COLUMN[parsed.data.category];
+  const supabase = await createClient();
+  try {
+    const { data: row, error } = await supabase
+      .from("project_rythm_intelligence")
+      .select(`id, ${column}`)
+      .eq("organization_id", org.organizationId)
+      .eq("meeting_id", parsed.data.meetingId)
+      .maybeSingle();
+    if (error || !row) return { error: "no_intelligence" };
+
+    const items = ((row as unknown as Record<string, unknown>)[column] ?? []) as unknown[];
+    if (!Array.isArray(items) || parsed.data.index >= items.length) return { error: "invalid_input" };
+    items.splice(parsed.data.index, 1);
+
+    const { error: updErr } = await supabase
+      .from("project_rythm_intelligence")
+      .update({ [column]: items })
+      .eq("organization_id", org.organizationId)
+      .eq("meeting_id", parsed.data.meetingId);
+    if (updErr) return { error: "delete_failed" };
+
+    revalidatePath(`/projects/${parsed.data.projectId}/rhythm`);
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteIntelligenceItemAction failed:", err);
+    return { error: "delete_failed" };
+  }
+}
+
+// ── deleteMeetingIntelligenceAction (clear all) ───────────────────────────────
+
+export async function deleteMeetingIntelligenceAction(input: {
+  projectId: string;
+  meetingId: string;
+}): Promise<{ ok?: boolean; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const parsed = z.object({ projectId: z.string().uuid(), meetingId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: "invalid_input" };
+
+  const supabase = await createClient();
+  try {
+    const { error } = await supabase
+      .from("project_rythm_intelligence")
+      .delete()
+      .eq("organization_id", org.organizationId)
+      .eq("meeting_id", parsed.data.meetingId);
+    if (error) return { error: "delete_failed" };
+    revalidatePath(`/projects/${parsed.data.projectId}/rhythm`);
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteMeetingIntelligenceAction failed:", err);
+    return { error: "delete_failed" };
+  }
+}
+
 // ── applyIntelligenceToProjectAction (bulk) ───────────────────────────────────
 // Creates project tasks / decisions / risks / milestones / dependency memory
 // items from the meeting intelligence, each with mandatory traceability back to
@@ -444,7 +574,7 @@ export async function applyIntelligenceToProjectAction(input: {
 
     const transcript = await getMeetingTranscript(supabase, org.organizationId, meetingId);
     const transcriptId = transcript?.id ?? null;
-    const trace = (owner: string, confidence: number, itemType: string) => ({
+    const trace = (owner: string, confidence: number, itemType: string, key: string) => ({
       source: "rythm_intelligence",
       item_type: itemType,
       meeting_id: meetingId,
@@ -452,12 +582,36 @@ export async function applyIntelligenceToProjectAction(input: {
       timestamp: intel.generatedAt,
       speaker: owner || null,
       confidence,
+      key,
     });
+
+    // Idempotency: skip anything already created from THIS meeting (so an
+    // accidental Regenerate → Apply does not duplicate tasks/risks/milestones/…).
+    const normKey = dedupKey;
+    const { data: existingLinks } = await supabase
+      .from("traceability_links")
+      .select("target_type, context_i18n")
+      .eq("organization_id", org.organizationId)
+      .eq("source_type", "meeting")
+      .eq("source_id", meetingId);
+    const appliedKeys = new Set<string>();
+    for (const l of existingLinks ?? []) {
+      const k = (l.context_i18n as Record<string, unknown> | null)?.key;
+      if (typeof k === "string") appliedKeys.add(`${l.target_type}|${k}`);
+    }
+    const seen = (targetType: string, key: string) => {
+      const sig = `${targetType}|${key}`;
+      if (appliedKeys.has(sig)) return true;
+      appliedKeys.add(sig);
+      return false;
+    };
 
     const counts: ApplyCounts = { actionItems: 0, decisions: 0, risks: 0, milestones: 0, dependencies: 0 };
 
     // Action items → roadmap_tasks
     for (const a of intel.actionItems) {
+      const key = normKey(a.task);
+      if (!a.task.trim() || seen("task", key)) continue;
       const notes = [a.owner ? `Owner: ${a.owner}` : "", a.due_date ? `Due: ${a.due_date}` : "", "From Rythm meeting intelligence"]
         .filter(Boolean)
         .join(" · ");
@@ -476,13 +630,15 @@ export async function applyIntelligenceToProjectAction(input: {
         .select("id")
         .single();
       if (task) {
-        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "task", task.id, trace(a.owner, a.confidence, "action_item"));
+        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "task", task.id, trace(a.owner, a.confidence, "action_item", key));
         counts.actionItems++;
       }
     }
 
     // Decisions → decisions register
     for (const d of intel.decisions) {
+      const key = normKey(d.title);
+      if (!d.title.trim() || seen("decision", key)) continue;
       const { data: dec } = await supabase
         .from("decisions")
         .insert({
@@ -499,13 +655,15 @@ export async function applyIntelligenceToProjectAction(input: {
         .select("id")
         .single();
       if (dec) {
-        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "decision", dec.id, trace(d.owner, d.confidence, "decision"));
+        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "decision", dec.id, trace(d.owner, d.confidence, "decision", key));
         counts.decisions++;
       }
     }
 
     // Risks → risk register
     for (const r of intel.risks) {
+      const key = normKey(r.description.slice(0, 200));
+      if (!r.description.trim() || seen("risk", key)) continue;
       const { data: risk } = await supabase
         .from("risks")
         .insert({
@@ -521,7 +679,7 @@ export async function applyIntelligenceToProjectAction(input: {
         .select("id")
         .single();
       if (risk) {
-        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "risk", risk.id, trace(r.owner, r.confidence, "risk"));
+        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "risk", risk.id, trace(r.owner, r.confidence, "risk", key));
         counts.risks++;
       }
     }
@@ -530,6 +688,8 @@ export async function applyIntelligenceToProjectAction(input: {
     for (const m of intel.milestones) {
       const title = m.title || m.description;
       if (!title) continue;
+      const key = normKey(title);
+      if (seen("milestone", key)) continue;
       const { data: ms } = await supabase
         .from("milestones")
         .insert({
@@ -545,7 +705,7 @@ export async function applyIntelligenceToProjectAction(input: {
         .select("id")
         .single();
       if (ms) {
-        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "milestone", ms.id, trace(m.owner ?? "", m.confidence ?? 0.5, "milestone"));
+        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "milestone", ms.id, trace(m.owner ?? "", m.confidence ?? 0.5, "milestone", key));
         counts.milestones++;
       }
     }
@@ -554,6 +714,8 @@ export async function applyIntelligenceToProjectAction(input: {
     for (const dep of intel.dependencies) {
       const title = dep.title || dep.description;
       if (!title) continue;
+      const key = normKey(title);
+      if (seen("memory", key)) continue;
       const { data: mem } = await supabase
         .from("project_memory_items")
         .insert({
@@ -572,7 +734,7 @@ export async function applyIntelligenceToProjectAction(input: {
         .select("id")
         .single();
       if (mem) {
-        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "memory", mem.id, trace(dep.owner ?? "", dep.confidence ?? 0.5, "dependency"));
+        await linkMeeting(supabase, org.organizationId, org.userId, meetingId, "memory", mem.id, trace(dep.owner ?? "", dep.confidence ?? 0.5, "dependency", key));
         counts.dependencies++;
       }
     }

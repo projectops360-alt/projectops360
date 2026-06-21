@@ -2252,7 +2252,10 @@
       "correctlyAttributed": "Attributed",
       "needsReview": "Needs Review",
       "unknownOwners": "Unknown Owners",
-      "lowConfidence": "Low Confidence"
+      "lowConfidence": "Low Confidence",
+      "removeItem": "Remove item",
+      "clearAll": "Clear",
+      "clearConfirm": "Delete all extracted intelligence for this meeting? This cannot be undone."
     },
     "transcript": {
       "title": "Transcript",

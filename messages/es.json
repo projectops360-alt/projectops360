@@ -2252,7 +2252,10 @@
       "correctlyAttributed": "Atribuidos",
       "needsReview": "Por Revisar",
       "unknownOwners": "Sin Responsable",
-      "lowConfidence": "Baja Confianza"
+      "lowConfidence": "Baja Confianza",
+      "removeItem": "Quitar elemento",
+      "clearAll": "Limpiar",
+      "clearConfirm": "¿Eliminar toda la inteligencia extraída de esta reunión? No se puede deshacer."
     },
     "transcript": {
       "title": "Transcripción",
