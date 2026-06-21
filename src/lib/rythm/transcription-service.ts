@@ -12,6 +12,7 @@ import { setMeetingRythmStatus } from "./processing-service";
 import {
   RYTHM_MAX_AUDIO_BYTES,
   RYTHM_TRANSCRIBE_MIME,
+  RYTHM_ACCEPTED_EXTENSIONS,
   RYTHM_TRANSCRIBE_PROVIDER,
   type RythmTranscript,
   type RythmTranscriptUtterance,
@@ -58,7 +59,9 @@ export async function submitTranscription(
 ): Promise<SubmitResult> {
   const { data: audio, error: audioErr } = await supabase
     .from(AUDIO)
-    .select("id, meeting_id, project_id, storage_bucket, storage_path, file_type, file_size, status")
+    .select(
+      "id, meeting_id, project_id, storage_bucket, storage_path, file_name, file_type, file_size, status",
+    )
     .eq("organization_id", orgId)
     .eq("id", audioFileId)
     .maybeSingle();
@@ -76,8 +79,12 @@ export async function submitTranscription(
   if (!audio.storage_path) return failUnusable("errorMissingStorage");
   if (!audio.file_size || audio.file_size <= 0) return failUnusable("errorEmptyFile");
   if (audio.file_size > RYTHM_MAX_AUDIO_BYTES) return failUnusable("errorTooLarge");
-  if (!audio.file_type || !RYTHM_TRANSCRIBE_MIME.includes(audio.file_type))
-    return failUnusable("errorUnsupportedType");
+  // Accept by MIME OR by file extension (older rows may have a generic MIME).
+  const ext = /\.([a-z0-9]+)$/i.exec(audio.file_name ?? "")?.[1]?.toLowerCase() ?? "";
+  const typeOk = !!audio.file_type && RYTHM_TRANSCRIBE_MIME.includes(audio.file_type);
+  const extOk =
+    !!ext && (RYTHM_ACCEPTED_EXTENSIONS as readonly string[]).includes(ext);
+  if (!typeOk && !extOk) return failUnusable("errorUnsupportedType");
   // Recoverable gate: allow fresh uploads, prepared assets, or retries of failures.
   if (!["uploaded", "ready_for_transcription", "failed"].includes(audio.status))
     return { ok: false, errorKey: "errorBadStatus", meetingId, projectId };

@@ -13,6 +13,8 @@ import {
   RYTHM_AUDIO_BUCKET,
   RYTHM_MAX_AUDIO_BYTES,
   RYTHM_ACCEPTED_EXTENSIONS,
+  RYTHM_ACCEPTED_MIME,
+  RYTHM_EXTENSION_MIME,
   type RythmAudioSource,
 } from "./types";
 
@@ -61,11 +63,23 @@ export function validateAudioFile(file: File): ValidationResult {
   if (file.size <= 0) return { ok: false, errorKey: "errorEmptyFile" };
   if (file.size > RYTHM_MAX_AUDIO_BYTES) return { ok: false, errorKey: "errorTooLarge" };
 
+  // Accept by extension OR by MIME type — files often have one but not the other.
   const ext = extensionFromFileName(file.name);
-  if (!ext || !RYTHM_ACCEPTED_EXTENSIONS.includes(ext as (typeof RYTHM_ACCEPTED_EXTENSIONS)[number])) {
-    return { ok: false, errorKey: "errorUnsupportedType" };
-  }
+  const extOk =
+    !!ext && RYTHM_ACCEPTED_EXTENSIONS.includes(ext as (typeof RYTHM_ACCEPTED_EXTENSIONS)[number]);
+  const mimeOk = !!file.type && RYTHM_ACCEPTED_MIME.includes(file.type.toLowerCase());
+  if (!extOk && !mimeOk) return { ok: false, errorKey: "errorUnsupportedType" };
   return { ok: true };
+}
+
+/** Resolves a meaningful content-type, falling back to the file extension. */
+function resolveContentType(file: File): string {
+  const type = file.type?.toLowerCase() ?? "";
+  if (type && type !== "application/octet-stream" && RYTHM_ACCEPTED_MIME.includes(type)) {
+    return type;
+  }
+  const ext = extensionFromFileName(file.name);
+  return RYTHM_EXTENSION_MIME[ext] ?? type ?? "application/octet-stream";
 }
 
 // ── Upload result ─────────────────────────────────────────────────────────────
@@ -133,7 +147,7 @@ export async function uploadRythmAudio(
     meetingId,
     blob: file,
     fileName: file.name,
-    contentType: file.type || "application/octet-stream",
+    contentType: resolveContentType(file),
     source: "manual_upload",
   });
 }

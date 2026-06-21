@@ -2084,7 +2084,7 @@
       "title": "Cargar audio",
       "hint": "Carga una grabación existente de esta reunión.",
       "choose": "Elige un archivo de audio",
-      "formats": "MP3, WAV, M4A, MP4 o WEBM · hasta 500 MB",
+      "formats": "MP3, WAV, M4A, MP4, WEBM, OGG, FLAC… · hasta 500 MB",
       "uploading": "Cargando…"
     },
     "detail": {
@@ -2130,7 +2130,7 @@
       "errorRegisterFailed": "No se pudo registrar el archivo de audio. Inténtalo de nuevo.",
       "errorEmptyFile": "El archivo seleccionado está vacío.",
       "errorTooLarge": "El archivo es demasiado grande (máx. 500 MB).",
-      "errorUnsupportedType": "Tipo de archivo no admitido. Usa MP3, WAV, M4A, MP4 o WEBM.",
+      "errorUnsupportedType": "Tipo de archivo no admitido. Usa un archivo de audio/video común (MP3, WAV, M4A, MP4, WEBM, OGG, FLAC, AAC, MOV…).",
       "sign_failed": "No se pudo cargar el audio. Inténtalo de nuevo.",
       "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo.",
       "delete_failed": "No se pudo eliminar el archivo de audio. Inténtalo de nuevo.",

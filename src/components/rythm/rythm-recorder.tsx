@@ -51,7 +51,12 @@ export function RythmRecorder({ projectId, meetingId, onSaved }: RythmRecorderPr
   const [devices, setDevices] = useState<AudioInputDevice[]>([]);
   const [deviceId, setDeviceId] = useState<string>("");
   const [mode, setMode] = useState<RecordingMode>("microphone");
-  const screenSupported = isScreenRecordingSupported();
+  // Hydration-safe: server renders false, client resolves after hydration.
+  const screenSupported = useSyncExternalStore(
+    () => () => {},
+    () => isScreenRecordingSupported(),
+    () => false,
+  );
 
   // Capability detection without a setState-in-effect: server renders optimistic
   // (true); the client snapshot resolves after hydration with no mismatch.

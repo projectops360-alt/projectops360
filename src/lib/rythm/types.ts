@@ -135,8 +135,12 @@ export const RYTHM_AUDIO_BUCKET = "meeting-audio";
 /** Hard ceiling for a single audio asset (matches UI copy + validation). */
 export const RYTHM_MAX_AUDIO_BYTES = 500 * 1024 * 1024; // 500 MB
 
-/** Accepted upload extensions / mime hints. */
-export const RYTHM_ACCEPTED_EXTENSIONS = ["mp3", "wav", "m4a", "mp4", "webm"] as const;
+/** Accepted upload extensions (AssemblyAI handles all of these). */
+export const RYTHM_ACCEPTED_EXTENSIONS = [
+  "mp3", "wav", "m4a", "mp4", "webm",
+  "ogg", "oga", "opus", "aac", "flac", "mov", "mkv", "3gp", "amr",
+] as const;
+
 export const RYTHM_ACCEPTED_MIME = [
   "audio/mpeg",
   "audio/mp3",
@@ -147,22 +151,39 @@ export const RYTHM_ACCEPTED_MIME = [
   "audio/x-m4a",
   "audio/m4a",
   "audio/webm",
+  "audio/ogg",
+  "audio/opus",
+  "audio/aac",
+  "audio/flac",
+  "audio/x-flac",
+  "audio/3gpp",
+  "audio/amr",
   "video/mp4", // some .mp4 audio recordings report a video container
   "video/webm", // screen + system-audio recordings
+  "video/quicktime", // .mov
+  "video/x-matroska", // .mkv
 ];
 
-/** Mime types accepted for transcription queueing (validation gate). */
-export const RYTHM_TRANSCRIBE_MIME = [
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/wav",
-  "audio/x-wav",
-  "audio/mp4",
-  "audio/m4a",
-  "audio/webm",
-  "video/mp4",
-  "video/webm", // screen recordings (extension over the base spec list)
-];
+/** Mime types accepted for transcription queueing (same superset). */
+export const RYTHM_TRANSCRIBE_MIME = RYTHM_ACCEPTED_MIME;
+
+/** Maps a file extension to a sensible audio/video mime type. */
+export const RYTHM_EXTENSION_MIME: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  m4a: "audio/mp4",
+  mp4: "video/mp4",
+  webm: "audio/webm",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/opus",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  mov: "video/quicktime",
+  mkv: "video/x-matroska",
+  "3gp": "audio/3gpp",
+  amr: "audio/amr",
+};
 
 /** Planned transcription provider — wired in a later phase (no API call yet). */
 export const RYTHM_TRANSCRIBE_PROVIDER = "assemblyai";
