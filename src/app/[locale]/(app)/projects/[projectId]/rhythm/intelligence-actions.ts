@@ -326,6 +326,85 @@ export async function promoteRiskAction(input: {
   }
 }
 
+// ── updateItemOwnerAction (manual owner review) ───────────────────────────────
+
+const CATEGORY_COLUMN: Record<string, string> = {
+  decisions: "decisions",
+  actionItems: "action_items",
+  risks: "risks",
+  commitments: "commitments",
+  dependencies: "dependencies",
+  milestones: "milestones",
+  blockers: "blockers",
+  assumptions: "assumptions",
+};
+
+export async function updateItemOwnerAction(input: {
+  projectId: string;
+  meetingId: string;
+  category: string;
+  index: number;
+  owner: string;
+}): Promise<{ ok?: boolean; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const parsed = z
+    .object({
+      projectId: z.string().uuid(),
+      meetingId: z.string().uuid(),
+      category: z.enum(Object.keys(CATEGORY_COLUMN) as [string, ...string[]]),
+      index: z.number().int().min(0),
+      owner: z.string().max(200).transform((s) => s.trim()),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { error: "invalid_input" };
+
+  const column = CATEGORY_COLUMN[parsed.data.category];
+  const supabase = await createClient();
+  try {
+    const { data: row, error } = await supabase
+      .from("project_rythm_intelligence")
+      .select(`id, ${column}`)
+      .eq("organization_id", org.organizationId)
+      .eq("meeting_id", parsed.data.meetingId)
+      .maybeSingle();
+    if (error || !row) return { error: "no_intelligence" };
+
+    const items = ((row as unknown as Record<string, unknown>)[column] ?? []) as Record<string, unknown>[];
+    if (!Array.isArray(items) || parsed.data.index >= items.length) return { error: "invalid_input" };
+
+    items[parsed.data.index] = {
+      ...items[parsed.data.index],
+      owner: parsed.data.owner,
+      owner_attribution: "manual",
+    };
+
+    const { error: updErr } = await supabase
+      .from("project_rythm_intelligence")
+      .update({ [column]: items })
+      .eq("organization_id", org.organizationId)
+      .eq("meeting_id", parsed.data.meetingId);
+    if (updErr) return { error: "update_failed" };
+
+    await logRythmActivity(supabase, org.organizationId, {
+      projectId: parsed.data.projectId,
+      meetingId: parsed.data.meetingId,
+      action: "owner_corrected",
+      details: { category: parsed.data.category, index: parsed.data.index, owner: parsed.data.owner },
+      userId: org.userId,
+    });
+    revalidatePath(`/projects/${parsed.data.projectId}/rhythm`);
+    return { ok: true };
+  } catch (err) {
+    console.error("updateItemOwnerAction failed:", err);
+    return { error: "update_failed" };
+  }
+}
+
 // ── applyIntelligenceToProjectAction (bulk) ───────────────────────────────────
 // Creates project tasks / decisions / risks / milestones / dependency memory
 // items from the meeting intelligence, each with mandatory traceability back to

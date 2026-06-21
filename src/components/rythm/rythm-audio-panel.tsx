@@ -227,6 +227,7 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
         locale={locale}
         transcript={transcript}
         intelligence={intelligence}
+        ownerOptions={speakerOptions}
         onChanged={load}
       />
     </div>

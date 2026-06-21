@@ -88,37 +88,55 @@ export type RythmActivityAction =
   | "decision_promoted"
   | "milestone_promoted"
   | "dependency_promoted"
-  | "intelligence_applied";
+  | "intelligence_applied"
+  | "owner_corrected";
 
 // ── Meeting Intelligence ──────────────────────────────────────────────────────
 
-export interface IntelDecision {
+/** How an item's owner was resolved (audit trail). */
+export type OwnerAttribution =
+  | "speaker"
+  | "explicit"
+  | "project_member"
+  | "attendee"
+  | "unknown"
+  | "manual";
+
+/** Evidence/traceability carried by every extracted item. */
+export interface IntelEvidence {
+  source_speaker?: string | null;
+  source_timestamp?: number | null; // seconds into the recording
+  source_excerpt?: string | null;
+  owner_attribution?: OwnerAttribution;
+}
+
+export interface IntelDecision extends IntelEvidence {
   title: string;
   description: string;
   owner: string;
   confidence: number;
 }
-export interface IntelActionItem {
+export interface IntelActionItem extends IntelEvidence {
   task: string;
   owner: string;
   due_date: string | null;
   priority: "high" | "medium" | "low";
   confidence: number;
 }
-export interface IntelRisk {
+export interface IntelRisk extends IntelEvidence {
   description: string;
   impact: string;
   owner: string;
   confidence: number;
 }
-export interface IntelCommitment {
+export interface IntelCommitment extends IntelEvidence {
   commitment: string;
   owner: string;
   target_date: string | null;
   confidence: number;
 }
-/** Generic item for blockers / assumptions / dependencies / milestones / commitments. */
-export interface IntelItem {
+/** Generic item for blockers / assumptions / dependencies / milestones. */
+export interface IntelItem extends IntelEvidence {
   title?: string;
   description?: string;
   owner?: string;

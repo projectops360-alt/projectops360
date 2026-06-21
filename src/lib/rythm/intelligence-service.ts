@@ -20,6 +20,8 @@ import type {
   IntelRisk,
   IntelCommitment,
   IntelItem,
+  IntelEvidence,
+  OwnerAttribution,
 } from "./types";
 
 type DB = SupabaseClient;
@@ -40,6 +42,10 @@ export interface MeetingIntelligenceContext {
   agenda: AgendaSection[];
   notes: string;
   participants: string[];
+  /** Ownership-resolution tiers (priority order). */
+  speakerNames: string[]; // tier 1 — mapped speaker labels → names
+  projectMembers: string[]; // tier 3 — project stakeholders/members
+  attendees: string[]; // tier 4 — meeting attendees
   attributedTranscript: string;
   hasTranscript: boolean;
 }
@@ -61,28 +67,32 @@ export async function getMeetingIntelligenceContext(
     .maybeSingle();
   if (!meeting || meeting.project_id !== projectId) return null;
 
-  const [eventRes, projectRes, attendeesRes, transcript, mappings] = await Promise.all([
+  const [eventRes, projectRes, attendeesRes, stakeholdersRes, transcript, mappings] = await Promise.all([
     meeting.event_id
       ? supabase.from("project_events").select("title, start_datetime").eq("id", meeting.event_id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("projects").select("title_i18n").eq("id", projectId).maybeSingle(),
     supabase.from("meeting_attendees").select("name").eq("organization_id", orgId).eq("meeting_id", meetingId),
+    supabase.from("stakeholders").select("name").eq("organization_id", orgId).eq("project_id", projectId).is("deleted_at", null).limit(200),
     getMeetingTranscript(supabase, orgId, meetingId),
     getSpeakerMappings(supabase, orgId, meetingId, null),
   ]);
 
   const nameByLabel = new Map(mappings.map((m) => [m.originalSpeakerLabel, m.mappedParticipantName]));
 
-  // Participants = mapped speaker names + named attendees (deduped).
-  const participantSet = new Set<string>();
-  for (const m of mappings) if (m.mappedParticipantName) participantSet.add(m.mappedParticipantName);
-  for (const a of attendeesRes.data ?? []) if (a.name) participantSet.add(a.name as string);
+  const speakerNames = mappings.map((m) => m.mappedParticipantName).filter(Boolean);
+  const attendees = (attendeesRes.data ?? []).map((a) => a.name as string).filter(Boolean);
+  const projectMembers = (stakeholdersRes.data ?? []).map((s) => s.name as string).filter(Boolean);
+  const participantSet = new Set<string>([...speakerNames, ...attendees]);
 
-  // Build a speaker-attributed transcript ("Efraín: ...").
+  // Build a speaker-attributed transcript with second offsets ("[t=41] Efraín: ...").
   let attributedTranscript = "";
   if (transcript?.utterances?.length) {
     attributedTranscript = transcript.utterances
-      .map((u) => `${nameByLabel.get(u.speaker) ?? `Speaker ${u.speaker}`}: ${u.text}`)
+      .map((u) => {
+        const secs = Math.floor((u.start ?? 0) / 1000);
+        return `[t=${secs}] ${nameByLabel.get(u.speaker) ?? `Speaker ${u.speaker}`}: ${u.text}`;
+      })
       .join("\n");
   } else if (transcript?.transcriptText) {
     attributedTranscript = transcript.transcriptText;
@@ -100,6 +110,9 @@ export async function getMeetingIntelligenceContext(
     agenda: (meeting.agenda_json ?? []) as AgendaSection[],
     notes: getI18nValue(meeting.notes_i18n as I18nField, locale) || "",
     participants: Array.from(participantSet),
+    speakerNames,
+    projectMembers,
+    attendees,
     attributedTranscript,
     hasTranscript: attributedTranscript.trim().length > 0,
   };
@@ -145,22 +158,34 @@ CONFIDENCE (0.0–1.0):
 - 0.90–1.00 explicitly stated.
 - 0.70–0.89 strong inference.
 - below 0.70 possible but uncertain.
-NEVER fabricate information. Owners must be real names from the meeting; use "" if none is stated.
-Dates must be ISO "YYYY-MM-DD" or null — never guess a date.
+NEVER fabricate information. Dates must be ISO "YYYY-MM-DD" or null — never guess a date.
 action_items.priority must be exactly "high", "medium", or "low".
 The executive_summary is one short factual paragraph of project context (decisions, ownership, risks) — NOT a transcript recap.
+
+OWNER (the responsible person), in priority order:
+- For a first-person commitment ("I will...", "voy a...") the owner is the SPEAKER of that line.
+- For "X will..." the owner is X (explicitly mentioned person).
+- Use the EXACT participant name as written. If no clear person, use "".
+- Do NOT pick a name from the participant list unless that person actually owns the item in the transcript.
+
+EVIDENCE — every item MUST include:
+- "source_speaker": the participant who spoke the supporting line.
+- "source_timestamp": the integer seconds from the [t=...] tag at the start of that line.
+- "source_excerpt": a short VERBATIM quote (<200 chars) from the transcript that supports the item.
+Never fabricate evidence; if a field is unknown use "" or null.
+
 Return ONLY valid JSON matching the schema. No prose, no markdown.
 
-OUTPUT SCHEMA:
+OUTPUT SCHEMA (every item also carries "source_speaker","source_timestamp","source_excerpt"):
 {
-  "decisions": [{"title":"","description":"","owner":"","confidence":0}],
-  "commitments": [{"commitment":"","owner":"","target_date":null,"confidence":0}],
-  "action_items": [{"task":"","owner":"","due_date":null,"priority":"high|medium|low","confidence":0}],
-  "risks": [{"description":"","impact":"","owner":"","confidence":0}],
-  "dependencies": [{"description":"","owner":"","confidence":0}],
-  "milestones": [{"title":"","due_date":null,"confidence":0}],
-  "blockers": [{"description":"","owner":"","confidence":0}],
-  "assumptions": [{"description":"","confidence":0}],
+  "decisions": [{"title":"","description":"","owner":"","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "commitments": [{"commitment":"","owner":"","target_date":null,"confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "action_items": [{"task":"","owner":"","due_date":null,"priority":"high|medium|low","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "risks": [{"description":"","impact":"","owner":"","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "dependencies": [{"description":"","owner":"","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "milestones": [{"title":"","due_date":null,"confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "blockers": [{"description":"","owner":"","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
+  "assumptions": [{"description":"","confidence":0,"source_speaker":"","source_timestamp":null,"source_excerpt":""}],
   "executive_summary": ""
 }`;
 
@@ -216,8 +241,20 @@ interface ExtractedIntelligence {
   model: string;
 }
 
+function evidence(o: Record<string, unknown>): IntelEvidence {
+  return {
+    source_speaker: str(o.source_speaker) || null,
+    source_timestamp:
+      typeof o.source_timestamp === "number" && o.source_timestamp >= 0
+        ? Math.floor(o.source_timestamp)
+        : null,
+    source_excerpt: str(o.source_excerpt).slice(0, 280) || null,
+  };
+}
+
 function genericItem(o: Record<string, unknown>): IntelItem {
   return {
+    ...evidence(o),
     title: str(o.title) || undefined,
     description: str(o.description) || undefined,
     owner: str(o.owner) || undefined,
@@ -229,11 +266,12 @@ function genericItem(o: Record<string, unknown>): IntelItem {
 function normalize(raw: Record<string, unknown>, model: string): ExtractedIntelligence {
   const decisions: IntelDecision[] = arr(raw.decisions)
     .filter((d) => str(d.title) || str(d.description))
-    .map((d) => ({ title: str(d.title), description: str(d.description), owner: str(d.owner), confidence: clamp01(d.confidence) }));
+    .map((d) => ({ ...evidence(d), title: str(d.title), description: str(d.description), owner: str(d.owner), confidence: clamp01(d.confidence) }));
 
   const actionItems: IntelActionItem[] = arr(raw.action_items)
     .filter((a) => str(a.task))
     .map((a) => ({
+      ...evidence(a),
       task: str(a.task),
       owner: str(a.owner),
       due_date: isoDateOrNull(a.due_date),
@@ -243,11 +281,12 @@ function normalize(raw: Record<string, unknown>, model: string): ExtractedIntell
 
   const risks: IntelRisk[] = arr(raw.risks)
     .filter((r) => str(r.description))
-    .map((r) => ({ description: str(r.description), impact: str(r.impact), owner: str(r.owner), confidence: clamp01(r.confidence) }));
+    .map((r) => ({ ...evidence(r), description: str(r.description), impact: str(r.impact), owner: str(r.owner), confidence: clamp01(r.confidence) }));
 
   const commitments: IntelCommitment[] = arr(raw.commitments)
     .filter((c) => str(c.commitment) || str(c.description))
     .map((c) => ({
+      ...evidence(c),
       commitment: str(c.commitment) || str(c.description),
       owner: str(c.owner),
       target_date: isoDateOrNull(c.target_date ?? c.due_date),
@@ -277,6 +316,72 @@ function normalize(raw: Record<string, unknown>, model: string): ExtractedIntell
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
+// ── Ownership resolution (audit hierarchy) ────────────────────────────────────
+// Priority: 1) speaker attribution mapping, 2) explicit person mention,
+// 3) project member match, 4) meeting attendee match, 5) unknown.
+// Never use the attendee list before speaker attribution.
+
+function norm(s: string): string {
+  return s.trim().toLowerCase();
+}
+function firstToken(s: string): string {
+  return norm(s).split(/\s+/)[0] ?? "";
+}
+function matchName(name: string | null | undefined, list: string[]): string | null {
+  const n = norm(name ?? "");
+  if (!n) return null;
+  for (const cand of list) {
+    if (norm(cand) === n || firstToken(cand) === n || norm(cand) === firstToken(name ?? "")) return cand;
+  }
+  return null;
+}
+
+function resolveOne(
+  owner: string,
+  sourceSpeaker: string | null | undefined,
+  excerpt: string | null | undefined,
+  ctx: MeetingIntelligenceContext,
+): { owner: string; attribution: OwnerAttribution } {
+  const aiOwner = (owner ?? "").trim();
+  const speaker = (sourceSpeaker ?? "").trim();
+  const ex = (excerpt ?? "").toLowerCase();
+  const firstPerson = /(^|\b)(i will|i'?ll|i am going to|i'?m going to|i can|voy a|me encargo|yo )/i.test(ex);
+
+  const speakerInMap = matchName(speaker, ctx.speakerNames); // tier 1
+  if (speakerInMap && (firstPerson || !aiOwner)) return { owner: speakerInMap, attribution: "speaker" };
+
+  if (aiOwner) {
+    const inSpk = matchName(aiOwner, ctx.speakerNames); // tier 1
+    if (inSpk) return { owner: inSpk, attribution: "speaker" };
+    const inMem = matchName(aiOwner, ctx.projectMembers); // tier 3
+    if (inMem) return { owner: inMem, attribution: "project_member" };
+    const inAtt = matchName(aiOwner, ctx.attendees); // tier 4
+    if (inAtt) return { owner: inAtt, attribution: "attendee" };
+    return { owner: aiOwner, attribution: "explicit" }; // tier 2 (explicit mention)
+  }
+
+  if (speakerInMap) return { owner: speakerInMap, attribution: "speaker" };
+  return { owner: "", attribution: "unknown" }; // tier 5
+}
+
+function resolveOwnership(data: ExtractedIntelligence, ctx: MeetingIntelligenceContext): void {
+  const apply = (items: Array<{ owner?: string; source_speaker?: string | null; source_excerpt?: string | null; owner_attribution?: OwnerAttribution }>) => {
+    for (const it of items) {
+      const r = resolveOne(it.owner ?? "", it.source_speaker, it.source_excerpt, ctx);
+      it.owner = r.owner;
+      it.owner_attribution = r.attribution;
+    }
+  };
+  apply(data.decisions);
+  apply(data.commitments);
+  apply(data.actionItems);
+  apply(data.risks);
+  apply(data.dependencies);
+  apply(data.milestones);
+  apply(data.blockers);
+  for (const a of data.assumptions) a.owner_attribution = a.owner ? a.owner_attribution : "unknown";
+}
+
 export async function extractIntelligence(
   ctx: MeetingIntelligenceContext,
 ): Promise<ExtractedIntelligence> {
@@ -288,7 +393,9 @@ export async function extractIntelligence(
     jsonMode: true,
   });
   if (!result.parsedJson) throw new Error("ai_invalid_json");
-  return normalize(result.parsedJson, result.model || MODEL);
+  const data = normalize(result.parsedJson, result.model || MODEL);
+  resolveOwnership(data, ctx);
+  return data;
 }
 
 // ── Persistence ─────────────────────────────────────────────────────────────
