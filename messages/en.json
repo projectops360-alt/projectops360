@@ -2149,7 +2149,9 @@
       "job_not_failed": "Only failed jobs can be retried.",
       "job_not_cancellable": "This job can no longer be cancelled.",
       "max_attempts_reached": "Maximum attempts reached.",
-      "list_failed": "Could not load the queue. Please try again."
+      "list_failed": "Could not load the queue. Please try again.",
+      "assemblyai_failed": "Could not start transcription. Please try again.",
+      "assemblyai_error": "The transcription provider returned an error."
     },
     "audioStatus": {
       "uploaded": "Uploaded",
@@ -2196,6 +2198,24 @@
       "decisions": "Decisions",
       "risks": "Risks",
       "blockers": "Blockers"
+    },
+    "transcript": {
+      "title": "Transcript",
+      "language": "Language",
+      "duration": "Duration",
+      "speakers": "Speakers",
+      "status": "Status",
+      "created": "Created",
+      "processing": "Transcription in progress…",
+      "failed": "Transcription failed.",
+      "empty": "No transcript content.",
+      "speaker": "Speaker"
+    },
+    "transcriptStatus": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
     }
   }
 }

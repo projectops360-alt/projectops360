@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { RythmRecorder } from "./rythm-recorder";
 import { RythmAudioUploader } from "./rythm-audio-uploader";
+import { RythmTranscriptView } from "./rythm-transcript-view";
 import {
   listRythmAudioAction,
   getRythmAudioUrlAction,
@@ -29,16 +30,20 @@ import {
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/audio-actions";
 import {
   prepareAudioForTranscriptionAction,
-  queueTranscriptionAction,
-  retryProcessingJobAction,
   cancelProcessingJobAction,
   listProcessingJobsAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/processing-actions";
+import {
+  submitTranscriptionAction,
+  pollTranscriptionAction,
+  getMeetingTranscriptAction,
+} from "@/app/[locale]/(app)/projects/[projectId]/rhythm/transcription-actions";
 import type {
   RythmAudioFile,
   RythmAudioStatus,
   RythmProcessingJob,
   RythmJobStatus,
+  RythmTranscript,
 } from "@/lib/rythm/types";
 
 interface RythmAudioPanelProps {
@@ -114,15 +119,18 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
   const t = useTranslations("rythm.detail");
   const [audioFiles, setAudioFiles] = useState<RythmAudioFile[]>([]);
   const [jobs, setJobs] = useState<RythmProcessingJob[]>([]);
+  const [transcript, setTranscript] = useState<RythmTranscript | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [audioRes, jobsRes] = await Promise.all([
+    const [audioRes, jobsRes, transRes] = await Promise.all([
       listRythmAudioAction({ meetingId }),
       listProcessingJobsAction({ meetingId }),
+      getMeetingTranscriptAction({ meetingId }),
     ]);
     setAudioFiles(audioRes.audioFiles ?? []);
     setJobs(jobsRes.jobs ?? []);
+    setTranscript(transRes.transcript ?? null);
     setLoading(false);
   }, [meetingId]);
 
@@ -130,6 +138,19 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  // While a transcription job is active, poll AssemblyAI (server-side) every 5s.
+  useEffect(() => {
+    const active = jobs.find(
+      (j) => j.jobType === "transcription" && (j.status === "running" || j.status === "queued"),
+    );
+    if (!active) return;
+    const interval = setInterval(async () => {
+      const r = await pollTranscriptionAction({ jobId: active.id });
+      if (r.status === "completed" || r.status === "failed") await load();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [jobs, load]);
 
   return (
     <div className="space-y-4">
@@ -155,7 +176,7 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
         ) : (
           <ul className="divide-y divide-border">
             {audioFiles.map((a) => (
-              <AssetRow key={a.id} audio={a} jobs={jobs} locale={locale} onChanged={load} />
+              <AssetRow key={a.id} audio={a} locale={locale} onChanged={load} />
             ))}
           </ul>
         )}
@@ -163,6 +184,9 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
 
       {/* Processing Queue */}
       <ProcessingQueue jobs={jobs} locale={locale} onChanged={load} />
+
+      {/* Transcript */}
+      {transcript && <RythmTranscriptView transcript={transcript} locale={locale} />}
 
       {/* Meeting Intelligence */}
       <MeetingIntelligence />
@@ -174,12 +198,10 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
 
 function AssetRow({
   audio,
-  jobs,
   locale,
   onChanged,
 }: {
   audio: RythmAudioFile;
-  jobs: RythmProcessingJob[];
   locale: string;
   onChanged: () => void;
 }) {
@@ -221,7 +243,7 @@ function AssetRow({
   async function queue() {
     setBusy("queue");
     setError(null);
-    const r = await queueTranscriptionAction({ audioFileId: audio.id });
+    const r = await submitTranscriptionAction({ audioFileId: audio.id });
     if (r.error) {
       setBusy(null);
       return showError(r.error, "queue_failed");
@@ -232,13 +254,8 @@ function AssetRow({
   async function retry() {
     setBusy("retry");
     setError(null);
-    // Reset the latest failed transcription job; if none, queue a fresh one.
-    const failed = jobs
-      .filter((j) => j.audioFileId === audio.id && j.jobType === "transcription" && j.status === "failed")
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    const r = failed
-      ? await retryProcessingJobAction({ jobId: failed.id })
-      : await queueTranscriptionAction({ audioFileId: audio.id });
+    // A retry creates a NEW AssemblyAI job + transcript (history is preserved).
+    const r = await submitTranscriptionAction({ audioFileId: audio.id, isRetry: true });
     if (r.error) {
       setBusy(null);
       return showError(r.error, "retry_failed");

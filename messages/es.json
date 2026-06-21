@@ -2149,7 +2149,9 @@
       "job_not_failed": "Solo se pueden reintentar trabajos fallidos.",
       "job_not_cancellable": "Este trabajo ya no se puede cancelar.",
       "max_attempts_reached": "Se alcanzó el máximo de intentos.",
-      "list_failed": "No se pudo cargar la cola. Inténtalo de nuevo."
+      "list_failed": "No se pudo cargar la cola. Inténtalo de nuevo.",
+      "assemblyai_failed": "No se pudo iniciar la transcripción. Inténtalo de nuevo.",
+      "assemblyai_error": "El proveedor de transcripción devolvió un error."
     },
     "audioStatus": {
       "uploaded": "Cargado",
@@ -2196,6 +2198,24 @@
       "decisions": "Decisiones",
       "risks": "Riesgos",
       "blockers": "Bloqueos"
+    },
+    "transcript": {
+      "title": "Transcripción",
+      "language": "Idioma",
+      "duration": "Duración",
+      "speakers": "Hablantes",
+      "status": "Estado",
+      "created": "Creada",
+      "processing": "Transcripción en progreso…",
+      "failed": "La transcripción falló.",
+      "empty": "Sin contenido de transcripción.",
+      "speaker": "Hablante"
+    },
+    "transcriptStatus": {
+      "pending": "Pendiente",
+      "processing": "Procesando",
+      "completed": "Completada",
+      "failed": "Fallida"
     }
   }
 }

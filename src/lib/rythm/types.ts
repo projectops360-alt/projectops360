@@ -21,6 +21,33 @@ export type RythmAudioStatus =
 
 export type RythmTranscriptStatus = "pending" | "processing" | "completed" | "failed";
 
+export interface RythmTranscriptUtterance {
+  speaker: string;
+  text: string;
+  start: number; // ms
+  end: number; // ms
+  confidence: number;
+}
+
+/** Camel-cased view of a project_rythm_transcripts row. */
+export interface RythmTranscript {
+  id: string;
+  meetingId: string;
+  audioFileId: string | null;
+  provider: string | null;
+  providerTranscriptId: string | null;
+  languageCode: string | null;
+  transcriptText: string | null;
+  utterances: RythmTranscriptUtterance[];
+  confidence: number | null;
+  durationSeconds: number | null;
+  status: RythmTranscriptStatus;
+  errorMessage: string | null;
+  speakerCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type RythmJobType = "transcription" | "summary" | "embedding";
 export type RythmJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
@@ -44,6 +71,10 @@ export type RythmActivityAction =
   | "audio_uploaded"
   | "audio_prepared"
   | "transcription_queued"
+  | "transcription_started"
+  | "transcription_completed"
+  | "transcription_failed"
+  | "transcription_retried"
   | "job_retried"
   | "job_cancelled"
   | "audio_deleted"
