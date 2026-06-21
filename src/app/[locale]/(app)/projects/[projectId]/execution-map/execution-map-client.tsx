@@ -14,7 +14,6 @@ import { RoadmapHero } from "@/components/roadmap/roadmap-hero";
 import { NextStepPanel } from "@/components/roadmap/next-step-panel";
 import { ExecutionDashboard } from "@/components/roadmap/execution-dashboard";
 import { VisualRoadmapTimeline } from "@/components/roadmap/visual-roadmap-timeline";
-import { FlowRoadmap, type FlowRoadmapTranslations } from "@/components/roadmap/flow-roadmap";
 import { GanttRoadmap } from "@/components/roadmap/gantt-roadmap";
 import { DependenciesView } from "@/components/roadmap/dependencies-view";
 import { updateTaskDatesAction } from "./dependency-actions";
@@ -27,7 +26,7 @@ import { sortTasksByMilestoneAndDependency } from "@/lib/roadmap/topological-sor
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type ExecutionTab = "overview" | "timeline" | "tasks" | "flow" | "gantt" | "critical-path" | "dependencies";
+type ExecutionTab = "overview" | "timeline" | "tasks" | "gantt" | "critical-path" | "dependencies";
 
 interface TaskCount {
   total: number;
@@ -307,7 +306,6 @@ const TAB_CONFIG: { key: ExecutionTab; icon: React.ComponentType<{ className?: s
   { key: "overview", icon: Eye, labelKey: "overview" },
   { key: "timeline", icon: LayoutList, labelKey: "timeline" },
   { key: "tasks", icon: ListTodo, labelKey: "tasks" },
-  { key: "flow", icon: Network, labelKey: "flow" },
   { key: "gantt", icon: Calendar, labelKey: "gantt" },
   { key: "critical-path", icon: AlertTriangle, labelKey: "criticalPath" },
   { key: "dependencies", icon: GitBranch, labelKey: "dependencies" },
@@ -382,7 +380,6 @@ export function ExecutionMapClient({
     overview: locale === "es" ? "Vista General" : "Overview",
     timeline: locale === "es" ? "Línea de Tiempo" : "Timeline",
     tasks: locale === "es" ? "Tareas" : "Tasks",
-    flow: locale === "es" ? "Flujo" : "Flow",
     gantt: locale === "es" ? "Cronograma" : "Gantt",
     "critical-path": locale === "es" ? "Ruta Crítica" : "Critical Path",
     dependencies: locale === "es" ? "Dependencias" : "Dependencies",
@@ -468,39 +465,6 @@ export function ExecutionMapClient({
   };
 
   const es = locale === "es";
-  const flowTranslations: FlowRoadmapTranslations = {
-    statusLabels: t.statusLabels,
-    priorityLabels: t.priorityLabels,
-    liveProcessFlow: es ? "Flujo de proceso en vivo" : "Live process flow",
-    conformance: es ? "conformidad" : "conformance",
-    currentPhase: es ? "Fase actual" : "Current phase",
-    tasks: t.tasks,
-    noTasks: t.noTasks,
-    reworkNeeded: es ? "{count} tareas bloqueadas — requiere retrabajo" : "{count} blocked tasks — rework needed",
-    kpiMilestonesCompleted: es ? "Hitos completados" : "Milestones completed",
-    kpiOverallProgress: es ? "Progreso general" : "Overall progress",
-    kpiTasksCompleted: es ? "Tareas completadas" : "Tasks completed",
-    kpiInProgress: es ? "En progreso" : "In progress",
-    kpiBlockers: es ? "Bloqueos" : "Blockers",
-    kpiRemainingEffort: es ? "Esfuerzo restante" : "Remaining effort",
-    kpiOfTotal: es ? "de {total}" : "of {total}",
-    kpiNoBlockers: es ? "Sin bloqueos" : "No blockers",
-    kpiTracked: es ? "de {total} registradas" : "of {total} tracked",
-    milestoneDistribution: es ? "Distribución de hitos" : "Milestone distribution",
-    conformanceCheck: es ? "Conformidad" : "Conformance check",
-    taskByPriority: es ? "Tareas por prioridad" : "Tasks by priority",
-    blockersRecommendations: es ? "Bloqueos y recomendaciones" : "Blockers & recommendations",
-    noBlockers: es ? "Sin bloqueos. El flujo avanza sin problemas." : "No blockers. Flow is running smoothly.",
-    completed: es ? "Completados" : "Completed",
-    inProgress: es ? "En progreso" : "In progress",
-    planned: es ? "Planificados" : "Planned",
-    blocked: es ? "Bloqueados" : "Blocked",
-    unblockSuggestion: es ? "Prioriza desbloquear para restaurar el flujo" : "Prioritize unblocking to restore flow",
-    legend: es ? "Leyenda" : "Legend",
-    legendActiveFlow: es ? "Flujo activo" : "Active flow",
-    legendPendingPath: es ? "Ruta pendiente" : "Pending path",
-  };
-
   // ── Handle status filter from dashboard ────────────────────────────────────────
 
   const handleStatusFilter = (status: TaskStatus) => {
@@ -693,18 +657,6 @@ export function ExecutionMapClient({
             await moveMilestoneAction(milestoneId, direction, projectId);
             router.refresh();
           }}
-        />
-      )}
-
-      {activeTab === "flow" && (
-        <FlowRoadmap
-          milestones={milestones}
-          tasks={tasks}
-          progress={progress}
-          tasksByMilestone={tasksByMilestone}
-          taskCounts={taskCounts}
-          locale={locale}
-          translations={flowTranslations}
         />
       )}
 

@@ -31,8 +31,9 @@ import {
   type NodeChange,
   type OnNodeDrag,
 } from "@xyflow/react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
+import { ExecutiveSummaryPanel } from "./executive-summary-panel";
 import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2 } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
@@ -219,6 +220,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
+  const locale = useLocale() as Locale;
   const router = useRouter();
   const { fitView, setCenter, getIntersectingNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -998,6 +1000,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           {t("recalculate")}
         </button>
       </div>
+
+      {/* Unified executive KPIs + insights (formerly the separate Flow view) */}
+      <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} />
 
       <LivingGraphToolbar
         overlay={overlay}
