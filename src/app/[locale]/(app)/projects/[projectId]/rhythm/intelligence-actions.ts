@@ -24,25 +24,59 @@ function dedupKey(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 160);
 }
 
-/** True if this meeting already produced an entity of targetType with this key. */
-async function meetingLinkExists(
+// Entity tables behind each traceability target type — used to dedup by the
+// REAL entity title even when a link was created without a dedup key (legacy).
+const ENTITY_TITLE_SOURCES: { targetType: string; table: string; titleCol: string; i18n: boolean }[] = [
+  { targetType: "task", table: "roadmap_tasks", titleCol: "title", i18n: false },
+  { targetType: "decision", table: "decisions", titleCol: "title_i18n", i18n: true },
+  { targetType: "risk", table: "risks", titleCol: "title", i18n: false },
+  { targetType: "milestone", table: "milestones", titleCol: "title", i18n: false },
+  { targetType: "memory", table: "project_memory_items", titleCol: "title", i18n: false },
+];
+
+/**
+ * All "already applied" signatures for a meeting: `${targetType}|${dedupKey}`.
+ * Built from BOTH the link dedup key AND the resolved entity title, so a re-apply
+ * is deduped even against links created before keys existed (or by another path).
+ */
+async function meetingAppliedSignatures(
   supabase: Awaited<ReturnType<typeof createClient>>,
   orgId: string,
   meetingId: string,
-  targetType: string,
-  key: string,
-): Promise<boolean> {
-  const { data } = await supabase
+): Promise<Set<string>> {
+  const sigs = new Set<string>();
+  const { data: links } = await supabase
     .from("traceability_links")
-    .select("context_i18n")
+    .select("target_type, target_id, context_i18n")
     .eq("organization_id", orgId)
     .eq("source_type", "meeting")
-    .eq("source_id", meetingId)
-    .eq("target_type", targetType);
-  for (const l of data ?? []) {
-    if ((l.context_i18n as Record<string, unknown> | null)?.key === key) return true;
+    .eq("source_id", meetingId);
+
+  const idsByType = new Map<string, string[]>();
+  for (const l of links ?? []) {
+    const key = (l.context_i18n as Record<string, unknown> | null)?.key;
+    if (typeof key === "string") sigs.add(`${l.target_type}|${key}`);
+    const arr = idsByType.get(l.target_type as string) ?? [];
+    arr.push(l.target_id as string);
+    idsByType.set(l.target_type as string, arr);
   }
-  return false;
+
+  await Promise.all(
+    ENTITY_TITLE_SOURCES.map(async (s) => {
+      const ids = idsByType.get(s.targetType);
+      if (!ids || ids.length === 0) return;
+      const { data } = await supabase.from(s.table).select(`id, ${s.titleCol}`).in("id", ids).is("deleted_at", null);
+      for (const row of (data ?? []) as unknown as Record<string, unknown>[]) {
+        const cell = row[s.titleCol];
+        const raw = s.i18n
+          ? ((cell as Record<string, string> | null)?.en ?? (cell as Record<string, string> | null)?.es ?? "")
+          : (cell as string | null) ?? "";
+        const k = dedupKey(String(raw));
+        if (k) sigs.add(`${s.targetType}|${k}`);
+      }
+    }),
+  );
+  return sigs;
 }
 
 // ── listProjectMilestonesAction (for the "destination milestone" picker) ──────
@@ -223,7 +257,7 @@ export async function promoteActionItemToTaskAction(input: {
   const supabase = await createClient();
   try {
     // Idempotent: if this meeting already created this task, don't duplicate.
-    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "task", dedupKey(parsed.data.task))) {
+    if ((await meetingAppliedSignatures(supabase, org.organizationId, parsed.data.meetingId)).has(`task|${dedupKey(parsed.data.task)}`)) {
       return {};
     }
     const notes: string[] = [];
@@ -297,7 +331,7 @@ export async function promoteDecisionAction(input: {
 
   const supabase = await createClient();
   try {
-    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "decision", dedupKey(parsed.data.title))) {
+    if ((await meetingAppliedSignatures(supabase, org.organizationId, parsed.data.meetingId)).has(`decision|${dedupKey(parsed.data.title)}`)) {
       return {};
     }
     const lang = parsed.data.locale;
@@ -367,7 +401,7 @@ export async function promoteRiskAction(input: {
 
   const supabase = await createClient();
   try {
-    if (await meetingLinkExists(supabase, org.organizationId, parsed.data.meetingId, "risk", dedupKey(parsed.data.description.slice(0, 200)))) {
+    if ((await meetingAppliedSignatures(supabase, org.organizationId, parsed.data.meetingId)).has(`risk|${dedupKey(parsed.data.description.slice(0, 200))}`)) {
       return {};
     }
     const title = parsed.data.description.slice(0, 200);
@@ -635,17 +669,9 @@ export async function applyIntelligenceToProjectAction(input: {
     // Idempotency: skip anything already created from THIS meeting (so an
     // accidental Regenerate → Apply does not duplicate tasks/risks/milestones/…).
     const normKey = dedupKey;
-    const { data: existingLinks } = await supabase
-      .from("traceability_links")
-      .select("target_type, context_i18n")
-      .eq("organization_id", org.organizationId)
-      .eq("source_type", "meeting")
-      .eq("source_id", meetingId);
-    const appliedKeys = new Set<string>();
-    for (const l of existingLinks ?? []) {
-      const k = (l.context_i18n as Record<string, unknown> | null)?.key;
-      if (typeof k === "string") appliedKeys.add(`${l.target_type}|${k}`);
-    }
+    // Signatures of everything this meeting already created (by link key OR by
+    // resolved entity title) — bulletproof against re-applies / legacy links.
+    const appliedKeys = await meetingAppliedSignatures(supabase, org.organizationId, meetingId);
     const seen = (targetType: string, key: string) => {
       const sig = `${targetType}|${key}`;
       if (appliedKeys.has(sig)) return true;
