@@ -320,7 +320,13 @@ function AssetRow({
               </AssetButton>
             )}
             {showRetry && (
-              <AssetButton onClick={retry} busy={busy === "retry"} disabled={anyBusy} icon={RefreshCw}>
+              <AssetButton
+                onClick={retry}
+                busy={busy === "retry"}
+                disabled={anyBusy}
+                icon={RefreshCw}
+                primary
+              >
                 {tAct("retry")}
               </AssetButton>
             )}

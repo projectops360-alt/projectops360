@@ -101,12 +101,16 @@ async function uploadBlob(params: {
 }): Promise<UploadResult> {
   const { projectId, meetingId, blob, fileName, contentType, source, durationSeconds } = params;
 
+  // Strip codec parameters (e.g. "audio/webm;codecs=opus" → "audio/webm") so the
+  // stored file_type stays a clean, recognised MIME for downstream validation.
+  const cleanType = (contentType || "application/octet-stream").split(";")[0].trim();
+
   const supabase = createClient();
   const storagePath = buildRythmAudioPath(projectId, meetingId, fileName);
 
   const { error: uploadError } = await supabase.storage
     .from(RYTHM_AUDIO_BUCKET)
-    .upload(storagePath, blob, { contentType, upsert: false });
+    .upload(storagePath, blob, { contentType: cleanType, upsert: false });
 
   if (uploadError) {
     return { ok: false, errorKey: "errorUploadFailed" };
@@ -118,7 +122,7 @@ async function uploadBlob(params: {
     meetingId,
     storagePath,
     fileName,
-    fileType: contentType,
+    fileType: cleanType,
     fileSize: blob.size,
     durationSeconds: durationSeconds ?? null,
     source,
