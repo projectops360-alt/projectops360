@@ -11,6 +11,8 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
 import { getOrgContext } from "@/lib/auth";
 import type {
   ProcessNode,
@@ -203,6 +205,15 @@ export default async function LivingGraphPage({
 
   if (!project) {
     notFound();
+  }
+
+  // Auto-clean orphan graph nodes (milestones/tasks deleted earlier) before
+  // reading, so the graph never shows entities that no longer exist. Cheap and
+  // best-effort — the heavier full rebuild stays behind the "Recalculate" button.
+  try {
+    await removeOrphanGraphNodes(createAdminClient(), org.organizationId, projectId);
+  } catch (err) {
+    console.error("Living Graph auto-clean failed:", err);
   }
 
   // Graph data + project-scoped enrichment, all in one parallel wave.
