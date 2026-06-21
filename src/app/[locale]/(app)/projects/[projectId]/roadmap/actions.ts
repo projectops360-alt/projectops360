@@ -1383,3 +1383,55 @@ export async function archiveMilestoneAction(
   revalidatePath(`/(app)/projects/${projectId}`, "layout");
   return {};
 }
+
+/** Move a milestone up or down in the project order (swaps with its neighbour). */
+export async function moveMilestoneAction(
+  milestoneId: string,
+  direction: "up" | "down",
+  projectId: string,
+): Promise<{ error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: milestones, error } = await supabase
+    .from("milestones")
+    .select("id, order_index")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("order_index", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error || !milestones) return { error: "unexpected" };
+
+  const idx = milestones.findIndex((m) => m.id === milestoneId);
+  if (idx < 0) return { error: "not_found" };
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= milestones.length) return {}; // already at the edge
+
+  // Swap, then renumber sequentially so the order is stable even when order_index
+  // values were duplicated (e.g. several batches imported with order_index = 0).
+  const ordered = [...milestones];
+  [ordered[idx], ordered[swapIdx]] = [ordered[swapIdx], ordered[idx]];
+
+  await Promise.all(
+    ordered.map((m, i) =>
+      m.order_index === i
+        ? Promise.resolve(null)
+        : supabase
+            .from("milestones")
+            .update({ order_index: i })
+            .eq("id", m.id)
+            .eq("project_id", projectId)
+            .eq("organization_id", org.organizationId),
+    ),
+  );
+
+  revalidatePath(`/(app)/projects/${projectId}`, "layout");
+  return {};
+}

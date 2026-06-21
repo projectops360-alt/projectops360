@@ -640,6 +640,11 @@ export function ExecutionMapClient({
             noTasks: t.noTasks,
             sprint: t.sprint,
           }}
+          onArchiveMilestone={async (milestoneId) => {
+            const { archiveMilestoneAction } = await import("@/app/[locale]/(app)/projects/[projectId]/roadmap/actions");
+            await archiveMilestoneAction(milestoneId, projectId);
+            router.refresh();
+          }}
         />
       )}
 
@@ -678,6 +683,11 @@ export function ExecutionMapClient({
             router.refresh();
           }}
           onAddTask={(milestoneId) => { setEditingTask(null); setPreselectedMilestoneId(milestoneId); setShowTaskForm(true); }}
+          onMoveMilestone={async (milestoneId, direction) => {
+            const { moveMilestoneAction } = await import("@/app/[locale]/(app)/projects/[projectId]/roadmap/actions");
+            await moveMilestoneAction(milestoneId, direction, projectId);
+            router.refresh();
+          }}
         />
       )}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Trash2, Loader2 } from "lucide-react";
 import type { Milestone, MilestoneStatus, MilestoneStatusDisplay, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
 import {
@@ -33,6 +35,47 @@ interface VisualRoadmapTimelineProps {
   onToggleMilestone: (id: string) => void;
   locale: Locale;
   translations: TimelineTranslations;
+  /** Delete a milestone and all of its tasks (cascade). */
+  onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+}
+
+// ── Delete-milestone button (with its own busy state) ─────────────────────────
+
+function MilestoneDeleteButton({
+  milestoneId,
+  taskCount,
+  locale,
+  onArchive,
+}: {
+  milestoneId: string;
+  taskCount: number;
+  locale: Locale;
+  onArchive: (milestoneId: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const es = locale === "es";
+  const label = es ? "Eliminar milestone y sus tareas" : "Delete milestone and its tasks";
+  const confirmText = es
+    ? `¿Eliminar este milestone${taskCount > 0 ? ` y sus ${taskCount} tarea(s)` : ""}? No se puede deshacer.`
+    : `Delete this milestone${taskCount > 0 ? ` and its ${taskCount} task(s)` : ""}? This cannot be undone.`;
+  return (
+    <div className="flex justify-end border-t border-border/50 px-4 py-2">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (!window.confirm(confirmText)) return;
+          setBusy(true);
+          await onArchive(milestoneId);
+          setBusy(false);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-900/20"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+        {label}
+      </button>
+    </div>
+  );
 }
 
 // ── Status Config ────────────────────────────────────────────────────────────────
@@ -58,6 +101,7 @@ export function VisualRoadmapTimeline({
   onToggleMilestone,
   locale,
   translations: t,
+  onArchiveMilestone,
 }: VisualRoadmapTimelineProps) {
   return (
     <div className="relative">
@@ -187,6 +231,14 @@ export function VisualRoadmapTimeline({
                       </ul>
                     ) : (
                       <p className="px-4 py-3 text-xs italic text-muted-foreground">{t.noTasks}</p>
+                    )}
+                    {onArchiveMilestone && (
+                      <MilestoneDeleteButton
+                        milestoneId={milestone.id}
+                        taskCount={counts.total}
+                        locale={locale}
+                        onArchive={onArchiveMilestone}
+                      />
                     )}
                   </div>
                 )}
