@@ -78,7 +78,35 @@ export type RythmActivityAction =
   | "job_retried"
   | "job_cancelled"
   | "audio_deleted"
-  | "validation_failed";
+  | "validation_failed"
+  | "speaker_mapping_saved"
+  | "speaker_mapping_reset";
+
+/** A saved mapping of a generic speaker label to a real participant. */
+export interface RythmSpeakerMapping {
+  id: string;
+  meetingId: string;
+  transcriptId: string | null;
+  originalSpeakerLabel: string;
+  mappedParticipantName: string;
+  mappedParticipantEmail: string | null;
+  confidence: string;
+  createdAt: string;
+}
+
+/** A suggested participant for the speaker dropdown. */
+export interface RythmSpeakerOption {
+  name: string;
+  email: string | null;
+  source: "attendee" | "stakeholder";
+}
+
+/** Client → server payload for one speaker mapping. */
+export interface SpeakerMappingInput {
+  originalSpeakerLabel: string;
+  mappedParticipantName: string;
+  mappedParticipantEmail?: string | null;
+}
 
 /** Camel-cased view of a project_rythm_audio_files row. */
 export interface RythmAudioFile {

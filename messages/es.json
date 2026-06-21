@@ -2151,7 +2151,10 @@
       "max_attempts_reached": "Se alcanzó el máximo de intentos.",
       "list_failed": "No se pudo cargar la cola. Inténtalo de nuevo.",
       "assemblyai_failed": "No se pudo iniciar la transcripción. Inténtalo de nuevo.",
-      "assemblyai_error": "El proveedor de transcripción devolvió un error."
+      "assemblyai_error": "El proveedor de transcripción devolvió un error.",
+      "errorEmptyName": "Escribe al menos un nombre de participante.",
+      "save_failed": "No se pudo guardar la asignación. Inténtalo de nuevo.",
+      "reset_failed": "No se pudo restablecer la asignación. Inténtalo de nuevo."
     },
     "audioStatus": {
       "uploaded": "Cargado",
@@ -2216,6 +2219,15 @@
       "processing": "Procesando",
       "completed": "Completada",
       "failed": "Fallida"
+    },
+    "speakers": {
+      "title": "Identificación de Hablantes",
+      "subtitle": "Asigna cada hablante detectado a un participante real. Escribe un nombre o elige un asistente sugerido.",
+      "speaker": "Hablante",
+      "namePlaceholder": "Nombre del participante…",
+      "save": "Guardar asignación",
+      "reset": "Restablecer asignación",
+      "duplicateConfirm": "Dos hablantes quedaron asignados al mismo participante. ¿Guardar de todos modos?"
     }
   }
 }

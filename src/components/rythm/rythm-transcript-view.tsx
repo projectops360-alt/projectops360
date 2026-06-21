@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { FileText, Loader2, AlertCircle, Languages, Clock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { RythmTranscript } from "@/lib/rythm/types";
+import type { RythmTranscript, RythmSpeakerMapping } from "@/lib/rythm/types";
 
 const SPEAKER_COLORS = [
   "bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300",
@@ -31,13 +31,16 @@ function formatDuration(seconds: number | null): string {
 
 export function RythmTranscriptView({
   transcript,
+  mappings = [],
   locale,
 }: {
   transcript: RythmTranscript;
+  mappings?: RythmSpeakerMapping[];
   locale: string;
 }) {
   const t = useTranslations("rythm.transcript");
   const tStatus = useTranslations("rythm.transcriptStatus");
+  const nameByLabel = new Map(mappings.map((m) => [m.originalSpeakerLabel, m.mappedParticipantName]));
 
   return (
     <div className="rounded-xl border border-border bg-background">
@@ -74,19 +77,29 @@ export function RythmTranscriptView({
           </p>
         ) : transcript.utterances.length > 0 ? (
           <div className="space-y-3">
-            {transcript.utterances.map((u, i) => (
-              <div key={i} className="flex gap-3">
-                <span
-                  className={cn(
-                    "h-fit shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                    speakerColor(u.speaker),
-                  )}
-                >
-                  {t("speaker")} {u.speaker}
-                </span>
-                <p className="text-sm leading-relaxed text-foreground">{u.text}</p>
-              </div>
-            ))}
+            {transcript.utterances.map((u, i) => {
+              const mappedName = nameByLabel.get(u.speaker);
+              return (
+                <div key={i} className="flex gap-3">
+                  <div className="h-fit w-28 shrink-0">
+                    <span
+                      className={cn(
+                        "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                        speakerColor(u.speaker),
+                      )}
+                    >
+                      {mappedName || `${t("speaker")} ${u.speaker}`}
+                    </span>
+                    {mappedName && (
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        · {t("speaker")} {u.speaker}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground">{u.text}</p>
+                </div>
+              );
+            })}
           </div>
         ) : transcript.transcriptText ? (
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">

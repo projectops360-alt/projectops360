@@ -2151,7 +2151,10 @@
       "max_attempts_reached": "Maximum attempts reached.",
       "list_failed": "Could not load the queue. Please try again.",
       "assemblyai_failed": "Could not start transcription. Please try again.",
-      "assemblyai_error": "The transcription provider returned an error."
+      "assemblyai_error": "The transcription provider returned an error.",
+      "errorEmptyName": "Enter at least one participant name.",
+      "save_failed": "Could not save the mapping. Please try again.",
+      "reset_failed": "Could not reset the mapping. Please try again."
     },
     "audioStatus": {
       "uploaded": "Uploaded",
@@ -2216,6 +2219,15 @@
       "processing": "Processing",
       "completed": "Completed",
       "failed": "Failed"
+    },
+    "speakers": {
+      "title": "Speaker Identification",
+      "subtitle": "Map each detected speaker to a real participant. Type a name or pick a suggested attendee.",
+      "speaker": "Speaker",
+      "namePlaceholder": "Participant name…",
+      "save": "Save Speaker Mapping",
+      "reset": "Reset Mapping",
+      "duplicateConfirm": "Two speakers are mapped to the same participant. Save anyway?"
     }
   }
 }

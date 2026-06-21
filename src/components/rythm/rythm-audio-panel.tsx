@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { RythmRecorder } from "./rythm-recorder";
 import { RythmAudioUploader } from "./rythm-audio-uploader";
 import { RythmTranscriptView } from "./rythm-transcript-view";
+import { RythmSpeakerIdentification } from "./rythm-speaker-identification";
 import {
   listRythmAudioAction,
   getRythmAudioUrlAction,
@@ -38,12 +39,15 @@ import {
   pollTranscriptionAction,
   getMeetingTranscriptAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/transcription-actions";
+import { getSpeakerDataAction } from "@/app/[locale]/(app)/projects/[projectId]/rhythm/speaker-actions";
 import type {
   RythmAudioFile,
   RythmAudioStatus,
   RythmProcessingJob,
   RythmJobStatus,
   RythmTranscript,
+  RythmSpeakerMapping,
+  RythmSpeakerOption,
 } from "@/lib/rythm/types";
 
 interface RythmAudioPanelProps {
@@ -120,6 +124,8 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
   const [audioFiles, setAudioFiles] = useState<RythmAudioFile[]>([]);
   const [jobs, setJobs] = useState<RythmProcessingJob[]>([]);
   const [transcript, setTranscript] = useState<RythmTranscript | null>(null);
+  const [speakerMappings, setSpeakerMappings] = useState<RythmSpeakerMapping[]>([]);
+  const [speakerOptions, setSpeakerOptions] = useState<RythmSpeakerOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -130,9 +136,20 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
     ]);
     setAudioFiles(audioRes.audioFiles ?? []);
     setJobs(jobsRes.jobs ?? []);
-    setTranscript(transRes.transcript ?? null);
+    const tr = transRes.transcript ?? null;
+    setTranscript(tr);
+
+    // Speaker mappings + suggestions only matter once a transcript exists.
+    if (tr) {
+      const sp = await getSpeakerDataAction({ projectId, meetingId, transcriptId: tr.id });
+      setSpeakerMappings(sp.mappings ?? []);
+      setSpeakerOptions(sp.options ?? []);
+    } else {
+      setSpeakerMappings([]);
+      setSpeakerOptions([]);
+    }
     setLoading(false);
-  }, [meetingId]);
+  }, [meetingId, projectId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -185,8 +202,22 @@ export function RythmAudioPanel({ projectId, meetingId, locale }: RythmAudioPane
       {/* Processing Queue */}
       <ProcessingQueue jobs={jobs} locale={locale} onChanged={load} />
 
+      {/* Speaker Identification (above Transcript) */}
+      {transcript && transcript.utterances.length > 0 && (
+        <RythmSpeakerIdentification
+          projectId={projectId}
+          meetingId={meetingId}
+          transcript={transcript}
+          mappings={speakerMappings}
+          options={speakerOptions}
+          onSaved={load}
+        />
+      )}
+
       {/* Transcript */}
-      {transcript && <RythmTranscriptView transcript={transcript} locale={locale} />}
+      {transcript && (
+        <RythmTranscriptView transcript={transcript} mappings={speakerMappings} locale={locale} />
+      )}
 
       {/* Meeting Intelligence */}
       <MeetingIntelligence />
