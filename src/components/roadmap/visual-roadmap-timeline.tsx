@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trash2, Loader2, GripVertical } from "lucide-react";
 import type { Milestone, MilestoneStatus, MilestoneStatusDisplay, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
 import {
@@ -37,6 +37,8 @@ interface VisualRoadmapTimelineProps {
   translations: TimelineTranslations;
   /** Delete a milestone and all of its tasks (cascade). */
   onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+  /** Persist a new milestone order after drag & drop. */
+  onReorderMilestones?: (orderedIds: string[]) => Promise<void>;
 }
 
 // ── Delete-milestone button (with its own busy state) ─────────────────────────
@@ -102,14 +104,47 @@ export function VisualRoadmapTimeline({
   locale,
   translations: t,
   onArchiveMilestone,
+  onReorderMilestones,
 }: VisualRoadmapTimelineProps) {
+  // Drag & drop ordering (optimistic; re-syncs when server data refreshes).
+  const [orderIds, setOrderIds] = useState<string[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrderIds(null);
+  }, [milestones]);
+
+  const byId = new Map(milestones.map((m) => [m.id, m]));
+  const ordered = orderIds
+    ? orderIds.map((id) => byId.get(id)).filter((m): m is Milestone => !!m)
+    : milestones;
+
+  function handleDrop(targetId: string) {
+    if (!dragId || dragId === targetId || !onReorderMilestones) {
+      setDragId(null);
+      setOverId(null);
+      return;
+    }
+    const ids = ordered.map((m) => m.id);
+    const from = ids.indexOf(dragId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, dragId);
+    setOrderIds(ids);
+    setDragId(null);
+    setOverId(null);
+    void onReorderMilestones(ids);
+  }
+
   return (
     <div className="relative">
       {/* Vertical timeline line */}
       <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-border" />
 
       <div className="space-y-6">
-        {milestones.map((milestone, idx) => {
+        {ordered.map((milestone, idx) => {
           const isExpanded = expandedMilestones.has(milestone.id);
           const milestoneTasks = tasksByMilestone[milestone.id] ?? [];
           const counts = taskCounts[milestone.id] ?? { total: 0, done: 0, inProgress: 0 };
@@ -119,10 +154,26 @@ export function VisualRoadmapTimeline({
           const milestoneIcon = renderMilestoneIcon(milestone.icon_key);
           const startDate = formatDate(milestone.start_date, locale);
           const targetDate = formatDate(milestone.target_date, locale);
-          const isLast = idx === milestones.length - 1;
+          const isLast = idx === ordered.length - 1;
+          const canDrag = !!onReorderMilestones;
 
           return (
-            <div key={milestone.id} className="relative pl-14">
+            <div
+              key={milestone.id}
+              draggable={canDrag}
+              onDragStart={canDrag ? () => setDragId(milestone.id) : undefined}
+              onDragOver={canDrag ? (e) => { e.preventDefault(); if (overId !== milestone.id) setOverId(milestone.id); } : undefined}
+              onDragLeave={canDrag ? () => setOverId((cur) => (cur === milestone.id ? null : cur)) : undefined}
+              onDrop={canDrag ? () => handleDrop(milestone.id) : undefined}
+              className={`relative pl-14 ${canDrag ? "cursor-move" : ""} ${
+                overId === milestone.id && dragId && dragId !== milestone.id ? "rounded-xl ring-2 ring-brand-400" : ""
+              } ${dragId === milestone.id ? "opacity-50" : ""}`}
+            >
+              {canDrag && (
+                <span className="absolute left-0 top-6 text-muted-foreground/60" title={locale === "es" ? "Arrastrar para reordenar" : "Drag to reorder"}>
+                  <GripVertical className="h-4 w-4" />
+                </span>
+              )}
               {/* Timeline node */}
               <div className={`absolute left-5 -translate-x-1/2 flex h-10 w-10 items-center justify-center rounded-full border-2 ${statusColors.ring} bg-card z-10`}>
                 <div className={`h-4 w-4 rounded-full ${statusColors.fill}`} />

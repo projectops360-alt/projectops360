@@ -645,6 +645,11 @@ export function ExecutionMapClient({
             await archiveMilestoneAction(milestoneId, projectId);
             router.refresh();
           }}
+          onReorderMilestones={async (orderedIds) => {
+            const { reorderMilestonesAction } = await import("@/app/[locale]/(app)/projects/[projectId]/roadmap/actions");
+            await reorderMilestonesAction(projectId, orderedIds);
+            router.refresh();
+          }}
         />
       )}
 

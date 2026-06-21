@@ -1324,6 +1324,9 @@ export async function archiveTaskAction(
     await recalculateMilestoneStatus(task.milestone_id, projectId, org.organizationId, supabase);
   }
 
+  // Recalculate the Living Graph: drop this task's node (edges cascade).
+  await removeGraphNodes(supabase, org.organizationId, projectId, "roadmap_tasks", [taskId]);
+
   revalidatePath(`/(app)/projects/${projectId}`, "layout");
   return {};
 }
@@ -1342,6 +1345,16 @@ export async function archiveMilestoneAction(
   }
 
   const supabase = createAdminClient();
+
+  // Capture the task ids first so we can also clean their Living Graph nodes.
+  const { data: childTasks } = await supabase
+    .from("roadmap_tasks")
+    .select("id")
+    .eq("milestone_id", milestoneId)
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
+  const taskIds = (childTasks ?? []).map((t) => t.id as string);
 
   // First, soft-delete all tasks belonging to this milestone
   const { error: taskDeleteError } = await supabase
@@ -1371,6 +1384,13 @@ export async function archiveMilestoneAction(
     return { error: "unexpected" };
   }
 
+  // Recalculate the Living Graph: remove the milestone gate + task nodes (their
+  // edges cascade via ON DELETE). Best-effort — never block the delete on it.
+  await removeGraphNodes(supabase, org.organizationId, projectId, "milestones", [milestoneId]);
+  if (taskIds.length > 0) {
+    await removeGraphNodes(supabase, org.organizationId, projectId, "roadmap_tasks", taskIds);
+  }
+
   await logAudit({
     org,
     projectId,
@@ -1382,6 +1402,25 @@ export async function archiveMilestoneAction(
 
   revalidatePath(`/(app)/projects/${projectId}`, "layout");
   return {};
+}
+
+/** Removes Living Graph nodes for the given source entities (edges cascade). */
+async function removeGraphNodes(
+  supabase: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  projectId: string,
+  sourceEntityType: "milestones" | "roadmap_tasks",
+  sourceEntityIds: string[],
+): Promise<void> {
+  if (sourceEntityIds.length === 0) return;
+  const { error } = await supabase
+    .from("process_nodes")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("project_id", projectId)
+    .eq("source_entity_type", sourceEntityType)
+    .in("source_entity_id", sourceEntityIds);
+  if (error) console.error("Failed to clean Living Graph nodes:", error.message);
 }
 
 /** Move a milestone up or down in the project order (swaps with its neighbour). */
@@ -1429,6 +1468,36 @@ export async function moveMilestoneAction(
             .eq("id", m.id)
             .eq("project_id", projectId)
             .eq("organization_id", org.organizationId),
+    ),
+  );
+
+  revalidatePath(`/(app)/projects/${projectId}`, "layout");
+  return {};
+}
+
+/** Persist an arbitrary milestone order (drag & drop) by id sequence. */
+export async function reorderMilestonesAction(
+  projectId: string,
+  orderedIds: string[],
+): Promise<{ error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return {};
+
+  const supabase = createAdminClient();
+  await Promise.all(
+    orderedIds.map((id, i) =>
+      supabase
+        .from("milestones")
+        .update({ order_index: i })
+        .eq("id", id)
+        .eq("project_id", projectId)
+        .eq("organization_id", org.organizationId)
+        .is("deleted_at", null),
     ),
   );
 
