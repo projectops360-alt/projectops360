@@ -21,6 +21,7 @@ import {
   scheduleFrameworkMeetingsAction, setColumnWipAction, type FrameworkConfig,
 } from "./actions";
 import { BacklogTab, CyclesTab, AiHealthTab } from "./delivery-tabs";
+import { RefinementTab } from "./refinement-tab";
 import { Link } from "@/i18n/navigation";
 
 interface Props {
@@ -40,6 +41,8 @@ interface Props {
   alerts: Record<string, unknown>[];
   milestones: Record<string, unknown>[];
   risks: Record<string, unknown>[];
+  dependencies: Record<string, unknown>[];
+  members: Record<string, unknown>[];
   startSetup: boolean;
 }
 
@@ -54,6 +57,7 @@ const sel = "w-full rounded-lg border border-border bg-background px-2.5 py-2 te
 const TABS = [
   { key: "overview", es: "Resumen", en: "Overview" },
   { key: "backlog", es: "Backlog", en: "Backlog" },
+  { key: "refinement", es: "Refinamiento", en: "Refinement" },
   { key: "cycles", es: "Ciclos", en: "Cycles" },
   { key: "ai", es: "IA y Salud", en: "AI & Health" },
 ];
@@ -98,6 +102,7 @@ export function DeliveryClient(p: Props) {
 
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
       {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
+      {tab === "refinement" && <RefinementTab projectId={p.projectId} locale={p.locale} items={p.backlog} dependencies={p.dependencies} members={p.members} method={(fw!.delivery_method as string) ?? null} projectType={(fw!.project_type as string) ?? null} />}
       {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={p.backlog} cycleItems={p.cycleItems} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>

@@ -1,0 +1,414 @@
+"use client";
+
+// ============================================================================
+// Work Refinement Center — adaptive 3-panel refinement experience.
+// Left: work item list + filters + readiness. Center: detail editor (criteria,
+// Definition of Ready, estimation, owner, risk, dependencies, destination).
+// Right: AI Refinement Assistant (facts / assumptions / recommendations).
+// Operates on project_backlog_items (the Work Item); template adapts to the
+// project's delivery method + type.
+// ============================================================================
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Sparkles, Loader2, CheckCircle2, AlertTriangle, GitBranch, Trash2, Send, Gauge,
+  Lightbulb, ClipboardCheck, HelpCircle, ShieldAlert, Scissors, Plus, Wand2,
+} from "lucide-react";
+import {
+  WORK_ITEM_TYPES, REFINEMENT_STATUS_META, REFINABLE_STATUSES, ESTIMATION_METHODS,
+  PRIORITIES, RISK_LEVELS, PLANNING_DESTINATIONS, templateFor, labelOf, bandForScore,
+} from "@/lib/refinement/templates";
+import { computeReadiness, type WorkItemLike } from "@/lib/refinement/readiness";
+import type { DeliveryMethod } from "@/lib/delivery/config";
+import {
+  saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
+  saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
+  type RefinementInput,
+} from "./actions";
+
+const inp = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+const TONE: Record<string, string> = {
+  gray: "bg-muted text-muted-foreground",
+  blue: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+  amber: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  green: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+  red: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+};
+const RESOLVED = new Set(["ready_for_planning", "planned", "in_execution", "done"]);
+const numOrNull = (v: string): number | null => { const n = Number(v); return v.trim() === "" || Number.isNaN(n) ? null : n; };
+
+interface DorItemState { key: string; label: string; checked: boolean }
+
+interface FormState {
+  description: string; acceptance_criteria: string; completion_criteria: string;
+  item_type: string; priority: string; risk_level: string; owner_id: string;
+  business_value: string; stakeholders: string; source_reference: string;
+  estimation_method: string; estimate_value: string; estimate_unit: string;
+  estimate_optimistic: string; estimate_most_likely: string; estimate_pessimistic: string;
+  definition_of_ready: DorItemState[];
+  target_planning_destination: string;
+}
+
+interface Props {
+  projectId: string; locale: string;
+  items: Record<string, unknown>[];
+  dependencies: Record<string, unknown>[];
+  members: Record<string, unknown>[];
+  method: string | null;
+  projectType: string | null;
+}
+
+export function RefinementTab(p: Props) {
+  const isEs = p.locale === "es";
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const tpl = useMemo(() => templateFor(p.method as DeliveryMethod | null, p.projectType), [p.method, p.projectType]);
+
+  // Only non-promoted items are refinable.
+  const refinable = useMemo(() => p.items.filter((it) => String(it.status) !== "promoted"), [p.items]);
+  const statusOf = useMemo(() => new Map(p.items.map((it) => [String(it.id), String(it.refinement_status ?? "new")])), [p.items]);
+
+  // ── Filters ────────────────────────────────────────────────────────────────
+  const [fStatus, setFStatus] = useState("");
+  const [fType, setFType] = useState("");
+  const [fPriority, setFPriority] = useState("");
+  const [fRisk, setFRisk] = useState("");
+  const [fBand, setFBand] = useState("");
+
+  const filtered = refinable.filter((it) => {
+    if (fStatus && String(it.refinement_status ?? "new") !== fStatus) return false;
+    if (fType && String(it.item_type ?? "") !== fType) return false;
+    if (fPriority && String(it.priority ?? "") !== fPriority) return false;
+    if (fRisk && String(it.risk_level ?? "") !== fRisk) return false;
+    if (fBand) { const s = Number(it.readiness_score ?? 0); if (bandForScore(s).key !== fBand) return false; }
+    return true;
+  });
+
+  const [selectedId, setSelectedId] = useState<string | null>(refinable[0] ? String(refinable[0].id) : null);
+  const selected = useMemo(() => refinable.find((it) => String(it.id) === selectedId) ?? null, [refinable, selectedId]);
+
+  // ── Form state, hydrated from the selected item during render ───────────────
+  // (React's "you might not need an effect" pattern: rehydrate when the
+  //  selection or template changes, without a setState-in-effect.)
+  const hydrate = (it: Record<string, unknown> | null): FormState | null => {
+    if (!it) return null;
+    const stored = Array.isArray(it.definition_of_ready) ? (it.definition_of_ready as { key?: string; checked?: boolean }[]) : [];
+    const checkedByKey = new Map(stored.map((d) => [String(d.key ?? ""), !!d.checked]));
+    const dor: DorItemState[] = tpl.definitionOfReady.map((d) => ({ key: d.key, label: isEs ? d.es : d.en, checked: checkedByKey.get(d.key) ?? false }));
+    return {
+      description: String(it.description ?? ""),
+      acceptance_criteria: String(it.acceptance_criteria ?? ""),
+      completion_criteria: String(it.completion_criteria ?? ""),
+      item_type: String(it.item_type ?? "task"),
+      priority: String(it.priority ?? ""),
+      risk_level: String(it.risk_level ?? ""),
+      owner_id: String(it.owner_id ?? ""),
+      business_value: it.business_value != null ? String(it.business_value) : "",
+      stakeholders: String(it.stakeholders ?? ""),
+      source_reference: String(it.source_reference ?? ""),
+      estimation_method: String(it.estimation_method ?? tpl.defaultEstimationMethod),
+      estimate_value: it.estimate_value != null ? String(it.estimate_value) : "",
+      estimate_unit: String(it.estimate_unit ?? ""),
+      estimate_optimistic: it.estimate_optimistic != null ? String(it.estimate_optimistic) : "",
+      estimate_most_likely: it.estimate_most_likely != null ? String(it.estimate_most_likely) : "",
+      estimate_pessimistic: it.estimate_pessimistic != null ? String(it.estimate_pessimistic) : "",
+      definition_of_ready: dor,
+      target_planning_destination: String(it.target_planning_destination ?? ""),
+    };
+  };
+  const aiRecOf = (it: Record<string, unknown> | null): Record<string, unknown> | null =>
+    (it && it.ai_recommendations && typeof it.ai_recommendations === "object" && Object.keys(it.ai_recommendations).length > 0) ? (it.ai_recommendations as Record<string, unknown>) : null;
+
+  const hydKey = `${selectedId ?? ""}|${tpl.key}`;
+  const [hydratedFor, setHydratedFor] = useState<string>("");
+  const [f, setF] = useState<FormState | null>(() => hydrate(selected));
+  const [aiResult, setAiResult] = useState<Record<string, unknown> | null>(() => aiRecOf(selected));
+  if (hydKey !== hydratedFor) {
+    setHydratedFor(hydKey);
+    setF(hydrate(selected));
+    setAiResult(aiRecOf(selected));
+  }
+
+  // ── Live readiness ──────────────────────────────────────────────────────────
+  const unresolvedDeps = useMemo(() => {
+    if (!selected) return 0;
+    return p.dependencies
+      .filter((d) => String(d.backlog_item_id) === String(selected.id))
+      .filter((d) => !RESOLVED.has(statusOf.get(String(d.depends_on_item_id)) ?? "new")).length;
+  }, [p.dependencies, selected, statusOf]);
+
+  const liveReadiness = useMemo(() => {
+    if (!f) return null;
+    const item: WorkItemLike = {
+      description: f.description, acceptance_criteria: f.acceptance_criteria, completion_criteria: f.completion_criteria,
+      definition_of_ready: f.definition_of_ready, estimation_method: f.estimation_method,
+      estimate_value: numOrNull(f.estimate_value), estimate_unit: f.estimate_unit,
+      estimate_optimistic: numOrNull(f.estimate_optimistic), estimate_most_likely: numOrNull(f.estimate_most_likely), estimate_pessimistic: numOrNull(f.estimate_pessimistic),
+      owner_id: f.owner_id || null, priority: f.priority, risk_level: f.risk_level, business_value: numOrNull(f.business_value),
+    };
+    return computeReadiness(item, tpl, unresolvedDeps);
+  }, [f, tpl, unresolvedDeps]);
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
+  const buildInput = (): RefinementInput | null => {
+    if (!selected || !f) return null;
+    const m = ESTIMATION_METHODS.find((e) => e.value === f.estimation_method);
+    const discrete = !!m && m.scale.length > 0 && !m.scale.every((v) => /^\d+$/.test(v)); // tshirt
+    return {
+      id: String(selected.id),
+      description: f.description, acceptance_criteria: f.acceptance_criteria, completion_criteria: f.completion_criteria,
+      item_type: f.item_type, priority: f.priority || null, risk_level: f.risk_level || null, owner_id: f.owner_id || null,
+      business_value: numOrNull(f.business_value), stakeholders: f.stakeholders, source_reference: f.source_reference,
+      estimation_method: f.estimation_method,
+      estimate_value: m?.threePoint || m?.range || discrete ? null : numOrNull(f.estimate_value),
+      estimate_unit: f.estimate_unit || null,
+      estimate_optimistic: numOrNull(f.estimate_optimistic), estimate_most_likely: numOrNull(f.estimate_most_likely), estimate_pessimistic: numOrNull(f.estimate_pessimistic),
+      definition_of_ready: f.definition_of_ready,
+      target_planning_destination: f.target_planning_destination || null,
+    };
+  };
+
+  const save = (after?: () => void) => {
+    const item = buildInput(); if (!item) return;
+    start(async () => { await saveRefinementAction({ projectId: p.projectId, item }); after?.(); router.refresh(); });
+  };
+  const setStatus = (status: string) => { const item = buildInput(); start(async () => { if (item) await saveRefinementAction({ projectId: p.projectId, item }); await setRefinementStatusAction({ projectId: p.projectId, id: String(selected!.id), status }); router.refresh(); }); };
+  const move = () => start(async () => { const r = await moveToPlanningAction({ projectId: p.projectId, id: String(selected!.id), destination: f?.target_planning_destination || undefined }); if (!r.error) { setSelectedId(null); } router.refresh(); });
+  const runAi = () => start(async () => { const r = await aiRefineItemAction({ projectId: p.projectId, id: String(selected!.id), locale: p.locale }); if (r.result) setAiResult(r.result as unknown as Record<string, unknown>); router.refresh(); });
+  const addDep = (dependsOnId: string) => { if (!dependsOnId) return; start(async () => { await saveWorkItemDependencyAction({ projectId: p.projectId, itemId: String(selected!.id), dependsOnId }); router.refresh(); }); };
+  const removeDep = (id: string) => start(async () => { await deleteWorkItemDependencyAction({ projectId: p.projectId, id }); router.refresh(); });
+
+  const upd = (patch: Partial<FormState>) => setF((s) => (s ? { ...s, ...patch } : s));
+  const toggleDor = (key: string) => setF((s) => (s ? { ...s, definition_of_ready: s.definition_of_ready.map((d) => (d.key === key ? { ...d, checked: !d.checked } : d)) } : s));
+
+  const selDeps = selected ? p.dependencies.filter((d) => String(d.backlog_item_id) === String(selected.id)) : [];
+  const itemTitle = (id: unknown) => { const x = p.items.find((it) => String(it.id) === String(id)); return x ? String(x.title) : "—"; };
+  const method = ESTIMATION_METHODS.find((e) => e.value === f?.estimation_method);
+  const numericScale = !!method && method.scale.length > 0 && method.scale.every((v) => /^\d+$/.test(v));
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{isEs ? tpl.secondaryLabel.es : tpl.secondaryLabel.en}</p>
+          <p className="text-[11px] text-muted-foreground">{isEs ? tpl.terminology.es : tpl.terminology.en}</p>
+        </div>
+        <p className="max-w-md text-right text-[11px] text-muted-foreground">{isEs ? "Aclara, estima y verifica cada ítem antes de mandarlo a ejecución. El readiness se adapta al método del proyecto." : "Clarify, estimate and verify each item before sending it to execution. Readiness adapts to the project's method."}</p>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-[280px_1fr_330px]">
+        {/* ── LEFT: list + filters ── */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            <select className={inp} value={fStatus} onChange={(e) => setFStatus(e.target.value)}><option value="">{isEs ? "Estado" : "Status"}</option>{Object.entries(REFINEMENT_STATUS_META).map(([k, v]) => <option key={k} value={k}>{isEs ? v.es : v.en}</option>)}</select>
+            <select className={inp} value={fType} onChange={(e) => setFType(e.target.value)}><option value="">{isEs ? "Tipo" : "Type"}</option>{WORK_ITEM_TYPES.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select>
+            <select className={inp} value={fPriority} onChange={(e) => setFPriority(e.target.value)}><option value="">{isEs ? "Prioridad" : "Priority"}</option>{PRIORITIES.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select>
+            <select className={inp} value={fRisk} onChange={(e) => setFRisk(e.target.value)}><option value="">{isEs ? "Riesgo" : "Risk"}</option>{RISK_LEVELS.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select>
+            <select className={`${inp} col-span-2`} value={fBand} onChange={(e) => setFBand(e.target.value)}><option value="">{isEs ? "Readiness (todos)" : "Readiness (all)"}</option><option value="ready">{isEs ? "Listo (85+)" : "Ready (85+)"}</option><option value="almost_ready">{isEs ? "Casi (70-84)" : "Almost (70-84)"}</option><option value="needs_clarification">{isEs ? "Aclaración (40-69)" : "Clarify (40-69)"}</option><option value="not_ready">{isEs ? "No listo (<40)" : "Not ready (<40)"}</option></select>
+          </div>
+          <div className="max-h-[640px] space-y-1.5 overflow-y-auto pr-0.5">
+            {filtered.map((it) => {
+              const sc = Number(it.readiness_score ?? 0);
+              const band = bandForScore(sc);
+              const st = REFINEMENT_STATUS_META[String(it.refinement_status ?? "new")] ?? REFINEMENT_STATUS_META.new;
+              const active = String(it.id) === selectedId;
+              return (
+                <button key={String(it.id)} onClick={() => setSelectedId(String(it.id))} className={`w-full rounded-lg border p-2.5 text-left transition-colors ${active ? "border-brand-400 bg-brand-50 dark:border-brand-700 dark:bg-brand-950/30" : "border-border bg-card hover:bg-muted/50"}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="line-clamp-2 text-sm font-medium text-foreground">{String(it.title)}</span>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${TONE[band.tone]}`}>{it.readiness_score != null ? sc : "—"}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${TONE[st.tone]}`}>{isEs ? st.es : st.en}</span>
+                    <span className="text-[10px] text-muted-foreground">{labelOf(WORK_ITEM_TYPES, String(it.item_type ?? ""), isEs)}</span>
+                  </div>
+                </button>
+              );
+            })}
+            {filtered.length === 0 && <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "Sin ítems. Agrega o genera trabajo en el Backlog." : "No items. Add or generate work in the Backlog."}</p>}
+          </div>
+        </div>
+
+        {/* ── CENTER: detail editor ── */}
+        {!selected || !f ? (
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-border p-10 text-sm text-muted-foreground">{isEs ? "Selecciona un ítem para refinarlo." : "Select an item to refine it."}</div>
+        ) : (
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <h3 className="text-base font-bold text-foreground">{String(selected.title)}</h3>
+
+            {/* Readiness banner */}
+            {liveReadiness && (
+              <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${TONE[liveReadiness.band.tone]}`}>
+                <Gauge className="h-4 w-4" />
+                <span className="text-sm font-semibold">{liveReadiness.score}/100 · {isEs ? liveReadiness.band.es : liveReadiness.band.en}</span>
+                {liveReadiness.missing.length > 0 && <span className="text-[11px] opacity-80">· {liveReadiness.missing.length} {isEs ? "pendientes" : "missing"}</span>}
+              </div>
+            )}
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              <Field label={isEs ? "Tipo" : "Type"}><select className={inp} value={f.item_type} onChange={(e) => upd({ item_type: e.target.value })}>{WORK_ITEM_TYPES.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select></Field>
+              <Field label={isEs ? "Prioridad" : "Priority"}><select className={inp} value={f.priority} onChange={(e) => upd({ priority: e.target.value })}><option value="">—</option>{PRIORITIES.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select></Field>
+              <Field label={isEs ? "Riesgo" : "Risk"}><select className={inp} value={f.risk_level} onChange={(e) => upd({ risk_level: e.target.value })}><option value="">—</option>{RISK_LEVELS.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select></Field>
+            </div>
+
+            <Field label={isEs ? "Descripción" : "Description"}><textarea className={inp} rows={2} value={f.description} onChange={(e) => upd({ description: e.target.value })} /></Field>
+            <Field label={isEs ? "Criterios de aceptación" : "Acceptance criteria"}><textarea className={inp} rows={2} value={f.acceptance_criteria} onChange={(e) => upd({ acceptance_criteria: e.target.value })} /></Field>
+            <Field label={isEs ? "Criterios de terminación" : "Completion criteria"}><textarea className={inp} rows={2} value={f.completion_criteria} onChange={(e) => upd({ completion_criteria: e.target.value })} /></Field>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={isEs ? "Owner" : "Owner"}>
+                <select className={inp} value={f.owner_id} onChange={(e) => upd({ owner_id: e.target.value })}>
+                  <option value="">{isEs ? "— Sin asignar —" : "— Unassigned —"}</option>
+                  {p.members.map((m) => <option key={String(m.user_id)} value={String(m.user_id)}>{String(m.display_name ?? m.user_id)}</option>)}
+                </select>
+              </Field>
+              <Field label={isEs ? "Stakeholders" : "Stakeholders"}><input className={inp} value={f.stakeholders} onChange={(e) => upd({ stakeholders: e.target.value })} /></Field>
+            </div>
+
+            {/* Definition of Ready */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><ClipboardCheck className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Definition of Ready" : "Definition of Ready"}</p>
+              <div className="space-y-1">
+                {f.definition_of_ready.map((d) => (
+                  <label key={d.key} className="flex items-start gap-2 text-xs text-foreground">
+                    <input type="checkbox" checked={d.checked} onChange={() => toggleDor(d.key)} className="mt-0.5 h-3.5 w-3.5 accent-brand-600" />
+                    <span className={d.checked ? "text-foreground" : "text-muted-foreground"}>{d.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Estimation */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><Gauge className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Estimación" : "Estimation"}</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select className={inp} value={f.estimation_method} onChange={(e) => upd({ estimation_method: e.target.value, estimate_value: "", estimate_unit: "" })}>{ESTIMATION_METHODS.map((m) => <option key={m.value} value={m.value}>{isEs ? m.es : m.en}</option>)}</select>
+                {method?.threePoint ? (
+                  <div className="grid grid-cols-3 gap-1">
+                    <input className={inp} type="number" placeholder={isEs ? "Opt." : "Opt."} value={f.estimate_optimistic} onChange={(e) => upd({ estimate_optimistic: e.target.value })} />
+                    <input className={inp} type="number" placeholder={isEs ? "Prob." : "Likely"} value={f.estimate_most_likely} onChange={(e) => upd({ estimate_most_likely: e.target.value })} />
+                    <input className={inp} type="number" placeholder={isEs ? "Pes." : "Pess."} value={f.estimate_pessimistic} onChange={(e) => upd({ estimate_pessimistic: e.target.value })} />
+                  </div>
+                ) : method?.range ? (
+                  <input className={inp} placeholder={isEs ? "Rango (ej. $10k–$20k)" : "Range (e.g. $10k–$20k)"} value={f.estimate_unit} onChange={(e) => upd({ estimate_unit: e.target.value })} />
+                ) : numericScale ? (
+                  <select className={inp} value={f.estimate_value} onChange={(e) => upd({ estimate_value: e.target.value })}><option value="">—</option>{method!.scale.map((v) => <option key={v} value={v}>{v}</option>)}</select>
+                ) : method && method.scale.length > 0 ? (
+                  <select className={inp} value={f.estimate_unit} onChange={(e) => upd({ estimate_unit: e.target.value })}><option value="">—</option>{method.scale.map((v) => <option key={v} value={v}>{v}</option>)}</select>
+                ) : (
+                  <div className="flex gap-1">
+                    <input className={inp} type="number" placeholder={isEs ? "Valor" : "Value"} value={f.estimate_value} onChange={(e) => upd({ estimate_value: e.target.value })} />
+                    <input className={`${inp} w-20`} placeholder={isEs ? method?.unitEs ?? "u" : method?.unitEn ?? "u"} value={f.estimate_unit} onChange={(e) => upd({ estimate_unit: e.target.value })} />
+                  </div>
+                )}
+              </div>
+              {method && <p className="mt-1.5 text-[10px] text-muted-foreground">{isEs ? `Recomendado para: ${method.recEs}` : `Recommended for: ${method.recEn}`}</p>}
+            </div>
+
+            {/* Dependencies */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><GitBranch className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Dependencias" : "Dependencies"}</p>
+              <div className="space-y-1">
+                {selDeps.map((d) => (
+                  <div key={String(d.id)} className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-2 py-1 text-xs">
+                    <span className="flex items-center gap-1.5 truncate text-foreground">{RESOLVED.has(statusOf.get(String(d.depends_on_item_id)) ?? "new") ? <CheckCircle2 className="h-3 w-3 text-green-500" /> : <AlertTriangle className="h-3 w-3 text-amber-500" />}{itemTitle(d.depends_on_item_id)}</span>
+                    <button onClick={() => removeDep(String(d.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <select disabled={pending} value="" onChange={(e) => addDep(e.target.value)} className="w-full rounded-lg border border-dashed border-border bg-background px-2 py-1.5 text-xs text-muted-foreground focus:border-brand-500 focus:outline-none">
+                  <option value="">{isEs ? "+ Depende de…" : "+ Depends on…"}</option>
+                  {refinable.filter((it) => String(it.id) !== selectedId && !selDeps.some((d) => String(d.depends_on_item_id) === String(it.id))).map((it) => <option key={String(it.id)} value={String(it.id)}>{String(it.title)}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Destination + status actions */}
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label={isEs ? "Destino de planeación" : "Planning destination"}>
+                <select className={inp} value={f.target_planning_destination} onChange={(e) => upd({ target_planning_destination: e.target.value })}>
+                  <option value="">—</option>
+                  {tpl.planningDestinations.map((v) => { const d = PLANNING_DESTINATIONS.find((x) => x.value === v); return d ? <option key={v} value={v}>{isEs ? d.es : d.en}</option> : null; })}
+                </select>
+              </Field>
+              <Field label={isEs ? "Estado de refinamiento" : "Refinement status"}>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${TONE[(REFINEMENT_STATUS_META[String(selected.refinement_status ?? "new")] ?? REFINEMENT_STATUS_META.new).tone]}`}>{(() => { const m = REFINEMENT_STATUS_META[String(selected.refinement_status ?? "new")] ?? REFINEMENT_STATUS_META.new; return isEs ? m.es : m.en; })()}</span>
+              </Field>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+              <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{isEs ? "Guardar" : "Save"}</button>
+              {REFINABLE_STATUSES.map((s) => { const meta = REFINEMENT_STATUS_META[s]; return (
+                <button key={s} onClick={() => setStatus(s)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">{isEs ? meta.es : meta.en}</button>
+              ); })}
+              <button onClick={move} disabled={pending || String(selected.refinement_status) !== "ready_for_planning"} title={isEs ? "Requiere estado 'Listo para planear'" : "Requires 'Ready for Planning' status"} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Mover a planeación" : "Move to planning"}</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── RIGHT: AI assistant ── */}
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Sparkles className="h-4 w-4 text-brand-500" />{isEs ? "Asistente de refinamiento" : "Refinement assistant"}</h3>
+            <button onClick={runAi} disabled={pending || !selected} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">{pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}{isEs ? "Refinar con IA" : "Refine with AI"}</button>
+          </div>
+
+          {!aiResult ? (
+            <p className="text-xs text-muted-foreground">{isEs ? "La IA usa el charter, el método de entrega y el contexto del proyecto para sugerir criterios, dependencias, riesgos, estimación y destino — separando hechos, supuestos y recomendaciones." : "The AI uses the charter, delivery method and project context to suggest criteria, dependencies, risks, estimate and destination — separating facts, assumptions and recommendations."}</p>
+          ) : (
+            <div className="space-y-3 text-xs">
+              {strv(aiResult.ai_summary) && <p className="rounded-lg bg-muted/40 p-2.5 text-foreground">{strv(aiResult.ai_summary)}</p>}
+              <AiList icon={HelpCircle} tone="text-blue-500" title={isEs ? "Preguntas abiertas" : "Open questions"} items={arrv(aiResult.questions)} />
+              {strv(aiResult.suggested_acceptance_criteria) && <AiBlock title={isEs ? "Criterios de aceptación sugeridos" : "Suggested acceptance criteria"} body={strv(aiResult.suggested_acceptance_criteria)} onUse={() => upd({ acceptance_criteria: strv(aiResult.suggested_acceptance_criteria) })} useLabel={isEs ? "Usar" : "Use"} />}
+              {strv(aiResult.suggested_completion_criteria) && <AiBlock title={isEs ? "Criterios de terminación sugeridos" : "Suggested completion criteria"} body={strv(aiResult.suggested_completion_criteria)} onUse={() => upd({ completion_criteria: strv(aiResult.suggested_completion_criteria) })} useLabel={isEs ? "Usar" : "Use"} />}
+              <AiList icon={GitBranch} tone="text-brand-500" title={isEs ? "Dependencias probables" : "Likely dependencies"} items={arrv(aiResult.suggested_dependencies)} />
+              <AiList icon={ShieldAlert} tone="text-amber-500" title={isEs ? "Riesgos probables" : "Likely risks"} items={arrv(aiResult.suggested_risks)} />
+              <AiList icon={ClipboardCheck} tone="text-brand-500" title={isEs ? "DoR faltante" : "Missing DoR"} items={arrv(aiResult.suggested_dor)} />
+              {(strv(aiResult.suggested_estimate) || strv(aiResult.suggested_priority) || strv(aiResult.suggested_destination)) && (
+                <div className="rounded-lg border border-border p-2.5">
+                  {strv(aiResult.suggested_estimate) && <p className="text-foreground"><span className="font-medium">{isEs ? "Estimación: " : "Estimate: "}</span>{strv(aiResult.suggested_estimate)}</p>}
+                  {strv(aiResult.suggested_priority) && <p className="text-foreground"><span className="font-medium">{isEs ? "Prioridad: " : "Priority: "}</span>{strv(aiResult.suggested_priority)} <button onClick={() => upd({ priority: strv(aiResult.suggested_priority) })} className="text-[10px] text-brand-600 hover:underline dark:text-brand-400">{isEs ? "usar" : "use"}</button></p>}
+                  {strv(aiResult.suggested_destination) && <p className="text-foreground"><span className="font-medium">{isEs ? "Destino: " : "Destination: "}</span>{strv(aiResult.suggested_destination)}</p>}
+                </div>
+              )}
+              {strv(aiResult.split_suggestion) && <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-2.5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-300"><Scissors className="mt-0.5 h-3.5 w-3.5 shrink-0" /><span>{strv(aiResult.split_suggestion)}</span></div>}
+              {strv(aiResult.readiness_explanation) && <div className="flex items-start gap-2 rounded-lg bg-muted/40 p-2.5 text-muted-foreground"><Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-500" /><span>{strv(aiResult.readiness_explanation)}</span></div>}
+              <div className="grid gap-2">
+                <AiList icon={CheckCircle2} tone="text-green-500" title={isEs ? "Hechos conocidos" : "Known facts"} items={arrv(aiResult.facts)} />
+                <AiList icon={HelpCircle} tone="text-muted-foreground" title={isEs ? "Supuestos de IA" : "AI assumptions"} items={arrv(aiResult.assumptions)} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── small helpers ─────────────────────────────────────────────────────────────
+
+const strv = (x: unknown) => (typeof x === "string" ? x : "");
+const arrv = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : []);
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div><label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>{children}</div>;
+}
+
+function AiList({ icon: Icon, tone, title, items }: { icon: typeof HelpCircle; tone: string; title: string; items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-1 flex items-center gap-1.5 font-medium text-foreground"><Icon className={`h-3.5 w-3.5 ${tone}`} />{title}</p>
+      <ul className="space-y-0.5 pl-1">{items.map((it, i) => <li key={i} className="flex gap-1.5 text-muted-foreground"><span className="text-brand-500">•</span>{it}</li>)}</ul>
+    </div>
+  );
+}
+
+function AiBlock({ title, body, onUse, useLabel }: { title: string; body: string; onUse: () => void; useLabel: string }) {
+  return (
+    <div className="rounded-lg border border-border p-2.5">
+      <div className="mb-1 flex items-center justify-between gap-2"><p className="font-medium text-foreground">{title}</p><button onClick={onUse} className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-brand-600 hover:bg-muted dark:text-brand-400"><Plus className="h-3 w-3" />{useLabel}</button></div>
+      <p className="whitespace-pre-line text-muted-foreground">{body}</p>
+    </div>
+  );
+}

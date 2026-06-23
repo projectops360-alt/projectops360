@@ -34,7 +34,7 @@ export default async function DeliveryPage({
   const project = projectResult.data;
   if (!project) notFound();
 
-  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes] = await Promise.all([
+  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes, depsRes, membersRes] = await Promise.all([
     framework
       ? supabase.from("project_board_columns").select("id, name, position, is_done_column, wip_limit").eq("framework_id", framework.id).order("position")
       : Promise.resolve({ data: [] }),
@@ -47,6 +47,8 @@ export default async function DeliveryPage({
     supabase.from("risks").select("id, title").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).limit(50),
     supabase.from("project_cycle_items").select("id, cycle_id, backlog_item_id").eq("project_id", projectId).eq("organization_id", org.organizationId),
     supabase.from("roadmap_tasks").select("status").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
+    supabase.from("work_item_dependencies").select("id, backlog_item_id, depends_on_item_id, dependency_type").eq("project_id", projectId).eq("organization_id", org.organizationId),
+    admin.from("project_team_members").select("user_id, display_name").eq("project_id", projectId).eq("organization_id", org.organizationId).neq("status", "removed").not("user_id", "is", null),
   ]);
 
   const cycleItemsData = cycleItemsRes.data;
@@ -79,6 +81,8 @@ export default async function DeliveryPage({
       alerts={(alertsRes.data ?? []) as Record<string, unknown>[]}
       milestones={(milestonesRes.data ?? []) as Record<string, unknown>[]}
       risks={(risksRes.data ?? []) as Record<string, unknown>[]}
+      dependencies={(depsRes.data ?? []) as Record<string, unknown>[]}
+      members={(membersRes.data ?? []) as Record<string, unknown>[]}
       startSetup={setup === "true"}
     />
   );

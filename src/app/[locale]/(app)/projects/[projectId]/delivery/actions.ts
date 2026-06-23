@@ -5,8 +5,10 @@ import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { Locale } from "@/types/database";
 import {
-  getFrameworkByProject, createFrameworkForProject, saveFrameworkEvent, syncFrameworkToMemory,
+  getFrameworkByProject, createFrameworkForProject, saveFrameworkEvent, syncFrameworkToMemory, mapProjectType,
 } from "@/lib/delivery/service";
+import { templateFor } from "@/lib/refinement/templates";
+import { computeReadiness, type WorkItemLike } from "@/lib/refinement/readiness";
 import { recommendFramework, type FrameworkInputs } from "@/lib/delivery/recommend";
 import { BOARD_TEMPLATES, boardTemplateFor, MEETING_RHYTHM, type DeliveryMethod } from "@/lib/delivery/config";
 
@@ -575,6 +577,179 @@ export async function alertToChangeRequestAction(input: { projectId: string; ale
   if (error) return { error: "unexpected" };
   await c.supabase.from("project_scope_creep_alerts").update({ status: "resolved", resolved_by: c.org.userId, resolved_at: new Date().toISOString() }).eq("id", input.alertId).eq("organization_id", c.org.organizationId);
   await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "change_request_created", `Scope alert converted to change request: ${title}`);
+  return {};
+}
+
+// ── Work Refinement Center ───────────────────────────────────────────────────
+
+const STATUS_ALLOWED = new Set([
+  "new", "needs_clarification", "ready_for_refinement", "in_refinement",
+  "split_required", "refined", "ready_for_planning", "planned",
+  "in_execution", "done", "rejected", "deferred",
+]);
+
+/** Resolve the project's refinement template from its delivery framework. */
+async function refinementTemplate(c: NonNullable<Awaited<ReturnType<typeof ctx>>>, projectId: string) {
+  const fw = await getFrameworkByProject(c.supabase, c.org.organizationId, projectId);
+  return templateFor((fw?.delivery_method ?? null) as never, fw?.project_type ?? mapProjectType(null));
+}
+
+/** Count dependencies whose predecessor item isn't refined/planned yet. */
+async function unresolvedDepCount(c: NonNullable<Awaited<ReturnType<typeof ctx>>>, itemId: string): Promise<number> {
+  const { data: deps } = await c.supabase.from("work_item_dependencies")
+    .select("depends_on_item_id").eq("backlog_item_id", itemId).eq("organization_id", c.org.organizationId);
+  const ids = (deps ?? []).map((d) => String((d as { depends_on_item_id: string }).depends_on_item_id));
+  if (ids.length === 0) return 0;
+  const { data: preds } = await c.supabase.from("project_backlog_items")
+    .select("refinement_status").in("id", ids).eq("organization_id", c.org.organizationId).is("deleted_at", null);
+  const resolved = new Set(["ready_for_planning", "planned", "in_execution", "done"]);
+  return (preds ?? []).filter((p) => !resolved.has(String((p as { refinement_status: string }).refinement_status))).length;
+}
+
+export interface RefinementInput {
+  id: string;
+  description?: string | null;
+  acceptance_criteria?: string | null;
+  completion_criteria?: string | null;
+  item_type?: string | null;
+  priority?: string | null;
+  risk_level?: string | null;
+  owner_id?: string | null;
+  business_value?: number | null;
+  customer_value?: number | null;
+  strategic_value?: number | null;
+  stakeholders?: string | null;
+  source_reference?: string | null;
+  estimation_method?: string | null;
+  estimate_value?: number | null;
+  estimate_unit?: string | null;
+  estimate_optimistic?: number | null;
+  estimate_most_likely?: number | null;
+  estimate_pessimistic?: number | null;
+  definition_of_ready?: { key: string; label: string; checked: boolean }[];
+  target_planning_destination?: string | null;
+}
+
+/** Save the refinement fields of a work item and recompute its readiness. */
+export async function saveRefinementAction(input: { projectId: string; item: RefinementInput }): Promise<{ error?: string; readiness?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const it = input.item;
+  if (!it.id) return { error: "id_required" };
+
+  const tpl = await refinementTemplate(c, input.projectId);
+  const unresolved = await unresolvedDepCount(c, it.id);
+  const itemForScore: WorkItemLike = {
+    description: it.description, acceptance_criteria: it.acceptance_criteria, completion_criteria: it.completion_criteria,
+    definition_of_ready: it.definition_of_ready, estimation_method: it.estimation_method, estimate_value: it.estimate_value,
+    estimate_optimistic: it.estimate_optimistic, estimate_most_likely: it.estimate_most_likely, estimate_pessimistic: it.estimate_pessimistic,
+    owner_id: it.owner_id, priority: it.priority, risk_level: it.risk_level, business_value: it.business_value,
+  };
+  const readiness = computeReadiness(itemForScore, tpl, unresolved);
+
+  const { error } = await c.supabase.from("project_backlog_items").update({
+    description: it.description?.trim() || null,
+    acceptance_criteria: it.acceptance_criteria?.trim() || null,
+    completion_criteria: it.completion_criteria?.trim() || null,
+    item_type: it.item_type || null,
+    priority: it.priority || null,
+    risk_level: it.risk_level || null,
+    owner_id: it.owner_id || null,
+    business_value: it.business_value ?? null,
+    customer_value: it.customer_value ?? null,
+    strategic_value: it.strategic_value ?? null,
+    stakeholders: it.stakeholders?.trim() || null,
+    source_reference: it.source_reference?.trim() || null,
+    estimation_method: it.estimation_method || null,
+    estimate_value: it.estimate_value ?? null,
+    estimate_unit: it.estimate_unit || null,
+    estimate_optimistic: it.estimate_optimistic ?? null,
+    estimate_most_likely: it.estimate_most_likely ?? null,
+    estimate_pessimistic: it.estimate_pessimistic ?? null,
+    definition_of_ready: it.definition_of_ready ?? [],
+    target_planning_destination: it.target_planning_destination || null,
+    readiness_score: readiness.score,
+  }).eq("id", it.id).eq("organization_id", c.org.organizationId);
+  if (error) return { error: "unexpected" };
+  return { readiness: readiness.score };
+}
+
+/** Set the refinement status (PM review outcome). */
+export async function setRefinementStatusAction(input: { projectId: string; id: string; status: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!STATUS_ALLOWED.has(input.status)) return { error: "bad_status" };
+  const patch: Record<string, unknown> = { refinement_status: input.status };
+  if (input.status === "refined" || input.status === "ready_for_planning") patch.refined_at = new Date().toISOString();
+  const { error } = await c.supabase.from("project_backlog_items").update(patch).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  if (!error) await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "item_refinement_status", `Work item set to ${input.status}`);
+  return error ? { error: "unexpected" } : {};
+}
+
+/** AI refine: generate summary, questions and recommendations; persist them. */
+export async function aiRefineItemAction(input: { projectId: string; id: string; locale: string }) {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" as const, result: null };
+  const { refineWorkItem } = await import("@/lib/refinement/ai");
+  const result = await refineWorkItem(c.org, input.projectId, input.id, (input.locale === "es" ? "es" : "en") as Locale);
+  if (!result.ai_summary && result.questions.length === 0) return { error: "ai_failed" as const, result: null };
+  await c.supabase.from("project_backlog_items").update({
+    ai_summary: result.ai_summary || null,
+    ai_refinement_questions: result.questions,
+    ai_recommendations: result,
+  }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return { result };
+}
+
+/** Add a dependency: this item depends on another work item. */
+export async function saveWorkItemDependencyAction(input: { projectId: string; itemId: string; dependsOnId: string; type?: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (input.itemId === input.dependsOnId) return { error: "self_dependency" };
+  const { error } = await c.supabase.from("work_item_dependencies").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    backlog_item_id: input.itemId, depends_on_item_id: input.dependsOnId,
+    dependency_type: input.type || "finish_to_start",
+  });
+  // Unique violation = already exists; treat as success.
+  if (error && !String(error.code).startsWith("23505")) return { error: "unexpected" };
+  return {};
+}
+
+export async function deleteWorkItemDependencyAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("work_item_dependencies").delete().eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Move a refined item into planning/execution. Gated on ready_for_planning.
+ *  Reuses the backlog→Workboard promotion (single execution board), records the
+ *  chosen destination, and marks the item planned. */
+export async function moveToPlanningAction(input: { projectId: string; id: string; destination?: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { data: item } = await c.supabase.from("project_backlog_items").select("*").eq("id", input.id).eq("organization_id", c.org.organizationId).is("deleted_at", null).maybeSingle();
+  if (!item) return { error: "not_found" };
+  const it = item as Record<string, unknown>;
+  if (String(it.refinement_status) !== "ready_for_planning") return { error: "not_ready" };
+
+  const destination = input.destination || (it.target_planning_destination as string) || "execution_board";
+
+  const { error } = await c.supabase.from("roadmap_tasks").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId,
+    title: String(it.title), description: (it.description as string) || null,
+    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+    milestone_id: (it.linked_milestone_id as string) || null,
+    acceptance_criteria: (it.acceptance_criteria as string) || null,
+    order_index: 0, external_key: `backlog:${input.id}`,
+  });
+  if (error) return { error: "unexpected" };
+
+  await c.supabase.from("project_backlog_items").update({
+    status: "promoted", refinement_status: "planned", target_planning_destination: destination,
+  }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "item_moved_to_planning", `Work item moved to planning (${destination}): ${String(it.title)}`);
   return {};
 }
 
