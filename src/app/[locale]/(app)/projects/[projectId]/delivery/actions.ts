@@ -736,12 +736,28 @@ export async function moveToPlanningAction(input: { projectId: string; id: strin
 
   const destination = input.destination || (it.target_planning_destination as string) || "execution_board";
 
+  // PMO governance gate: governance-style templates need approval first.
+  const tpl = await refinementTemplate(c, input.projectId);
+  if (tpl.key === "pmo") {
+    const gov = String(it.governance_status ?? "not_required");
+    if (gov === "pending" || gov === "rejected") return { error: "governance_required" };
+  }
+
+  // Schedule-aware promotion: seed start/duration so the task lands on the
+  // Timeline and critical path (which read roadmap_tasks) ready to schedule.
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() + ((8 - start.getDay()) % 7 || 7)); // next Monday
+  const duration = it.estimation_method === "days" && Number(it.estimate_value) > 0 ? Math.max(1, Math.round(Number(it.estimate_value))) : 1;
+  const end = new Date(start); end.setDate(start.getDate() + duration - 1);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
   const { error } = await c.supabase.from("roadmap_tasks").insert({
     organization_id: c.org.organizationId, project_id: input.projectId,
     title: String(it.title), description: (it.description as string) || null,
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
+    start_date: iso(start), end_date: iso(end), duration_days: duration,
     order_index: 0, external_key: `backlog:${input.id}`,
   });
   if (error) return { error: "unexpected" };
@@ -751,6 +767,22 @@ export async function moveToPlanningAction(input: { projectId: string; id: strin
   }).eq("id", input.id).eq("organization_id", c.org.organizationId);
   await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "item_moved_to_planning", `Work item moved to planning (${destination}): ${String(it.title)}`);
   return {};
+}
+
+/** PMO governance approval on a work item (request / approve / reject). */
+export async function setGovernanceAction(input: { projectId: string; id: string; status: string; notes?: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!["not_required", "pending", "approved", "rejected"].includes(input.status)) return { error: "bad_status" };
+  const decided = input.status === "approved" || input.status === "rejected";
+  const { error } = await c.supabase.from("project_backlog_items").update({
+    governance_status: input.status,
+    governance_notes: input.notes?.trim() || null,
+    governance_approver_id: decided ? c.org.userId : null,
+    governance_approved_at: decided ? new Date().toISOString() : null,
+  }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  if (!error) await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "governance_status", `Governance ${input.status}`);
+  return error ? { error: "unexpected" } : {};
 }
 
 // ── Work Refinement — Phase 2 (sessions, split, links) ──────────────────────

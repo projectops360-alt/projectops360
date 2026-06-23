@@ -354,6 +354,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <QuickLink href={`${base}/import`} icon={<UploadCloud className="h-4 w-4" />} label={tt("Import Project", "Importar Proyecto")} />
             <QuickLink href={`${base}/ai-operator`} icon={<Sparkles className="h-4 w-4" />} label={tt("Ask AI Operator", "Consultar Operador IA")} />
             <QuickLink href={`${base}/reports`} icon={<BarChart3 className="h-4 w-4" />} label={tt("Create Report", "Crear Reporte")} />
+            <QuickLink href={`${base}/portfolio/refinement`} icon={<ListChecks className="h-4 w-4" />} label={tt("Portfolio Refinement", "Refinamiento del Portafolio")} />
             <QuickLink href={`${base}/projects`} icon={<FolderKanban className="h-4 w-4" />} label={tt("Projects", "Proyectos")} />
             <QuickLink href={`${base}/team`} icon={<Users className="h-4 w-4" />} label={tt("Team", "Equipo")} />
           </div>

@@ -34,7 +34,7 @@ export default async function DeliveryPage({
   const project = projectResult.data;
   if (!project) notFound();
 
-  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes, depsRes, membersRes, sessionsRes, sessionItemsRes, linksRes, decisionsRes, meetingsRes, commsRes] = await Promise.all([
+  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes, depsRes, membersRes, sessionsRes, sessionItemsRes, linksRes, decisionsRes, meetingsRes, commsRes, rfiCountRes, matCountRes, permitCountRes, inspCountRes] = await Promise.all([
     framework
       ? supabase.from("project_board_columns").select("id, name, position, is_done_column, wip_limit").eq("framework_id", framework.id).order("position")
       : Promise.resolve({ data: [] }),
@@ -55,6 +55,10 @@ export default async function DeliveryPage({
     supabase.from("decisions").select("id, title_i18n").eq("project_id", projectId).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
     supabase.from("meetings").select("id, title_i18n, meeting_date").eq("project_id", projectId).is("deleted_at", null).order("meeting_date", { ascending: false }).limit(100),
     supabase.from("communication_items").select("id, title_i18n").eq("project_id", projectId).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("rfis").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).in("status", ["draft", "open"]),
+    supabase.from("material_requirements").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).not("status", "in", "(delivered,installed)"),
+    supabase.from("permits").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).in("status", ["required", "applied", "rejected", "expired"]),
+    supabase.from("inspections").select("id", { count: "exact", head: true }).eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).in("status", ["pending", "scheduled", "failed"]),
   ]);
 
   const cycleItemsData = cycleItemsRes.data;
@@ -77,6 +81,12 @@ export default async function DeliveryPage({
     decision: toLabeled(decisionsRes.data),
     meeting: toLabeled(meetingsRes.data),
     communication: toLabeled(commsRes.data),
+  };
+  const constructionSignals = {
+    openRfis: rfiCountRes.count ?? 0,
+    pendingMaterials: matCountRes.count ?? 0,
+    pendingPermits: permitCountRes.count ?? 0,
+    pendingInspections: inspCountRes.count ?? 0,
   };
 
   return (
@@ -103,6 +113,7 @@ export default async function DeliveryPage({
       sessionItems={(sessionItemsRes.data ?? []) as Record<string, unknown>[]}
       links={(linksRes.data ?? []) as Record<string, unknown>[]}
       linkTargets={linkTargets}
+      constructionSignals={constructionSignals}
       startSetup={setup === "true"}
     />
   );

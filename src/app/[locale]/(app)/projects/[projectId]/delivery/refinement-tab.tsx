@@ -27,10 +27,11 @@ import type { DeliveryMethod } from "@/lib/delivery/config";
 import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
   saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
-  splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction,
+  splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction, setGovernanceAction,
   type RefinementInput,
 } from "./actions";
 import { SessionsPanel } from "./refinement-session";
+import { Link } from "@/i18n/navigation";
 
 const inp = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 const TONE: Record<string, string> = {
@@ -66,6 +67,7 @@ interface Props {
   sessionItems: Record<string, unknown>[];
   links: Record<string, unknown>[];
   linkTargets: { decision: { id: string; title: string }[]; meeting: { id: string; title: string }[]; communication: { id: string; title: string }[] };
+  constructionSignals: { openRfis: number; pendingMaterials: number; pendingPermits: number; pendingInspections: number };
 }
 
 export function RefinementTab(p: Props) {
@@ -196,7 +198,9 @@ export function RefinementTab(p: Props) {
     start(async () => { await saveRefinementAction({ projectId: p.projectId, item }); after?.(); router.refresh(); });
   };
   const setStatus = (status: string) => { const item = buildInput(); start(async () => { if (item) await saveRefinementAction({ projectId: p.projectId, item }); await setRefinementStatusAction({ projectId: p.projectId, id: String(selected!.id), status }); router.refresh(); }); };
-  const move = () => start(async () => { const r = await moveToPlanningAction({ projectId: p.projectId, id: String(selected!.id), destination: f?.target_planning_destination || undefined }); if (!r.error) { setSelectedId(null); } router.refresh(); });
+  const [moveErr, setMoveErr] = useState<string | null>(null);
+  const move = () => start(async () => { setMoveErr(null); const r = await moveToPlanningAction({ projectId: p.projectId, id: String(selected!.id), destination: f?.target_planning_destination || undefined }); if (r.error === "governance_required") { setMoveErr(isEs ? "Requiere aprobación de gobernanza antes de planear." : "Requires governance approval before planning."); return; } if (!r.error) { setSelectedId(null); } router.refresh(); });
+  const setGov = (status: string) => start(async () => { await setGovernanceAction({ projectId: p.projectId, id: String(selected!.id), status }); router.refresh(); });
   const runAi = () => start(async () => { const r = await aiRefineItemAction({ projectId: p.projectId, id: String(selected!.id), locale: p.locale }); if (r.result) setAiResult(r.result as unknown as Record<string, unknown>); router.refresh(); });
   const addDep = (dependsOnId: string) => { if (!dependsOnId) return; start(async () => { await saveWorkItemDependencyAction({ projectId: p.projectId, itemId: String(selected!.id), dependsOnId }); router.refresh(); }); };
   const removeDep = (id: string) => start(async () => { await deleteWorkItemDependencyAction({ projectId: p.projectId, id }); router.refresh(); });
@@ -441,6 +445,49 @@ export function RefinementTab(p: Props) {
               </div>
             )}
 
+            {/* Construction context (work readiness from project RFIs / materials / permits / inspections) */}
+            {tpl.key === "construction" && (
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="mb-2 flex items-center justify-between gap-1.5 text-xs font-semibold text-foreground">
+                  <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" />{isEs ? "Contexto de obra (proyecto)" : "Field context (project)"}</span>
+                  <Link href={`/projects/${p.projectId}/labor-capacity/lookahead`} className="text-[10px] font-normal text-brand-600 hover:underline dark:text-brand-400">{isEs ? "Lookahead →" : "Lookahead →"}</Link>
+                </p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                  {([["openRfis", isEs ? "RFIs abiertos" : "Open RFIs"], ["pendingMaterials", isEs ? "Materiales pend." : "Materials pend."], ["pendingPermits", isEs ? "Permisos pend." : "Permits pend."], ["pendingInspections", isEs ? "Inspecc. pend." : "Inspections pend."]] as const).map(([k, lbl]) => {
+                    const n = p.constructionSignals[k];
+                    return <div key={k} className={`rounded-md border px-2 py-1.5 text-center ${n > 0 ? "border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20" : "border-border bg-background"}`}><div className={`text-base font-bold ${n > 0 ? "text-amber-700 dark:text-amber-300" : "text-foreground"}`}>{n}</div><div className="text-[10px] text-muted-foreground">{lbl}</div></div>;
+                  })}
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground">{isEs ? "Señales del proyecto a revisar al confirmar el Definition of Ready de este paquete." : "Project-level signals to review when confirming this package's Definition of Ready."}</p>
+              </div>
+            )}
+
+            {/* PMO governance approval gate */}
+            {tpl.key === "pmo" && (() => {
+              const gs = String(selected.governance_status ?? "not_required");
+              const GS: Record<string, { es: string; en: string; tone: string }> = {
+                not_required: { es: "No requerida", en: "Not required", tone: TONE.gray },
+                pending: { es: "Pendiente", en: "Pending", tone: TONE.amber },
+                approved: { es: "Aprobada", en: "Approved", tone: TONE.green },
+                rejected: { es: "Rechazada", en: "Rejected", tone: TONE.red },
+              };
+              const m = GS[gs] ?? GS.not_required;
+              return (
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="mb-2 flex items-center justify-between gap-1.5 text-xs font-semibold text-foreground">
+                    <span className="flex items-center gap-1.5"><ShieldAlert className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Aprobación de gobernanza" : "Governance approval"}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.tone}`}>{isEs ? m.es : m.en}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button onClick={() => setGov("pending")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">{isEs ? "Solicitar" : "Request"}</button>
+                    <button onClick={() => setGov("approved")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-green-300 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50 dark:border-green-900 dark:text-green-400 dark:hover:bg-green-950/30"><CheckCircle2 className="h-3.5 w-3.5" />{isEs ? "Aprobar" : "Approve"}</button>
+                    <button onClick={() => setGov("rejected")} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30">{isEs ? "Rechazar" : "Reject"}</button>
+                  </div>
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">{isEs ? "Las iniciativas PMO requieren aprobación antes de mover a planeación." : "PMO initiatives require approval before moving to planning."}</p>
+                </div>
+              );
+            })()}
+
             {/* Destination + status actions */}
             <div className="grid gap-2 sm:grid-cols-2">
               <Field label={isEs ? "Destino de planeación" : "Planning destination"}>
@@ -453,6 +500,8 @@ export function RefinementTab(p: Props) {
                 <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${TONE[(REFINEMENT_STATUS_META[String(selected.refinement_status ?? "new")] ?? REFINEMENT_STATUS_META.new).tone]}`}>{(() => { const m = REFINEMENT_STATUS_META[String(selected.refinement_status ?? "new")] ?? REFINEMENT_STATUS_META.new; return isEs ? m.es : m.en; })()}</span>
               </Field>
             </div>
+
+            {moveErr && <p className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{moveErr}</p>}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
               <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{isEs ? "Guardar" : "Save"}</button>
