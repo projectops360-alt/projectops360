@@ -46,6 +46,24 @@ async function projectInfo(supabase: Supabase, organizationId: string, projectId
   return [getI18nValue(data.title_i18n as never, locale), getI18nValue(data.description_i18n as never, locale), `type: ${data.project_type ?? "general"}`].filter(Boolean).join(" — ");
 }
 
+/** Phase 3: pull the most relevant Project Memory items as grounding context.
+ *  Ranks by importance then recency (lightweight; no embedding round-trip).
+ *  Returns a formatted block or "" when the project has no memory. */
+async function projectMemoryContext(supabase: Supabase, organizationId: string, projectId: string, limit = 8): Promise<string> {
+  const { data } = await supabase.from("project_memory_items")
+    .select("title, summary, content, importance_level, created_at")
+    .eq("project_id", projectId).eq("organization_id", organizationId).is("deleted_at", null)
+    .order("created_at", { ascending: false }).limit(40);
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return "";
+  const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  rows.sort((a, b) => (rank[String(a.importance_level)] ?? 2) - (rank[String(b.importance_level)] ?? 2));
+  return rows.slice(0, limit).map((m) => {
+    const body = str(m.summary) || str(m.content).slice(0, 200);
+    return `- [${str(m.importance_level) || "med"}] ${str(m.title)}${body ? `: ${body}` : ""}`;
+  }).join("\n");
+}
+
 // ── Refine a single work item ────────────────────────────────────────────────
 
 export interface RefineWorkItemResult {
@@ -95,9 +113,10 @@ export async function refineWorkItem(
   const isEs = locale === "es";
   const lang = isEs ? "español" : "English";
 
-  const [scope, info] = await Promise.all([
+  const [scope, info, memory] = await Promise.all([
     charterScope(supabase, org.organizationId, projectId),
     projectInfo(supabase, org.organizationId, projectId, locale),
+    projectMemoryContext(supabase, org.organizationId, projectId),
   ]);
 
   const dorList = tpl.definitionOfReady.map((d) => `- ${isEs ? d.es : d.en}`).join("\n");
@@ -140,6 +159,7 @@ export async function refineWorkItem(
     "",
     `PROJECT: ${info}`,
     "", "=== CHARTER SCOPE ===", scope || "(charter not filled — infer reasonably)",
+    memory ? `\n=== PROJECT MEMORY (known facts — prefer these over assumptions) ===\n${memory}` : "",
     "",
     "=== WORK ITEM ===",
     `Title: ${str(it.title)}`,
@@ -199,7 +219,10 @@ export async function prepareRefinementSession(
   const tpl = templateFor(method, fw?.project_type ?? mapProjectType(null));
   const isEs = locale === "es";
   const lang = isEs ? "español" : "English";
-  const scope = await charterScope(supabase, org.organizationId, projectId);
+  const [scope, memory] = await Promise.all([
+    charterScope(supabase, org.organizationId, projectId),
+    projectMemoryContext(supabase, org.organizationId, projectId, 6),
+  ]);
   const methodName = method ? (isEs ? DELIVERY_METHODS[method].es : DELIVERY_METHODS[method].en) : "n/a";
 
   const list = items.map((it) => `- id:${String(it.id)} | "${str(it.title)}" | type:${str(it.item_type)} | readiness:${it.readiness_score ?? "?"} | ${str(it.description).slice(0, 160)}`).join("\n");
@@ -207,7 +230,7 @@ export async function prepareRefinementSession(
     `You are facilitating a "${isEs ? tpl.secondaryLabel.es : tpl.secondaryLabel.en}" review for a ${methodName} project. Respond in ${lang}.`,
     "For EACH work item, give 2-4 concise TALKING POINTS the team should discuss and the OPEN QUESTIONS to resolve so the item becomes ready. Be specific to the item and the delivery method.",
     'Return ONLY JSON: { "items": [ { "backlog_item_id": "<exact id>", "talking_points": ["..."], "open_questions": ["..."] } ] }.',
-    "", scope ? `=== CHARTER SCOPE ===\n${scope}\n` : "", "=== WORK ITEMS ===", list,
+    "", scope ? `=== CHARTER SCOPE ===\n${scope}\n` : "", memory ? `=== PROJECT MEMORY ===\n${memory}\n` : "", "=== WORK ITEMS ===", list,
   ].join("\n");
 
   const json = await runJson(org, projectId, prompt);

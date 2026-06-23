@@ -22,6 +22,7 @@ import {
   READINESS_BANDS,
 } from "@/lib/refinement/templates";
 import { computeReadiness, type WorkItemLike } from "@/lib/refinement/readiness";
+import { detectRefinementRisks, topSeverity, type RefinementRisk } from "@/lib/refinement/risk";
 import type { DeliveryMethod } from "@/lib/delivery/config";
 import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
@@ -77,6 +78,18 @@ export function RefinementTab(p: Props) {
   // Only non-promoted items are refinable.
   const refinable = useMemo(() => p.items.filter((it) => String(it.status) !== "promoted"), [p.items]);
   const statusOf = useMemo(() => new Map(p.items.map((it) => [String(it.id), String(it.refinement_status ?? "new")])), [p.items]);
+
+  // Predictive refinement-risk per item (deterministic, explainable).
+  const RESOLVED_SET = useMemo(() => new Set(["ready_for_planning", "planned", "in_execution", "done"]), []);
+  const itemRisks = useMemo(() => {
+    return refinable.map((it) => {
+      const unresolved = p.dependencies
+        .filter((d) => String(d.backlog_item_id) === String(it.id))
+        .filter((d) => !RESOLVED_SET.has(statusOf.get(String(d.depends_on_item_id)) ?? "new")).length;
+      return { item: it, risks: detectRefinementRisks(it as never, unresolved) };
+    }).filter((r) => r.risks.length > 0);
+  }, [refinable, p.dependencies, statusOf, RESOLVED_SET]);
+  const riskById = useMemo(() => new Map(itemRisks.map((r) => [String(r.item.id), r.risks])), [itemRisks]);
 
   // ── Filters ────────────────────────────────────────────────────────────────
   const [fStatus, setFStatus] = useState("");
@@ -210,6 +223,32 @@ export function RefinementTab(p: Props) {
   const method = ESTIMATION_METHODS.find((e) => e.value === f?.estimation_method);
   const numericScale = !!method && method.scale.length > 0 && method.scale.every((v) => /^\d+$/.test(v));
 
+  // Historical estimation comparison: peers of the same type + method.
+  const benchmark = (() => {
+    if (!f || !selected || !method) return null;
+    const peers = p.items.filter((it) => String(it.id) !== String(selected.id)
+      && String(it.item_type ?? "") === f.item_type
+      && String(it.estimation_method ?? "") === f.estimation_method);
+    if (peers.length === 0) return null;
+    if (method.threePoint) {
+      const vals = peers.map((it) => Number(it.estimate_most_likely)).filter((n) => !Number.isNaN(n) && n > 0);
+      if (vals.length === 0) return { count: peers.length, label: null as string | null };
+      return { count: vals.length, label: `~${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}` };
+    }
+    if (method.scale.length > 0 && !numericScale) { // t-shirt: mode of estimate_unit
+      const counts: Record<string, number> = {};
+      peers.forEach((it) => { const u = String(it.estimate_unit ?? ""); if (u) counts[u] = (counts[u] ?? 0) + 1; });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+      return { count: peers.length, label: top ? (isEs ? `mayoría ${top[0]}` : `mostly ${top[0]}`) : null };
+    }
+    if (method.range) return { count: peers.length, label: null };
+    const vals = peers.map((it) => Number(it.estimate_value)).filter((n) => !Number.isNaN(n) && n > 0);
+    if (vals.length === 0) return { count: peers.length, label: null };
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const unit = method.scale.length > 0 ? "" : ` ${isEs ? method.unitEs ?? "" : method.unitEn ?? ""}`;
+    return { count: vals.length, label: `~${avg % 1 === 0 ? avg : avg.toFixed(1)}${unit}` };
+  })();
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -226,7 +265,7 @@ export function RefinementTab(p: Props) {
         </div>
       </div>
 
-      {mode === "summary" && <SummaryPanel isEs={isEs} refinable={refinable} sessions={p.sessions} />}
+      {mode === "summary" && <SummaryPanel isEs={isEs} refinable={refinable} sessions={p.sessions} itemRisks={itemRisks} onOpenItem={(id) => { setMode("workbench"); setSelectedId(id); }} />}
       {mode === "sessions" && <SessionsPanel projectId={p.projectId} locale={p.locale} items={p.items} refinable={refinable} sessions={p.sessions} sessionItems={p.sessionItems} />}
 
       {mode === "workbench" && (
@@ -255,6 +294,7 @@ export function RefinementTab(p: Props) {
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${TONE[st.tone]}`}>{isEs ? st.es : st.en}</span>
                     <span className="text-[10px] text-muted-foreground">{labelOf(WORK_ITEM_TYPES, String(it.item_type ?? ""), isEs)}</span>
+                    {(() => { const rk = riskById.get(String(it.id)); const sev = rk ? topSeverity(rk) : null; return sev ? <span title={isEs ? "En riesgo" : "At risk"} className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${sev === "high" ? "text-red-500" : sev === "medium" ? "text-amber-500" : "text-muted-foreground"}`}><AlertTriangle className="h-3 w-3" />{rk!.length}</span> : null; })()}
                   </div>
                 </button>
               );
@@ -337,6 +377,14 @@ export function RefinementTab(p: Props) {
                 )}
               </div>
               {method && <p className="mt-1.5 text-[10px] text-muted-foreground">{isEs ? `Recomendado para: ${method.recEs}` : `Recommended for: ${method.recEn}`}</p>}
+              {benchmark && (
+                <p className="mt-1 flex items-center gap-1.5 text-[10px] text-brand-600 dark:text-brand-400">
+                  <BarChart3 className="h-3 w-3" />
+                  {isEs
+                    ? `Histórico: ${benchmark.count} ítem(s) similar(es)${benchmark.label ? ` · estimaron ${benchmark.label}` : ""}`
+                    : `History: ${benchmark.count} similar item(s)${benchmark.label ? ` · estimated ${benchmark.label}` : ""}`}
+                </p>
+              )}
             </div>
 
             {/* Dependencies */}
@@ -459,7 +507,7 @@ export function RefinementTab(p: Props) {
 
 // ── Refined backlog summary ───────────────────────────────────────────────────
 
-function SummaryPanel({ isEs, refinable, sessions }: { isEs: boolean; refinable: Record<string, unknown>[]; sessions: Record<string, unknown>[] }) {
+function SummaryPanel({ isEs, refinable, sessions, itemRisks, onOpenItem }: { isEs: boolean; refinable: Record<string, unknown>[]; sessions: Record<string, unknown>[]; itemRisks: { item: Record<string, unknown>; risks: RefinementRisk[] }[]; onOpenItem: (id: string) => void }) {
   const total = refinable.length;
   const scored = refinable.filter((it) => it.readiness_score != null);
   const avg = scored.length > 0 ? Math.round(scored.reduce((s, it) => s + Number(it.readiness_score ?? 0), 0) / scored.length) : 0;
@@ -468,6 +516,9 @@ function SummaryPanel({ isEs, refinable, sessions }: { isEs: boolean; refinable:
   const needsClar = refinable.filter((it) => String(it.refinement_status) === "needs_clarification").length;
   const splitReq = refinable.filter((it) => String(it.refinement_status) === "split_required").length;
   const activeSessions = sessions.filter((s) => String(s.status) === "active").length;
+  const atRisk = itemRisks.length;
+  const SEV_DOT: Record<string, string> = { high: "text-red-500", medium: "text-amber-500", low: "text-muted-foreground" };
+  const SEV_BADGE: Record<string, string> = { high: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300", medium: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300", low: "bg-muted text-muted-foreground" };
 
   const cards: { label: string; value: string | number; tone?: string }[] = [
     { label: isEs ? "Ítems a refinar" : "Items to refine", value: total },
@@ -475,6 +526,7 @@ function SummaryPanel({ isEs, refinable, sessions }: { isEs: boolean; refinable:
     { label: isEs ? "Listos para planear" : "Ready for planning", value: readyForPlanning, tone: "text-green-600 dark:text-green-400" },
     { label: isEs ? "Necesitan aclaración" : "Need clarification", value: needsClar, tone: needsClar > 0 ? "text-amber-600 dark:text-amber-400" : undefined },
     { label: isEs ? "Requieren división" : "Split required", value: splitReq, tone: splitReq > 0 ? "text-amber-600 dark:text-amber-400" : undefined },
+    { label: isEs ? "En riesgo" : "At risk", value: atRisk, tone: atRisk > 0 ? "text-red-600 dark:text-red-400" : undefined },
     { label: isEs ? "Sesiones activas" : "Active sessions", value: activeSessions },
   ];
 
@@ -504,6 +556,24 @@ function SummaryPanel({ isEs, refinable, sessions }: { isEs: boolean; refinable:
             );
           })}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground"><ShieldAlert className="h-4 w-4 text-red-500" />{isEs ? "Riesgos de refinamiento (predictivo)" : "Refinement risks (predictive)"}<span className="text-xs font-normal text-muted-foreground">({atRisk})</span></p>
+        {atRisk === 0 ? (
+          <p className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400"><CheckCircle2 className="h-4 w-4" />{isEs ? "Ningún ítem en riesgo. El backlog refinado se ve sano." : "No items at risk. The refined backlog looks healthy."}</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {itemRisks.slice().sort((a, b) => (topSeverity(a.risks) === "high" ? -1 : 0) - (topSeverity(b.risks) === "high" ? -1 : 0)).map(({ item, risks }) => (
+              <li key={String(item.id)} className="rounded-lg border border-border/60 px-3 py-2">
+                <button onClick={() => onOpenItem(String(item.id))} className="text-left text-sm font-medium text-foreground hover:text-brand-600 dark:hover:text-brand-400">{String(item.title)}</button>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {risks.map((r, i) => <span key={i} className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${SEV_BADGE[r.severity]}`}><span className={SEV_DOT[r.severity]}>●</span>{isEs ? r.es : r.en}</span>)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
