@@ -43,6 +43,10 @@ interface Props {
   risks: Record<string, unknown>[];
   dependencies: Record<string, unknown>[];
   members: Record<string, unknown>[];
+  sessions: Record<string, unknown>[];
+  sessionItems: Record<string, unknown>[];
+  links: Record<string, unknown>[];
+  linkTargets: { decision: { id: string; title: string }[]; meeting: { id: string; title: string }[]; communication: { id: string; title: string }[] };
   startSetup: boolean;
 }
 
@@ -102,7 +106,7 @@ export function DeliveryClient(p: Props) {
 
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
       {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
-      {tab === "refinement" && <RefinementTab projectId={p.projectId} locale={p.locale} items={p.backlog} dependencies={p.dependencies} members={p.members} method={(fw!.delivery_method as string) ?? null} projectType={(fw!.project_type as string) ?? null} />}
+      {tab === "refinement" && <RefinementTab projectId={p.projectId} locale={p.locale} items={p.backlog} dependencies={p.dependencies} members={p.members} method={(fw!.delivery_method as string) ?? null} projectType={(fw!.project_type as string) ?? null} sessions={p.sessions} sessionItems={p.sessionItems} links={p.links} linkTargets={p.linkTargets} />}
       {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={p.backlog} cycleItems={p.cycleItems} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>

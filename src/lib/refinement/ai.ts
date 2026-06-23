@@ -172,3 +172,48 @@ export async function refineWorkItem(
     assumptions: strArr(json.assumptions),
   };
 }
+
+// ── Prepare a refinement session ──────────────────────────────────────────────
+
+export interface SessionTalkingPoints { backlog_item_id: string; talking_points: string[]; open_questions: string[]; }
+
+/**
+ * AI-prepare a refinement review: for each selected work item, produce concise
+ * talking points and the open questions to resolve during the session. Template
+ * + charter aware. Returns one entry per item (best-effort).
+ */
+export async function prepareRefinementSession(
+  org: OrgContext, projectId: string, itemIds: string[], locale: Locale,
+): Promise<SessionTalkingPoints[]> {
+  if (itemIds.length === 0) return [];
+  const supabase = createAdminClient();
+
+  const { data: rows } = await supabase.from("project_backlog_items")
+    .select("id, title, item_type, description, acceptance_criteria, priority, risk_level, readiness_score")
+    .in("id", itemIds).eq("organization_id", org.organizationId).is("deleted_at", null);
+  const items = (rows ?? []) as Record<string, unknown>[];
+  if (items.length === 0) return [];
+
+  const fw = await getFrameworkByProject(supabase, org.organizationId, projectId);
+  const method = (fw?.delivery_method ?? null) as DeliveryMethod | null;
+  const tpl = templateFor(method, fw?.project_type ?? mapProjectType(null));
+  const isEs = locale === "es";
+  const lang = isEs ? "español" : "English";
+  const scope = await charterScope(supabase, org.organizationId, projectId);
+  const methodName = method ? (isEs ? DELIVERY_METHODS[method].es : DELIVERY_METHODS[method].en) : "n/a";
+
+  const list = items.map((it) => `- id:${String(it.id)} | "${str(it.title)}" | type:${str(it.item_type)} | readiness:${it.readiness_score ?? "?"} | ${str(it.description).slice(0, 160)}`).join("\n");
+  const prompt = [
+    `You are facilitating a "${isEs ? tpl.secondaryLabel.es : tpl.secondaryLabel.en}" review for a ${methodName} project. Respond in ${lang}.`,
+    "For EACH work item, give 2-4 concise TALKING POINTS the team should discuss and the OPEN QUESTIONS to resolve so the item becomes ready. Be specific to the item and the delivery method.",
+    'Return ONLY JSON: { "items": [ { "backlog_item_id": "<exact id>", "talking_points": ["..."], "open_questions": ["..."] } ] }.',
+    "", scope ? `=== CHARTER SCOPE ===\n${scope}\n` : "", "=== WORK ITEMS ===", list,
+  ].join("\n");
+
+  const json = await runJson(org, projectId, prompt);
+  const valid = new Set(items.map((i) => String(i.id)));
+  return arr(json?.items).map((x) => {
+    const o = x as Record<string, unknown>;
+    return { backlog_item_id: str(o.backlog_item_id), talking_points: strArr(o.talking_points), open_questions: strArr(o.open_questions) };
+  }).filter((e) => valid.has(e.backlog_item_id));
+}

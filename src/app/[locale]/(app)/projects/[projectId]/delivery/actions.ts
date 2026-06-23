@@ -753,6 +753,135 @@ export async function moveToPlanningAction(input: { projectId: string; id: strin
   return {};
 }
 
+// ── Work Refinement — Phase 2 (sessions, split, links) ──────────────────────
+
+/** Create a refinement session over selected work items; optionally let AI
+ *  prepare talking points for each. */
+export async function createRefinementSessionAction(input: { projectId: string; title: string; itemIds: string[]; locale: string; prepare?: boolean }): Promise<{ error?: string; sessionId?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!input.title.trim()) return { error: "title_required" };
+  if (!input.itemIds?.length) return { error: "no_items" };
+
+  const fw = await getFrameworkByProject(c.supabase, c.org.organizationId, input.projectId);
+  const { data: session, error } = await c.supabase.from("refinement_sessions").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId, framework_id: fw?.id ?? null,
+    title: input.title.trim(), delivery_method: fw?.delivery_method ?? null, status: "active",
+    facilitator_id: c.org.userId, started_at: new Date().toISOString(), created_by: c.org.userId,
+  }).select("id").single();
+  if (error || !session) return { error: "unexpected" };
+  const sessionId = String((session as { id: string }).id);
+
+  // Optional AI talking points (best-effort).
+  let pointsByItem = new Map<string, { talking_points: string[]; open_questions: string[] }>();
+  if (input.prepare) {
+    try {
+      const { prepareRefinementSession } = await import("@/lib/refinement/ai");
+      const prepared = await prepareRefinementSession(c.org, input.projectId, input.itemIds, (input.locale === "es" ? "es" : "en") as Locale);
+      pointsByItem = new Map(prepared.map((p) => [p.backlog_item_id, { talking_points: p.talking_points, open_questions: p.open_questions }]));
+    } catch { /* talking points are optional */ }
+  }
+
+  await c.supabase.from("refinement_session_items").insert(input.itemIds.map((id, i) => ({
+    organization_id: c.org.organizationId, project_id: input.projectId, session_id: sessionId,
+    backlog_item_id: id, position: i,
+    talking_points: pointsByItem.get(id)
+      ? [...pointsByItem.get(id)!.talking_points.map((t) => ({ kind: "point", text: t })), ...pointsByItem.get(id)!.open_questions.map((t) => ({ kind: "question", text: t }))]
+      : [],
+  })));
+
+  // Items entering a session are at least "in_refinement" (don't downgrade).
+  await c.supabase.from("project_backlog_items").update({ refinement_status: "in_refinement" })
+    .in("id", input.itemIds).eq("organization_id", c.org.organizationId)
+    .in("refinement_status", ["new", "needs_clarification", "ready_for_refinement"]);
+
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "refinement_session_started", `Refinement session "${input.title.trim()}" with ${input.itemIds.length} item(s)`);
+  return { sessionId };
+}
+
+export async function setSessionStatusAction(input: { projectId: string; id: string; status: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!["planned", "active", "completed", "canceled"].includes(input.status)) return { error: "bad_status" };
+  const patch: Record<string, unknown> = { status: input.status };
+  if (input.status === "completed") patch.completed_at = new Date().toISOString();
+  const { error } = await c.supabase.from("refinement_sessions").update(patch).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+export async function deleteRefinementSessionAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("refinement_sessions").update({ deleted_at: new Date().toISOString() }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+/** Save the outcome of reviewing one item in a session. If the outcome is a
+ *  refinement status, propagate it to the backlog item. */
+export async function saveSessionItemOutcomeAction(input: { projectId: string; sessionItemId: string; backlogItemId: string; outcome?: string; decisions?: string; notes?: string; actionItems?: string; reviewed?: boolean }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("refinement_session_items").update({
+    outcome: input.outcome || null, decisions: input.decisions?.trim() || null,
+    notes: input.notes?.trim() || null, action_items: input.actionItems?.trim() || null,
+    reviewed: input.reviewed ?? true,
+  }).eq("id", input.sessionItemId).eq("organization_id", c.org.organizationId);
+  if (error) return { error: "unexpected" };
+
+  if (input.outcome && STATUS_ALLOWED.has(input.outcome)) {
+    const patch: Record<string, unknown> = { refinement_status: input.outcome };
+    if (input.outcome === "refined" || input.outcome === "ready_for_planning") patch.refined_at = new Date().toISOString();
+    await c.supabase.from("project_backlog_items").update(patch).eq("id", input.backlogItemId).eq("organization_id", c.org.organizationId);
+  }
+  return {};
+}
+
+/** Split a work item into child items (carry over type/priority/milestone).
+ *  The parent is marked split_required and the children point back to it. */
+export async function splitWorkItemAction(input: { projectId: string; id: string; childTitles: string[] }): Promise<{ error?: string; count?: number }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const titles = input.childTitles.map((t) => t.trim()).filter(Boolean);
+  if (titles.length < 2) return { error: "need_two_children" };
+  const { data: parent } = await c.supabase.from("project_backlog_items").select("*").eq("id", input.id).eq("organization_id", c.org.organizationId).is("deleted_at", null).maybeSingle();
+  if (!parent) return { error: "not_found" };
+  const pt = parent as Record<string, unknown>;
+
+  const { count } = await c.supabase.from("project_backlog_items").select("id", { count: "exact", head: true }).eq("project_id", input.projectId).eq("organization_id", c.org.organizationId).is("deleted_at", null);
+  const base = count ?? 0;
+  const { error } = await c.supabase.from("project_backlog_items").insert(titles.map((title, i) => ({
+    organization_id: c.org.organizationId, project_id: input.projectId, framework_id: c.frameworkId,
+    title, item_type: (pt.item_type as string) || null, priority: (pt.priority as string) || null,
+    linked_milestone_id: (pt.linked_milestone_id as string) || null,
+    parent_item_id: input.id, status: "backlog", refinement_status: "new",
+    position: base + i, source: "split",
+  })));
+  if (error) return { error: "unexpected" };
+  await c.supabase.from("project_backlog_items").update({ refinement_status: "split_required" }).eq("id", input.id).eq("organization_id", c.org.organizationId);
+  await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "work_item_split", `Split "${String(pt.title)}" into ${titles.length} item(s)`);
+  return { count: titles.length };
+}
+
+/** Link a work item to a decision / meeting / communication / document / risk. */
+export async function linkWorkItemAction(input: { projectId: string; itemId: string; entityType: string; entityId: string; label?: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!["decision", "meeting", "communication", "document", "risk", "issue"].includes(input.entityType)) return { error: "bad_type" };
+  const { error } = await c.supabase.from("work_item_links").insert({
+    organization_id: c.org.organizationId, project_id: input.projectId, backlog_item_id: input.itemId,
+    entity_type: input.entityType, entity_id: input.entityId, label: input.label || null, created_by: c.org.userId,
+  });
+  if (error && !String(error.code).startsWith("23505")) return { error: "unexpected" };
+  return {};
+}
+
+export async function unlinkWorkItemAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("work_item_links").delete().eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
 // ── WIP limits (board columns) ──────────────────────────────────────────────
 
 /** Set/clear a column's WIP limit (visible on the framework board). */

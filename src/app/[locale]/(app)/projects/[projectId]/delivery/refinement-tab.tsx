@@ -14,18 +14,22 @@ import { useRouter } from "next/navigation";
 import {
   Sparkles, Loader2, CheckCircle2, AlertTriangle, GitBranch, Trash2, Send, Gauge,
   Lightbulb, ClipboardCheck, HelpCircle, ShieldAlert, Scissors, Plus, Wand2,
+  Link2, LayoutGrid, Users2, BarChart3, X,
 } from "lucide-react";
 import {
   WORK_ITEM_TYPES, REFINEMENT_STATUS_META, REFINABLE_STATUSES, ESTIMATION_METHODS,
   PRIORITIES, RISK_LEVELS, PLANNING_DESTINATIONS, templateFor, labelOf, bandForScore,
+  READINESS_BANDS,
 } from "@/lib/refinement/templates";
 import { computeReadiness, type WorkItemLike } from "@/lib/refinement/readiness";
 import type { DeliveryMethod } from "@/lib/delivery/config";
 import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
   saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
+  splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction,
   type RefinementInput,
 } from "./actions";
+import { SessionsPanel } from "./refinement-session";
 
 const inp = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 const TONE: Record<string, string> = {
@@ -57,6 +61,10 @@ interface Props {
   members: Record<string, unknown>[];
   method: string | null;
   projectType: string | null;
+  sessions: Record<string, unknown>[];
+  sessionItems: Record<string, unknown>[];
+  links: Record<string, unknown>[];
+  linkTargets: { decision: { id: string; title: string }[]; meeting: { id: string; title: string }[]; communication: { id: string; title: string }[] };
 }
 
 export function RefinementTab(p: Props) {
@@ -64,6 +72,7 @@ export function RefinementTab(p: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const tpl = useMemo(() => templateFor(p.method as DeliveryMethod | null, p.projectType), [p.method, p.projectType]);
+  const [mode, setMode] = useState<"workbench" | "sessions" | "summary">("workbench");
 
   // Only non-promoted items are refinable.
   const refinable = useMemo(() => p.items.filter((it) => String(it.status) !== "promoted"), [p.items]);
@@ -179,6 +188,20 @@ export function RefinementTab(p: Props) {
   const addDep = (dependsOnId: string) => { if (!dependsOnId) return; start(async () => { await saveWorkItemDependencyAction({ projectId: p.projectId, itemId: String(selected!.id), dependsOnId }); router.refresh(); }); };
   const removeDep = (id: string) => start(async () => { await deleteWorkItemDependencyAction({ projectId: p.projectId, id }); router.refresh(); });
 
+  // Split
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [splitText, setSplitText] = useState("");
+  const doSplit = () => {
+    const titles = splitText.split("\n").map((t) => t.trim()).filter(Boolean);
+    if (titles.length < 2) return;
+    start(async () => { await splitWorkItemAction({ projectId: p.projectId, id: String(selected!.id), childTitles: titles }); setSplitOpen(false); setSplitText(""); router.refresh(); });
+  };
+
+  // Links
+  const addLink = (entityType: string, entityId: string, label: string) => { if (!entityId) return; start(async () => { await linkWorkItemAction({ projectId: p.projectId, itemId: String(selected!.id), entityType, entityId, label }); router.refresh(); }); };
+  const removeLink = (id: string) => start(async () => { await unlinkWorkItemAction({ projectId: p.projectId, id }); router.refresh(); });
+  const selLinks = selected ? p.links.filter((l) => String(l.backlog_item_id) === String(selected.id)) : [];
+
   const upd = (patch: Partial<FormState>) => setF((s) => (s ? { ...s, ...patch } : s));
   const toggleDor = (key: string) => setF((s) => (s ? { ...s, definition_of_ready: s.definition_of_ready.map((d) => (d.key === key ? { ...d, checked: !d.checked } : d)) } : s));
 
@@ -194,9 +217,19 @@ export function RefinementTab(p: Props) {
           <p className="text-sm font-semibold text-foreground">{isEs ? tpl.secondaryLabel.es : tpl.secondaryLabel.en}</p>
           <p className="text-[11px] text-muted-foreground">{isEs ? tpl.terminology.es : tpl.terminology.en}</p>
         </div>
-        <p className="max-w-md text-right text-[11px] text-muted-foreground">{isEs ? "Aclara, estima y verifica cada ítem antes de mandarlo a ejecución. El readiness se adapta al método del proyecto." : "Clarify, estimate and verify each item before sending it to execution. Readiness adapts to the project's method."}</p>
+        <div className="flex rounded-lg border border-border p-0.5 text-xs">
+          {([["workbench", LayoutGrid, isEs ? "Banco de trabajo" : "Workbench"], ["sessions", Users2, isEs ? "Sesiones" : "Sessions"], ["summary", BarChart3, isEs ? "Resumen" : "Summary"]] as const).map(([k, Icon, lbl]) => (
+            <button key={k} onClick={() => setMode(k)} className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-medium ${mode === k ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+              <Icon className="h-3.5 w-3.5" />{lbl}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {mode === "summary" && <SummaryPanel isEs={isEs} refinable={refinable} sessions={p.sessions} />}
+      {mode === "sessions" && <SessionsPanel projectId={p.projectId} locale={p.locale} items={p.items} refinable={refinable} sessions={p.sessions} sessionItems={p.sessionItems} />}
+
+      {mode === "workbench" && (
       <div className="grid gap-3 lg:grid-cols-[280px_1fr_330px]">
         {/* ── LEFT: list + filters ── */}
         <div className="space-y-2">
@@ -323,6 +356,43 @@ export function RefinementTab(p: Props) {
               </div>
             </div>
 
+            {/* Related links: decisions / meetings / communications */}
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><Link2 className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Relacionado con" : "Related to"}</p>
+              <div className="space-y-1">
+                {selLinks.map((l) => (
+                  <div key={String(l.id)} className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-background px-2 py-1 text-xs">
+                    <span className="truncate text-foreground"><span className="text-[10px] uppercase text-muted-foreground">{String(l.entity_type)}</span> · {String(l.label || l.entity_id)}</span>
+                    <button onClick={() => removeLink(String(l.id))} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                <div className="grid grid-cols-3 gap-1">
+                  {([["decision", isEs ? "Decisión…" : "Decision…"], ["meeting", isEs ? "Reunión…" : "Meeting…"], ["communication", isEs ? "Comunicación…" : "Comm…"]] as const).map(([et, ph]) => {
+                    const opts = p.linkTargets[et] ?? [];
+                    const used = new Set(selLinks.filter((l) => String(l.entity_type) === et).map((l) => String(l.entity_id)));
+                    return (
+                      <select key={et} disabled={pending} value="" onChange={(e) => { const o = opts.find((x) => x.id === e.target.value); if (o) addLink(et, o.id, o.title); }} className="rounded-lg border border-dashed border-border bg-background px-1.5 py-1.5 text-[11px] text-muted-foreground focus:border-brand-500 focus:outline-none">
+                        <option value="">{ph}</option>
+                        {opts.filter((o) => !used.has(o.id)).map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+                      </select>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Split */}
+            {splitOpen && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground"><Scissors className="h-3.5 w-3.5 text-amber-600" />{isEs ? "Dividir en sub-ítems (uno por línea, mínimo 2)" : "Split into sub-items (one per line, min 2)"}</p>
+                  <button onClick={() => setSplitOpen(false)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                </div>
+                <textarea className={inp} rows={3} placeholder={isEs ? "Sub-ítem 1\nSub-ítem 2" : "Sub-item 1\nSub-item 2"} value={splitText} onChange={(e) => setSplitText(e.target.value)} />
+                <button onClick={doSplit} disabled={pending || splitText.split("\n").map((t) => t.trim()).filter(Boolean).length < 2} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50">{pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scissors className="h-3.5 w-3.5" />}{isEs ? "Dividir" : "Split"}</button>
+              </div>
+            )}
+
             {/* Destination + status actions */}
             <div className="grid gap-2 sm:grid-cols-2">
               <Field label={isEs ? "Destino de planeación" : "Planning destination"}>
@@ -341,6 +411,7 @@ export function RefinementTab(p: Props) {
               {REFINABLE_STATUSES.map((s) => { const meta = REFINEMENT_STATUS_META[s]; return (
                 <button key={s} onClick={() => setStatus(s)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">{isEs ? meta.es : meta.en}</button>
               ); })}
+              <button onClick={() => setSplitOpen((v) => !v)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"><Scissors className="h-3.5 w-3.5" />{isEs ? "Dividir" : "Split"}</button>
               <button onClick={move} disabled={pending || String(selected.refinement_status) !== "ready_for_planning"} title={isEs ? "Requiere estado 'Listo para planear'" : "Requires 'Ready for Planning' status"} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Mover a planeación" : "Move to planning"}</button>
             </div>
           </div>
@@ -379,6 +450,59 @@ export function RefinementTab(p: Props) {
               </div>
             </div>
           )}
+        </div>
+      </div>
+      )}
+    </div>
+  );
+}
+
+// ── Refined backlog summary ───────────────────────────────────────────────────
+
+function SummaryPanel({ isEs, refinable, sessions }: { isEs: boolean; refinable: Record<string, unknown>[]; sessions: Record<string, unknown>[] }) {
+  const total = refinable.length;
+  const scored = refinable.filter((it) => it.readiness_score != null);
+  const avg = scored.length > 0 ? Math.round(scored.reduce((s, it) => s + Number(it.readiness_score ?? 0), 0) / scored.length) : 0;
+  const bandCount = (key: string) => refinable.filter((it) => bandForScore(Number(it.readiness_score ?? 0)).key === key).length;
+  const readyForPlanning = refinable.filter((it) => String(it.refinement_status) === "ready_for_planning").length;
+  const needsClar = refinable.filter((it) => String(it.refinement_status) === "needs_clarification").length;
+  const splitReq = refinable.filter((it) => String(it.refinement_status) === "split_required").length;
+  const activeSessions = sessions.filter((s) => String(s.status) === "active").length;
+
+  const cards: { label: string; value: string | number; tone?: string }[] = [
+    { label: isEs ? "Ítems a refinar" : "Items to refine", value: total },
+    { label: isEs ? "Readiness promedio" : "Avg readiness", value: `${avg}/100`, tone: "text-brand-600 dark:text-brand-400" },
+    { label: isEs ? "Listos para planear" : "Ready for planning", value: readyForPlanning, tone: "text-green-600 dark:text-green-400" },
+    { label: isEs ? "Necesitan aclaración" : "Need clarification", value: needsClar, tone: needsClar > 0 ? "text-amber-600 dark:text-amber-400" : undefined },
+    { label: isEs ? "Requieren división" : "Split required", value: splitReq, tone: splitReq > 0 ? "text-amber-600 dark:text-amber-400" : undefined },
+    { label: isEs ? "Sesiones activas" : "Active sessions", value: activeSessions },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {cards.map((c, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{c.label}</p>
+            <p className={`mt-0.5 text-lg font-bold ${c.tone ?? "text-foreground"}`}>{c.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="mb-2 text-sm font-semibold text-foreground">{isEs ? "Distribución de readiness" : "Readiness distribution"}</p>
+        <div className="space-y-1.5">
+          {READINESS_BANDS.slice().reverse().map((b) => {
+            const n = bandCount(b.key);
+            const pct = total > 0 ? Math.round((n / total) * 100) : 0;
+            const bar: Record<string, string> = { red: "bg-red-500", amber: "bg-amber-500", blue: "bg-blue-500", green: "bg-green-500" };
+            return (
+              <div key={b.key} className="flex items-center gap-2 text-xs">
+                <span className="w-32 shrink-0 text-muted-foreground">{isEs ? b.es : b.en}</span>
+                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted"><div className={`h-full ${bar[b.tone]}`} style={{ width: `${pct}%` }} /></div>
+                <span className="w-10 shrink-0 text-right font-medium text-foreground">{n}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

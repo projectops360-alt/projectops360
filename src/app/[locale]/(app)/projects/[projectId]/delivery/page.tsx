@@ -34,7 +34,7 @@ export default async function DeliveryPage({
   const project = projectResult.data;
   if (!project) notFound();
 
-  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes, depsRes, membersRes] = await Promise.all([
+  const [columnsRes, eventsRes, charterRes, backlogRes, cyclesRes, alertsRes, milestonesRes, risksRes, cycleItemsRes, taskRowsRes, depsRes, membersRes, sessionsRes, sessionItemsRes, linksRes, decisionsRes, meetingsRes, commsRes] = await Promise.all([
     framework
       ? supabase.from("project_board_columns").select("id, name, position, is_done_column, wip_limit").eq("framework_id", framework.id).order("position")
       : Promise.resolve({ data: [] }),
@@ -49,6 +49,12 @@ export default async function DeliveryPage({
     supabase.from("roadmap_tasks").select("status").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
     supabase.from("work_item_dependencies").select("id, backlog_item_id, depends_on_item_id, dependency_type").eq("project_id", projectId).eq("organization_id", org.organizationId),
     admin.from("project_team_members").select("user_id, display_name").eq("project_id", projectId).eq("organization_id", org.organizationId).neq("status", "removed").not("user_id", "is", null),
+    supabase.from("refinement_sessions").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("refinement_session_items").select("*").eq("project_id", projectId).eq("organization_id", org.organizationId).order("position"),
+    supabase.from("work_item_links").select("id, backlog_item_id, entity_type, entity_id, label").eq("project_id", projectId).eq("organization_id", org.organizationId),
+    supabase.from("decisions").select("id, title_i18n").eq("project_id", projectId).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("meetings").select("id, title_i18n, meeting_date").eq("project_id", projectId).is("deleted_at", null).order("meeting_date", { ascending: false }).limit(100),
+    supabase.from("communication_items").select("id, title_i18n").eq("project_id", projectId).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
   ]);
 
   const cycleItemsData = cycleItemsRes.data;
@@ -62,6 +68,16 @@ export default async function DeliveryPage({
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   const defaultProjectType = mapProjectType(project.project_type);
   const charter = charterRes.data as { project_goal?: string; objectives?: string } | null;
+
+  // Linkable entities (decisions / meetings / communications) flattened to {id, title}.
+  const toLabeled = (rows: unknown) => ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id), title: getI18nValue(r.title_i18n as never, locale as Locale) || "—",
+  }));
+  const linkTargets = {
+    decision: toLabeled(decisionsRes.data),
+    meeting: toLabeled(meetingsRes.data),
+    communication: toLabeled(commsRes.data),
+  };
 
   return (
     <DeliveryClient
@@ -83,6 +99,10 @@ export default async function DeliveryPage({
       risks={(risksRes.data ?? []) as Record<string, unknown>[]}
       dependencies={(depsRes.data ?? []) as Record<string, unknown>[]}
       members={(membersRes.data ?? []) as Record<string, unknown>[]}
+      sessions={(sessionsRes.data ?? []) as Record<string, unknown>[]}
+      sessionItems={(sessionItemsRes.data ?? []) as Record<string, unknown>[]}
+      links={(linksRes.data ?? []) as Record<string, unknown>[]}
+      linkTargets={linkTargets}
       startSetup={setup === "true"}
     />
   );
