@@ -154,6 +154,15 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
                 </div>
               )}
 
+              {text.trim() && (
+                <details className="rounded-lg border border-border">
+                  <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {isEs ? "Ver transcripción completa" : "View full transcript"}
+                  </summary>
+                  <p className="whitespace-pre-wrap border-t border-border px-3 py-2 text-sm text-foreground">{text}</p>
+                </details>
+              )}
+
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">{(items ?? []).length} {isEs ? "elementos extraídos" : "extracted items"} · {approvedCount} {isEs ? "aprobados" : "approved"}</p>
                 {(items ?? []).length > 0 && <button onClick={approveAll} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"><ClipboardCheck className="h-3.5 w-3.5" />{isEs ? "Aprobar todo" : "Approve all"}</button>}

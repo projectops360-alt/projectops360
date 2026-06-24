@@ -62,6 +62,49 @@ const lvl = (v: unknown, set: Set<string>, dflt: string) => {
   return set.has(s) ? s : dflt;
 };
 
+// ── Owner → project member matching ─────────────────────────────────────────────
+// Maps an AI-extracted owner name ("Diego") to a real assignee so the created task
+// is actually assigned, instead of only carrying the name in its description.
+export interface OwnerMatch { teamMemberId: string | null; userId: string | null; displayName: string }
+
+/** True when every token of the query appears as a token of the candidate name
+ *  (so "Diego" matches "Diego Torres", and "Diego Torres" matches itself). */
+function nameMatches(candidate: string, q: string): boolean {
+  const c = candidate.toLowerCase().trim();
+  if (!c) return false;
+  if (c === q) return true;
+  const cTokens = new Set(c.split(/\s+/));
+  const qTokens = q.split(/\s+/).filter(Boolean);
+  return qTokens.length > 0 && qTokens.every((t) => cTokens.has(t));
+}
+
+/** Load project people once and return a resolver from an owner name to an assignee. */
+async function buildOwnerResolver(
+  supabase: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  projectId: string,
+): Promise<(owner: string | null) => OwnerMatch | null> {
+  const [teamRes, profRes] = await Promise.all([
+    supabase.from("project_team_members").select("id, display_name, user_id").eq("project_id", projectId).eq("organization_id", organizationId).neq("status", "removed"),
+    supabase.from("profiles").select("id, display_name").eq("organization_id", organizationId),
+  ]);
+  const profiles = (profRes.data ?? []) as { id: string; display_name: string | null }[];
+  const nameByUser = new Map(profiles.map((p) => [p.id, p.display_name || ""]));
+  const members = ((teamRes.data ?? []) as { id: string; display_name: string | null; user_id: string | null }[])
+    .map((m) => ({ teamMemberId: m.id, userId: m.user_id, name: (m.display_name || (m.user_id ? nameByUser.get(m.user_id) || "" : "")).trim() }))
+    .filter((m) => m.name);
+
+  return (owner: string | null): OwnerMatch | null => {
+    const q = (owner ?? "").toLowerCase().trim();
+    if (!q) return null;
+    const tm = members.find((m) => nameMatches(m.name, q));
+    if (tm) return { teamMemberId: tm.teamMemberId, userId: tm.userId, displayName: tm.name };
+    const p = profiles.find((p) => nameMatches(p.display_name || "", q));
+    if (p) return { teamMemberId: null, userId: p.id, displayName: p.display_name || owner! };
+    return null;
+  };
+}
+
 /** Create the real project entity for an approved item. Returns the entity ref. */
 async function createEntityForItem(
   supabase: ReturnType<typeof createAdminClient>,
@@ -69,22 +112,30 @@ async function createEntityForItem(
   projectId: string,
   lang: string,
   it: ScribeItemInput,
+  resolveOwner: (owner: string | null) => OwnerMatch | null,
 ): Promise<{ type: string; id: string } | null> {
   const title = it.description.slice(0, 300);
   if (it.item_type === "action_item") {
+    const match = resolveOwner(it.suggested_owner);
     const { data } = await supabase.from("roadmap_tasks").insert({
       organization_id: org.organizationId, project_id: projectId,
       title, status: "not_started", priority: "p2", order_index: 0,
       end_date: it.suggested_due_date || null,
-      description: it.suggested_owner ? `Owner: ${it.suggested_owner}` : null,
+      assigned_to: match?.userId ?? null,
+      project_team_member_id: match?.teamMemberId ?? null,
+      assignment_type: match?.userId ? "person" : null,
+      // If we matched a real assignee, the assignment carries the owner; otherwise
+      // keep the raw name in the description so it isn't lost.
+      description: match ? null : (it.suggested_owner ? `Owner: ${it.suggested_owner}` : null),
     }).select("id").single();
     return data ? { type: "task", id: String(data.id) } : null;
   }
   if (it.item_type === "decision") {
+    const match = resolveOwner(it.suggested_owner);
     const { data } = await supabase.from("decisions").insert({
       organization_id: org.organizationId, project_id: projectId,
       title_i18n: { [lang]: title }, status: "proposed",
-      decision_maker: it.suggested_owner || null,
+      decision_maker: match?.displayName || it.suggested_owner || null,
       source_type: "manual", created_by: org.userId,
     }).select("id").single();
     return data ? { type: "decision", id: String(data.id) } : null;
@@ -144,12 +195,17 @@ export async function saveScribeEntryAction(input: {
 
   const created = { tasks: 0, decisions: 0, risks: 0 };
 
+  // Resolve owner names → real assignees once (only needed when creating entities).
+  const resolveOwner = input.createApproved
+    ? await buildOwnerResolver(supabase, org.organizationId, input.projectId)
+    : () => null;
+
   // 2. Persist every extracted item (rejected ones too, for audit).
   for (const it of input.items) {
     let createdRef: { type: string; id: string } | null = null;
     const approved = it.status === "approved" || it.status === "edited";
     if (input.createApproved && approved) {
-      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it);
+      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner);
       if (createdRef) {
         if (createdRef.type === "task") created.tasks++;
         else if (createdRef.type === "decision") created.decisions++;

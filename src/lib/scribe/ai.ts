@@ -56,8 +56,10 @@ async function runJson(org: OrgContext, projectId: string, prompt: string): Prom
 
 function buildPrompt(text: string, locale: Locale): string {
   const lang = locale === "es" ? "español" : "English";
+  const today = new Date().toISOString().slice(0, 10);
   return [
     `You are ProjectOps Scribe, a meticulous project-management assistant. Analyze the CAPTURE below and extract structured project intelligence. Respond in ${lang}.`,
+    `Today's date is ${today}.`,
     "",
     "STRICT RULES (avoid hallucinated project data):",
     "- Extract ONLY information explicitly supported by the capture text.",
@@ -67,7 +69,8 @@ function buildPrompt(text: string, locale: Locale): string {
     "- Include a \"confidence\" between 0 and 1 for every item.",
     "- Separate facts from assumptions: assumptions must have needs_review = true and lower confidence.",
     "- Identify possible project impact WITHOUT proposing to apply any change automatically.",
-    "- Dates must be ISO (YYYY-MM-DD) only if explicitly present; otherwise null.",
+    "- DATES: capture deadlines and due dates. Convert any date or deadline you find — explicit (e.g. \"June 30, 2026\", \"30 de junio\") OR relative (e.g. \"end of the month\", \"fin de mes\", \"next Friday\", \"in two weeks\") — into an absolute ISO date (YYYY-MM-DD) resolved against today's date. If no date or deadline is mentioned at all, use null. Never invent a date that is not implied by the text.",
+    "- OWNERS: if a person is named as responsible (e.g. \"Diego will handle…\"), put just their name (as written) in the owner field. Do not invent owners.",
     "- Keep a professional, project-management tone. Return VALID JSON only — no prose outside the JSON.",
     "",
     "Return EXACTLY this JSON shape:",
