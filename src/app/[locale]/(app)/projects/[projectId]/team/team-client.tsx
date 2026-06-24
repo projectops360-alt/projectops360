@@ -9,7 +9,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserPlus, Loader2, Trash2, Sparkles, ShieldCheck, Eye, Plus, X,
-  AlertTriangle, Building2, Mail, UserCog,
+  AlertTriangle, Building2, Mail, UserCog, Pencil, Check,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/lib/team-roles/config";
 import {
   addProjectMemberAction, addCompanyTeamToProjectAction, addStakeholderViewerAction,
-  revokeStakeholderAccessAction, updateProjectMemberAction, removeProjectMemberAction,
+  revokeStakeholderAccessAction, updateProjectMemberAction, removeProjectMemberAction, renameProjectMemberAction,
   recommendRolesAction, addRecommendedRolesAction, addRaciAction, deleteRaciAction, generateRaciDraftAction,
 } from "./actions";
 
@@ -121,6 +121,10 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
   const updatePerm = (id: string, level: string) => start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id, patch: { permission_level: level, applyPreset: true } }); refresh(); });
   const toggleFlag = (id: string, flag: PermissionFlag, current: boolean) => start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id, patch: { flags: { [flag]: !current } } }); refresh(); });
   const remove = (id: string) => start(async () => { await removeProjectMemberAction({ projectId: p.projectId, id }); refresh(); });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const beginEdit = (id: string, current: string) => { setEditId(id); setEditName(current); };
+  const saveName = (id: string) => { if (!editName.trim()) return; start(async () => { await renameProjectMemberAction({ projectId: p.projectId, id, name: editName.trim() }); setEditId(null); refresh(); }); };
 
   const QUICK_FLAGS: PermissionFlag[] = ["can_approve_changes", "can_view_budget", "can_access_memory", "can_manage_tasks"];
 
@@ -222,8 +226,20 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
               return (
                 <tr key={id} className="border-t border-border/50 align-top">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-foreground">{m.display_name ? String(m.display_name) : <span className="italic text-amber-600 dark:text-amber-400">{isEs ? "Sin asignar" : "Unassigned"}</span>}</div>
+                    {editId === id ? (
+                      <div className="flex items-center gap-1">
+                        <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveName(id); if (e.key === "Escape") setEditId(null); }} className="w-40 rounded border border-border bg-background px-1.5 py-1 text-sm focus:border-brand-500 focus:outline-none" placeholder={isEs ? "Nombre" : "Name"} />
+                        <button onClick={() => saveName(id)} disabled={pending} title={isEs ? "Guardar" : "Save"} className="text-green-600 hover:opacity-80"><Check className="h-4 w-4" /></button>
+                        <button onClick={() => setEditId(null)} title={isEs ? "Cancelar" : "Cancel"} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                      </div>
+                    ) : (
+                      <div className="group flex items-center gap-1.5">
+                        <span className="font-medium text-foreground">{m.display_name ? String(m.display_name) : <span className="italic text-amber-600 dark:text-amber-400">{isEs ? "Sin asignar" : "Unassigned"}</span>}</span>
+                        {!unassigned && <button onClick={() => beginEdit(id, m.display_name ? String(m.display_name) : "")} title={isEs ? "Editar nombre" : "Edit name"} className="text-muted-foreground opacity-0 transition-opacity hover:text-brand-600 group-hover:opacity-100 dark:hover:text-brand-400"><Pencil className="h-3.5 w-3.5" /></button>}
+                      </div>
+                    )}
                     {unassigned && <div className="text-[10px] text-muted-foreground">{isEs ? "Rol pendiente de asignar persona" : "Role missing assignment"}</div>}
+                    {editId === id && m.user_id ? <div className="mt-0.5 text-[10px] text-muted-foreground">{isEs ? "Actualiza el nombre de la cuenta" : "Updates the account name"}</div> : null}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{labelOf(MEMBER_TYPES, String(m.member_type), isEs)}</td>
                   <td className="px-3 py-2">

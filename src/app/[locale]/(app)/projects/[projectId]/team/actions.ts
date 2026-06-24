@@ -175,6 +175,38 @@ export async function updateProjectMemberAction(input: { projectId: string; id: 
   return {};
 }
 
+/** Rename a project member. For external members this sets the project-level
+ *  display name. For members linked to a user account, it updates the account
+ *  profile name (the single source of truth) and keeps this org's team-member
+ *  rows in sync, so the new name shows everywhere consistently. */
+export async function renameProjectMemberAction(input: { projectId: string; id: string; name: string }): Promise<{ error?: string; scope?: "account" | "project" }> {
+  const c = await ctx();
+  if (!c) return { error: "not_authenticated" };
+  const name = input.name?.trim();
+  if (!name) return { error: "name_required" };
+
+  const { data: m } = await c.supabase.from("project_team_members")
+    .select("id, user_id").eq("id", input.id).eq("organization_id", c.org.organizationId).maybeSingle();
+  if (!m) return { error: "not_found" };
+  const userId = (m as { user_id: string | null }).user_id;
+
+  if (userId) {
+    // Linked account: update the profile name + sync this org's member rows.
+    const { error: pe } = await c.supabase.from("profiles").update({ display_name: name }).eq("id", userId);
+    if (pe) return { error: "unexpected" };
+    await c.supabase.from("project_team_members").update({ display_name: name })
+      .eq("user_id", userId).eq("organization_id", c.org.organizationId);
+  } else {
+    const { error } = await c.supabase.from("project_team_members").update({ display_name: name })
+      .eq("id", input.id).eq("organization_id", c.org.organizationId);
+    if (error) return { error: "unexpected" };
+  }
+
+  await logAudit({ org: c.org, projectId: input.projectId, action: "update", entityType: "project_team_members", entityId: input.id, metadata: { renamed_to: name, scope: userId ? "account" : "project" } });
+  void recordTeamMemory(c.org, input.projectId, { title: `Team member renamed to "${name}"`, content: userId ? "account profile name" : "project display name", tag: "project_team" });
+  return { scope: userId ? "account" : "project" };
+}
+
 export async function removeProjectMemberAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
   const c = await ctx();
   if (!c) return { error: "not_authenticated" };
