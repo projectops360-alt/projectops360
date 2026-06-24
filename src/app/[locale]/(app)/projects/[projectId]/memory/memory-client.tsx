@@ -16,8 +16,10 @@ import {
   CheckCircle2,
   Circle,
   ArrowRight,
+  Mic,
 } from "lucide-react";
 import { MemoryTimeline } from "@/components/memory";
+import { ScribeModal } from "@/components/memory/scribe-modal";
 import type { MemoryItemView, LinkableEntities } from "@/components/memory";
 import type { Locale } from "@/types/database";
 
@@ -124,6 +126,7 @@ export function ProjectMemoryClient({
   counts,
 }: ProjectMemoryClientProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("timeline");
+  const [scribeOpen, setScribeOpen] = useState(false);
   const base = localizedHref(locale, `/projects/${projectId}`);
 
   const isEs = locale === "es";
@@ -218,15 +221,25 @@ export function ProjectMemoryClient({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="text-lg font-bold text-foreground">
-          {isEs ? "Memoria del Proyecto" : "Project Memory"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {isEs
-            ? "La memoria operativa viva del proyecto: captura notas, emails, decisiones, riesgos y evidencia con clasificación IA y búsqueda semántica."
-            : "The project's living operational memory: capture notes, emails, decisions, risks, and evidence with AI classification and semantic search."}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold text-foreground">
+            {isEs ? "Memoria del Proyecto" : "Project Memory"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {isEs
+              ? "La memoria operativa viva del proyecto: captura notas, emails, decisiones, riesgos y evidencia con clasificación IA y búsqueda semántica."
+              : "The project's living operational memory: capture notes, emails, decisions, risks, and evidence with AI classification and semantic search."}
+          </p>
+        </div>
+        <button
+          onClick={() => setScribeOpen(true)}
+          title={isEs ? "Capturar actualización con ProjectOps Scribe" : "Capture update with ProjectOps Scribe"}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        >
+          <Mic className="h-4 w-4" />
+          <span className="hidden sm:inline">ProjectOps Scribe</span>
+        </button>
       </div>
 
       {/* Sub-tab navigation */}
@@ -542,6 +555,8 @@ export function ProjectMemoryClient({
           </div>
         )}
       </div>
+
+      {scribeOpen && <ScribeModal projectId={projectId} locale={locale} onClose={() => setScribeOpen(false)} />}
     </div>
   );
 }
