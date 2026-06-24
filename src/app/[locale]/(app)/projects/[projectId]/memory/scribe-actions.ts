@@ -113,22 +113,30 @@ async function createEntityForItem(
   lang: string,
   it: ScribeItemInput,
   resolveOwner: (owner: string | null) => OwnerMatch | null,
+  frameworkId: string | null,
 ): Promise<{ type: string; id: string } | null> {
   const title = it.description.slice(0, 300);
   if (it.item_type === "action_item") {
     const match = resolveOwner(it.suggested_owner);
-    const { data } = await supabase.from("roadmap_tasks").insert({
-      organization_id: org.organizationId, project_id: projectId,
-      title, status: "not_started", priority: "p2", order_index: 0,
-      end_date: it.suggested_due_date || null,
-      assigned_to: match?.userId ?? null,
-      project_team_member_id: match?.teamMemberId ?? null,
-      assignment_type: match?.userId ? "person" : null,
-      // If we matched a real assignee, the assignment carries the owner; otherwise
-      // keep the raw name in the description so it isn't lost.
-      description: match ? null : (it.suggested_owner ? `Owner: ${it.suggested_owner}` : null),
+    // A captured action enters the Refinement stage as a work item (it is NOT a
+    // task yet — it gets refined, then promoted to the Backlog/Workboard). The
+    // backlog row has no due-date column, so the suggested owner + date are kept
+    // in the description so nothing captured is lost before refinement.
+    const ownerLabel = lang === "es" ? "Responsable sugerido" : "Suggested owner";
+    const dueLabel = lang === "es" ? "Fecha sugerida" : "Suggested due date";
+    const notes: string[] = [];
+    if (it.suggested_owner) notes.push(`${ownerLabel}: ${match?.displayName || it.suggested_owner}`);
+    if (it.suggested_due_date) notes.push(`${dueLabel}: ${it.suggested_due_date}`);
+    const { data } = await supabase.from("project_backlog_items").insert({
+      organization_id: org.organizationId, project_id: projectId, framework_id: frameworkId,
+      title, description: notes.length ? notes.join(" · ") : null,
+      item_type: "Task", priority: "Medium",
+      status: "backlog", refinement_status: "new",
+      owner_id: match?.userId ?? null,
+      source: "projectops_scribe",
+      source_reference: it.source_excerpt ? it.source_excerpt.slice(0, 500) : null,
     }).select("id").single();
-    return data ? { type: "task", id: String(data.id) } : null;
+    return data ? { type: "work_item", id: String(data.id) } : null;
   }
   if (it.item_type === "decision") {
     const match = resolveOwner(it.suggested_owner);
@@ -166,7 +174,7 @@ export async function saveScribeEntryAction(input: {
   items: ScribeItemInput[];
   createApproved: boolean;
   locale: string;
-}): Promise<{ error?: string; memoryItemId?: string; created?: { tasks: number; decisions: number; risks: number } }> {
+}): Promise<{ error?: string; memoryItemId?: string; created?: { workItems: number; decisions: number; risks: number } }> {
   const c = await ctx();
   if ("error" in c) return { error: c.error };
   const { org, supabase } = c;
@@ -193,30 +201,46 @@ export async function saveScribeEntryAction(input: {
   if (entryErr || !entry) return { error: "unexpected" };
   const memoryItemId = String(entry.id);
 
-  const created = { tasks: 0, decisions: 0, risks: 0 };
+  const created = { workItems: 0, decisions: 0, risks: 0 };
 
   // Resolve owner names → real assignees once (only needed when creating entities).
   const resolveOwner = input.createApproved
     ? await buildOwnerResolver(supabase, org.organizationId, input.projectId)
     : () => null;
 
+  // The project's delivery framework (if configured) — new work items are tagged
+  // with it so they show under Delivery → Refinement.
+  let frameworkId: string | null = null;
+  if (input.createApproved) {
+    const { data: fw } = await supabase.from("project_delivery_frameworks")
+      .select("id").eq("project_id", input.projectId).eq("organization_id", org.organizationId)
+      .is("deleted_at", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    frameworkId = fw ? String(fw.id) : null;
+  }
+
+  // traceability_links only allows certain target types (work_item is not one);
+  // work-item provenance is kept on the backlog row's source/source_reference.
+  const LINKABLE = new Set(["decision", "risk", "task", "milestone"]);
+
   // 2. Persist every extracted item (rejected ones too, for audit).
   for (const it of input.items) {
     let createdRef: { type: string; id: string } | null = null;
     const approved = it.status === "approved" || it.status === "edited";
     if (input.createApproved && approved) {
-      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner);
+      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner, frameworkId);
       if (createdRef) {
-        if (createdRef.type === "task") created.tasks++;
+        if (createdRef.type === "work_item") created.workItems++;
         else if (createdRef.type === "decision") created.decisions++;
         else if (createdRef.type === "risk") created.risks++;
-        // Traceability: memory entry → created entity.
-        await supabase.from("traceability_links").insert({
-          organization_id: org.organizationId,
-          source_type: "memory", source_id: memoryItemId,
-          target_type: createdRef.type, target_id: createdRef.id,
-          link_type: "derived_from", created_by: org.userId,
-        });
+        // Traceability: memory entry → created entity (where the link type allows).
+        if (LINKABLE.has(createdRef.type)) {
+          await supabase.from("traceability_links").insert({
+            organization_id: org.organizationId,
+            source_type: "memory", source_id: memoryItemId,
+            target_type: createdRef.type, target_id: createdRef.id,
+            link_type: "derived_from", created_by: org.userId,
+          });
+        }
       }
     }
     await supabase.from("project_scribe_items").insert({

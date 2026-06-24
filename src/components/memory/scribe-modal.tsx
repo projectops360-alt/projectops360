@@ -167,6 +167,9 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
                 <p className="text-xs text-muted-foreground">{(items ?? []).length} {isEs ? "elementos extraídos" : "extracted items"} · {approvedCount} {isEs ? "aprobados" : "approved"}</p>
                 {(items ?? []).length > 0 && <button onClick={approveAll} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"><ClipboardCheck className="h-3.5 w-3.5" />{isEs ? "Aprobar todo" : "Approve all"}</button>}
               </div>
+              {(items ?? []).length > 0 && (
+                <p className="-mt-2 text-[11px] text-muted-foreground">{isEs ? "Las acciones aprobadas entran a Refinamiento (Delivery) para refinarlas antes de planear; las decisiones y riesgos se crean en sus registros." : "Approved action items go to Refinement (Delivery) to be refined before planning; decisions and risks are created in their registries."}</p>
+              )}
 
               {(items ?? []).length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">{isEs ? "La IA no extrajo elementos accionables. Puedes guardar la nota igualmente." : "No actionable items extracted. You can still save the note."}</p>
