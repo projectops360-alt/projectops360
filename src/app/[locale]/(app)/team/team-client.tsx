@@ -11,15 +11,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserRound, HardHat, Building2, Wrench, ShieldCheck, Plus, Pencil, Merge,
-  Archive, Mail, X, Loader2,
+  Archive, Mail, X, Loader2, Check,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import {
   createTeamResourceAction, updateTeamResourceAction, mergeTeamResourcesAction,
-  archiveTeamResourceAction, inviteResourceAsUserAction,
+  archiveTeamResourceAction, inviteResourceAsUserAction, renameWorkspaceUserAction,
 } from "./actions";
 
-export interface TeamMember { role: string; name: string; isYou: boolean }
+export interface TeamMember { userId: string; role: string; name: string; isYou: boolean }
 export interface TeamProject { id: string; name: string }
 export interface TeamResource {
   id: string; name: string; resourceType: string; trade: string | null;
@@ -60,8 +60,19 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
   const [inviting, setInviting] = useState<TeamResource | null>(null);
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<string | null>(null);
+  const [editUserName, setEditUserName] = useState("");
+  const [savingUser, setSavingUser] = useState(false);
 
   const tt = (en: string, es: string) => (isEs ? es : en);
+
+  async function saveUserName(userId: string) {
+    if (!editUserName.trim()) return;
+    setSavingUser(true);
+    const r = await renameWorkspaceUserAction({ userId, name: editUserName.trim() });
+    setSavingUser(false);
+    if (!r.error) { setEditUser(null); flash(tt("Saved", "Guardado")); router.refresh(); }
+  }
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   async function withBusy(key: string, fn: () => Promise<void>) {
@@ -120,15 +131,32 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
           {tt("Workspace users", "Usuarios del workspace")} <span className="font-normal text-muted-foreground/70">({members.length})</span>
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {members.map((m, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{m.name.slice(0, 2).toUpperCase()}</span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
-                <p className="text-xs text-muted-foreground">{roleLabel(m.role)}</p>
+          {members.map((m, i) => {
+            const canRename = canManage || m.isYou;
+            const isEditing = editUser === m.userId;
+            return (
+              <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{m.name.slice(0, 2).toUpperCase()}</span>
+                <div className="min-w-0 flex-1">
+                  {isEditing ? (
+                    <div className="flex items-center gap-1">
+                      <input autoFocus value={editUserName} onChange={(e) => setEditUserName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveUserName(m.userId); if (e.key === "Escape") setEditUser(null); }}
+                        maxLength={200} className="w-full rounded border border-border bg-background px-1.5 py-1 text-sm focus:border-brand-500 focus:outline-none" />
+                      <button type="button" onClick={() => saveUserName(m.userId)} disabled={savingUser} title={tt("Save", "Guardar")} className="shrink-0 text-green-600 hover:opacity-80">{savingUser ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}</button>
+                      <button type="button" onClick={() => setEditUser(null)} title={tt("Cancel", "Cancelar")} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    </div>
+                  ) : (
+                    <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
+                      <span className="truncate">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</span>
+                      {canRename && <button type="button" onClick={() => { setEditUser(m.userId); setEditUserName(m.name); }} title={tt("Edit name", "Editar nombre")} className="shrink-0 text-muted-foreground hover:text-brand-600 dark:hover:text-brand-400"><Pencil className="h-3.5 w-3.5" /></button>}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">{roleLabel(m.role)}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

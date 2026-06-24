@@ -113,6 +113,46 @@ export async function updateTeamResourceAction(input: {
   return {};
 }
 
+// ── Rename a workspace user (profile display name) ───────────────────────────
+
+const renameUserSchema = z.object({
+  userId: z.string().uuid(),
+  name: z.string().min(1, "nameRequired").max(200).transform((s) => s.trim()),
+});
+
+/**
+ * Rename a workspace user. Owners/admins may rename anyone in the org; any user
+ * may rename themselves. Updates profiles.display_name (the single source of
+ * truth) and syncs this org's project team-member rows so the new name shows
+ * consistently everywhere.
+ */
+export async function renameWorkspaceUserAction(input: { userId: string; name: string }): Promise<{ error?: string }> {
+  let org;
+  try { org = await getOrgContext(); } catch { return { error: "not_authenticated" }; }
+  const parsed = renameUserSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "validation_error" };
+  const d = parsed.data;
+
+  const isSelf = d.userId === org.userId;
+  if (!isSelf && org.role !== "owner" && org.role !== "admin") return { error: "not_allowed" };
+
+  const supabase = createAdminClient();
+  // Scope to a profile in the caller's org (also guards cross-org renames).
+  const { data: prof } = await supabase
+    .from("profiles").select("id").eq("id", d.userId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!prof) return { error: "not_found" };
+
+  const { error } = await supabase
+    .from("profiles").update({ display_name: d.name }).eq("id", d.userId).eq("organization_id", org.organizationId);
+  if (error) return { error: "unexpected" };
+  // Keep project team-member rows in sync for this org.
+  await supabase.from("project_team_members").update({ display_name: d.name }).eq("user_id", d.userId).eq("organization_id", org.organizationId);
+
+  await logAudit({ org, action: "update", entityType: "profiles", entityId: d.userId, metadata: { renamed_to: d.name } });
+  revalidatePath("/(app)/team", "page");
+  return {};
+}
+
 // ── Merge duplicates ────────────────────────────────────────────────────────
 
 export async function mergeTeamResourcesAction(input: { resourceIds: string[] }): Promise<{ error?: string; keptId?: string; merged?: number }> {
