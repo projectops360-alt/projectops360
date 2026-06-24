@@ -26,7 +26,12 @@ function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-export function useDictation(locale: string, onFinalText: (text: string) => void) {
+// Maps a short dictation language choice to a BCP-47 tag the recognizer wants.
+function toRecognizerLang(lang: string): string {
+  return lang === "es" ? "es-ES" : "en-US";
+}
+
+export function useDictation(lang: string, onFinalText: (text: string) => void) {
   // The modal mounts client-side on click, so this lazy check runs with a real
   // window — no SSR/hydration concern.
   const [supported] = useState(() => getRecognitionCtor() !== null);
@@ -44,7 +49,7 @@ export function useDictation(locale: string, onFinalText: (text: string) => void
     const Ctor = getRecognitionCtor();
     if (!Ctor) return;
     const rec = new Ctor();
-    rec.lang = locale === "es" ? "es-ES" : "en-US";
+    rec.lang = toRecognizerLang(lang);
     rec.continuous = true;
     rec.interimResults = false;
     rec.onresult = (e) => {
@@ -58,7 +63,7 @@ export function useDictation(locale: string, onFinalText: (text: string) => void
     rec.onend = () => setListening(false);
     recRef.current = rec;
     try { rec.start(); setListening(true); } catch { setListening(false); }
-  }, [locale]);
+  }, [lang]);
 
   useEffect(() => () => { try { recRef.current?.stop(); } catch { /* noop */ } }, []);
 

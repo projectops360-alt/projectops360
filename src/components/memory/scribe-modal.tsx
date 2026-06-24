@@ -57,7 +57,8 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
   const [editing, setEditing] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const dictation = useDictation(locale, (t) => setText((prev) => (prev ? `${prev} ${t}` : t)));
+  const [dictLang, setDictLang] = useState(locale === "es" ? "es" : "en");
+  const dictation = useDictation(dictLang, (t) => setText((prev) => (prev ? `${prev} ${t}` : t)));
 
   const analyze = () => {
     if (!text.trim()) return;
@@ -127,9 +128,21 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
                   {SOURCE_TYPES.map((s) => <option key={s.value} value={s.value}>{isEs ? s.es : s.en}</option>)}
                 </select>
                 {dictation.supported && (
-                  <button onClick={() => (dictation.listening ? dictation.stop() : dictation.start())} className={`ml-auto inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${dictation.listening ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" : "border-border text-foreground hover:bg-muted"}`}>
-                    {dictation.listening ? <><MicOff className="h-3.5 w-3.5" />{isEs ? "Detener" : "Stop"}</> : <><Mic className="h-3.5 w-3.5" />{isEs ? "Dictar" : "Dictate"}</>}
-                  </button>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <select
+                      value={dictLang}
+                      onChange={(e) => setDictLang(e.target.value)}
+                      disabled={dictation.listening}
+                      title={isEs ? "Idioma del dictado por voz" : "Voice dictation language"}
+                      className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="es">🎤 ES</option>
+                      <option value="en">🎤 EN</option>
+                    </select>
+                    <button onClick={() => (dictation.listening ? dictation.stop() : dictation.start())} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${dictation.listening ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" : "border-border text-foreground hover:bg-muted"}`}>
+                      {dictation.listening ? <><MicOff className="h-3.5 w-3.5" />{isEs ? "Detener" : "Stop"}</> : <><Mic className="h-3.5 w-3.5" />{isEs ? "Dictar" : "Dictate"}</>}
+                    </button>
+                  </div>
                 )}
               </div>
               <textarea
