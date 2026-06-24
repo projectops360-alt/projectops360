@@ -3,7 +3,7 @@
 import { usePathname } from "@/i18n/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sidebarNav, bottomNav, type NavItem } from "@/config/navigation";
 import { Logo } from "@/components/shared/logo";
@@ -38,23 +38,24 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
   const titleKey = item.title as Parameters<typeof t>[0];
   const displayTitle = t(titleKey);
 
+  // `collapsed` is a DESKTOP-only width state — on the mobile drawer the nav is
+  // always expanded, so collapsed visuals are gated behind `lg:`.
   return (
     <Link
       href={resolvedHref}
       title={collapsed ? displayTitle : undefined}
-      aria-label={collapsed ? displayTitle : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg py-2.5 text-sm font-medium transition-colors",
-        collapsed ? "justify-center px-2" : "px-3",
+        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+        collapsed && "lg:justify-center lg:px-2",
         active
           ? "bg-sidebar-active/10 text-sidebar-active"
           : "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
       )}
     >
       <item.icon className="h-5 w-5 shrink-0" />
-      {!collapsed && <span>{displayTitle}</span>}
-      {!collapsed && item.badge && (
-        <span className="ml-auto rounded-full bg-sidebar-active px-2 py-0.5 text-xs text-white">
+      <span className={cn(collapsed && "lg:hidden")}>{displayTitle}</span>
+      {item.badge && (
+        <span className={cn("ml-auto rounded-full bg-sidebar-active px-2 py-0.5 text-xs text-white", collapsed && "lg:hidden")}>
           {item.badge}
         </span>
       )}
@@ -63,7 +64,7 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
+export function Sidebar({ collapsed = false, onToggle, mobileOpen = false, onMobileClose }: { collapsed?: boolean; onToggle?: () => void; mobileOpen?: boolean; onMobileClose?: () => void }) {
   const pathname = usePathname();
   const tNav = useTranslations("nav");
   const projectId = extractProjectId(pathname);
@@ -86,13 +87,18 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-30 flex flex-col bg-sidebar-bg text-sidebar-text transition-[width] duration-200",
-        collapsed ? "w-16" : "w-64",
+        // Mobile: off-canvas drawer (full width 64) sliding in/out.
+        "fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-sidebar-bg text-sidebar-text transition-transform duration-200",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        // Desktop: always visible, width follows the collapse state.
+        "lg:z-30 lg:translate-x-0 lg:transition-[width,transform]",
+        collapsed ? "lg:w-16" : "lg:w-64",
       )}
     >
-      {/* ── Logo + collapse toggle ── */}
-      <div className={cn("relative border-b border-white/5", collapsed && "flex h-20 items-center justify-center px-2")}>
-        {!collapsed && <Logo fullWidth />}
+      {/* ── Logo + collapse/close toggles ── */}
+      <div className={cn("relative border-b border-white/5", collapsed && "lg:flex lg:h-20 lg:items-center lg:justify-center lg:px-2")}>
+        <div className={cn(collapsed && "lg:hidden")}><Logo fullWidth /></div>
+        {/* Desktop collapse toggle */}
         {onToggle && (
           <button
             type="button"
@@ -100,13 +106,24 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
             title={collapsed ? expandLabel : collapseLabel}
             aria-label={collapsed ? expandLabel : collapseLabel}
             className={cn(
-              "rounded-lg p-1.5 transition-colors",
+              "hidden rounded-lg p-1.5 transition-colors lg:block",
               collapsed
                 ? "text-sidebar-text hover:bg-sidebar-hover hover:text-white"
                 : "absolute right-2 top-2 bg-black/30 text-white/70 backdrop-blur-sm hover:bg-black/50 hover:text-white",
             )}
           >
             {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
+        )}
+        {/* Mobile close button */}
+        {onMobileClose && (
+          <button
+            type="button"
+            onClick={onMobileClose}
+            aria-label="Close menu"
+            className="absolute right-2 top-2 rounded-lg bg-black/30 p-1.5 text-white/70 backdrop-blur-sm hover:bg-black/50 hover:text-white lg:hidden"
+          >
+            <X className="h-5 w-5" />
           </button>
         )}
       </div>
@@ -153,12 +170,10 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
         ))}
       </nav>
 
-      {/* ── Language switcher (hidden when collapsed) ── */}
-      {!collapsed && (
-        <div className="border-t border-white/5 px-3 py-4">
-          <LanguageSwitcher />
-        </div>
-      )}
+      {/* ── Language switcher (hidden only when collapsed on desktop) ── */}
+      <div className={cn("border-t border-white/5 px-3 py-4", collapsed && "lg:hidden")}>
+        <LanguageSwitcher />
+      </div>
     </aside>
   );
 }

@@ -1,5 +1,4 @@
 import { AppFrame } from "@/components/layout/app-frame";
-import { Header } from "@/components/layout/header";
 import type { I18nField } from "@/types/database";
 
 export interface OrgData {
@@ -23,7 +22,7 @@ export interface AppShellProps {
 
 export function AppShell({ children, user, org }: AppShellProps) {
   return (
-    <AppFrame header={<Header user={user} org={org} />}>
+    <AppFrame user={user} org={org}>
       {children}
     </AppFrame>
   );
