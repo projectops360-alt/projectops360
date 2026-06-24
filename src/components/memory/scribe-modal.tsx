@@ -33,15 +33,6 @@ const TYPE_META: Record<string, { es: string; en: string; icon: typeof ListCheck
   follow_up: { es: "Seguimiento", en: "Follow-up", icon: ArrowRight, tone: "text-muted-foreground" },
 };
 
-const SOURCE_TYPES = [
-  { value: "manual_note", es: "Nota", en: "Note" },
-  { value: "pasted_transcript", es: "Transcripción", en: "Transcript" },
-  { value: "field_update", es: "Actualización de campo", en: "Field update" },
-  { value: "client_conversation", es: "Conversación con cliente", en: "Client conversation" },
-  { value: "status_update", es: "Estado", en: "Status update" },
-  { value: "meeting_note", es: "Nota de reunión", en: "Meeting note" },
-];
-
 interface UiItem extends ScribeItemInput { id: number }
 
 export function ScribeModal({ projectId, locale, onClose }: { projectId: string; locale: string; onClose: () => void }) {
@@ -49,7 +40,6 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  const [sourceType, setSourceType] = useState("manual_note");
   const [text, setText] = useState("");
   const [summary, setSummary] = useState("");
   const [detectedLang, setDetectedLang] = useState("");
@@ -79,9 +69,9 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
     if (dictation.listening) dictation.stop();
     start(async () => {
       const r = await saveScribeEntryAction({
-        projectId, sourceType,
+        projectId, sourceType: "manual_note",
         title: "", content: text, summary, detectedLanguage: detectedLang,
-        captureMethod: sourceType,
+        captureMethod: "manual_note",
         items: (items ?? []).map((it): ScribeItemInput => ({
           item_type: it.item_type, description: it.description,
           suggested_owner: it.suggested_owner, suggested_due_date: it.suggested_due_date,
@@ -122,29 +112,23 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
           {!reviewing ? (
             // ── Capture step ──────────────────────────────────────────────
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="text-xs font-medium text-muted-foreground">{isEs ? "Tipo de captura" : "Capture type"}</label>
-                <select value={sourceType} onChange={(e) => setSourceType(e.target.value)} className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-brand-500 focus:outline-none">
-                  {SOURCE_TYPES.map((s) => <option key={s.value} value={s.value}>{isEs ? s.es : s.en}</option>)}
-                </select>
-                {dictation.supported && (
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <select
-                      value={dictLang}
-                      onChange={(e) => setDictLang(e.target.value)}
-                      disabled={dictation.listening}
-                      title={isEs ? "Idioma del dictado por voz" : "Voice dictation language"}
-                      className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-brand-500 focus:outline-none disabled:opacity-50"
-                    >
-                      <option value="es">🎤 ES</option>
-                      <option value="en">🎤 EN</option>
-                    </select>
-                    <button onClick={() => (dictation.listening ? dictation.stop() : dictation.start())} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${dictation.listening ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" : "border-border text-foreground hover:bg-muted"}`}>
-                      {dictation.listening ? <><MicOff className="h-3.5 w-3.5" />{isEs ? "Detener" : "Stop"}</> : <><Mic className="h-3.5 w-3.5" />{isEs ? "Dictar" : "Dictate"}</>}
-                    </button>
-                  </div>
-                )}
-              </div>
+              {dictation.supported && (
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <select
+                    value={dictLang}
+                    onChange={(e) => setDictLang(e.target.value)}
+                    disabled={dictation.listening}
+                    title={isEs ? "Idioma del dictado por voz" : "Voice dictation language"}
+                    className="rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-brand-500 focus:outline-none disabled:opacity-50"
+                  >
+                    <option value="es">🎤 ES</option>
+                    <option value="en">🎤 EN</option>
+                  </select>
+                  <button onClick={() => (dictation.listening ? dictation.stop() : dictation.start())} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium ${dictation.listening ? "border-red-300 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" : "border-border text-foreground hover:bg-muted"}`}>
+                    {dictation.listening ? <><MicOff className="h-3.5 w-3.5" />{isEs ? "Detener" : "Stop"}</> : <><Mic className="h-3.5 w-3.5" />{isEs ? "Dictar" : "Dictate"}</>}
+                  </button>
+                </div>
+              )}
               <textarea
                 autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={10}
                 placeholder={isEs ? "Escribe o pega la actualización… (en el móvil, toca el micrófono de tu teclado para dictar)" : "Type or paste the update… (on mobile, tap your keyboard's mic to dictate)"}
