@@ -233,9 +233,9 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
                         <button onClick={() => setEditId(null)} title={isEs ? "Cancelar" : "Cancel"} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
                       </div>
                     ) : (
-                      <div className="group flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5">
                         <span className="font-medium text-foreground">{m.display_name ? String(m.display_name) : <span className="italic text-amber-600 dark:text-amber-400">{isEs ? "Sin asignar" : "Unassigned"}</span>}</span>
-                        {!unassigned && <button onClick={() => beginEdit(id, m.display_name ? String(m.display_name) : "")} title={isEs ? "Editar nombre" : "Edit name"} className="text-muted-foreground opacity-0 transition-opacity hover:text-brand-600 group-hover:opacity-100 dark:hover:text-brand-400"><Pencil className="h-3.5 w-3.5" /></button>}
+                        {!unassigned && <button onClick={() => beginEdit(id, m.display_name ? String(m.display_name) : "")} title={isEs ? "Editar nombre" : "Edit name"} className="shrink-0 text-muted-foreground hover:text-brand-600 dark:hover:text-brand-400"><Pencil className="h-3.5 w-3.5" /></button>}
                       </div>
                     )}
                     {unassigned && <div className="text-[10px] text-muted-foreground">{isEs ? "Rol pendiente de asignar persona" : "Role missing assignment"}</div>}
