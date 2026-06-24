@@ -28,6 +28,7 @@ import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
   saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
   splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction, setGovernanceAction,
+  saveBacklogItemAction, generateBacklogAction,
   type RefinementInput,
 } from "./actions";
 import { SessionsPanel } from "./refinement-session";
@@ -99,6 +100,14 @@ export function RefinementTab(p: Props) {
   const [fPriority, setFPriority] = useState("");
   const [fRisk, setFRisk] = useState("");
   const [fBand, setFBand] = useState("");
+
+  // ── Capture (intake): new work enters here, unrefined, before the Backlog ───
+  const [newTitle, setNewTitle] = useState("");
+  const captureItem = () => {
+    if (!newTitle.trim()) return;
+    start(async () => { await saveBacklogItemAction({ projectId: p.projectId, item: { title: newTitle.trim() } }); setNewTitle(""); router.refresh(); });
+  };
+  const generateItems = () => start(async () => { await generateBacklogAction({ projectId: p.projectId, locale: p.locale }); router.refresh(); });
 
   const filtered = refinable.filter((it) => {
     if (fStatus && String(it.refinement_status ?? "new") !== fStatus) return false;
@@ -274,8 +283,26 @@ export function RefinementTab(p: Props) {
 
       {mode === "workbench" && (
       <div className="grid gap-3 lg:grid-cols-[280px_1fr_330px]">
-        {/* ── LEFT: list + filters ── */}
+        {/* ── LEFT: capture + list + filters ── */}
         <div className="space-y-2">
+          {/* Capture (intake): new work enters the Refinement stage first */}
+          <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-2">
+            <div className="flex gap-1.5">
+              <input
+                className={inp}
+                placeholder={isEs ? "Capturar nuevo trabajo…" : "Capture new work…"}
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") captureItem(); }}
+              />
+              <button onClick={captureItem} disabled={pending || !newTitle.trim()} title={isEs ? "Agregar" : "Add"} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <button onClick={generateItems} disabled={pending} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}{isEs ? "Generar con IA desde el charter" : "Generate with AI from charter"}
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             <select className={inp} value={fStatus} onChange={(e) => setFStatus(e.target.value)}><option value="">{isEs ? "Estado" : "Status"}</option>{Object.entries(REFINEMENT_STATUS_META).map(([k, v]) => <option key={k} value={k}>{isEs ? v.es : v.en}</option>)}</select>
             <select className={inp} value={fType} onChange={(e) => setFType(e.target.value)}><option value="">{isEs ? "Tipo" : "Type"}</option>{WORK_ITEM_TYPES.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select>
@@ -303,7 +330,7 @@ export function RefinementTab(p: Props) {
                 </button>
               );
             })}
-            {filtered.length === 0 && <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "Sin ítems. Agrega o genera trabajo en el Backlog." : "No items. Add or generate work in the Backlog."}</p>}
+            {filtered.length === 0 && <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "Sin ítems. Captura trabajo arriba o genéralo con IA para empezar a refinar." : "No items. Capture work above or generate it with AI to start refining."}</p>}
           </div>
         </div>
 

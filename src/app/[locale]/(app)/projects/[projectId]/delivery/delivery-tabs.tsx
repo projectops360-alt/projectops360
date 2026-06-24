@@ -10,29 +10,25 @@ import {
   Plus, Trash2, Loader2, Sparkles, Play, CheckCircle2, AlertTriangle, XCircle, Lightbulb,
   MessageSquareText, Activity, Send, ArrowUp, ArrowDown, ListOrdered, GitPullRequestArrow, Flag,
 } from "lucide-react";
-import { BACKLOG_ITEM_TYPES } from "@/lib/delivery/config";
 import {
-  saveBacklogItemAction, deleteBacklogItemAction, promoteBacklogItemsAction,
+  deleteBacklogItemAction, promoteBacklogItemsAction,
   moveBacklogItemAction, prioritizeBacklogAction,
   generateMilestonesAction, createMilestoneInlineAction, setBacklogMilestoneAction,
   saveCycleAction, setCycleStatusAction, deleteCycleAction,
   addItemsToCycleAction, removeCycleItemAction, promoteCycleAction,
-  resolveScopeAlertAction, alertToChangeRequestAction, generateBacklogAction, scopeCheckAction,
+  resolveScopeAlertAction, alertToChangeRequestAction, scopeCheckAction,
   deliveryStakeholderSummaryAction, cycleLessonsAction, frameworkHealthAction,
 } from "./actions";
 
 const inp = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
-const PRIORITIES = ["High", "Medium", "Low"];
 const PR_CLS: Record<string, string> = { High: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300", Medium: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300", Low: "bg-muted text-muted-foreground" };
 
 // ── Backlog ─────────────────────────────────────────────────────────────────
 
-export function BacklogTab({ projectId, locale, items, milestones, risks }: { projectId: string; locale: string; items: Record<string, unknown>[]; milestones: Record<string, unknown>[]; risks: Record<string, unknown>[] }) {
+export function BacklogTab({ projectId, locale, items, milestones }: { projectId: string; locale: string; items: Record<string, unknown>[]; milestones: Record<string, unknown>[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
-  const empty = { title: "", description: "", item_type: "Task", priority: "Medium", linked_charter_objective: "", linked_milestone_id: "", linked_risk_id: "" };
-  const [f, setF] = useState(empty);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "milestone">("list");
   const [msTitle, setMsTitle] = useState("");
@@ -60,11 +56,9 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
   const allSelected = pending_ids.length > 0 && pending_ids.every((id) => sel.has(id));
   const toggleAll = () => setSel(allSelected ? new Set() : new Set(pending_ids));
 
-  const add = () => { if (!f.title.trim()) return; start(async () => { await saveBacklogItemAction({ projectId, item: { ...f, linked_milestone_id: f.linked_milestone_id || null, linked_risk_id: f.linked_risk_id || null } }); setF(empty); router.refresh(); }); };
   const del = (id: string) => start(async () => { await deleteBacklogItemAction({ projectId, id }); router.refresh(); });
   const promoteSelected = () => start(async () => { setErr(null); const r = await promoteBacklogItemsAction({ projectId, ids: [...sel] }); if (r.error) { setErr(fail); return; } setSel(new Set()); router.refresh(); });
   const promoteAll = () => start(async () => { setErr(null); const r = await promoteBacklogItemsAction({ projectId }); if (r.error) { setErr(fail); return; } setSel(new Set()); router.refresh(); });
-  const gen = () => start(async () => { await generateBacklogAction({ projectId, locale }); router.refresh(); });
   const prioritize = () => start(async () => { await prioritizeBacklogAction({ projectId, locale }); router.refresh(); });
   const move = (id: string, direction: "up" | "down") => start(async () => { await moveBacklogItemAction({ projectId, id, direction }); router.refresh(); });
   const genMilestones = () => start(async () => { setErr(null); const r = await generateMilestonesAction({ projectId, locale }); if (r.error) { setErr(isEs ? "La IA no pudo generar hitos. Revisa que el charter tenga objetivos/alcance e inténtalo de nuevo." : "AI couldn't generate milestones. Make sure the charter has objectives/scope and try again."); return; } setView("milestone"); router.refresh(); });
@@ -80,7 +74,7 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
         </div>
       )}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{isEs ? "Backlog de planeación: define el trabajo (alineado al charter) y promuévelo a tarea para ejecutarlo en el Workboard." : "Planning backlog: define the work (aligned to the charter) and promote it to a task to execute it on the Workboard."}</p>
+        <p className="text-xs text-muted-foreground">{isEs ? "Backlog: trabajo ya refinado y listo para planear. Promuévelo a tarea para ejecutarlo en el Workboard. (La captura y el refinamiento se hacen en la pestaña Refinamiento.)" : "Backlog: refined, ready-to-plan work. Promote it to a task to execute on the Workboard. (Capture and refine in the Refinement tab.)"}</p>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-border p-0.5 text-xs">
             <button onClick={() => setView("list")} className={`rounded-md px-2 py-1 ${view === "list" ? "bg-muted font-medium text-foreground" : "text-muted-foreground"}`}>{isEs ? "Lista" : "List"}</button>
@@ -88,9 +82,6 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
           </div>
           <button onClick={prioritize} disabled={pending || items.length === 0} title={isEs ? "Reordena y reasigna prioridad según valor, riesgo y alineación al charter" : "Reorders and reassigns priority by value, risk and charter alignment"} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListOrdered className="h-4 w-4" />}{isEs ? "Priorizar con IA" : "Prioritize with AI"}
-          </button>
-          <button onClick={gen} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{isEs ? "Generar con IA" : "Generate with AI"}
           </button>
         </div>
       </div>
@@ -196,19 +187,9 @@ export function BacklogTab({ projectId, locale, items, milestones, risks }: { pr
                 </Fragment>
               );
             })}
-            {items.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-xs text-muted-foreground">{isEs ? "Backlog vacío. Agrega items o genéralos con IA." : "Empty backlog. Add items or generate with AI."}</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "No hay items refinados todavía. Captura y refina el trabajo en la pestaña Refinamiento; aparecerá aquí en cuanto quede refinado." : "No refined items yet. Capture and refine work in the Refinement tab; it will appear here once refined."}</td></tr>}
           </tbody>
         </table>
-      </div>
-
-      <div className="grid gap-2 rounded-lg border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <input className={`${inp} sm:col-span-2`} placeholder={isEs ? "Título del item" : "Item title"} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} />
-        <select className={inp} value={f.item_type} onChange={(e) => setF({ ...f, item_type: e.target.value })}>{BACKLOG_ITEM_TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-        <select className={inp} value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>{PRIORITIES.map((t) => <option key={t}>{t}</option>)}</select>
-        <input className={`${inp} sm:col-span-2`} placeholder={isEs ? "Objetivo del charter (alineación)" : "Charter objective (alignment)"} value={f.linked_charter_objective} onChange={(e) => setF({ ...f, linked_charter_objective: e.target.value })} />
-        <select className={inp} value={f.linked_milestone_id} onChange={(e) => setF({ ...f, linked_milestone_id: e.target.value })}><option value="">{isEs ? "Hito…" : "Milestone…"}</option>{milestones.map((m) => <option key={String(m.id)} value={String(m.id)}>{String(m.title)}</option>)}</select>
-        <select className={inp} value={f.linked_risk_id} onChange={(e) => setF({ ...f, linked_risk_id: e.target.value })}><option value="">{isEs ? "Riesgo…" : "Risk…"}</option>{risks.map((r) => <option key={String(r.id)} value={String(r.id)}>{String(r.title)}</option>)}</select>
-        <button onClick={add} disabled={pending} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{isEs ? "Agregar" : "Add"}</button>
       </div>
     </div>
   );

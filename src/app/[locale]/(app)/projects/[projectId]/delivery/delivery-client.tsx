@@ -61,11 +61,17 @@ const sel = "w-full rounded-lg border border-border bg-background px-2.5 py-2 te
 
 const TABS = [
   { key: "overview", es: "Resumen", en: "Overview" },
-  { key: "backlog", es: "Backlog", en: "Backlog" },
   { key: "refinement", es: "Refinamiento", en: "Refinement" },
+  { key: "backlog", es: "Backlog", en: "Backlog" },
   { key: "cycles", es: "Ciclos", en: "Cycles" },
   { key: "ai", es: "IA y Salud", en: "AI & Health" },
 ];
+
+// A work item only reaches the Backlog once it has been refined. Items still in
+// intake/refinement (new, in_refinement, needs_clarification, split_required…)
+// live in the Refinement tab and are hidden from the Backlog.
+const REFINED_BACKLOG_STATUS = new Set(["refined", "ready_for_planning", "planned", "in_execution", "done"]);
+const isRefined = (b: Record<string, unknown>) => REFINED_BACKLOG_STATUS.has(String(b.refinement_status ?? "new"));
 
 export function DeliveryClient(p: Props) {
   const isEs = p.locale === "es";
@@ -75,6 +81,9 @@ export function DeliveryClient(p: Props) {
   const configured = !!fw && fw.status !== "draft" && !!fw.delivery_method;
   const [mode, setMode] = useState<"overview" | "wizard">(configured && !p.startSetup ? "overview" : "wizard");
   const [tab, setTab] = useState("overview");
+
+  // Backlog = refined work only; everything else stays in the Refinement tab.
+  const refinedBacklog = p.backlog.filter(isRefined);
 
   if (mode === "wizard" || !configured) {
     return <Wizard p={p} isEs={isEs} pending={pending} start={start} router={router} onDone={() => setMode("overview")} />;
@@ -106,9 +115,9 @@ export function DeliveryClient(p: Props) {
       </div>
 
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
-      {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={p.backlog} milestones={p.milestones} risks={p.risks} />}
       {tab === "refinement" && <RefinementTab projectId={p.projectId} locale={p.locale} items={p.backlog} dependencies={p.dependencies} members={p.members} method={(fw!.delivery_method as string) ?? null} projectType={(fw!.project_type as string) ?? null} sessions={p.sessions} sessionItems={p.sessionItems} links={p.links} linkTargets={p.linkTargets} constructionSignals={p.constructionSignals} />}
-      {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={p.backlog} cycleItems={p.cycleItems} />}
+      {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={refinedBacklog} milestones={p.milestones} />}
+      {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={refinedBacklog} cycleItems={p.cycleItems} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>
   );
@@ -324,7 +333,7 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
 
       <p className="flex items-center gap-1.5 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Info className="h-3.5 w-3.5 shrink-0" />
-        {isEs ? "Flujo: define el Backlog → promueve a tarea → ejecuta en el Workboard. Usa Ciclos e IA para planear y controlar." : "Flow: define the Backlog → promote to task → execute on the Workboard. Use Cycles and AI to plan and control."}
+        {isEs ? "Flujo: captura y refina el trabajo en Refinamiento → al quedar refinado pasa al Backlog → promuévelo a tarea y ejecútalo en el Workboard. Usa Ciclos e IA para planear y controlar." : "Flow: capture and refine work in Refinement → once refined it moves to the Backlog → promote it to a task and execute on the Workboard. Use Cycles and AI to plan and control."}
       </p>
     </div>
   );
@@ -342,7 +351,7 @@ function buildMetrics(method: DeliveryMethod, counts: Record<string, number>, to
   const queue = c("not_started") + c("prompt_ready") + c("sent_to_ai");
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   const activeCycles = p.cycles.filter((x) => String(x.status) === "active").length;
-  const openBacklog = p.backlog.filter((x) => String(x.status) !== "promoted").length;
+  const openBacklog = p.backlog.filter((x) => isRefined(x) && String(x.status) !== "promoted").length;
   const blkTone = blocked > 0 ? "text-red-600 dark:text-red-400" : "text-foreground";
 
   if (method === "kanban") {
