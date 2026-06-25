@@ -86,7 +86,8 @@ function buildPrompt(text: string, locale: Locale): string {
   "project_impacts": [ { "impact_type": "schedule|budget|scope|quality|resource|stakeholder", "description": "", "confidence": 0.0, "source_excerpt": "", "needs_review": true } ],
   "open_questions": [ { "question": "", "reason": "", "source_excerpt": "" } ]
 }`,
-    "For each action_item: \"description\" is a short imperative title; \"details\" is a 1-2 sentence description of what the work involves and its context (deliverable, deadline, who is involved) WITHOUT inventing anything; \"priority\" is High/Medium/Low only if the text implies urgency, else null.",
+    "GRANULARITY: if one statement enumerates several distinct deliverables or sub-tasks (e.g. \"four reports: A, B, C, D\", \"design the login and signup screens\"), create a SEPARATE action_item for EACH one — do NOT collapse them into a single generic action. Carry the shared owner, due date and priority onto each.",
+    "For each action_item: \"description\" is a short specific title naming the concrete deliverable (e.g. the actual report/screen name, not \"develop reports\"); \"details\" preserves the SPECIFICS stated in the text (what this deliverable is and what it does/contains) — never replace them with a vague summary; \"priority\" is High/Medium/Low only if the text implies urgency, else null. Keep details grounded; do not invent.",
     "Use empty arrays for sections with nothing to extract. Do not add keys that are not in the shape.",
     "",
     "=== CAPTURE ===",

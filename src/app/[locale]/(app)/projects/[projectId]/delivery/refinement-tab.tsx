@@ -28,7 +28,7 @@ import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
   saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
   splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction, setGovernanceAction,
-  saveBacklogItemAction, generateBacklogAction, aiSuggestFieldAction,
+  saveBacklogItemAction, generateBacklogAction, aiSuggestFieldAction, deleteBacklogItemAction,
   type RefinementInput,
 } from "./actions";
 import { SessionsPanel } from "./refinement-session";
@@ -212,6 +212,11 @@ export function RefinementTab(p: Props) {
   const setStatus = (status: string) => { const item = buildInput(); start(async () => { if (item) await saveRefinementAction({ projectId: p.projectId, item }); await setRefinementStatusAction({ projectId: p.projectId, id: String(selected!.id), status }); router.refresh(); }); };
   const [moveErr, setMoveErr] = useState<string | null>(null);
   const move = () => start(async () => { setMoveErr(null); const r = await moveToPlanningAction({ projectId: p.projectId, id: String(selected!.id), destination: f?.target_planning_destination || undefined }); if (r.error === "governance_required") { setMoveErr(isEs ? "Requiere aprobación de gobernanza antes de planear." : "Requires governance approval before planning."); return; } if (!r.error) { setSelectedId(null); } router.refresh(); });
+  const del = () => {
+    if (!selected) return;
+    if (!window.confirm(isEs ? `¿Eliminar "${String(selected.title)}"? Esta acción no se puede deshacer.` : `Delete "${String(selected.title)}"? This cannot be undone.`)) return;
+    start(async () => { await deleteBacklogItemAction({ projectId: p.projectId, id: String(selected.id) }); setSelectedId(null); router.refresh(); });
+  };
   const setGov = (status: string) => start(async () => { await setGovernanceAction({ projectId: p.projectId, id: String(selected!.id), status }); router.refresh(); });
   const runAi = () => start(async () => { const r = await aiRefineItemAction({ projectId: p.projectId, id: String(selected!.id), locale: p.locale }); if (r.result) setAiResult(r.result as unknown as Record<string, unknown>); router.refresh(); });
   const addDep = (dependsOnId: string) => { if (!dependsOnId) return; start(async () => { await saveWorkItemDependencyAction({ projectId: p.projectId, itemId: String(selected!.id), dependsOnId }); router.refresh(); }); };
@@ -556,6 +561,7 @@ export function RefinementTab(p: Props) {
                 <button key={s} onClick={() => setStatus(s)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">{isEs ? meta.es : meta.en}</button>
               ); })}
               <button onClick={() => setSplitOpen((v) => !v)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"><Scissors className="h-3.5 w-3.5" />{isEs ? "Dividir" : "Split"}</button>
+              <button onClick={del} disabled={pending} title={isEs ? "Eliminar este ítem" : "Delete this item"} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"><Trash2 className="h-3.5 w-3.5" />{isEs ? "Eliminar" : "Delete"}</button>
               {/* Mark refined + ready → the item shows up in the Backlog, ready to plan/pick up. */}
               <button onClick={() => setStatus("ready_for_planning")} disabled={pending} title={isEs ? "Marca el ítem como refinado y lo envía al Backlog para planearlo y que el responsable lo tome" : "Marks the item refined and sends it to the Backlog to be planned and picked up by the owner"} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Enviar al Backlog" : "Send to Backlog"}</button>
               <button onClick={move} disabled={pending || String(selected.refinement_status) !== "ready_for_planning"} title={isEs ? "Crea la tarea en el Workboard (requiere 'Listo para planear')" : "Creates the task on the Workboard (requires 'Ready for Planning')"} className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Mover a planeación" : "Move to planning"}</button>
