@@ -1226,7 +1226,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           </button>
         )}
         {!showPanel && insightsOpen && (
-          <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
+          <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
             <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <BarChart3 className="h-3.5 w-3.5 text-brand-500" aria-hidden />
@@ -1254,7 +1254,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
               <LivingGraphMetricsHeader health={health} layout="grid" />
-              <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} defaultOpen />
+              <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} defaultOpen compact />
             </div>
           </div>
         )}

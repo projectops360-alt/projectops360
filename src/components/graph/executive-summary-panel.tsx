@@ -34,11 +34,14 @@ export function ExecutiveSummaryPanel({
   tasks,
   locale,
   defaultOpen = false,
+  compact = false,
 }: {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   locale: Locale;
   defaultOpen?: boolean;
+  /** Narrow-container mode (floating panel): 2-col KPIs, stacked blocks. */
+  compact?: boolean;
 }) {
   const es = locale === "es";
   // Collapsed by default — the Living Graph is the hero of this screen. The
@@ -95,12 +98,12 @@ export function ExecutiveSummaryPanel({
         </span>
         <span className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
           <span>{progressPct}% · {completedMs}/{totalMs} milestones</span>
-          {inProgress > 0 && (
+          {!compact && inProgress > 0 && (
             <span className="hidden rounded bg-brand-100 px-1.5 py-0.5 font-medium text-brand-700 sm:inline dark:bg-brand-900/30 dark:text-brand-300">
               {inProgress} {es ? "en curso" : "in progress"}
             </span>
           )}
-          {blocked.length > 0 && (
+          {!compact && blocked.length > 0 && (
             <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
               {blocked.length} {es ? "bloqueos" : "blockers"}
             </span>
@@ -111,7 +114,7 @@ export function ExecutiveSummaryPanel({
       {open && (
         <div className="space-y-3 px-3 pb-3">
           {/* KPIs */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"}>
             <Kpi label={es ? "Milestones" : "Milestones"} value={`${completedMs}/${totalMs}`} sub={es ? "completados" : "completed"} accent="text-brand-600" />
             <Kpi label={es ? "Progreso" : "Progress"} value={`${progressPct}%`} sub={es ? "general" : "overall"} />
             <Kpi label={es ? "Tareas" : "Tasks"} value={`${doneTasks}/${totalTasks}`} sub={es ? "completadas" : "completed"} accent="text-green-600" />
@@ -120,7 +123,7 @@ export function ExecutiveSummaryPanel({
             <Kpi label={es ? "Esfuerzo restante" : "Remaining effort"} value={`${remainingEffort}h`} />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className={compact ? "grid grid-cols-1 gap-2" : "grid grid-cols-1 gap-3 md:grid-cols-3"}>
             {/* Milestone distribution */}
             <div className="rounded-lg border border-border bg-card p-2.5">
               <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
