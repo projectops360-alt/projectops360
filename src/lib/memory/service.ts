@@ -171,7 +171,7 @@ export async function processMemoryItem(
     .update({ index_status: "processing" })
     .eq("id", itemId);
 
-  const { success } = await generateAndStoreEmbedding("project_memory_items", itemId, {
+  const { success, contentHash, model } = await generateAndStoreEmbedding("project_memory_items", itemId, {
     source_type: item.source_type,
     title: item.title,
     author_name: item.author_name,
@@ -183,7 +183,10 @@ export async function processMemoryItem(
 
   await supabase
     .from("project_memory_items")
-    .update({ index_status: success ? "completed" : "failed" })
+    .update({
+      index_status: success ? "completed" : "failed",
+      ...(success ? { indexed_at: new Date().toISOString(), embedding_model: model ?? null, content_hash: contentHash ?? null } : {}),
+    })
     .eq("id", itemId);
 }
 

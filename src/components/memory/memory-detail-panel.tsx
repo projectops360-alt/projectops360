@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   X, Pencil, Trash2, Sparkles, Link2, Plus, Loader2, AlertTriangle, Lightbulb,
-  Wand2, ListChecks, Scale, ShieldAlert, ArrowUpRight,
+  Wand2, ListChecks, Scale, ShieldAlert, ArrowUpRight, Database, RefreshCw, ChevronDown,
 } from "lucide-react";
 import {
   archiveMemoryItemAction,
@@ -13,7 +13,10 @@ import {
   linkMemoryItemAction,
   unlinkMemoryItemAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/memory/actions";
-import { getMemoryArtifactsAction, type MemoryArtifact } from "@/app/[locale]/(app)/projects/[projectId]/memory/scribe-actions";
+import {
+  getMemoryArtifactsAction, getMemoryIndexStatusAction, reindexMemoryItemAction,
+  type MemoryArtifact, type MemoryIndexStatus,
+} from "@/app/[locale]/(app)/projects/[projectId]/memory/scribe-actions";
 import {
   SourceTypeBadge, ImportanceDot, ClassificationBadges, ENTITY_TYPE_META, LINK_TYPE_META,
 } from "./memory-badges";
@@ -58,6 +61,30 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
     });
     return () => { cancelled = true; };
   }, [isScribe, item.id, projectId, locale]);
+
+  // Admin / debug index status — loaded on demand when the panel is expanded.
+  const [showDebug, setShowDebug] = useState(false);
+  const [debug, setDebug] = useState<MemoryIndexStatus | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+  async function loadDebug() {
+    const res = await getMemoryIndexStatusAction({ memoryItemId: item.id, projectId });
+    if (res.status) setDebug(res.status);
+  }
+  function toggleDebug() {
+    const next = !showDebug;
+    setShowDebug(next);
+    if (next && !debug) void loadDebug();
+  }
+  async function handleReindex() {
+    setReindexing(true);
+    try {
+      await reindexMemoryItemAction({ memoryItemId: item.id, projectId, locale });
+      await loadDebug();
+      refresh();
+    } finally {
+      setReindexing(false);
+    }
+  }
 
   const ai = item.aiClassification ?? {};
   const hasFlags =
@@ -346,6 +373,51 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
             {item.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {item.tags.map((t) => <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">#{t}</span>)}
+              </div>
+            )}
+          </section>
+
+          {/* Admin / debug: index + traceability status */}
+          <section className="rounded-lg border border-border">
+            <button type="button" onClick={toggleDebug}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted/40">
+              <Database className="h-3.5 w-3.5" />{isEs ? "Índice y diagnóstico" : "Index & debug"}
+              <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${showDebug ? "rotate-180" : ""}`} />
+            </button>
+            {showDebug && (
+              <div className="space-y-2 border-t border-border px-3 py-2.5">
+                {debug === null ? (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{isEs ? "Cargando…" : "Loading…"}</p>
+                ) : (
+                  <>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                      <dt className="text-muted-foreground">{isEs ? "Estado vector" : "Vector status"}</dt>
+                      <dd>
+                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          debug.hasEmbedding && debug.indexStatus === "completed" ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300"
+                          : debug.indexStatus === "failed" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"}`}>
+                          {debug.hasEmbedding && debug.indexStatus === "completed" ? (isEs ? "indexado" : "indexed")
+                            : debug.indexStatus === "failed" ? (isEs ? "falló" : "failed")
+                            : (isEs ? "pendiente" : "pending")}
+                        </span>
+                      </dd>
+                      <dt className="text-muted-foreground">{isEs ? "Tareas/artefactos" : "Linked artifacts"}</dt>
+                      <dd className="text-foreground">{debug.generatedArtifacts} / {debug.totalExtractions} · {debug.linkedEntities} {isEs ? "vínculos" : "links"}</dd>
+                      <dt className="text-muted-foreground">{isEs ? "Último indexado" : "Last embedded"}</dt>
+                      <dd className="text-foreground">{debug.indexedAt ? new Date(debug.indexedAt).toLocaleString(locale) : "—"}</dd>
+                      <dt className="text-muted-foreground">{isEs ? "Modelo" : "Model"}</dt>
+                      <dd className="truncate text-foreground">{debug.embeddingModel ?? "—"}</dd>
+                      <dt className="text-muted-foreground">{isEs ? "Hash" : "Content hash"}</dt>
+                      <dd className="truncate font-mono text-[10px] text-foreground">{debug.contentHash ? debug.contentHash.slice(0, 16) + "…" : "—"}</dd>
+                    </dl>
+                    <button type="button" onClick={handleReindex} disabled={reindexing}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50">
+                      {reindexing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                      {isEs ? "Re-indexar" : "Re-index"}
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </section>

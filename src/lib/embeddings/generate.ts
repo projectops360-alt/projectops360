@@ -6,8 +6,11 @@
 // ============================================================================
 
 import OpenAI from "openai";
+import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
+
+export const EMBEDDING_MODEL = "text-embedding-3-small";
 
 // ── OpenAI client singleton ──────────────────────────────────────────────────────
 
@@ -135,7 +138,7 @@ export async function generateAndStoreEmbedding(
   entityType: EmbeddableEntityType,
   entityId: string,
   record: Record<string, unknown>,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; contentHash?: string; model?: string }> {
   const text = buildEmbeddingText(entityType, record);
 
   if (!text.trim()) {
@@ -143,11 +146,13 @@ export async function generateAndStoreEmbedding(
     return { success: true };
   }
 
+  const contentHash = createHash("sha256").update(text).digest("hex");
+
   try {
     const openai = getOpenAiClient();
 
     const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: EMBEDDING_MODEL,
       input: text,
       dimensions: 1536,
     });
@@ -168,7 +173,7 @@ export async function generateAndStoreEmbedding(
       return { success: false, error: updateError.message };
     }
 
-    return { success: true };
+    return { success: true, contentHash, model: EMBEDDING_MODEL };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`Failed to generate embedding for ${entityType}/${entityId}:`, message);

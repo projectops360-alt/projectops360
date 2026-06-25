@@ -257,6 +257,66 @@ export async function getMemoryArtifactsAction(input: { memoryItemId: string; pr
   return { artifacts };
 }
 
+// ── Admin / debug: index status + re-index ──────────────────────────────────
+
+export interface MemoryIndexStatus {
+  indexStatus: string;
+  hasEmbedding: boolean;
+  indexedAt: string | null;
+  embeddingModel: string | null;
+  contentHash: string | null;
+  linkedEntities: number;     // traceability_links touching this memory item
+  generatedArtifacts: number; // scribe extractions that created an entity
+  totalExtractions: number;   // all scribe extractions for this note
+}
+
+export async function getMemoryIndexStatusAction(input: { memoryItemId: string; projectId: string }): Promise<{ status?: MemoryIndexStatus; error?: string }> {
+  const c = await ctx();
+  if ("error" in c) return { error: c.error };
+  const { org, supabase } = c;
+
+  const { data: item } = await supabase
+    .from("project_memory_items")
+    .select("index_status, embedding, indexed_at, embedding_model, content_hash")
+    .eq("id", input.memoryItemId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!item) return { error: "not_found" };
+
+  const [linkRes, scribeRes] = await Promise.all([
+    supabase.from("traceability_links").select("id", { count: "exact", head: true })
+      .eq("organization_id", org.organizationId)
+      .or(`and(source_type.eq.memory,source_id.eq.${input.memoryItemId}),and(target_type.eq.memory,target_id.eq.${input.memoryItemId})`),
+    supabase.from("project_scribe_items").select("created_entity_id")
+      .eq("memory_item_id", input.memoryItemId).eq("organization_id", org.organizationId),
+  ]);
+  const scribeRows = (scribeRes.data ?? []) as Array<{ created_entity_id: string | null }>;
+
+  return {
+    status: {
+      indexStatus: String((item as Record<string, unknown>).index_status ?? "pending"),
+      hasEmbedding: (item as Record<string, unknown>).embedding != null,
+      indexedAt: ((item as Record<string, unknown>).indexed_at as string) ?? null,
+      embeddingModel: ((item as Record<string, unknown>).embedding_model as string) ?? null,
+      contentHash: ((item as Record<string, unknown>).content_hash as string) ?? null,
+      linkedEntities: linkRes.count ?? 0,
+      generatedArtifacts: scribeRows.filter((r) => r.created_entity_id).length,
+      totalExtractions: scribeRows.length,
+    },
+  };
+}
+
+/** Re-generate the embedding for a memory item (admin "re-index" action). */
+export async function reindexMemoryItemAction(input: { memoryItemId: string; projectId: string; locale: string }): Promise<{ error?: string }> {
+  const c = await ctx();
+  if ("error" in c) return { error: c.error };
+  const { org, supabase } = c;
+  const { data: item } = await supabase.from("project_memory_items")
+    .select("id").eq("id", input.memoryItemId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!item) return { error: "not_found" };
+  const { processMemoryItem } = await import("@/lib/memory/service");
+  await processMemoryItem(org, input.memoryItemId, { runClassification: false, locale: (input.locale === "es" ? "es" : "en") as Locale });
+  return {};
+}
+
 export async function saveScribeEntryAction(input: {
   projectId: string;
   sourceType: string;
