@@ -466,6 +466,16 @@ export function nodeOverlayEmphasis(
       if (varianceData.varianceSeverity === "minor") return "normal";
       return "dimmed";
     }
+    case "workforceCapacity": {
+      // Highlight resource nodes and work affected by overloaded resources.
+      const wf = node.metadata?.workforce as
+        | import("@/types/living-graph").WorkforceNodeData
+        | undefined;
+      if (!wf) return "dimmed";
+      if (wf.status === "critical" || wf.status === "overallocated") return "highlight";
+      if (wf.status === "near_capacity") return "normal";
+      return "dimmed";
+    }
     default:
       return "normal";
   }

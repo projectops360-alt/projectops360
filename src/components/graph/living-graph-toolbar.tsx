@@ -40,6 +40,7 @@ const OVERLAYS: LivingGraphOverlay[] = [
   "sopCandidate",
   "blocker",
   "laborCapacity",
+  "workforceCapacity",
   "readiness",
   "variance",
   "timeline",

@@ -43,6 +43,8 @@ import { computeProductivityVariance } from "@/lib/labor/productivity-variance";
 import type { ProductivityVarianceResult } from "@/lib/labor/productivity-variance";
 import { classifyAllVarianceCauses } from "@/lib/labor/variance-cause-classification";
 import type { VarianceCauseResult } from "@/lib/labor/variance-cause-classification";
+import { computeResourceCapacity } from "@/lib/capacity/service";
+import type { ResourceCapacityResult } from "@/lib/capacity/service";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -433,6 +435,14 @@ export default async function LivingGraphPage({
     }
   }
 
+  // Generic Resource Capacity (Workforce Intelligence Layer) — non-fatal.
+  let resourceCapacity: ResourceCapacityResult | undefined;
+  try {
+    resourceCapacity = await computeResourceCapacity(org, projectId, { weeks: 4 });
+  } catch {
+    // No capacity data — the workforce overlay simply stays empty.
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
@@ -462,6 +472,7 @@ export default async function LivingGraphPage({
         laborVariance={laborVariance}
         varianceResult={varianceResult}
         varianceCauses={varianceCauses}
+        resourceCapacity={resourceCapacity}
       />
     </div>
   );

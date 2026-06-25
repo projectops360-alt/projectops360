@@ -1482,6 +1482,7 @@
       "sopCandidate": "SOP Candidate View",
       "blocker": "Blocker View",
       "laborCapacity": "Labor Capacity View",
+      "workforceCapacity": "Workforce Intelligence",
       "readiness": "Workface Readiness",
       "variance": "Variance View",
       "timeline": "Timeline Playback",

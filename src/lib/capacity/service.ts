@@ -27,6 +27,8 @@ export interface ResourceCapacityRow {
   resourceKey: string;
   name: string;
   role: string | null;
+  userId: string | null;
+  teamMemberId: string | null;
   nominalWeeklyHours: number;
   effectiveWeeklyHours: number;
   nominalPeriodHours: number;
@@ -244,7 +246,7 @@ export async function computeResourceCapacity(org: OrgContext, projectId: string
     const util = utilizationPercent(assigned, effPeriod);
     const status = classifyCapacityStatus(util, r.hasCapacityData && effPeriod > 0);
     return {
-      resourceKey: r.key, name: r.name, role: r.role,
+      resourceKey: r.key, name: r.name, role: r.role, userId: r.userId, teamMemberId: r.teamMemberId,
       nominalWeeklyHours: round2(r.weekly), effectiveWeeklyHours: effWeekly,
       nominalPeriodHours: round2(nominalPeriod), effectivePeriodHours: round2(effPeriod),
       assignedHours: assigned, remainingHours: remainingCapacityHours(effPeriod, assigned),

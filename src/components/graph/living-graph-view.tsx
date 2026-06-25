@@ -85,6 +85,12 @@ import {
   enrichNodesWithReadiness,
   enrichNodesWithVariance,
 } from "@/lib/graph/labor-graph-mapping";
+import {
+  mapWorkforceResourceNodes,
+  mapWorkforceAssignmentEdges,
+  enrichNodesWithWorkforce,
+} from "@/lib/graph/workforce-graph-mapping";
+import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
 import { LivingGraphEdge } from "./living-graph-edge";
@@ -138,11 +144,13 @@ export interface LivingGraphViewProps {
   varianceResult?: import("@/lib/labor/productivity-variance").ProductivityVarianceResult;
   /** Variance cause classification results (optional — enables variance overlay detail). */
   varianceCauses?: import("@/lib/labor/variance-cause-classification").VarianceCauseResult[];
+  /** Generic resource capacity result (optional — enables the workforceCapacity overlay). */
+  resourceCapacity?: ResourceCapacityResult;
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -209,6 +217,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             laborVariance={laborVariance}
             varianceResult={varianceResult}
             varianceCauses={varianceCauses}
+            resourceCapacity={resourceCapacity}
           />
         </ReactFlowProvider>
       </div>
@@ -218,7 +227,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -318,19 +327,56 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     };
   }, [data, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities]);
 
+  // ── Task → capacity-resource map (for the Workforce Intelligence Layer) ──
+  const taskResourceKey = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!resourceCapacity) return map;
+    const byTm = new Map<string, string>(); const byUser = new Map<string, string>();
+    for (const r of resourceCapacity.resources) {
+      if (r.teamMemberId) byTm.set(r.teamMemberId, r.resourceKey);
+      if (r.userId) byUser.set(r.userId, r.resourceKey);
+    }
+    for (const t of tasks) {
+      const tmId = (t as { project_team_member_id?: string | null }).project_team_member_id;
+      const k =
+        (tmId ? byTm.get(tmId) : undefined)
+        ?? (t.assigned_to ? byUser.get(t.assigned_to) : undefined);
+      if (k) map.set(t.id, k);
+    }
+    return map;
+  }, [resourceCapacity, tasks]);
+
+  // ── Workforce Intelligence Layer: enrich + inject resource nodes/edges ──
+  const graphData = useMemo(() => {
+    if (overlay !== "workforceCapacity" || !resourceCapacity || !resourceCapacity.hasResources) {
+      return laborEnrichedData;
+    }
+    const enriched = enrichNodesWithWorkforce(laborEnrichedData.nodes, resourceCapacity, taskResourceKey);
+    if (viewLevel === "milestones") {
+      return { ...laborEnrichedData, nodes: enriched };
+    }
+    const resourceNodes = mapWorkforceResourceNodes(resourceCapacity);
+    const assignmentEdges = mapWorkforceAssignmentEdges(resourceNodes, enriched, taskResourceKey, projectId);
+    return {
+      ...laborEnrichedData,
+      nodes: [...enriched, ...resourceNodes],
+      edges: [...laborEnrichedData.edges, ...assignmentEdges],
+    };
+  }, [overlay, resourceCapacity, taskResourceKey, laborEnrichedData, viewLevel, projectId]);
+
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
-      return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges);
+      return aggregateByMilestone(graphData.nodes, graphData.edges);
     }
     const graph =
       viewLevel === "activities"
-        ? clusterByEntity(laborEnrichedData.nodes, laborEnrichedData.edges)
-        : { nodes: laborEnrichedData.nodes, edges: laborEnrichedData.edges };
+        ? clusterByEntity(graphData.nodes, graphData.edges)
+        : { nodes: graphData.nodes, edges: graphData.edges };
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges]);
+  }, [viewLevel, graphData, simplifyEdges]);
 
   const analysis = useMemo(
     () => analyzeGraph(displayGraph.nodes, displayGraph.edges),
