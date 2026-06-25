@@ -121,16 +121,25 @@ async function createEntityForItem(
     // A captured action enters the Refinement stage as a work item (it is NOT a
     // task yet — it gets refined, then promoted to the Backlog/Workboard). The
     // backlog row has no due-date column, so the suggested owner + date are kept
-    // in the description so nothing captured is lost before refinement.
+    // in the description (PM-style) so nothing captured is lost before refinement.
     const ownerLabel = lang === "es" ? "Responsable sugerido" : "Suggested owner";
     const dueLabel = lang === "es" ? "Fecha sugerida" : "Suggested due date";
-    const notes: string[] = [];
-    if (it.suggested_owner) notes.push(`${ownerLabel}: ${match?.displayName || it.suggested_owner}`);
-    if (it.suggested_due_date) notes.push(`${dueLabel}: ${it.suggested_due_date}`);
+    const sourceLabel = lang === "es" ? "Origen (Scribe)" : "Source (Scribe)";
+    const details = typeof it.extra?.details === "string" ? it.extra.details.trim() : "";
+    const parts: string[] = [];
+    if (details) parts.push(details);
+    const meta: string[] = [];
+    if (it.suggested_owner) meta.push(`${ownerLabel}: ${match?.displayName || it.suggested_owner}`);
+    if (it.suggested_due_date) meta.push(`${dueLabel}: ${it.suggested_due_date}`);
+    if (meta.length) parts.push(meta.join(" · "));
+    if (it.source_excerpt) parts.push(`${sourceLabel}: "${it.source_excerpt}"`);
+    const PR = new Set(["High", "Medium", "Low"]);
+    const rawPriority = typeof it.extra?.priority === "string" ? it.extra.priority.trim() : "";
+    const priority = PR.has(rawPriority) ? rawPriority : "Medium";
     const { data } = await supabase.from("project_backlog_items").insert({
       organization_id: org.organizationId, project_id: projectId, framework_id: frameworkId,
-      title, description: notes.length ? notes.join(" · ") : null,
-      item_type: "Task", priority: "Medium",
+      title, description: parts.length ? parts.join("\n\n") : null,
+      item_type: "Task", priority,
       status: "backlog", refinement_status: "new",
       owner_id: match?.userId ?? null,
       source: "projectops_scribe",

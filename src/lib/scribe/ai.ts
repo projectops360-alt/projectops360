@@ -77,7 +77,7 @@ function buildPrompt(text: string, locale: Locale): string {
     `{
   "summary": "2-4 sentence neutral summary of the capture",
   "detected_language": "en | es | mixed",
-  "action_items": [ { "description": "", "owner": null, "due_date": null, "confidence": 0.0, "source_excerpt": "", "needs_review": true, "proposed_action": "create_task" } ],
+  "action_items": [ { "description": "", "details": "", "priority": null, "owner": null, "due_date": null, "confidence": 0.0, "source_excerpt": "", "needs_review": true, "proposed_action": "create_task" } ],
   "decisions": [ { "description": "", "decision_maker": null, "date": null, "confidence": 0.0, "source_excerpt": "", "needs_review": true, "proposed_action": "save_decision" } ],
   "risks": [ { "description": "", "impact": null, "probability": null, "owner": null, "confidence": 0.0, "source_excerpt": "", "needs_review": true, "proposed_action": "create_risk" } ],
   "issues": [ { "description": "", "owner": null, "severity": null, "confidence": 0.0, "source_excerpt": "", "needs_review": true, "proposed_action": "flag_issue" } ],
@@ -86,6 +86,7 @@ function buildPrompt(text: string, locale: Locale): string {
   "project_impacts": [ { "impact_type": "schedule|budget|scope|quality|resource|stakeholder", "description": "", "confidence": 0.0, "source_excerpt": "", "needs_review": true } ],
   "open_questions": [ { "question": "", "reason": "", "source_excerpt": "" } ]
 }`,
+    "For each action_item: \"description\" is a short imperative title; \"details\" is a 1-2 sentence description of what the work involves and its context (deliverable, deadline, who is involved) WITHOUT inventing anything; \"priority\" is High/Medium/Low only if the text implies urgency, else null.",
     "Use empty arrays for sections with nothing to extract. Do not add keys that are not in the shape.",
     "",
     "=== CAPTURE ===",
@@ -124,7 +125,7 @@ function mapItems(json: Record<string, unknown>): ScribeItem[] {
     }
   };
 
-  push("action_item", json.action_items, "description", "create_task", []);
+  push("action_item", json.action_items, "description", "create_task", ["details", "priority"]);
   push("decision", json.decisions, "description", "save_decision", []);
   push("risk", json.risks, "description", "create_risk", ["impact", "probability"]);
   push("issue", json.issues, "description", "flag_issue", ["severity"]);
