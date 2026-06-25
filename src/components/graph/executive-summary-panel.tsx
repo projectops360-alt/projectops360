@@ -33,15 +33,17 @@ export function ExecutiveSummaryPanel({
   milestones,
   tasks,
   locale,
+  defaultOpen = false,
 }: {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   locale: Locale;
+  defaultOpen?: boolean;
 }) {
   const es = locale === "es";
   // Collapsed by default — the Living Graph is the hero of this screen. The
   // one-line summary bar stays visible; expand on demand.
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   // ── Live milestone statuses (computed from tasks, like the Timeline) ──
   const computedStatuses = new Map<string, MilestoneStatusDisplay>();

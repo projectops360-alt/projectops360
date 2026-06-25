@@ -57,9 +57,11 @@ function MetricChip({ icon: Icon, label, value, severity, hint }: MetricChipProp
 
 export interface LivingGraphMetricsHeaderProps {
   health: GraphHealthMetrics;
+  /** "strip" = single scrollable row (default); "grid" = 2-col for narrow panels. */
+  layout?: "strip" | "grid";
 }
 
-function LivingGraphMetricsHeaderComponent({ health }: LivingGraphMetricsHeaderProps) {
+function LivingGraphMetricsHeaderComponent({ health, layout = "strip" }: LivingGraphMetricsHeaderProps) {
   const t = useTranslations("livingGraph");
 
   const scoreSeverity: Severity =
@@ -82,6 +84,16 @@ function LivingGraphMetricsHeaderComponent({ health }: LivingGraphMetricsHeaderP
     { icon: IterationCw, label: t("metrics.reworkSignals"), value: `${health.reworkSignals}`, severity: countSeverity(health.reworkSignals, 3), hint: t("metrics.hints.reworkSignals") },
     { icon: BrainCircuit, label: t("metrics.processConfidence"), value: `${health.processConfidence}%`, severity: health.processConfidence >= 60 ? "good" : "neutral", hint: t("metrics.hints.processConfidence") },
   ];
+
+  if (layout === "grid") {
+    return (
+      <div role="region" aria-label={t("metrics.title")} className="grid grid-cols-2 gap-1">
+        {chips.map((c) => (
+          <MetricChip key={c.label} {...c} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div

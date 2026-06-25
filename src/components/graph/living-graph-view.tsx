@@ -34,7 +34,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ExecutiveSummaryPanel } from "./executive-summary-panel";
-import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2 } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3 } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -234,6 +234,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const { fitView, setCenter, getIntersectingNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const [recalculating, setRecalculating] = useState(false);
+  // Floating "Insights" panel (executive KPIs + summary) over the canvas.
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   async function handleRecalculate() {
     setRecalculating(true);
@@ -1029,27 +1031,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   return (
     <div
       ref={containerRef}
-      className="flex h-[calc(100vh-150px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
+      className="flex h-[calc(100vh-120px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
     >
-      {/* Compact executive metric strip + recalculate (single row, graph-first) */}
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <LivingGraphMetricsHeader health={health} />
-        </div>
-        <button
-          type="button"
-          onClick={handleRecalculate}
-          disabled={recalculating}
-          title={t("recalculateHint")}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-[7px] text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
-        >
-          {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">{t("recalculate")}</span>
-        </button>
-      </div>
-
-      {/* Unified executive KPIs + insights — collapsed by default (graph-first) */}
-      <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} />
+      {/* Executive KPIs + summary now live in a floating "Insights" panel ON the
+          canvas (see below) so the Living Graph owns the full viewport height. */}
 
       <LivingGraphToolbar
         overlay={overlay}
@@ -1218,6 +1203,62 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         }}
       >
         <LivingGraphLegend />
+
+        {/* Floating Insights (executive KPIs + summary) — hidden while a node
+            detail panel occupies the right side. Graph keeps full height. */}
+        {!showPanel && !insightsOpen && (
+          <button
+            type="button"
+            onClick={() => setInsightsOpen(true)}
+            className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-muted"
+          >
+            <BarChart3 className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+            {locale === "es" ? "Indicadores" : "Insights"}
+            <span
+              className="rounded px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums"
+              style={{
+                color: health.healthScore >= 75 ? "#10b981" : health.healthScore >= 50 ? "#f59e0b" : "#ef4444",
+                background: "rgba(100,116,139,0.12)",
+              }}
+            >
+              {health.healthScore}
+            </span>
+          </button>
+        )}
+        {!showPanel && insightsOpen && (
+          <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[340px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <BarChart3 className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+                {locale === "es" ? "Indicadores ejecutivos" : "Executive Insights"}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleRecalculate}
+                  disabled={recalculating}
+                  title={t("recalculateHint")}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                >
+                  {recalculating ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInsightsOpen(false)}
+                  aria-label={t("actions.close")}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+              <LivingGraphMetricsHeader health={health} layout="grid" />
+              <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} defaultOpen />
+            </div>
+          </div>
+        )}
+
         {overlay === "simulation" && selectedNode && (
           <LivingGraphSimulationPanel
             selectedNode={selectedNode}
