@@ -14,11 +14,31 @@ export interface MemorySearchResult {
   occurredAt: string | null;
   matchType: "semantic" | "keyword";
   similarity?: number | null;
+  /** memory | task | work_item | decision | risk | meeting | communication | document */
+  entityType: string;
+  /** For non-memory results, where to open them (memory results open the panel). */
+  href?: string | null;
+  /** For memory notes: how many artifacts (tasks/decisions/risks) it generated. */
+  generatedCount?: number;
 }
 
 interface MemorySearchInput {
   projectId: string;
   query: string;
+}
+
+// Locale-less paths — the UI renders them via the i18n Link which localizes.
+const projectHrefBase = (projectId: string) => `/projects/${projectId}`;
+function hrefForEntity(base: string, type: string, id: string): string {
+  switch (type) {
+    case "work_item": return `${base}/delivery`;
+    case "task": return `${base}/workboard?task=${id}`;
+    case "decision": return `${base}/decisions/${id}`;
+    case "meeting": return `${base}/meetings/${id}`;
+    case "communication": return `${base}/communications`;
+    case "document": return `${base}/documents/${id}`;
+    default: return base; // risk and others open the project home
+  }
 }
 
 // ── Server Action ────────────────────────────────────────────────────────────────
@@ -81,19 +101,23 @@ export async function searchMemoryAction(
           filter_project_id: projectId,
         });
 
+        const base = projectHrefBase(projectId);
         for (const m of (matches ?? []) as Array<{
           id: string; entity_type: string; title: string; content: string; similarity: number;
         }>) {
-          if (m.entity_type !== "memory") continue; // memory-only surface
-          semanticIds.add(m.id);
+          const isMemory = m.entity_type === "memory";
+          if (isMemory) semanticIds.add(m.id);
           semantic.push({
             id: m.id,
             title: m.title || "Untitled",
             snippet: m.content?.slice(0, 160) || "",
-            sourceType: "",
+            // Memory rows get their source_type filled below; others show their kind.
+            sourceType: isMemory ? "" : m.entity_type,
             occurredAt: null,
             matchType: "semantic",
             similarity: m.similarity,
+            entityType: m.entity_type,
+            href: isMemory ? null : hrefForEntity(base, m.entity_type, m.id),
           });
         }
       }
@@ -134,6 +158,7 @@ export async function searchMemoryAction(
       sourceType: it.source_type ?? "manual_note",
       occurredAt: it.occurred_at,
       matchType: "keyword",
+      entityType: "memory",
     });
   }
 
@@ -153,6 +178,23 @@ export async function searchMemoryAction(
         s.occurredAt = r.occurred_at;
       }
     }
+  }
+
+  // ── Enrich memory notes with their generated-artifact count ───────────────
+  const all = [...semantic, ...keyword];
+  const memoryIds = all.filter((r) => r.entityType === "memory").map((r) => r.id);
+  if (memoryIds.length > 0) {
+    const { data: scribeRows } = await supabase
+      .from("project_scribe_items")
+      .select("memory_item_id, created_entity_id")
+      .in("memory_item_id", memoryIds)
+      .eq("organization_id", org.organizationId);
+    const counts = new Map<string, number>();
+    for (const r of scribeRows ?? []) {
+      const mid = String((r as Record<string, unknown>).memory_item_id);
+      if ((r as Record<string, unknown>).created_entity_id) counts.set(mid, (counts.get(mid) ?? 0) + 1);
+    }
+    for (const r of all) if (r.entityType === "memory") r.generatedCount = counts.get(r.id) ?? 0;
   }
 
   const semanticSorted = semantic.sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));

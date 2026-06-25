@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   X, Pencil, Trash2, Sparkles, Link2, Plus, Loader2, AlertTriangle, Lightbulb,
+  Wand2, ListChecks, Scale, ShieldAlert, ArrowUpRight,
 } from "lucide-react";
 import {
   archiveMemoryItemAction,
@@ -11,6 +13,7 @@ import {
   linkMemoryItemAction,
   unlinkMemoryItemAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/memory/actions";
+import { getMemoryArtifactsAction, type MemoryArtifact } from "@/app/[locale]/(app)/projects/[projectId]/memory/scribe-actions";
 import {
   SourceTypeBadge, ImportanceDot, ClassificationBadges, ENTITY_TYPE_META, LINK_TYPE_META,
 } from "./memory-badges";
@@ -43,6 +46,18 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
   const [linkType, setLinkType] = useState<LinkableEntityType>("task");
   const [linkTargetId, setLinkTargetId] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // Generated Artifacts (ProjectOps Scribe provenance) — loaded for Scribe notes.
+  const isScribe = item.sourceSystem === "projectops_scribe";
+  const [artifacts, setArtifacts] = useState<MemoryArtifact[] | null>(null);
+  useEffect(() => {
+    if (!isScribe) return;
+    let cancelled = false;
+    getMemoryArtifactsAction({ memoryItemId: item.id, projectId, locale }).then((res) => {
+      if (!cancelled) setArtifacts(res.artifacts);
+    });
+    return () => { cancelled = true; };
+  }, [isScribe, item.id, projectId, locale]);
 
   const ai = item.aiClassification ?? {};
   const hasFlags =
@@ -199,6 +214,57 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
             <section>
               <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isEs ? "Contenido" : "Content"}</h3>
               <div className="whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-sm text-foreground">{item.content}</div>
+            </section>
+          )}
+
+          {/* Generated Artifacts (ProjectOps Scribe) */}
+          {isScribe && (
+            <section>
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Wand2 className="h-3.5 w-3.5 text-brand-500" />{isEs ? "Trabajo generado" : "Generated Artifacts"}
+              </h3>
+              {artifacts === null ? (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />{isEs ? "Cargando…" : "Loading…"}</p>
+              ) : artifacts.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{isEs ? "Esta nota no generó tareas, decisiones ni riesgos." : "This note did not generate tasks, decisions or risks."}</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {artifacts.map((a) => {
+                    const Icon = a.entityType === "decision" ? Scale : a.entityType === "risk" ? ShieldAlert : ListChecks;
+                    const kind = a.entityType === "work_item" ? (isEs ? "Tarea" : "Task")
+                      : a.entityType === "decision" ? (isEs ? "Decisión" : "Decision")
+                      : a.entityType === "risk" ? (isEs ? "Riesgo" : "Risk")
+                      : (isEs ? "Solo memoria" : "Memory-only");
+                    const inner = (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                          <span className="text-[10px] font-medium uppercase text-muted-foreground">{kind}</span>
+                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">{a.title}</span>
+                          {a.href && <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-5 text-[11px] text-muted-foreground">
+                          {a.status && <span>{isEs ? "Estado" : "Status"}: <strong className="text-foreground">{a.status.replace(/_/g, " ")}</strong></span>}
+                          {a.owner && <span>{isEs ? "Responsable" : "Owner"}: <strong className="text-foreground">{a.owner}</strong></span>}
+                          {a.dueDate && <span>{isEs ? "Vence" : "Due"}: <strong className="text-foreground">{fmt(a.dueDate, locale)}</strong></span>}
+                          {a.priority && <span>{isEs ? "Prioridad" : "Priority"}: <strong className="text-foreground">{a.priority}</strong></span>}
+                          {typeof a.confidence === "number" && <span>IA: {Math.round(a.confidence * 100)}%</span>}
+                        </div>
+                        <p className="mt-0.5 pl-5 text-[10px] font-medium text-brand-600 dark:text-brand-400">
+                          {isEs ? "Generado por ProjectOps Scribe" : "Generated by ProjectOps Scribe"}
+                        </p>
+                      </>
+                    );
+                    return (
+                      <li key={a.scribeItemId} className="rounded-lg border border-border bg-background px-2.5 py-2">
+                        {a.href ? (
+                          <Link href={a.href} className="block transition-colors hover:opacity-80">{inner}</Link>
+                        ) : inner}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </section>
           )}
 

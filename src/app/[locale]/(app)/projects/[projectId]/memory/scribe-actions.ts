@@ -114,6 +114,7 @@ async function createEntityForItem(
   it: ScribeItemInput,
   resolveOwner: (owner: string | null) => OwnerMatch | null,
   frameworkId: string | null,
+  memoryItemId: string,
 ): Promise<{ type: string; id: string } | null> {
   const title = it.description.slice(0, 300);
   if (it.item_type === "action_item") {
@@ -139,6 +140,8 @@ async function createEntityForItem(
       due_date: it.suggested_due_date || null,
       source: "projectops_scribe",
       source_reference: it.source_excerpt ? it.source_excerpt.slice(0, 500) : null,
+      // Reverse traceability: this work item points back to the Scribe note.
+      source_memory_item_id: memoryItemId,
     }).select("id").single();
     return data ? { type: "work_item", id: String(data.id) } : null;
   }
@@ -165,6 +168,93 @@ async function createEntityForItem(
     return data ? { type: "risk", id: String(data.id) } : null;
   }
   return null; // issue/blocker/dependency/project_impact/open_question/follow_up → memory-only in MVP
+}
+
+// ── Generated Artifacts (for the Project Memory detail view) ────────────────
+
+export interface MemoryArtifact {
+  scribeItemId: string;
+  itemType: string;            // action_item | decision | risk | ...
+  entityType: string | null;   // work_item | decision | risk | null
+  entityId: string | null;
+  title: string;
+  status: string | null;
+  owner: string | null;
+  dueDate: string | null;
+  priority: string | null;
+  confidence: number | null;
+  sourceExcerpt: string | null;
+  href: string | null;
+}
+
+/** Returns the artifacts a ProjectOps Scribe note generated (work items,
+ *  decisions, risks) plus any extractions that stayed memory-only. */
+export async function getMemoryArtifactsAction(input: { memoryItemId: string; projectId: string; locale: string }): Promise<{ artifacts: MemoryArtifact[] }> {
+  const c = await ctx();
+  if ("error" in c) return { artifacts: [] };
+  const { org, supabase } = c;
+  const base = input.locale === "es" ? "/es" : "";
+
+  const { data: items } = await supabase
+    .from("project_scribe_items")
+    .select("id, item_type, description, status, confidence_score, source_excerpt, suggested_owner, suggested_due_date, created_entity_type, created_entity_id")
+    .eq("memory_item_id", input.memoryItemId)
+    .eq("organization_id", org.organizationId)
+    .order("created_at", { ascending: true });
+  const rows = (items ?? []) as Array<Record<string, unknown>>;
+  if (rows.length === 0) return { artifacts: [] };
+
+  const workIds = rows.filter((r) => r.created_entity_type === "work_item").map((r) => String(r.created_entity_id));
+  const decisionIds = rows.filter((r) => r.created_entity_type === "decision").map((r) => String(r.created_entity_id));
+  const riskIds = rows.filter((r) => r.created_entity_type === "risk").map((r) => String(r.created_entity_id));
+
+  const [workRes, decRes, riskRes, profRes] = await Promise.all([
+    workIds.length ? supabase.from("project_backlog_items").select("id, title, status, priority, owner_id, due_date").in("id", workIds).eq("organization_id", org.organizationId) : Promise.resolve({ data: [] }),
+    decisionIds.length ? supabase.from("decisions").select("id, title_i18n, status").in("id", decisionIds).eq("organization_id", org.organizationId) : Promise.resolve({ data: [] }),
+    riskIds.length ? supabase.from("risks").select("id, title, severity, status").in("id", riskIds).eq("organization_id", org.organizationId) : Promise.resolve({ data: [] }),
+    supabase.from("profiles").select("id, display_name").eq("organization_id", org.organizationId),
+  ]);
+  const work = new Map((workRes.data ?? []).map((r) => [String((r as Record<string, unknown>).id), r as Record<string, unknown>]));
+  const dec = new Map((decRes.data ?? []).map((r) => [String((r as Record<string, unknown>).id), r as Record<string, unknown>]));
+  const risk = new Map((riskRes.data ?? []).map((r) => [String((r as Record<string, unknown>).id), r as Record<string, unknown>]));
+  const nameByUser = new Map((profRes.data ?? []).map((r) => [String((r as Record<string, unknown>).id), String((r as Record<string, unknown>).display_name ?? "")]));
+  const i18n = (f: unknown): string => {
+    if (f && typeof f === "object") { const o = f as Record<string, string>; return o[input.locale] || o.en || o.es || ""; }
+    return "";
+  };
+
+  const artifacts: MemoryArtifact[] = rows.map((r) => {
+    const et = (r.created_entity_type as string) ?? null;
+    const eid = r.created_entity_id ? String(r.created_entity_id) : null;
+    let title = String(r.description ?? "").slice(0, 200);
+    let status: string | null = null, owner: string | null = (r.suggested_owner as string) ?? null;
+    let dueDate: string | null = (r.suggested_due_date as string) ?? null, priority: string | null = null, href: string | null = null;
+    if (et === "work_item" && eid && work.has(eid)) {
+      const w = work.get(eid)!;
+      title = String(w.title ?? title); status = (w.status as string) ?? null;
+      priority = (w.priority as string) ?? null;
+      owner = w.owner_id ? (nameByUser.get(String(w.owner_id)) || owner) : owner;
+      dueDate = (w.due_date as string) ?? dueDate;
+      href = `${base}/projects/${input.projectId}/delivery`;
+    } else if (et === "decision" && eid && dec.has(eid)) {
+      const d = dec.get(eid)!;
+      title = i18n(d.title_i18n) || title; status = (d.status as string) ?? null;
+      href = `${base}/projects/${input.projectId}/decisions/${eid}`;
+    } else if (et === "risk" && eid && risk.has(eid)) {
+      const rk = risk.get(eid)!;
+      title = String(rk.title ?? title); status = (rk.status as string) ?? null;
+      priority = (rk.severity as string) ?? null;
+      href = `${base}/projects/${input.projectId}`;
+    }
+    return {
+      scribeItemId: String(r.id), itemType: String(r.item_type), entityType: et, entityId: eid,
+      title, status, owner, dueDate, priority,
+      confidence: typeof r.confidence_score === "number" ? r.confidence_score : null,
+      sourceExcerpt: (r.source_excerpt as string) ?? null, href,
+    };
+  });
+
+  return { artifacts };
 }
 
 export async function saveScribeEntryAction(input: {
@@ -231,7 +321,7 @@ export async function saveScribeEntryAction(input: {
     let createdRef: { type: string; id: string } | null = null;
     const approved = it.status === "approved" || it.status === "edited";
     if (input.createApproved && approved) {
-      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner, frameworkId);
+      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner, frameworkId, memoryItemId);
       if (createdRef) {
         if (createdRef.type === "work_item") created.workItems++;
         else if (createdRef.type === "decision") created.decisions++;
@@ -247,7 +337,7 @@ export async function saveScribeEntryAction(input: {
         }
       }
     }
-    await supabase.from("project_scribe_items").insert({
+    const { data: scribeRow } = await supabase.from("project_scribe_items").insert({
       organization_id: org.organizationId, project_id: input.projectId,
       memory_item_id: memoryItemId, item_type: it.item_type,
       description: it.description, suggested_owner: it.suggested_owner || null,
@@ -259,7 +349,25 @@ export async function saveScribeEntryAction(input: {
       created_entity_id: createdRef?.id ?? null,
       metadata: { ...(it.extra ?? {}), needs_review: it.needs_review ?? null },
       created_by: org.userId,
-    });
+    }).select("id").single();
+
+    // Complete the reverse link + vectorize the generated work item so it is
+    // findable from Project Memory semantic search.
+    if (createdRef?.type === "work_item") {
+      if (scribeRow) {
+        await supabase.from("project_backlog_items")
+          .update({ source_scribe_item_id: String(scribeRow.id) })
+          .eq("id", createdRef.id).eq("organization_id", org.organizationId);
+      }
+      const workItemId = createdRef.id;
+      void import("@/lib/embeddings/generate").then(({ generateAndStoreEmbedding }) =>
+        generateAndStoreEmbedding("project_backlog_items", workItemId, {
+          title: it.description.slice(0, 300),
+          description: it.proposed_action || it.description,
+          source_reference: it.source_excerpt || "",
+        }).catch(() => {}),
+      );
+    }
   }
 
   // 3. Vectorize the entry for semantic search (fire-and-forget).

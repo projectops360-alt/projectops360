@@ -3,8 +3,9 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, Search, BookOpen, X, Loader2, Filter, ArrowRight,
+  Plus, Search, BookOpen, X, Loader2, Filter, ArrowRight, Wand2,
 } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import { AddMemoryDialog } from "./add-memory-dialog";
 import { MemoryDetailPanel } from "./memory-detail-panel";
 import {
@@ -221,26 +222,48 @@ export function MemoryTimeline({ locale, projectId, items, entities, initialItem
             </div>
           ) : (
             <div className="space-y-1.5">
-              {searchResults.map((r) => (
-                <button key={r.id} onClick={() => setSelectedId(r.id)} className="group flex w-full items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-brand-300 hover:bg-muted/30">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      {r.sourceType && <SourceTypeBadge type={r.sourceType as never} isEs={isEs} />}
-                      <p className="truncate text-sm font-medium text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400">{r.title}</p>
+              {searchResults.map((r) => {
+                const ENTITY_LABEL: Record<string, { en: string; es: string }> = {
+                  memory: { en: "Note", es: "Nota" }, work_item: { en: "Task", es: "Tarea" },
+                  task: { en: "Task", es: "Tarea" }, decision: { en: "Decision", es: "Decisión" },
+                  risk: { en: "Risk", es: "Riesgo" }, meeting: { en: "Meeting", es: "Reunión" },
+                  communication: { en: "Comm", es: "Comunicación" }, document: { en: "Document", es: "Documento" },
+                };
+                const kind = ENTITY_LABEL[r.entityType] ?? { en: r.entityType, es: r.entityType };
+                const inner = (
+                  <>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {r.entityType === "memory" && r.sourceType
+                          ? <SourceTypeBadge type={r.sourceType as never} isEs={isEs} />
+                          : <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{isEs ? kind.es : kind.en}</span>}
+                        <p className="truncate text-sm font-medium text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400">{r.title}</p>
+                      </div>
+                      {r.snippet && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{r.snippet}</p>}
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5">{r.matchType === "semantic" ? (isEs ? "semántica" : "semantic") : (isEs ? "palabra clave" : "keyword")}</span>
+                        {r.matchType === "semantic" && r.similarity != null && (
+                          <span className="rounded bg-brand-50 px-1.5 py-0.5 font-medium text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
+                            {Math.round(r.similarity * 100)}% {isEs ? "relevancia" : "match"}
+                          </span>
+                        )}
+                        {r.entityType === "memory" && (r.generatedCount ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded bg-brand-100 px-1.5 py-0.5 font-medium text-brand-700 dark:bg-brand-950/40 dark:text-brand-300">
+                            <Wand2 className="h-2.5 w-2.5" />{r.generatedCount} {isEs ? "generadas" : "generated"}
+                          </span>
+                        )}
+                        {r.occurredAt && <span>{fmt(r.occurredAt, locale)}</span>}
+                      </div>
                     </div>
-                    {r.snippet && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{r.snippet}</p>}
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {r.matchType === "semantic" && r.similarity != null && (
-                        <span className="rounded bg-brand-50 px-1.5 py-0.5 font-medium text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
-                          {Math.round(r.similarity * 100)}% {isEs ? "relevancia" : "match"}
-                        </span>
-                      )}
-                      {r.occurredAt && <span>{fmt(r.occurredAt, locale)}</span>}
-                    </div>
-                  </div>
-                  <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                </button>
-              ))}
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </>
+                );
+                const cls = "group flex w-full items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-brand-300 hover:bg-muted/30";
+                // Memory notes open the detail panel; other entities navigate to their module.
+                return r.href
+                  ? <Link key={`${r.entityType}-${r.id}`} href={r.href} className={cls}>{inner}</Link>
+                  : <button key={`${r.entityType}-${r.id}`} onClick={() => setSelectedId(r.id)} className={cls}>{inner}</button>;
+              })}
             </div>
           )}
         </div>

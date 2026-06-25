@@ -30,7 +30,8 @@ export type EmbeddableEntityType =
   | "meetings"
   | "decisions"
   | "documents"
-  | "project_memory_items";
+  | "project_memory_items"
+  | "project_backlog_items";
 
 // ── Text builder per entity type ─────────────────────────────────────────────────
 
@@ -108,6 +109,15 @@ function buildEmbeddingText(
         get("tags"),
         get("summary"),
         get("content"),
+      ].filter(Boolean).join("\n");
+
+    case "project_backlog_items":
+      // Generated/work items: title, description, and the source excerpt that
+      // produced them (so a Scribe-generated task is findable by its origin).
+      return [
+        get("title"),
+        get("description"),
+        get("source_reference"),
       ].filter(Boolean).join("\n");
 
     default:
