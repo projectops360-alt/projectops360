@@ -136,6 +136,9 @@ export async function createProjectAction(input: {
       status: data.status,
       project_type: data.projectType,
       created_by: org.userId,
+      // The creator is the responsible PM by default (so they retain access and
+      // appear as the project's manager under the project-scoped model).
+      project_manager_id: org.userId,
     })
     .select("id")
     .single();
