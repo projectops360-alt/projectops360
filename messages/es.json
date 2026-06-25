@@ -31,6 +31,7 @@
     "projectMemory": "Memoria del Proyecto",
     "settings": "Configuración",
     "laborCapacity": "Capacidad Laboral",
+    "resourceCapacity": "Capacidad de Recursos",
     "drawingIntelligence": "BIM",
     "rhythm": "Ritmo",
     "statusReport": "Estado"
