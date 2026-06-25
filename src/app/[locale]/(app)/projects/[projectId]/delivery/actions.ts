@@ -729,7 +729,7 @@ export async function aiRefineItemAction(input: { projectId: string; id: string;
 /** Inline AI assistant for a single field (acceptance / completion criteria),
  *  using whatever the user has typed so far (no save required). */
 export async function aiSuggestFieldAction(input: {
-  projectId: string; field: "acceptance_criteria" | "completion_criteria"; locale: string;
+  projectId: string; field: "acceptance_criteria" | "completion_criteria" | "description"; locale: string;
   title: string; description?: string; itemType?: string; acceptanceCriteria?: string;
 }): Promise<{ error?: string; text?: string }> {
   const c = await ctx(input.projectId);

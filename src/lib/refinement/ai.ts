@@ -199,29 +199,45 @@ export async function refineWorkItem(
  *  work item, using whatever the user has typed so far. Returns bulleted text. */
 export async function suggestWorkItemField(
   org: OrgContext, projectId: string,
-  field: "acceptance_criteria" | "completion_criteria",
+  field: "acceptance_criteria" | "completion_criteria" | "description",
   context: { title: string; description?: string; itemType?: string; acceptanceCriteria?: string },
   locale: Locale,
 ): Promise<string> {
   const isEs = locale === "es";
   const lang = isEs ? "español" : "English";
-  const fieldName = field === "acceptance_criteria"
-    ? (isEs ? "criterios de aceptación" : "acceptance criteria")
-    : (isEs ? "criterios de terminación (Definition of Done)" : "completion criteria (Definition of Done)");
-  const prompt = [
-    `You are an AI Project Manager. Write clear, testable ${fieldName} for the work item below. Respond in ${lang}.`,
-    "Output 3-6 short bullet points, each starting with \"- \", specific and verifiable. Do NOT invent scope beyond what the title/description reasonably imply.",
-    field === "completion_criteria"
-      ? "Completion criteria describe when the work is fully done and ready to hand off (quality checks, sign-off, documentation), distinct from acceptance criteria."
-      : "Acceptance criteria describe the conditions the deliverable must meet to be accepted by the stakeholder.",
-    'Return ONLY JSON: { "text": "- ...\\n- ..." }.',
-    "",
-    "=== WORK ITEM ===",
-    `Title: ${context.title}`,
-    context.itemType ? `Type: ${context.itemType}` : "",
-    `Description: ${context.description || "(none)"}`,
-    field === "completion_criteria" && context.acceptanceCriteria ? `Acceptance criteria already defined: ${context.acceptanceCriteria}` : "",
-  ].filter(Boolean).join("\n");
+
+  let prompt: string;
+  if (field === "description") {
+    // Improve/clarify the existing description, strictly grounded — no hallucination.
+    prompt = [
+      `You are an AI Project Manager. Improve the DESCRIPTION of the work item below so it is clear, specific and concise. Respond in ${lang}.`,
+      "Rewrite it in 1-3 short sentences (optionally a brief bullet list of concrete sub-points). Ground it STRICTLY in the title and the current description/source text — do NOT invent scope, owners, dates, numbers or requirements that are not present. Preserve every specific already stated (names, what it does). If the current description is empty, write a minimal factual description from the title only.",
+      'Return ONLY JSON: { "text": "..." }.',
+      "",
+      "=== WORK ITEM ===",
+      `Title: ${context.title}`,
+      context.itemType ? `Type: ${context.itemType}` : "",
+      `Current description: ${context.description || "(empty)"}`,
+    ].filter(Boolean).join("\n");
+  } else {
+    const fieldName = field === "acceptance_criteria"
+      ? (isEs ? "criterios de aceptación" : "acceptance criteria")
+      : (isEs ? "criterios de terminación (Definition of Done)" : "completion criteria (Definition of Done)");
+    prompt = [
+      `You are an AI Project Manager. Write clear, testable ${fieldName} for the work item below. Respond in ${lang}.`,
+      "Output 3-6 short bullet points, each starting with \"- \", specific and verifiable. Do NOT invent scope beyond what the title/description reasonably imply.",
+      field === "completion_criteria"
+        ? "Completion criteria describe when the work is fully done and ready to hand off (quality checks, sign-off, documentation), distinct from acceptance criteria."
+        : "Acceptance criteria describe the conditions the deliverable must meet to be accepted by the stakeholder.",
+      'Return ONLY JSON: { "text": "- ...\\n- ..." }.',
+      "",
+      "=== WORK ITEM ===",
+      `Title: ${context.title}`,
+      context.itemType ? `Type: ${context.itemType}` : "",
+      `Description: ${context.description || "(none)"}`,
+      field === "completion_criteria" && context.acceptanceCriteria ? `Acceptance criteria already defined: ${context.acceptanceCriteria}` : "",
+    ].filter(Boolean).join("\n");
+  }
   const json = await runJson(org, projectId, prompt);
   return str(json?.text);
 }

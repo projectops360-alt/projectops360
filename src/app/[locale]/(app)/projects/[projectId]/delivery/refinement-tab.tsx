@@ -241,7 +241,7 @@ export function RefinementTab(p: Props) {
 
   // Inline AI assistant for a single criteria field (uses the on-screen draft).
   const [aiField, setAiField] = useState<string | null>(null);
-  const suggestField = (field: "acceptance_criteria" | "completion_criteria") => {
+  const suggestField = (field: "acceptance_criteria" | "completion_criteria" | "description") => {
     if (!selected || !f) return;
     setAiField(field);
     start(async () => {
@@ -376,11 +376,13 @@ export function RefinementTab(p: Props) {
               <Field label={isEs ? "Riesgo" : "Risk"}><select className={inp} value={f.risk_level} onChange={(e) => upd({ risk_level: e.target.value })}><option value="">—</option>{RISK_LEVELS.map((t) => <option key={t.value} value={t.value}>{isEs ? t.es : t.en}</option>)}</select></Field>
             </div>
 
-            <Field label={isEs ? "Descripción" : "Description"}><textarea className={inp} rows={2} value={f.description} onChange={(e) => upd({ description: e.target.value })} /></Field>
-            <Field label={isEs ? "Criterios de aceptación" : "Acceptance criteria"} action={<AiFillButton loading={aiField === "acceptance_criteria"} disabled={pending} onClick={() => suggestField("acceptance_criteria")} isEs={isEs} />}>
+            <Field label={isEs ? "Descripción" : "Description"} action={<AiFillButton loading={aiField === "description"} disabled={pending || !f.description.trim()} onClick={() => suggestField("description")} label={isEs ? "Mejorar con IA" : "Improve with AI"} />}>
+              <textarea className={inp} rows={3} value={f.description} onChange={(e) => upd({ description: e.target.value })} />
+            </Field>
+            <Field label={isEs ? "Criterios de aceptación" : "Acceptance criteria"} action={<AiFillButton loading={aiField === "acceptance_criteria"} disabled={pending} onClick={() => suggestField("acceptance_criteria")} label={isEs ? "Rellenar con IA" : "Fill with AI"} />}>
               <textarea className={inp} rows={2} value={f.acceptance_criteria} onChange={(e) => upd({ acceptance_criteria: e.target.value })} />
             </Field>
-            <Field label={isEs ? "Criterios de terminación" : "Completion criteria"} action={<AiFillButton loading={aiField === "completion_criteria"} disabled={pending} onClick={() => suggestField("completion_criteria")} isEs={isEs} />}>
+            <Field label={isEs ? "Criterios de terminación" : "Completion criteria"} action={<AiFillButton loading={aiField === "completion_criteria"} disabled={pending} onClick={() => suggestField("completion_criteria")} label={isEs ? "Rellenar con IA" : "Fill with AI"} />}>
               <textarea className={inp} rows={2} value={f.completion_criteria} onChange={(e) => upd({ completion_criteria: e.target.value })} />
             </Field>
 
@@ -688,11 +690,11 @@ function SummaryPanel({ isEs, refinable, sessions, itemRisks, onOpenItem }: { is
 const strv = (x: unknown) => (typeof x === "string" ? x : "");
 const arrv = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : []);
 
-function AiFillButton({ loading, disabled, onClick, isEs }: { loading: boolean; disabled: boolean; onClick: () => void; isEs: boolean }) {
+function AiFillButton({ loading, disabled, onClick, label }: { loading: boolean; disabled: boolean; onClick: () => void; label: string }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} title={isEs ? "Rellenar con IA" : "Fill with AI"}
+    <button type="button" onClick={onClick} disabled={disabled} title={label}
       className="inline-flex items-center gap-1 rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
-      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}{isEs ? "Rellenar con IA" : "Fill with AI"}
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}{label}
     </button>
   );
 }
