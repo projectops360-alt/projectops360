@@ -39,7 +39,9 @@ export function ExecutiveSummaryPanel({
   locale: Locale;
 }) {
   const es = locale === "es";
-  const [open, setOpen] = useState(true);
+  // Collapsed by default — the Living Graph is the hero of this screen. The
+  // one-line summary bar stays visible; expand on demand.
+  const [open, setOpen] = useState(false);
 
   // ── Live milestone statuses (computed from tasks, like the Timeline) ──
   const computedStatuses = new Map<string, MilestoneStatusDisplay>();
@@ -89,8 +91,18 @@ export function ExecutiveSummaryPanel({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {es ? "Resumen ejecutivo" : "Executive Summary"}
         </span>
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          {progressPct}% · {completedMs}/{totalMs} {es ? "milestones" : "milestones"}
+        <span className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span>{progressPct}% · {completedMs}/{totalMs} milestones</span>
+          {inProgress > 0 && (
+            <span className="hidden rounded bg-brand-100 px-1.5 py-0.5 font-medium text-brand-700 sm:inline dark:bg-brand-900/30 dark:text-brand-300">
+              {inProgress} {es ? "en curso" : "in progress"}
+            </span>
+          )}
+          {blocked.length > 0 && (
+            <span className="rounded bg-red-100 px-1.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              {blocked.length} {es ? "bloqueos" : "blockers"}
+            </span>
+          )}
         </span>
       </button>
 

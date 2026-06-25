@@ -1029,25 +1029,26 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   return (
     <div
       ref={containerRef}
-      className="flex h-[calc(100vh-220px)] min-h-[640px] flex-col gap-2 rounded-lg bg-background"
+      className="flex h-[calc(100vh-150px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
     >
-      {/* Executive insight header */}
-      <LivingGraphMetricsHeader health={health} />
-
-      <div className="flex justify-end">
+      {/* Compact executive metric strip + recalculate (single row, graph-first) */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <LivingGraphMetricsHeader health={health} />
+        </div>
         <button
           type="button"
           onClick={handleRecalculate}
           disabled={recalculating}
           title={t("recalculateHint")}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-[7px] text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
         >
           {recalculating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          {t("recalculate")}
+          <span className="hidden sm:inline">{t("recalculate")}</span>
         </button>
       </div>
 
-      {/* Unified executive KPIs + insights (formerly the separate Flow view) */}
+      {/* Unified executive KPIs + insights — collapsed by default (graph-first) */}
       <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} />
 
       <LivingGraphToolbar
