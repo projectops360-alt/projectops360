@@ -53,6 +53,7 @@ interface FormState {
   business_value: string; stakeholders: string; source_reference: string;
   estimation_method: string; estimate_value: string; estimate_unit: string;
   estimate_optimistic: string; estimate_most_likely: string; estimate_pessimistic: string;
+  due_date: string;
   definition_of_ready: DorItemState[];
   target_planning_destination: string;
 }
@@ -146,6 +147,7 @@ export function RefinementTab(p: Props) {
       estimate_optimistic: it.estimate_optimistic != null ? String(it.estimate_optimistic) : "",
       estimate_most_likely: it.estimate_most_likely != null ? String(it.estimate_most_likely) : "",
       estimate_pessimistic: it.estimate_pessimistic != null ? String(it.estimate_pessimistic) : "",
+      due_date: String(it.due_date ?? ""),
       definition_of_ready: dor,
       target_planning_destination: String(it.target_planning_destination ?? ""),
     };
@@ -197,6 +199,7 @@ export function RefinementTab(p: Props) {
       estimate_value: m?.threePoint || m?.range || discrete ? null : numOrNull(f.estimate_value),
       estimate_unit: f.estimate_unit || null,
       estimate_optimistic: numOrNull(f.estimate_optimistic), estimate_most_likely: numOrNull(f.estimate_most_likely), estimate_pessimistic: numOrNull(f.estimate_pessimistic),
+      due_date: f.due_date || null,
       definition_of_ready: f.definition_of_ready,
       target_planning_destination: f.target_planning_destination || null,
     };
@@ -376,13 +379,14 @@ export function RefinementTab(p: Props) {
               <textarea className={inp} rows={2} value={f.completion_criteria} onChange={(e) => upd({ completion_criteria: e.target.value })} />
             </Field>
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               <Field label={isEs ? "Owner" : "Owner"}>
                 <select className={inp} value={f.owner_id} onChange={(e) => upd({ owner_id: e.target.value })}>
                   <option value="">{isEs ? "— Sin asignar —" : "— Unassigned —"}</option>
                   {p.members.map((m) => <option key={String(m.user_id)} value={String(m.user_id)}>{String(m.display_name ?? m.user_id)}</option>)}
                 </select>
               </Field>
+              <Field label={isEs ? "Fecha de entrega" : "Due date"}><input type="date" className={inp} value={f.due_date} onChange={(e) => upd({ due_date: e.target.value })} /></Field>
               <Field label={isEs ? "Stakeholders" : "Stakeholders"}><input className={inp} value={f.stakeholders} onChange={(e) => upd({ stakeholders: e.target.value })} /></Field>
             </div>
 

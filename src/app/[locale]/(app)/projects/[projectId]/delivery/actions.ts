@@ -166,6 +166,18 @@ const PRIORITY_MAP: Record<string, string> = { High: "p1", Medium: "p2", Low: "p
 
 /** Promote a backlog item into a real execution task (Workboard). Unifies the
  *  planning backlog with the single execution board. */
+/** Resolve a work item's owner (a user) into a roadmap_tasks assignment, keeping
+ *  the project_team_member link in sync so Team & Roles / the Workboard show it. */
+async function ownerToAssignment(
+  c: NonNullable<Awaited<ReturnType<typeof ctx>>>, projectId: string, ownerId: string | null,
+): Promise<{ assigned_to: string | null; project_team_member_id: string | null; assignment_type: string | null }> {
+  if (!ownerId) return { assigned_to: null, project_team_member_id: null, assignment_type: null };
+  const { data: tm } = await c.supabase.from("project_team_members")
+    .select("id").eq("project_id", projectId).eq("organization_id", c.org.organizationId)
+    .eq("user_id", ownerId).neq("status", "removed").limit(1).maybeSingle();
+  return { assigned_to: ownerId, project_team_member_id: (tm?.id as string) ?? null, assignment_type: "person" };
+}
+
 export async function promoteBacklogItemAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
   const c = await ctx(input.projectId);
   if (!c) return { error: "not_authenticated" };
@@ -173,12 +185,15 @@ export async function promoteBacklogItemAction(input: { projectId: string; id: s
   if (!item) return { error: "not_found" };
   const it = item as Record<string, unknown>;
 
+  const asg = await ownerToAssignment(c, input.projectId, (it.owner_id as string) || null);
   const { error } = await c.supabase.from("roadmap_tasks").insert({
     organization_id: c.org.organizationId, project_id: input.projectId,
     title: String(it.title), description: (it.description as string) || null,
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
+    end_date: (it.due_date as string) || null,
+    assigned_to: asg.assigned_to, project_team_member_id: asg.project_team_member_id, assignment_type: asg.assignment_type,
     order_index: 0, external_key: `backlog:${input.id}`,
   });
   if (error) return { error: "unexpected" };
@@ -203,14 +218,22 @@ export async function promoteBacklogItemsAction(input: { projectId: string; ids?
   const rows = (items ?? []) as Record<string, unknown>[];
   if (rows.length === 0) return { count: 0 };
 
-  const { error } = await c.supabase.from("roadmap_tasks").insert(rows.map((it, i) => ({
-    organization_id: c.org.organizationId, project_id: input.projectId,
-    title: String(it.title), description: (it.description as string) || null,
-    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
-    milestone_id: (it.linked_milestone_id as string) || null,
-    acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: i, external_key: `backlog:${it.id}`,
-  })));
+  const taskRows = [];
+  for (let i = 0; i < rows.length; i++) {
+    const it = rows[i];
+    const asg = await ownerToAssignment(c, input.projectId, (it.owner_id as string) || null);
+    taskRows.push({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: String(it.title), description: (it.description as string) || null,
+      status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+      milestone_id: (it.linked_milestone_id as string) || null,
+      acceptance_criteria: (it.acceptance_criteria as string) || null,
+      end_date: (it.due_date as string) || null,
+      assigned_to: asg.assigned_to, project_team_member_id: asg.project_team_member_id, assignment_type: asg.assignment_type,
+      order_index: i, external_key: `backlog:${it.id}`,
+    });
+  }
+  const { error } = await c.supabase.from("roadmap_tasks").insert(taskRows);
   if (error) return { error: "unexpected" };
 
   await c.supabase.from("project_backlog_items").update({ status: "promoted" })
@@ -626,6 +649,7 @@ export interface RefinementInput {
   estimate_optimistic?: number | null;
   estimate_most_likely?: number | null;
   estimate_pessimistic?: number | null;
+  due_date?: string | null;
   definition_of_ready?: { key: string; label: string; checked: boolean }[];
   target_planning_destination?: string | null;
 }
@@ -666,6 +690,7 @@ export async function saveRefinementAction(input: { projectId: string; item: Ref
     estimate_optimistic: it.estimate_optimistic ?? null,
     estimate_most_likely: it.estimate_most_likely ?? null,
     estimate_pessimistic: it.estimate_pessimistic ?? null,
+    due_date: it.due_date || null,
     definition_of_ready: it.definition_of_ready ?? [],
     target_planning_destination: it.target_planning_destination || null,
     readiness_score: readiness.score,
@@ -769,13 +794,26 @@ export async function moveToPlanningAction(input: { projectId: string; id: strin
   const end = new Date(start); end.setDate(start.getDate() + duration - 1);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+  // Honor the captured/refined delivery date as the task's end date.
+  let startIso = iso(start);
+  let endIso = iso(end);
+  let durationDays = duration;
+  const dueStr = (it.due_date as string) || null;
+  if (dueStr) {
+    endIso = dueStr;
+    if (dueStr < startIso) startIso = dueStr;
+    durationDays = Math.max(1, Math.round((Date.parse(endIso) - Date.parse(startIso)) / 86400000) + 1);
+  }
+
+  const asg = await ownerToAssignment(c, input.projectId, (it.owner_id as string) || null);
   const { error } = await c.supabase.from("roadmap_tasks").insert({
     organization_id: c.org.organizationId, project_id: input.projectId,
     title: String(it.title), description: (it.description as string) || null,
     status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
     milestone_id: (it.linked_milestone_id as string) || null,
     acceptance_criteria: (it.acceptance_criteria as string) || null,
-    start_date: iso(start), end_date: iso(end), duration_days: duration,
+    start_date: startIso, end_date: endIso, duration_days: durationDays,
+    assigned_to: asg.assigned_to, project_team_member_id: asg.project_team_member_id, assignment_type: asg.assignment_type,
     order_index: 0, external_key: `backlog:${input.id}`,
   });
   if (error) return { error: "unexpected" };

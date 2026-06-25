@@ -25,11 +25,12 @@ const PR_CLS: Record<string, string> = { High: "bg-red-100 text-red-700 dark:bg-
 
 // ── Backlog ─────────────────────────────────────────────────────────────────
 
-export function BacklogTab({ projectId, locale, items, milestones }: { projectId: string; locale: string; items: Record<string, unknown>[]; milestones: Record<string, unknown>[] }) {
+export function BacklogTab({ projectId, locale, items, milestones, members = [] }: { projectId: string; locale: string; items: Record<string, unknown>[]; milestones: Record<string, unknown>[]; members?: Record<string, unknown>[] }) {
   const isEs = locale === "es";
   const router = useRouter();
   const [pending, start] = useTransition();
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const ownerName = new Map(members.map((m) => [String(m.user_id), String(m.display_name ?? m.user_id)]));
   const [view, setView] = useState<"list" | "milestone">("list");
   const [msTitle, setMsTitle] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -156,7 +157,16 @@ export function BacklogTab({ projectId, locale, items, milestones }: { projectId
                   )}
                   <tr className={`border-t border-border/50 align-top ${promoted ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2">{!promoted && <input type="checkbox" checked={sel.has(String(it.id))} onChange={() => toggle(String(it.id))} className="h-3.5 w-3.5 accent-brand-600" />}</td>
-                    <td className="px-3 py-2"><div className="font-medium text-foreground">{String(it.title)}</div>{it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-foreground">{String(it.title)}</div>
+                      {it.linked_charter_objective ? <div className="text-[11px] text-muted-foreground">↳ {String(it.linked_charter_objective)}</div> : null}
+                      {(it.owner_id || it.due_date) ? (
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          {it.owner_id ? <span>{isEs ? "Responsable" : "Owner"}: {ownerName.get(String(it.owner_id)) ?? "—"}</span> : null}
+                          {it.due_date ? <span>{isEs ? "Entrega" : "Due"}: {String(it.due_date)}</span> : null}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-2">
                       {promoted ? (
                         <span className="text-muted-foreground">{msName(it.linked_milestone_id) ?? "—"}</span>

@@ -116,7 +116,7 @@ export function DeliveryClient(p: Props) {
 
       {tab === "overview" && <OverviewBody p={p} isEs={isEs} />}
       {tab === "refinement" && <RefinementTab projectId={p.projectId} locale={p.locale} items={p.backlog} dependencies={p.dependencies} members={p.members} method={(fw!.delivery_method as string) ?? null} projectType={(fw!.project_type as string) ?? null} sessions={p.sessions} sessionItems={p.sessionItems} links={p.links} linkTargets={p.linkTargets} constructionSignals={p.constructionSignals} />}
-      {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={refinedBacklog} milestones={p.milestones} />}
+      {tab === "backlog" && <BacklogTab projectId={p.projectId} locale={p.locale} items={refinedBacklog} milestones={p.milestones} members={p.members} />}
       {tab === "cycles" && <CyclesTab projectId={p.projectId} locale={p.locale} cycles={p.cycles} backlog={refinedBacklog} cycleItems={p.cycleItems} />}
       {tab === "ai" && <AiHealthTab projectId={p.projectId} locale={p.locale} alerts={p.alerts} />}
     </div>
