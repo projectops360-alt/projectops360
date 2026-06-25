@@ -1,10 +1,12 @@
 import { setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, getProjectAccess } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, ProjectModule } from "@/types/database";
 import { getEnabledModules } from "@/lib/execution/modules";
 import { ProjectTabs } from "@/components/layout/project-tabs";
+import { notFound, redirect } from "next/navigation";
+import { routing } from "@/i18n/routing";
 
 export default async function ProjectLayout({
   children,
@@ -16,11 +18,26 @@ export default async function ProjectLayout({
   const { locale, projectId } = await params;
   setRequestLocale(locale);
 
+  // ── Access guard ──────────────────────────────────────────────────────────
+  // Enforce the project boundary BEFORE rendering anything. A user who is not
+  // PMO-level, the PM/creator, a project member, or a stakeholder cannot reach
+  // this project — not even via a direct URL. (RLS enforces the same on the
+  // authenticated client; this is the explicit, friendly app-layer guard.)
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    redirect(locale === routing.defaultLocale ? "/login" : `/${locale}/login`);
+  }
+  const access = await getProjectAccess(org, projectId);
+  if (!access.canView) {
+    notFound();
+  }
+
   // Fetch the project title + type so tabs adapt to the project's modules
   let projectTitle = "";
   let enabledModules: ProjectModule[] | undefined;
   try {
-    const org = await getOrgContext();
     const supabase = await createClient();
     const { data: project } = await supabase
       .from("projects")
@@ -34,7 +51,7 @@ export default async function ProjectLayout({
       enabledModules = getEnabledModules(project);
     }
   } catch {
-    // Not authenticated or fetch failed — tabs still render without the title
+    // Fetch failed — tabs still render without the title
   }
 
   return (

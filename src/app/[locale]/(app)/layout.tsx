@@ -1,4 +1,5 @@
 import { getOrgContext } from "@/lib/auth";
+import { getUserOrganizations } from "@/lib/auth/org-actions";
 import { AppShell } from "@/components/layout/app-shell";
 import { redirect } from "next/navigation";
 import { routing } from "@/i18n/routing";
@@ -23,6 +24,8 @@ export default async function AppLayout({
     redirect(locale === routing.defaultLocale ? "/login" : `/${locale}/login`);
   }
 
+  const organizations = await getUserOrganizations();
+
   return (
     <AppShell
       user={{
@@ -35,6 +38,9 @@ export default async function AppLayout({
         name: org.organizationName,
         slug: org.organizationSlug,
         role: org.role,
+        orgRole: org.orgRole,
+        isPmoLevel: org.isPmoLevel,
+        organizations: organizations.map((o) => ({ id: o.id, name: o.name, slug: o.slug })),
       }}
     >
       {children}

@@ -5,6 +5,8 @@
   },
   "nav": {
     "commandCenter": "Command Center",
+    "pmCenter": "PM Center",
+    "myWork": "My Work",
     "projects": "Projects",
     "executionMap": "Execution Map",
     "workboard": "Workboard",
@@ -572,7 +574,8 @@
     "userMenu": {
       "profile": "Profile",
       "settings": "Settings",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "organizations": "Organizations"
     },
     "callback": {
       "title": "Confirming your email…",

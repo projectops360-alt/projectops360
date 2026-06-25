@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, getAccessibleProjectIds } from "@/lib/auth";
 import { getI18nValue, type I18nField } from "@/types/database";
 import { localizedHref } from "@/i18n/href";
 
@@ -43,9 +43,17 @@ export async function globalSearchAction(input: { query: string; locale?: string
   const orgId = org.organizationId;
   const P = localizedHref(locale, "/projects");
 
-  // Project name map (for sublabels/links)
-  const { data: projectRows } = await supabase
+  // Project name map (for sublabels/links). Non-PMO users only see projects
+  // they may access; restricting this set auto-filters every child record below
+  // because they are all gated through `aliveIds`.
+  const accessibleIds = await getAccessibleProjectIds(org);
+  let projectQuery = supabase
     .from("projects").select("id, title_i18n, slug, status").eq("organization_id", orgId).is("deleted_at", null);
+  if (accessibleIds !== null) {
+    if (accessibleIds.length === 0) return { results: [] };
+    projectQuery = projectQuery.in("id", accessibleIds);
+  }
+  const { data: projectRows } = await projectQuery;
   const projectName = new Map((projectRows ?? []).map((p) => [p.id, getI18nValue(p.title_i18n as I18nField, locale as "en" | "es") || p.slug]));
   // Only surface child records whose parent project is still alive. Archived
   // projects leave their tasks/risks/etc. behind (no cascade soft-delete), and

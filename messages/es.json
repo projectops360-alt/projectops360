@@ -5,6 +5,8 @@
   },
   "nav": {
     "commandCenter": "Centro de Mando",
+    "pmCenter": "Centro del PM",
+    "myWork": "Mi Trabajo",
     "projects": "Proyectos",
     "executionMap": "Mapa de Ejecución",
     "workboard": "Tablero de Trabajo",
@@ -572,7 +574,8 @@
     "userMenu": {
       "profile": "Perfil",
       "settings": "Configuración",
-      "signOut": "Cerrar sesión"
+      "signOut": "Cerrar sesión",
+      "organizations": "Organizaciones"
     },
     "callback": {
       "title": "Confirmando tu correo…",

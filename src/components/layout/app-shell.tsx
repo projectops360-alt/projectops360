@@ -6,6 +6,12 @@ export interface OrgData {
   name: I18nField;
   slug: string;
   role: string;
+  /** Enforced org role (COMPANY_OWNER … VIEWER) — drives role-based navigation. */
+  orgRole?: string;
+  /** TRUE when the role is PMO/portfolio-level. */
+  isPmoLevel?: boolean;
+  /** All orgs the user belongs to (for the org switcher). */
+  organizations?: { id: string; name: I18nField; slug: string }[];
 }
 
 export interface UserData {

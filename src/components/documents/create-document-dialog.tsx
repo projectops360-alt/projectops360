@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { X, Loader2, Upload } from "lucide-react";
 import { createDocumentAction } from "@/app/[locale]/(app)/projects/[projectId]/documents/actions";
 import { createClient } from "@/lib/supabase/client";
-import { getOrgContext } from "@/lib/auth";
 import type { DocumentStatus, DocumentType, StorageType, Locale } from "@/types/database";
 
 type CreateState =

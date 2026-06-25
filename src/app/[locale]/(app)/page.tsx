@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getOrgContext } from "@/lib/auth";
 import { getCommandCenterSummary, band, type CommandCenterData, type HealthBand } from "@/lib/command-center/service";
 import {
@@ -29,6 +30,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const tt = (en: string, es: string) => (isEs ? es : en);
 
   const org = await getOrgContext();
+
+  // ── Role-based landing ──────────────────────────────────────────────────────
+  // The home route is the PMO Command Center (portfolio governance). Only
+  // PMO-level roles land here; Project Managers go to their PM Center and
+  // everyone else to their personal work area. Enforced again on those routes,
+  // so a direct URL cannot bypass it.
+  const homeBase = locale === "es" ? "/es" : "";
+  if (!org.isPmoLevel) {
+    redirect(org.orgRole === "PROJECT_MANAGER" ? `${homeBase}/pm` : `${homeBase}/my-work`);
+  }
+
   const data = await getCommandCenterSummary(org.organizationId, locale);
   // Locale prefix used to build hrefs (e.g. `${base}/reports`). Must be EMPTY
   // for the default locale — localizedHref(locale, "") returns "/" (correct as

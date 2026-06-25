@@ -1,6 +1,10 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { I18nField } from "@/types/database";
+
+/** Cookie holding the user's currently active organization (for org switching). */
+export const ACTIVE_ORG_COOKIE = "po360.activeOrg";
 
 // ---------------------------------------------------------------------------
 // OrgContext — the full authenticated + organizational context for a request
@@ -16,6 +20,34 @@ import type { I18nField } from "@/types/database";
 // creates the missing data and returns it. This makes the app self-healing.
 // ---------------------------------------------------------------------------
 
+/** The 8 canonical, enforced organization roles. */
+export type OrgRole =
+  | "COMPANY_OWNER"
+  | "PMO_ADMIN"
+  | "PORTFOLIO_MANAGER"
+  | "PROJECT_MANAGER"
+  | "TEAM_MEMBER"
+  | "STAKEHOLDER"
+  | "CLIENT"
+  | "VIEWER";
+
+/** Roles that see the whole organization (PMO Center, all projects). */
+export const PMO_LEVEL_ROLES: OrgRole[] = ["COMPANY_OWNER", "PMO_ADMIN", "PORTFOLIO_MANAGER"];
+
+/** Map the legacy 4-value role onto the canonical enforced role (fallback only). */
+export function legacyRoleToOrgRole(role: string | null | undefined): OrgRole {
+  switch (role) {
+    case "owner":
+      return "COMPANY_OWNER";
+    case "admin":
+      return "PMO_ADMIN";
+    case "viewer":
+      return "VIEWER";
+    default:
+      return "TEAM_MEMBER";
+  }
+}
+
 export interface OrgContext {
   /** auth.users.id */
   userId: string;
@@ -27,8 +59,12 @@ export interface OrgContext {
   avatarUrl: string | null;
   /** profiles.locale (for UI language preference) */
   locale: string;
-  /** The user's role in the organization */
+  /** The user's legacy role in the organization (kept for billing/back-compat) */
   role: "owner" | "admin" | "member" | "viewer";
+  /** The user's canonical, enforced role — the source of truth for access */
+  orgRole: OrgRole;
+  /** TRUE when orgRole is PMO/portfolio-level (sees all projects in the org) */
+  isPmoLevel: boolean;
   /** organizations.id — the tenant scope for all data queries */
   organizationId: string;
   /** organizations.name_i18n — the localized org name */
@@ -64,22 +100,44 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
     throw new Error("Not authenticated");
   }
 
-  // Query profile and membership in parallel
-  const [profileResult, membershipResult] = await Promise.all([
+  // Query profile and ALL memberships in parallel. A user may belong to more
+  // than one organization; we pick the active one from a cookie, falling back to
+  // their default org, then the first membership.
+  const [profileResult, membershipsResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("display_name, avatar_url, locale, organization_id")
+      .select("display_name, avatar_url, locale, organization_id, default_organization_id")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
       .from("organization_members")
-      .select("role, organizations(id, slug, name_i18n)")
+      .select("role, org_role, organization_id, organizations(id, slug, name_i18n)")
       .eq("user_id", user.id)
-      .maybeSingle(),
+      .neq("status", "removed"),
   ]);
 
+  const memberships = (membershipsResult.data ?? []) as unknown as Array<{
+    role: string;
+    org_role?: string | null;
+    organization_id: string;
+    organizations: { id: string; slug: string; name_i18n: I18nField } | null;
+  }>;
+
+  // Resolve the active membership: cookie → profile.default → first.
+  let membership = memberships[0] ?? null;
+  if (memberships.length > 1) {
+    const cookieStore = await cookies();
+    const cookieOrg = cookieStore.get(ACTIVE_ORG_COOKIE)?.value;
+    const preferred =
+      (cookieOrg && memberships.find((m) => m.organization_id === cookieOrg)) ||
+      (profileResult.data?.default_organization_id &&
+        memberships.find((m) => m.organization_id === profileResult.data!.default_organization_id)) ||
+      null;
+    if (preferred) membership = preferred;
+  }
+
   // If no membership found, auto-heal via RPC
-  if (!membershipResult.data) {
+  if (!membership) {
     // Call ensure_user_org() which creates org/profile/membership if missing
     const { data: rpcData, error: rpcError } = await supabase.rpc("ensure_user_org");
 
@@ -112,6 +170,7 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
     const avatarUrl = profile?.avatar_url ?? null;
     const locale = profile?.locale ?? "en";
 
+    const healedOrgRole = legacyRoleToOrgRole(orgData.role);
     return {
       userId: user.id,
       email: user.email!,
@@ -119,6 +178,8 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
       avatarUrl,
       locale,
       role: orgData.role as OrgContext["role"],
+      orgRole: healedOrgRole,
+      isPmoLevel: PMO_LEVEL_ROLES.includes(healedOrgRole),
       organizationId: orgData.organizationId,
       organizationName: orgData.organizationName,
       organizationSlug: orgData.organizationSlug,
@@ -126,7 +187,6 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
   }
 
   // Normal path — membership found
-  const membership = membershipResult.data;
   const org = membership.organizations as unknown as {
     id: string;
     slug: string;
@@ -143,6 +203,15 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
   const avatarUrl = profile?.avatar_url ?? null;
   const locale = profile?.locale ?? "en";
 
+  // org_role is the enforced source of truth; fall back to the legacy role for
+  // rows created before the RBAC migration backfilled them.
+  const rawOrgRole = (membership as { org_role?: string | null }).org_role;
+  const orgRole: OrgRole = (PMO_LEVEL_ROLES as string[])
+    .concat(["PROJECT_MANAGER", "TEAM_MEMBER", "STAKEHOLDER", "CLIENT", "VIEWER"])
+    .includes(rawOrgRole ?? "")
+    ? (rawOrgRole as OrgRole)
+    : legacyRoleToOrgRole(membership.role);
+
   return {
     userId: user.id,
     email: user.email!,
@@ -150,6 +219,8 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
     avatarUrl,
     locale,
     role: membership.role as OrgContext["role"],
+    orgRole,
+    isPmoLevel: PMO_LEVEL_ROLES.includes(orgRole),
     organizationId: org.id,
     organizationName: org.name_i18n,
     organizationSlug: org.slug,

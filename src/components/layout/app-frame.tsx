@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import type { OrgData, UserData } from "@/components/layout/app-shell";
+import { navGroupForRole } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "po360.sidebarCollapsed";
@@ -61,6 +62,7 @@ export function AppFrame({
         onToggle={toggle}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        navGroup={navGroupForRole(org?.orgRole, org?.isPmoLevel ?? false)}
       />
 
       {/* Mobile backdrop */}

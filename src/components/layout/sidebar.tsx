@@ -5,7 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sidebarNav, bottomNav, type NavItem } from "@/config/navigation";
+import { sidebarNav, bottomNav, navForGroup, type NavItem, type NavGroup } from "@/config/navigation";
 import { Logo } from "@/components/shared/logo";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
@@ -64,14 +64,18 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle, mobileOpen = false, onMobileClose }: { collapsed?: boolean; onToggle?: () => void; mobileOpen?: boolean; onMobileClose?: () => void }) {
+export function Sidebar({ collapsed = false, onToggle, mobileOpen = false, onMobileClose, navGroup = "pmo" }: { collapsed?: boolean; onToggle?: () => void; mobileOpen?: boolean; onMobileClose?: () => void; navGroup?: NavGroup }) {
   const pathname = usePathname();
   const tNav = useTranslations("nav");
   const projectId = extractProjectId(pathname);
 
+  // Role-aware nav: only show items this audience is allowed to see.
+  const visibleNav = navForGroup(sidebarNav, navGroup);
+  const visibleBottom = navForGroup(bottomNav, navGroup);
+
   // Separate global and project-scoped items
-  const globalItems = sidebarNav.filter((item) => !item.projectScoped);
-  const projectItems = sidebarNav.filter((item) => item.projectScoped);
+  const globalItems = visibleNav.filter((item) => !item.projectScoped);
+  const projectItems = visibleNav.filter((item) => item.projectScoped);
 
   // Resolve project-scoped hrefs with the current projectId
   function resolveHref(item: NavItem): string {
@@ -159,7 +163,7 @@ export function Sidebar({ collapsed = false, onToggle, mobileOpen = false, onMob
         <div className="my-2 border-t border-white/10" />
 
         {/* ── Bottom nav items inside main section ── */}
-        {bottomNav.map((item) => (
+        {visibleBottom.map((item) => (
           <NavButton
             key={item.href}
             item={item}

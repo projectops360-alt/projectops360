@@ -62,6 +62,11 @@ export function Header({ user, org, onMenuClick }: HeaderProps) {
             displayName={user.displayName}
             email={user.email}
             orgName={orgName}
+            activeOrgId={org?.id}
+            organizations={(org?.organizations ?? []).map((o) => ({
+              id: o.id,
+              name: getI18nValue(o.name, locale, o.slug),
+            }))}
           />
         ) : (
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white">

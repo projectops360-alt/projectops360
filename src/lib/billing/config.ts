@@ -60,6 +60,35 @@ export const WORKSPACE_ROLES: { value: string; es: string; en: string }[] = [
   { value: "External Collaborator", es: "Colaborador externo", en: "External Collaborator" },
 ];
 
+/** Map a workspace role label onto the canonical enforced org_role. */
+export function workspaceRoleToOrgRole(workspaceRole: string | null | undefined): string {
+  switch (workspaceRole) {
+    case "Owner": return "COMPANY_OWNER";
+    case "Admin": return "PMO_ADMIN";
+    case "PMO Manager": return "PMO_ADMIN";
+    case "Project Manager": return "PROJECT_MANAGER";
+    case "Team Member": return "TEAM_MEMBER";
+    case "Stakeholder": return "STAKEHOLDER";
+    case "Viewer": return "VIEWER";
+    case "External Collaborator": return "CLIENT";
+    default: return "TEAM_MEMBER";
+  }
+}
+
+/** Map a billing seat type onto a sensible default enforced org_role. */
+export function seatTypeToOrgRole(seat: string | null | undefined): string {
+  switch (seat) {
+    case "owner": return "COMPANY_OWNER";
+    case "admin": return "PMO_ADMIN";
+    case "full_seat": return "PROJECT_MANAGER";
+    case "contributor_seat": return "TEAM_MEMBER";
+    case "light_seat": return "STAKEHOLDER";
+    case "viewer_free": return "VIEWER";
+    case "external_free": return "CLIENT";
+    default: return "TEAM_MEMBER";
+  }
+}
+
 export const MEMBER_STATUSES: { value: string; es: string; en: string; tone: string }[] = [
   { value: "invited", es: "Invitado", en: "Invited", tone: "amber" },
   { value: "active", es: "Activo", en: "Active", tone: "green" },
