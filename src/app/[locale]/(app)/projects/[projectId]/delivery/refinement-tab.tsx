@@ -28,7 +28,7 @@ import {
   saveRefinementAction, setRefinementStatusAction, aiRefineItemAction,
   saveWorkItemDependencyAction, deleteWorkItemDependencyAction, moveToPlanningAction,
   splitWorkItemAction, linkWorkItemAction, unlinkWorkItemAction, setGovernanceAction,
-  saveBacklogItemAction, generateBacklogAction,
+  saveBacklogItemAction, generateBacklogAction, aiSuggestFieldAction,
   type RefinementInput,
 } from "./actions";
 import { SessionsPanel } from "./refinement-session";
@@ -140,7 +140,7 @@ export function RefinementTab(p: Props) {
       business_value: it.business_value != null ? String(it.business_value) : "",
       stakeholders: String(it.stakeholders ?? ""),
       source_reference: String(it.source_reference ?? ""),
-      estimation_method: String(it.estimation_method ?? tpl.defaultEstimationMethod),
+      estimation_method: String(it.estimation_method ?? "story_points"),
       estimate_value: it.estimate_value != null ? String(it.estimate_value) : "",
       estimate_unit: String(it.estimate_unit ?? ""),
       estimate_optimistic: it.estimate_optimistic != null ? String(it.estimate_optimistic) : "",
@@ -230,6 +230,18 @@ export function RefinementTab(p: Props) {
 
   const upd = (patch: Partial<FormState>) => setF((s) => (s ? { ...s, ...patch } : s));
   const toggleDor = (key: string) => setF((s) => (s ? { ...s, definition_of_ready: s.definition_of_ready.map((d) => (d.key === key ? { ...d, checked: !d.checked } : d)) } : s));
+
+  // Inline AI assistant for a single criteria field (uses the on-screen draft).
+  const [aiField, setAiField] = useState<string | null>(null);
+  const suggestField = (field: "acceptance_criteria" | "completion_criteria") => {
+    if (!selected || !f) return;
+    setAiField(field);
+    start(async () => {
+      const r = await aiSuggestFieldAction({ projectId: p.projectId, field, locale: p.locale, title: String(selected.title), description: f.description, itemType: f.item_type, acceptanceCriteria: f.acceptance_criteria });
+      if (r.text) upd({ [field]: r.text } as Partial<FormState>);
+      setAiField(null);
+    });
+  };
 
   const selDeps = selected ? p.dependencies.filter((d) => String(d.backlog_item_id) === String(selected.id)) : [];
   const itemTitle = (id: unknown) => { const x = p.items.find((it) => String(it.id) === String(id)); return x ? String(x.title) : "—"; };
@@ -357,8 +369,12 @@ export function RefinementTab(p: Props) {
             </div>
 
             <Field label={isEs ? "Descripción" : "Description"}><textarea className={inp} rows={2} value={f.description} onChange={(e) => upd({ description: e.target.value })} /></Field>
-            <Field label={isEs ? "Criterios de aceptación" : "Acceptance criteria"}><textarea className={inp} rows={2} value={f.acceptance_criteria} onChange={(e) => upd({ acceptance_criteria: e.target.value })} /></Field>
-            <Field label={isEs ? "Criterios de terminación" : "Completion criteria"}><textarea className={inp} rows={2} value={f.completion_criteria} onChange={(e) => upd({ completion_criteria: e.target.value })} /></Field>
+            <Field label={isEs ? "Criterios de aceptación" : "Acceptance criteria"} action={<AiFillButton loading={aiField === "acceptance_criteria"} disabled={pending} onClick={() => suggestField("acceptance_criteria")} isEs={isEs} />}>
+              <textarea className={inp} rows={2} value={f.acceptance_criteria} onChange={(e) => upd({ acceptance_criteria: e.target.value })} />
+            </Field>
+            <Field label={isEs ? "Criterios de terminación" : "Completion criteria"} action={<AiFillButton loading={aiField === "completion_criteria"} disabled={pending} onClick={() => suggestField("completion_criteria")} isEs={isEs} />}>
+              <textarea className={inp} rows={2} value={f.completion_criteria} onChange={(e) => upd({ completion_criteria: e.target.value })} />
+            </Field>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <Field label={isEs ? "Owner" : "Owner"}>
@@ -531,12 +547,14 @@ export function RefinementTab(p: Props) {
             {moveErr && <p className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />{moveErr}</p>}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-              <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{isEs ? "Guardar" : "Save"}</button>
-              {REFINABLE_STATUSES.map((s) => { const meta = REFINEMENT_STATUS_META[s]; return (
+              <button onClick={() => save()} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{isEs ? "Guardar" : "Save"}</button>
+              {REFINABLE_STATUSES.filter((s) => s !== "ready_for_planning").map((s) => { const meta = REFINEMENT_STATUS_META[s]; return (
                 <button key={s} onClick={() => setStatus(s)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50">{isEs ? meta.es : meta.en}</button>
               ); })}
               <button onClick={() => setSplitOpen((v) => !v)} disabled={pending} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"><Scissors className="h-3.5 w-3.5" />{isEs ? "Dividir" : "Split"}</button>
-              <button onClick={move} disabled={pending || String(selected.refinement_status) !== "ready_for_planning"} title={isEs ? "Requiere estado 'Listo para planear'" : "Requires 'Ready for Planning' status"} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Mover a planeación" : "Move to planning"}</button>
+              {/* Mark refined + ready → the item shows up in the Backlog, ready to plan/pick up. */}
+              <button onClick={() => setStatus("ready_for_planning")} disabled={pending} title={isEs ? "Marca el ítem como refinado y lo envía al Backlog para planearlo y que el responsable lo tome" : "Marks the item refined and sends it to the Backlog to be planned and picked up by the owner"} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Enviar al Backlog" : "Send to Backlog"}</button>
+              <button onClick={move} disabled={pending || String(selected.refinement_status) !== "ready_for_planning"} title={isEs ? "Crea la tarea en el Workboard (requiere 'Listo para planear')" : "Creates the task on the Workboard (requires 'Ready for Planning')"} className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{isEs ? "Mover a planeación" : "Move to planning"}</button>
             </div>
           </div>
         )}
@@ -660,8 +678,25 @@ function SummaryPanel({ isEs, refinable, sessions, itemRisks, onOpenItem }: { is
 const strv = (x: unknown) => (typeof x === "string" ? x : "");
 const arrv = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : []);
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>{children}</div>;
+function AiFillButton({ loading, disabled, onClick, isEs }: { loading: boolean; disabled: boolean; onClick: () => void; isEs: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={isEs ? "Rellenar con IA" : "Fill with AI"}
+      className="inline-flex items-center gap-1 rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300">
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}{isEs ? "Rellenar con IA" : "Fill with AI"}
+    </button>
+  );
+}
+
+function Field({ label, children, action }: { label: string; children: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="block text-[11px] font-medium text-muted-foreground">{label}</label>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
 }
 
 function AiList({ icon: Icon, tone, title, items }: { icon: typeof HelpCircle; tone: string; title: string; items: string[] }) {

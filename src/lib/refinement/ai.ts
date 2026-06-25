@@ -193,6 +193,39 @@ export async function refineWorkItem(
   };
 }
 
+// ── Single-field assistant (acceptance / completion criteria) ─────────────────
+
+/** Generate just one field's content (acceptance or completion criteria) for a
+ *  work item, using whatever the user has typed so far. Returns bulleted text. */
+export async function suggestWorkItemField(
+  org: OrgContext, projectId: string,
+  field: "acceptance_criteria" | "completion_criteria",
+  context: { title: string; description?: string; itemType?: string; acceptanceCriteria?: string },
+  locale: Locale,
+): Promise<string> {
+  const isEs = locale === "es";
+  const lang = isEs ? "español" : "English";
+  const fieldName = field === "acceptance_criteria"
+    ? (isEs ? "criterios de aceptación" : "acceptance criteria")
+    : (isEs ? "criterios de terminación (Definition of Done)" : "completion criteria (Definition of Done)");
+  const prompt = [
+    `You are an AI Project Manager. Write clear, testable ${fieldName} for the work item below. Respond in ${lang}.`,
+    "Output 3-6 short bullet points, each starting with \"- \", specific and verifiable. Do NOT invent scope beyond what the title/description reasonably imply.",
+    field === "completion_criteria"
+      ? "Completion criteria describe when the work is fully done and ready to hand off (quality checks, sign-off, documentation), distinct from acceptance criteria."
+      : "Acceptance criteria describe the conditions the deliverable must meet to be accepted by the stakeholder.",
+    'Return ONLY JSON: { "text": "- ...\\n- ..." }.',
+    "",
+    "=== WORK ITEM ===",
+    `Title: ${context.title}`,
+    context.itemType ? `Type: ${context.itemType}` : "",
+    `Description: ${context.description || "(none)"}`,
+    field === "completion_criteria" && context.acceptanceCriteria ? `Acceptance criteria already defined: ${context.acceptanceCriteria}` : "",
+  ].filter(Boolean).join("\n");
+  const json = await runJson(org, projectId, prompt);
+  return str(json?.text);
+}
+
 // ── Prepare a refinement session ──────────────────────────────────────────────
 
 export interface SessionTalkingPoints { backlog_item_id: string; talking_points: string[]; open_questions: string[]; }

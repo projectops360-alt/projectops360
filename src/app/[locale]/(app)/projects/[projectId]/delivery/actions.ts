@@ -701,6 +701,24 @@ export async function aiRefineItemAction(input: { projectId: string; id: string;
   return { result };
 }
 
+/** Inline AI assistant for a single field (acceptance / completion criteria),
+ *  using whatever the user has typed so far (no save required). */
+export async function aiSuggestFieldAction(input: {
+  projectId: string; field: "acceptance_criteria" | "completion_criteria"; locale: string;
+  title: string; description?: string; itemType?: string; acceptanceCriteria?: string;
+}): Promise<{ error?: string; text?: string }> {
+  const c = await ctx(input.projectId);
+  if (!c) return { error: "not_authenticated" };
+  if (!input.title?.trim()) return { error: "no_context" };
+  const { suggestWorkItemField } = await import("@/lib/refinement/ai");
+  const text = await suggestWorkItemField(
+    c.org, input.projectId, input.field,
+    { title: input.title, description: input.description, itemType: input.itemType, acceptanceCriteria: input.acceptanceCriteria },
+    (input.locale === "es" ? "es" : "en") as Locale,
+  );
+  return text ? { text } : { error: "ai_failed" };
+}
+
 /** Add a dependency: this item depends on another work item. */
 export async function saveWorkItemDependencyAction(input: { projectId: string; itemId: string; dependsOnId: string; type?: string }): Promise<{ error?: string }> {
   const c = await ctx(input.projectId);
