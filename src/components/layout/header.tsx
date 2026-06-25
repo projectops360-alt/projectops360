@@ -2,6 +2,7 @@
 
 import { Bell, Menu } from "lucide-react";
 import { UserMenu } from "@/components/layout/user-menu";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { ProjectOpsNavigatorButton } from "@/components/navigator/ProjectOpsNavigatorButton";
 import type { OrgData, UserData } from "@/components/layout/app-shell";
@@ -44,6 +45,9 @@ export function Header({ user, org, onMenuClick }: HeaderProps) {
 
       {/* ── Right actions ── */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        {/* ── Quick light/dark toggle ── */}
+        <ThemeToggle />
+
         {/* ── Navigator guided help ── */}
         <ProjectOpsNavigatorButton />
 

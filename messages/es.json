@@ -576,7 +576,9 @@
       "profile": "Perfil",
       "settings": "Configuración",
       "signOut": "Cerrar sesión",
-      "organizations": "Organizaciones"
+      "organizations": "Organizaciones",
+      "themeDark": "Modo oscuro",
+      "themeLight": "Modo claro"
     },
     "callback": {
       "title": "Confirmando tu correo…",

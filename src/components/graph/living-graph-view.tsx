@@ -34,7 +34,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ExecutiveSummaryPanel } from "./executive-summary-panel";
-import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3 } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -85,11 +85,7 @@ import {
   enrichNodesWithReadiness,
   enrichNodesWithVariance,
 } from "@/lib/graph/labor-graph-mapping";
-import {
-  mapWorkforceResourceNodes,
-  mapWorkforceAssignmentEdges,
-  enrichNodesWithWorkforce,
-} from "@/lib/graph/workforce-graph-mapping";
+import { enrichNodesWithWorkforce } from "@/lib/graph/workforce-graph-mapping";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
@@ -348,37 +344,29 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return map;
   }, [resourceCapacity, tasks]);
 
-  // ── Workforce Intelligence Layer: enrich + inject resource nodes/edges ──
-  const graphData = useMemo(() => {
-    if (overlay !== "workforceCapacity" || !resourceCapacity || !resourceCapacity.hasResources) {
-      return laborEnrichedData;
-    }
-    const enriched = enrichNodesWithWorkforce(laborEnrichedData.nodes, resourceCapacity, taskResourceKey);
-    if (viewLevel === "milestones") {
-      return { ...laborEnrichedData, nodes: enriched };
-    }
-    const resourceNodes = mapWorkforceResourceNodes(resourceCapacity);
-    const assignmentEdges = mapWorkforceAssignmentEdges(resourceNodes, enriched, taskResourceKey, projectId);
-    return {
-      ...laborEnrichedData,
-      nodes: [...enriched, ...resourceNodes],
-      edges: [...laborEnrichedData.edges, ...assignmentEdges],
-    };
-  }, [overlay, resourceCapacity, taskResourceKey, laborEnrichedData, viewLevel, projectId]);
-
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
-      return aggregateByMilestone(graphData.nodes, graphData.edges);
+      return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges);
     }
     const graph =
       viewLevel === "activities"
-        ? clusterByEntity(graphData.nodes, graphData.edges)
-        : { nodes: graphData.nodes, edges: graphData.edges };
+        ? clusterByEntity(laborEnrichedData.nodes, laborEnrichedData.edges)
+        : { nodes: laborEnrichedData.nodes, edges: laborEnrichedData.edges };
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, graphData, simplifyEdges]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges]);
+
+  // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
+  //    with capacity status so at-risk work lights up. No resource nodes are
+  //    injected into the flow — the per-person roster lives in a side panel,
+  //    which works on the readable Milestones view without any drill-down.
+  const workforceActive = overlay === "workforceCapacity" && !!resourceCapacity?.hasResources;
+  const overlayNodes = useMemo(() => {
+    if (!workforceActive || !resourceCapacity) return displayGraph.nodes;
+    return enrichNodesWithWorkforce(displayGraph.nodes, resourceCapacity, taskResourceKey);
+  }, [workforceActive, resourceCapacity, displayGraph.nodes, taskResourceKey]);
 
   const analysis = useMemo(
     () => analyzeGraph(displayGraph.nodes, displayGraph.edges),
@@ -397,7 +385,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const filtered = useMemo(() => {
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTime = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null;
-    const nodes = displayGraph.nodes.filter((n) => {
+    const nodes = overlayNodes.filter((n) => {
       if (!nodeTypeFilter.has(n.nodeType)) return false;
       if (statusFilter && n.status !== statusFilter) return false;
       if (riskFilter && n.riskLevel !== riskFilter) return false;
@@ -428,6 +416,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return { nodes, edges };
   }, [
     displayGraph,
+    overlayNodes,
     analysis,
     nodeTypeFilter,
     edgeTypeFilter,
@@ -1255,6 +1244,51 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
               <LivingGraphMetricsHeader health={health} layout="grid" />
               <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} defaultOpen compact />
+            </div>
+          </div>
+        )}
+
+        {/* Workforce roster — per-person utilization, shown with the Workforce
+            overlay. Works on the readable Milestones view; at-risk cards light
+            up in the graph while this lists who is overloaded. */}
+        {workforceActive && resourceCapacity && (
+          <div className="absolute left-3 top-14 z-20 flex max-h-[calc(100%-4.5rem)] w-[256px] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
+            <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Users className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+              {locale === "es" ? "Fuerza laboral" : "Workforce"}
+              <span className="ml-auto font-normal normal-case text-[11px]">
+                {resourceCapacity.resources.length} · {locale === "es" ? "4 sem" : "4 wks"}
+              </span>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5">
+              {[...resourceCapacity.resources]
+                .sort((a, b) => (b.utilizationPercent ?? -1) - (a.utilizationPercent ?? -1))
+                .map((r) => {
+                  const u = r.utilizationPercent;
+                  const color =
+                    r.status === "critical" ? "#ef4444"
+                    : r.status === "overallocated" ? "#f97316"
+                    : r.status === "near_capacity" ? "#f59e0b"
+                    : r.status === "needs_review" ? "#94a3b8"
+                    : "#10b981";
+                  return (
+                    <div key={r.resourceKey}>
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="min-w-0 truncate font-medium text-foreground" title={r.role ?? undefined}>{r.name}</span>
+                        <span className="shrink-0 font-mono font-bold tabular-nums" style={{ color }}>
+                          {u == null ? "—" : `${Math.round(u)}%`}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, u ?? 0)}%`, background: color }} />
+                      </div>
+                      <div className="mt-0.5 flex justify-between text-[10px] text-muted-foreground">
+                        <span className="truncate">{r.role ?? "—"}</span>
+                        <span className="shrink-0">{Math.round(r.assignedHours)}/{Math.round(r.effectivePeriodHours)}h</span>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

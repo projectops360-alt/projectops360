@@ -576,7 +576,9 @@
       "profile": "Profile",
       "settings": "Settings",
       "signOut": "Sign out",
-      "organizations": "Organizations"
+      "organizations": "Organizations",
+      "themeDark": "Dark mode",
+      "themeLight": "Light mode"
     },
     "callback": {
       "title": "Confirming your email…",
