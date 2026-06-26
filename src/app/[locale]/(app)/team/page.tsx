@@ -23,7 +23,8 @@ export default async function TeamPage({
   // made renames look like no-ops). Mirror /organization/members: fetch by id.
   const membersRes = await supabase.from("organization_members")
     .select("id, user_id, role, billing_seat_type, workspace_role, status, department, job_title")
-    .eq("organization_id", org.organizationId);
+    .eq("organization_id", org.organizationId)
+    .neq("status", "removed");
   const memberRows = membersRes.data ?? [];
   const memberIds = memberRows.map((m) => String(m.user_id));
 
