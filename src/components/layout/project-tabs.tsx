@@ -31,6 +31,8 @@ interface ProjectTabsProps {
   /** Modules enabled for this project (project_type defaults or explicit list).
    *  Undefined = show every tab (backward compatible). */
   enabledModules?: ProjectModule[];
+  /** Tab titleKeys the current user may open. Undefined = all (managers). */
+  allowedTabKeys?: string[];
 }
 
 interface TabItem {
@@ -129,13 +131,15 @@ const TAB_ITEMS: TabItem[] = [
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ProjectTabs({ projectId, projectTitle, enabledModules }: ProjectTabsProps) {
+export function ProjectTabs({ projectId, projectTitle, enabledModules, allowedTabKeys }: ProjectTabsProps) {
   // next-intl usePathname() returns the locale-less path (e.g. /projects/x/workboard).
   const pathname = usePathname();
   const t = useTranslations("projectTabs");
 
   const visibleTabs = TAB_ITEMS.filter(
-    (tab) => !tab.module || !enabledModules || enabledModules.includes(tab.module),
+    (tab) =>
+      (!tab.module || !enabledModules || enabledModules.includes(tab.module)) &&
+      (!allowedTabKeys || allowedTabKeys.includes(tab.titleKey)),
   );
 
   return (

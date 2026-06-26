@@ -90,6 +90,31 @@ export default async function WorkboardPage({
     (milestones ?? []) as Milestone[],
   );
 
+  // ── Resolve the assignee name for each task (team member → user → resource) ──
+  const taskRows = (tasks ?? []) as Array<RoadmapTask & { assigned_resource_id?: string | null; project_team_member_id?: string | null }>;
+  const userIds = [...new Set(taskRows.map((t) => t.assigned_to).filter(Boolean) as string[])];
+  const resIds = [...new Set(taskRows.map((t) => t.assigned_resource_id).filter(Boolean) as string[])];
+  const tmIds = [...new Set(taskRows.map((t) => t.project_team_member_id).filter(Boolean) as string[])];
+  const [profRes, resRes, tmRes] = await Promise.all([
+    userIds.length ? supabase.from("profiles").select("id, display_name").in("id", userIds) : Promise.resolve({ data: [] }),
+    resIds.length ? supabase.from("resources").select("id, name").in("id", resIds).eq("organization_id", org.organizationId) : Promise.resolve({ data: [] }),
+    tmIds.length ? supabase.from("project_team_members").select("id, display_name, user_id").in("id", tmIds).eq("organization_id", org.organizationId) : Promise.resolve({ data: [] }),
+  ]);
+  const nameByUser = new Map((profRes.data ?? []).map((p) => [String((p as Record<string, unknown>).id), String((p as Record<string, unknown>).display_name ?? "")]));
+  const nameByRes = new Map((resRes.data ?? []).map((r) => [String((r as Record<string, unknown>).id), String((r as Record<string, unknown>).name ?? "")]));
+  const tmById = new Map((tmRes.data ?? []).map((m) => [String((m as Record<string, unknown>).id), m as Record<string, unknown>]));
+  const assignees: Record<string, string> = {};
+  for (const tk of taskRows) {
+    let name = "";
+    if (tk.project_team_member_id && tmById.has(tk.project_team_member_id)) {
+      const m = tmById.get(tk.project_team_member_id)!;
+      name = String(m.display_name || (m.user_id ? nameByUser.get(String(m.user_id)) : "") || "");
+    }
+    if (!name && tk.assigned_to) name = nameByUser.get(tk.assigned_to) || "";
+    if (!name && tk.assigned_resource_id) name = nameByRes.get(tk.assigned_resource_id) || "";
+    if (name) assignees[tk.id] = name;
+  }
+
   return (
     <WorkboardClient
       projectId={projectId}
@@ -97,6 +122,7 @@ export default async function WorkboardPage({
       milestones={(milestones ?? []) as Milestone[]}
       tasks={sortedTasks}
       dependencies={dependencies}
+      assignees={assignees}
       locale={locale as Locale}
       translations={{
         title: t("title"),

@@ -24,4 +24,7 @@ export {
   canManageRisks,
   canViewProjectMemory,
   canViewReports,
+  isProjectManagerTier,
+  canAccessProjectTab,
+  type ProjectTab,
 } from "./permissions";

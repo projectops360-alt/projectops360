@@ -49,6 +49,8 @@ export default async function ResourceCapacityPage({ params }: { params: Promise
   setRequestLocale(locale);
   const isEs = locale === "es";
   if (!UUID_RE.test(projectId)) notFound();
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "resource-capacity");
 
   const org = await getOrgContext();
   const supabase = await createClient();

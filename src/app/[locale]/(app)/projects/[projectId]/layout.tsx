@@ -1,6 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
-import { getOrgContext, getProjectAccess } from "@/lib/auth";
+import { getOrgContext, getProjectAccess, canAccessProjectTab, isProjectManagerTier, type ProjectTab } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, ProjectModule } from "@/types/database";
 import { getEnabledModules } from "@/lib/execution/modules";
@@ -34,6 +34,22 @@ export default async function ProjectLayout({
     notFound();
   }
 
+  // Tabs the current user may open. Managers (PMO/PM/creator) see everything;
+  // contributors (team members) are limited to execution (Workboard, Status, and
+  // Memory if allowed). This drives the visible tabs; sensitive pages also guard
+  // themselves so a direct URL cannot bypass it.
+  const TAB_BY_KEY: Record<string, ProjectTab> = {
+    commandCenter: "overview", charterGovernance: "charter", deliveryFramework: "delivery",
+    teamRoles: "team", workboard: "workboard", executionMap: "execution-map",
+    resourceCapacity: "resource-capacity", laborCapacity: "labor-capacity",
+    drawingIntelligence: "drawing-intelligence", projectMemory: "memory",
+    rhythm: "rhythm", statusReport: "status", settings: "settings",
+  };
+  const allowedTabKeys = Object.entries(TAB_BY_KEY)
+    .filter(([, tab]) => canAccessProjectTab(access, tab))
+    .map(([key]) => key);
+  const isManagerTier = isProjectManagerTier(access);
+
   // Fetch the project title + type so tabs adapt to the project's modules
   let projectTitle = "";
   let enabledModules: ProjectModule[] | undefined;
@@ -61,6 +77,7 @@ export default async function ProjectLayout({
         locale={locale}
         projectTitle={projectTitle}
         enabledModules={enabledModules}
+        allowedTabKeys={isManagerTier ? undefined : allowedTabKeys}
       />
       <div className="p-6">{children}</div>
     </div>

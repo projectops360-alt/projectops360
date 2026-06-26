@@ -15,6 +15,8 @@ export default async function ProjectSettingsPage({
 }) {
   const { locale, projectId } = await params;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "settings");
 
   const org = await getOrgContext();
   const supabase = await createClient();

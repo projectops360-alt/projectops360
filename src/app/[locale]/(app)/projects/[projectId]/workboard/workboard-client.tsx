@@ -63,6 +63,8 @@ interface WorkboardClientProps {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   dependencies: TaskDependency[];
+  /** taskId → assignee display name (resolved server-side). */
+  assignees: Record<string, string>;
   locale: Locale;
   translations: WorkboardTranslations;
 }
@@ -125,6 +127,7 @@ interface BoardColumnProps {
   columnTasks: RoadmapTask[];
   milestoneMap: Map<string, string>;
   predecessorsByTask: Map<string, PredecessorInfo[]>;
+  assigneeByTask: Map<string, string>;
   anyResizing: boolean;
   getColumnWidth: (status: TaskStatus) => number;
   setColumnWidth: (status: TaskStatus, width: number) => void;
@@ -151,6 +154,7 @@ function BoardColumn({
   columnTasks,
   milestoneMap,
   predecessorsByTask,
+  assigneeByTask,
   anyResizing,
   getColumnWidth,
   setColumnWidth,
@@ -266,6 +270,17 @@ function BoardColumn({
                               {task.is_blocked && <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />}
                             </div>
                             {task.estimate_hours && <span className="text-[10px] text-muted-foreground/60 mt-0.5">{task.estimate_hours}h</span>}
+                            {(() => {
+                              const who = assigneeByTask.get(task.id);
+                              if (!who) return null;
+                              const initials = who.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+                              return (
+                                <div className="mt-1.5 flex items-center gap-1.5" title={who}>
+                                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[8px] font-bold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{initials}</span>
+                                  <span className="truncate text-[10px] font-medium text-foreground">{who}</span>
+                                </div>
+                              );
+                            })()}
                             {task.progress > 0 && (
                               <div className="mt-1.5 flex items-center gap-1">
                                 <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
@@ -315,6 +330,7 @@ export function WorkboardClient({
   milestones,
   tasks: initialTasks,
   dependencies,
+  assignees,
   locale,
   translations: t,
 }: WorkboardClientProps) {
@@ -388,6 +404,7 @@ export function WorkboardClient({
 
   // Milestone lookup (declared early so filter options can use it)
   const milestoneMap = new Map(milestones.map((m) => [m.id, m.title]));
+  const assigneeByTask = useMemo(() => new Map(Object.entries(assignees)), [assignees]);
 
   const sprintOptions = useMemo(() => {
     const names = new Set<string>();
@@ -748,6 +765,7 @@ export function WorkboardClient({
                           columnTasks={tasksByStatus[status]}
                           milestoneMap={milestoneMap}
                           predecessorsByTask={predecessorsByTask}
+                          assigneeByTask={assigneeByTask}
                           anyResizing={anyResizing}
                           getColumnWidth={getColumnWidth}
                           setColumnWidth={setColumnWidth}

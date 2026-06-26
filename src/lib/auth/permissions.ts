@@ -184,6 +184,37 @@ export const canViewProjectMemory = (a: ProjectAccess): boolean =>
 export const canViewReports = (a: ProjectAccess): boolean =>
   !!(a.isPmo || a.isManager || a.isMember || a.flags.can_view_reports);
 
+// ── Project tab access (PM/PMO full; contributors = execution-only) ─────────
+
+export type ProjectTab =
+  | "overview" | "charter" | "delivery" | "team" | "workboard" | "execution-map"
+  | "resource-capacity" | "labor-capacity" | "drawing-intelligence" | "memory"
+  | "rhythm" | "status" | "settings" | "decisions" | "communications"
+  | "documents" | "meetings" | "closeout";
+
+/** Manager tier sees/edits the whole project. */
+export function isProjectManagerTier(a: ProjectAccess): boolean {
+  return a.isPmo || a.isManager || a.flags.can_manage_team || a.flags.can_invite_others;
+}
+
+/**
+ * What a given access level may open inside a project.
+ *  - Manager (PMO/PM/creator) → everything.
+ *  - Contributor (team member) → execution only: Workboard + Status, plus
+ *    Project Memory when they have memory access.
+ *  - Stakeholder/viewer → read-only Status.
+ */
+export function canAccessProjectTab(a: ProjectAccess, tab: ProjectTab): boolean {
+  if (isProjectManagerTier(a)) return true;
+  if (a.isMember) {
+    if (tab === "workboard" || tab === "status") return true;
+    if (tab === "memory") return !!a.flags.can_access_memory;
+    return false;
+  }
+  if (a.isStakeholder) return tab === "status";
+  return false;
+}
+
 // ── Accessible project IDs (for list/dashboard scoping) ─────────────────────
 
 /**

@@ -20,6 +20,8 @@ export default async function ExecutionMapPage({
   const sp = await searchParams;
   const onboard = sp.onboard === "true";
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "execution-map");
 
   const t = await getTranslations("roadmap");
   const org = await getOrgContext();

@@ -19,6 +19,8 @@ export default async function CharterPage({
   const { locale, projectId } = await params;
   const { onboard } = await searchParams;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "charter");
 
   const org = await getOrgContext();
   const supabase = await createClient();

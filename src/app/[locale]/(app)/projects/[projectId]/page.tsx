@@ -34,6 +34,16 @@ export default async function ProjectDetailPage({
   const { locale, projectId } = await params;
   setRequestLocale(locale);
 
+  // Contributors (team members) don't get the project command center — send them
+  // to their Workboard. Managers (PMO/PM/creator) see the full overview.
+  const { getProjectAccess, canAccessProjectTab } = await import("@/lib/auth");
+  const orgForGuard = await getOrgContext();
+  const accessForGuard = await getProjectAccess(orgForGuard, projectId);
+  if (!canAccessProjectTab(accessForGuard, "overview")) {
+    const { redirect } = await import("next/navigation");
+    redirect(`${locale === "es" ? "/es" : ""}/projects/${projectId}/workboard`);
+  }
+
   const t = await getTranslations("projects");
   const tAi = await getTranslations("projects.aiCommSummary");
   const tDash = await getTranslations("projects.dashboard");

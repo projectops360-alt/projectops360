@@ -19,6 +19,8 @@ export default async function DeliveryPage({
   const { locale, projectId } = await params;
   const { setup } = await searchParams;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "delivery");
 
   const org = await getOrgContext();
   const supabase = await createClient();

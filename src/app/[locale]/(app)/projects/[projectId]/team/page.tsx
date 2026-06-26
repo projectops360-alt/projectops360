@@ -15,6 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage({ params }: { params: Promise<{ locale: string; projectId: string }> }) {
   const { locale, projectId } = await params;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "team");
   const org = await getOrgContext();
   const admin = createAdminClient();
 
