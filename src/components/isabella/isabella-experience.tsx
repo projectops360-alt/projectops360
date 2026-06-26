@@ -46,6 +46,10 @@ const ICONS: Record<string, typeof ScanSearch> = {
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert,
 };
 
+// The realistic 3D figure only renders when the official Ready Player Me avatar
+// URL is configured; otherwise the elegant holographic presence stands in.
+const HAS_3D_AVATAR = !!process.env.NEXT_PUBLIC_ISABELLA_AVATAR_URL;
+
 const MODE_ICON: Record<WindowMode, typeof Compass> = {
   assistant: MessageSquare,
   guide: Compass,
@@ -95,6 +99,8 @@ export function IsabellaExperience({
   const [greeting, setGreeting] = useState(true);
   const [speaking, setSpeaking] = useState(false);
   const [guideNote, setGuideNote] = useState<string | null>(null);
+  // True when voice is enabled but no female voice could play (text-only, never male).
+  const [voiceUnavailable, setVoiceUnavailable] = useState(false);
   const [tone, setTone] = useState<StageTone>(() => {
     try {
       const s = typeof window !== "undefined" ? (window.localStorage.getItem(TONE_STORAGE) as StageTone | null) : null;
@@ -163,7 +169,7 @@ export function IsabellaExperience({
         setTurns((t) => t.map((x) => (x.id === id ? { ...x, answer } : x)));
         setSpeaking(true);
         setTimeout(() => setSpeaking(false), 3200);
-        if (voice.enabled) voice.speak(answer.answer, answer.language);
+        if (voice.enabled) setVoiceUnavailable(!voice.speak(answer.answer, answer.language));
       } catch {
         setTurns((t) =>
           t.map((x) =>
@@ -323,9 +329,11 @@ export function IsabellaExperience({
             <div className="absolute inset-0">
               <HologramPlaceholder state={presence} size={presenceSize} accent={expert.presentation.accent} label={expert.displayName} />
             </div>
-            <div className="absolute inset-0">
-              <IsabellaPresence renderer="three" state={presence} size={presenceSize} accent={expert.presentation.accent} name={expert.displayName} />
-            </div>
+            {HAS_3D_AVATAR && (
+              <div className="absolute inset-0">
+                <IsabellaPresence renderer="three" state={presence} size={presenceSize} accent={expert.presentation.accent} name={expert.displayName} />
+              </div>
+            )}
           </div>
           <div className={styles.nameplate}>
             <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
@@ -334,9 +342,9 @@ export function IsabellaExperience({
               <span className={styles.statusDot} />
               {statusLabel[presence]}
             </p>
-            {voice.enabled && voice.supported && !voice.hasFemaleVoice(locale) && (
+            {voice.enabled && voice.supported && (voiceUnavailable || !voice.hasFemaleVoice(locale)) && (
               <p className="mt-1 text-[10px] text-muted-foreground">
-                {tt("No female voice installed — using the closest available.", "No hay voz femenina instalada — uso la más cercana.")}
+                {tt("Female voice unavailable on this device.", "Voz femenina no disponible en este dispositivo.")}
               </p>
             )}
           </div>
@@ -389,7 +397,7 @@ export function IsabellaExperience({
                   locale={locale}
                   links={actionLinks}
                   canSpeak={voice.supported}
-                  onSpeak={(text, lang) => voice.speak(text, lang)}
+                  onSpeak={(text, lang) => setVoiceUnavailable(!voice.speak(text, lang))}
                   onNavigate={onNavigate}
                   onFeedback={(helpful) => feedback(turn.id, turn.answer!.answerId, helpful)}
                   onFollowup={(q) => ask("question", q)}

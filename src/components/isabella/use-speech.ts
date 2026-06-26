@@ -56,7 +56,9 @@ export interface SpeechApi {
   /** Whether a female voice exists for the language (so the UI can inform gracefully). */
   hasFemaleVoice: (lang: Locale) => boolean;
   toggleEnabled: () => void;
-  speak: (text: string, lang: Locale) => void;
+  /** Speaks ONLY with a female voice. Returns false (and does NOT speak) when no
+   *  female voice exists — Isabella never speaks with a male voice. */
+  speak: (text: string, lang: Locale) => boolean;
   stop: () => void;
 }
 
@@ -100,26 +102,20 @@ export function useSpeech(): SpeechApi {
     return voices.filter((v) => v.lang?.toLowerCase().startsWith(want));
   }, []);
 
-  // Always prefer a FEMALE voice in the language; prefer LatAm Spanish / US
-  // English exact locales; never fall back to a known-male voice when avoidable.
-  const pickVoice = useCallback(
+  // Isabella speaks ONLY with a FEMALE voice. Prefer LatAm Spanish / US English
+  // exact locales. If no female voice exists for the language → return null and
+  // the caller shows text only (NEVER a male voice).
+  const pickFemaleVoice = useCallback(
     (lang: Locale): SpeechSynthesisVoice | null => {
       if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
-      const inLang = voicesFor(lang);
-      if (inLang.length === 0) return null;
-      const female = inLang.filter(isFemaleVoice);
+      const female = voicesFor(lang).filter(isFemaleVoice);
+      if (female.length === 0) return null;
       const preferLocale = lang === "es" ? ["es-mx", "es-us", "es-419", "es-co", "es-ar", "es-es"] : ["en-us", "en-ca", "en-gb"];
-      const byLocale = (list: SpeechSynthesisVoice[]) => {
-        for (const loc of preferLocale) {
-          const hit = list.find((v) => v.lang?.toLowerCase() === loc);
-          if (hit) return hit;
-        }
-        return list[0];
-      };
-      if (female.length) return byLocale(female);
-      // No female voice → avoid known-male voices if any neutral ones exist.
-      const notMale = inLang.filter((v) => !MALE_NAMES.some((m) => v.name.toLowerCase().includes(m)));
-      return byLocale(notMale.length ? notMale : inLang);
+      for (const loc of preferLocale) {
+        const hit = female.find((v) => v.lang?.toLowerCase() === loc);
+        if (hit) return hit;
+      }
+      return female[0];
     },
     [voicesFor],
   );
@@ -130,23 +126,27 @@ export function useSpeech(): SpeechApi {
   );
 
   const speak = useCallback(
-    (text: string, lang: Locale) => {
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    (text: string, lang: Locale): boolean => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
       const clean = plainForSpeech(text);
-      if (!clean) return;
+      if (!clean) return false;
+      // Female-only: if there is no female voice for this language, do NOT speak
+      // (Isabella never uses a male voice) — the UI shows text only + a notice.
+      const v = pickFemaleVoice(lang);
+      if (!v) return false;
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(clean);
       u.lang = lang === "es" ? "es-ES" : "en-US";
-      const v = pickVoice(lang);
-      if (v) u.voice = v;
+      u.voice = v;
       u.rate = 1;
       u.pitch = 1;
       u.onstart = () => setSpeaking(true);
       u.onend = () => setSpeaking(false);
       u.onerror = () => setSpeaking(false);
       window.speechSynthesis.speak(u);
+      return true;
     },
-    [pickVoice],
+    [pickFemaleVoice],
   );
 
   const toggleEnabled = useCallback(() => {
