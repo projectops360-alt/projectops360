@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import { runAi } from "@/lib/ai";
 import type { Locale, ActionItemPriority } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -54,12 +54,9 @@ export async function extractActionItemsAction(input: {
   projectId: string;
   locale: string;
 }): Promise<ActionExtractionResult> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { suggestions: [], aiRunId: "", error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { suggestions: [], aiRunId: "", error: "forbidden" };
+  const org = __g.org;
 
   const supabase = createAdminClient();
 
@@ -157,12 +154,9 @@ export async function approveExtractedActionItemAction(input: {
   aiRunId: string;
   locale: string;
 }): Promise<ActionApprovalResult> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: "forbidden" };
+  const org = __g.org;
 
   const parsed = approveActionItemSchema.safeParse({
     meetingId: input.meetingId,

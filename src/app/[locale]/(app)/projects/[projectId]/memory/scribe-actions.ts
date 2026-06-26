@@ -11,17 +11,15 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { Locale } from "@/types/database";
 import { analyzeScribeCapture, type ScribeAnalysis } from "@/lib/scribe/ai";
 
-async function ctx() {
-  try {
-    const org = await getOrgContext();
-    if (org.role === "viewer") return { error: "not_allowed" as const };
-    return { org, supabase: createAdminClient() };
-  } catch { return { error: "not_authenticated" as const }; }
+async function ctx(projectId: string) {
+  const gate = await requireProjectContributor(projectId);
+  if (!gate.ok) return { error: gate.error };
+  return { org: gate.org, supabase: createAdminClient() };
 }
 
 const ALLOWED_SOURCE_TYPES = new Set([
@@ -32,7 +30,7 @@ const ALLOWED_SOURCE_TYPES = new Set([
 // ── Analyze ───────────────────────────────────────────────────────────────────
 
 export async function analyzeScribeAction(input: { projectId: string; text: string; locale: string }): Promise<{ error?: string; analysis?: ScribeAnalysis }> {
-  const c = await ctx();
+  const c = await ctx(input.projectId);
   if ("error" in c) return { error: c.error };
   if (!input.text?.trim()) return { error: "empty" };
   const analysis = await analyzeScribeCapture(c.org, input.projectId, input.text, (input.locale === "es" ? "es" : "en") as Locale);
@@ -190,7 +188,7 @@ export interface MemoryArtifact {
 /** Returns the artifacts a ProjectOps Scribe note generated (work items,
  *  decisions, risks) plus any extractions that stayed memory-only. */
 export async function getMemoryArtifactsAction(input: { memoryItemId: string; projectId: string; locale: string }): Promise<{ artifacts: MemoryArtifact[] }> {
-  const c = await ctx();
+  const c = await ctx(input.projectId);
   if ("error" in c) return { artifacts: [] };
   const { org, supabase } = c;
   const base = input.locale === "es" ? "/es" : "";
@@ -271,7 +269,7 @@ export interface MemoryIndexStatus {
 }
 
 export async function getMemoryIndexStatusAction(input: { memoryItemId: string; projectId: string }): Promise<{ status?: MemoryIndexStatus; error?: string }> {
-  const c = await ctx();
+  const c = await ctx(input.projectId);
   if ("error" in c) return { error: c.error };
   const { org, supabase } = c;
 
@@ -306,7 +304,7 @@ export async function getMemoryIndexStatusAction(input: { memoryItemId: string; 
 
 /** Re-generate the embedding for a memory item (admin "re-index" action). */
 export async function reindexMemoryItemAction(input: { memoryItemId: string; projectId: string; locale: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await ctx(input.projectId);
   if ("error" in c) return { error: c.error };
   const { org, supabase } = c;
   const { data: item } = await supabase.from("project_memory_items")
@@ -329,7 +327,7 @@ export async function saveScribeEntryAction(input: {
   createApproved: boolean;
   locale: string;
 }): Promise<{ error?: string; memoryItemId?: string; created?: { workItems: number; decisions: number; risks: number } }> {
-  const c = await ctx();
+  const c = await ctx(input.projectId);
   if ("error" in c) return { error: c.error };
   const { org, supabase } = c;
   const lang = input.locale === "es" ? "es" : "en";

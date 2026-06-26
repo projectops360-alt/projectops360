@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { Locale } from "@/types/database";
 import { revalidatePath } from "next/cache";
@@ -95,12 +95,9 @@ export async function createDocumentAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string; documentId?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = createDocumentSchema.safeParse({
     title: input.title,
@@ -203,12 +200,9 @@ export async function updateDocumentAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = updateDocumentSchema.safeParse({
     documentId: input.documentId,
@@ -310,6 +304,13 @@ export async function archiveDocumentAction(
   }
 
   const supabase = createAdminClient();
+
+  const { data: __row } = await supabase
+    .from("documents").select("project_id")
+    .eq("id", documentId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!__row?.project_id) return { error: "not_found" };
+  const __g = await requireProjectContributor(__row.project_id as string);
+  if (!__g.ok) return { error: __g.error };
 
   const { error: deleteError } = await supabase
     .from("documents")

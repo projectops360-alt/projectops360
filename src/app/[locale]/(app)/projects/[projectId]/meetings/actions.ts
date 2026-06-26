@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, requireProjectContributor } from "@/lib/auth";
 import { emitAndAutoLink } from "@/lib/graph/emit-event";
 import type { Locale } from "@/types/database";
 import { revalidatePath } from "next/cache";
@@ -127,12 +127,9 @@ export async function createMeetingAction(input: {
   locale: string;
 }): Promise<{ error?: string; meetingId?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = createMeetingSchema.safeParse({
@@ -237,12 +234,9 @@ export async function updateMeetingAction(input: {
   locale: string;
 }): Promise<{ error?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = updateMeetingSchema.safeParse({
@@ -329,6 +323,13 @@ export async function archiveMeetingAction(
 
   // ── Soft delete ─────────────────────────────────────────────────────────
   const supabase = createAdminClient();
+
+  const { data: __row } = await supabase
+    .from("meetings").select("project_id")
+    .eq("id", meetingId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!__row?.project_id) return { error: "not_found" };
+  const __g = await requireProjectContributor(__row.project_id as string);
+  if (!__g.ok) return { error: __g.error };
 
   const { error: deleteError } = await supabase
     .from("meetings")

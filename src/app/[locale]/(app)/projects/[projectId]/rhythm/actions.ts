@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { buildAgenda, getTemplate } from "@/lib/rhythm/templates";
@@ -24,7 +24,6 @@ function normalizeLink(v?: string): string | null {
   if (!/^https?:\/\//i.test(s)) return `https://${s}`.slice(0, 500);
   return s.slice(0, 500);
 }
-async function auth() { try { return await getOrgContext(); } catch { return null; } }
 function rv(locale: string, projectId: string) {
   revalidatePath(`/${locale}/projects/${projectId}/rhythm`, "page");
 }
@@ -36,7 +35,7 @@ export async function createEventAction(input: {
   startDatetime: string; endDatetime?: string; priority?: string; status?: string;
   relatedMilestoneId?: string; relatedTaskId?: string; relatedRiskId?: string; locale: string;
 }): Promise<{ error?: string; eventId?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const schema = z.object({
     projectId: z.string().uuid(),
     title: z.string().min(1).max(300).transform((s) => s.trim()),
@@ -74,7 +73,7 @@ export async function updateEventAction(input: {
   eventId: string; projectId: string; title?: string; description?: string;
   startDatetime?: string; endDatetime?: string; priority?: string; status?: string; locale: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   if (!z.string().uuid().safeParse(input.eventId).success) return err("validation_error");
   const patch: Record<string, unknown> = {};
   if (input.title) patch.title = input.title.trim();
@@ -97,7 +96,7 @@ export async function updateEventAction(input: {
 }
 
 export async function deleteEventAction(input: { eventId: string; projectId: string; locale: string }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const supabase = createAdminClient();
   const { error } = await supabase.from("project_events")
     .update({ deleted_at: new Date().toISOString() })
@@ -118,7 +117,7 @@ export async function createMeetingFromTemplateAction(input: {
   endDatetime?: string; priority?: string; meetingLink?: string;
   attendees?: { name?: string; stakeholderId?: string; role?: string }[]; locale: string;
 }): Promise<{ error?: string; eventId?: string; meetingId?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const schema = z.object({
     projectId: z.string().uuid(),
     meetingType: z.enum(["kickoff","status_update","stakeholder_review","project_review","closing","other"]),
@@ -178,7 +177,7 @@ export async function updateMeetingAction(input: {
   meetingId: string; projectId: string; locale: string;
   agenda?: AgendaSection[]; notes?: string; objective?: string; expectedOutcome?: string; meetingLink?: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const lang = (input.locale as Locale) ?? "en";
   const patch: Record<string, unknown> = {};
   if (input.agenda) patch.agenda_json = input.agenda.slice(0, 40).map((s) => ({ key: String(s.key), title: String(s.title).slice(0, 200), content: String(s.content ?? "").slice(0, 8000) }));
@@ -199,7 +198,7 @@ export async function updateMeetingAction(input: {
 export async function addAttendeeAction(input: {
   meetingId: string; projectId: string; name?: string; stakeholderId?: string; role?: string; locale: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   if (!input.name?.trim() && !input.stakeholderId) return err("validation_error");
   const supabase = createAdminClient();
   const { error } = await supabase.from("meeting_attendees").insert({
@@ -216,7 +215,7 @@ export async function addAttendeeAction(input: {
 export async function updateAttendeeAction(input: {
   attendeeId: string; projectId: string; attendanceStatus?: string; role?: string; locale: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const patch: Record<string, unknown> = {};
   if (input.attendanceStatus && ["invited","accepted","declined","tentative","attended","absent"].includes(input.attendanceStatus)) patch.attendance_status = input.attendanceStatus;
   if (input.role && ["organizer","presenter","required","optional"].includes(input.role)) patch.role = input.role;
@@ -229,7 +228,7 @@ export async function updateAttendeeAction(input: {
 }
 
 export async function removeAttendeeAction(input: { attendeeId: string; projectId: string; locale: string }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const supabase = createAdminClient();
   const { error } = await supabase.from("meeting_attendees").delete()
     .eq("id", input.attendeeId).eq("organization_id", org.organizationId);
@@ -243,7 +242,7 @@ export async function removeAttendeeAction(input: { attendeeId: string; projectI
 export async function addMeetingDecisionAction(input: {
   meetingId: string; projectId: string; decision: string; impactArea?: string; locale: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   if (!input.decision?.trim()) return err("validation_error");
   const lang = (input.locale as Locale) ?? "en";
   const supabase = createAdminClient();
@@ -264,7 +263,7 @@ export async function addMeetingActionItemAction(input: {
   meetingId: string; projectId: string; title: string; description?: string;
   dueDate?: string; priority?: string; relatedTaskId?: string; locale: string;
 }): Promise<{ error?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   if (!input.title?.trim()) return err("validation_error");
   const lang = (input.locale as Locale) ?? "en";
   const supabase = createAdminClient();
@@ -286,7 +285,7 @@ export async function addMeetingActionItemAction(input: {
 // ── Summary + complete (AI + Project Memory) ───────────────────────────────────
 
 export async function generateSummaryAction(input: { meetingId: string; projectId: string; locale: string }): Promise<{ error?: string; summary?: string }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const { generateMeetingSummary } = await import("@/lib/rhythm/service");
   const res = await generateMeetingSummary(org, input.meetingId, (input.locale as Locale) ?? "en");
   rv(input.locale, input.projectId);
@@ -295,7 +294,7 @@ export async function generateSummaryAction(input: { meetingId: string; projectI
 }
 
 export async function completeMeetingAction(input: { meetingId: string; projectId: string; locale: string }): Promise<{ error?: string; memoryItems?: number }> {
-  const org = await auth(); if (!org) return err("not_authenticated");
+  const __g = await requireProjectContributor(input.projectId); if (!__g.ok) return err(__g.error); const org = __g.org;
   const { completeMeeting } = await import("@/lib/rhythm/service");
   const res = await completeMeeting(org, input.meetingId, (input.locale as Locale) ?? "en");
   await logAudit({ org, projectId: input.projectId, action: "update", entityType: "meetings", entityId: input.meetingId, metadata: { completed: true, memory_items: res.memoryItems } });

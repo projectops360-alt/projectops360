@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectManager, requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   getCharterByProject, snapshotCharterVersion, syncCharterToMemory,
@@ -12,12 +12,16 @@ import type { Locale } from "@/types/database";
 
 const VALID_KEYS = new Set<string>(CHARTER_FIELDS.map((f) => f.key));
 
-async function authed() {
-  try {
-    return await getOrgContext();
-  } catch {
-    return null;
-  }
+/** Charter & governance are PM/PMO concerns: require manager tier. */
+async function managerOrg(projectId: string) {
+  const gate = await requireProjectManager(projectId);
+  return gate.ok ? gate.org : null;
+}
+
+/** Read-only charter AI: require at least an active project member. */
+async function contributorOrg(projectId: string) {
+  const gate = await requireProjectContributor(projectId);
+  return gate.ok ? gate.org : null;
 }
 
 /** Save edited charter section fields. Editing an approved charter opens a new
@@ -26,8 +30,8 @@ export async function updateCharterAction(input: {
   projectId: string;
   fields: Partial<Record<CharterFieldKey, string>>;
 }): Promise<{ error?: string; status?: string; version?: number }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
 
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
@@ -66,8 +70,8 @@ const transition = z.object({ projectId: z.string().uuid(), notes: z.string().ma
  *  Readiness gate: required text fields complete AND governance defined
  *  (≥1 role, ≥1 approval-matrix rule, ≥1 sign-off requested). */
 export async function submitCharterAction(input: { projectId: string }): Promise<{ error?: string; missing?: string[] }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
   if (!charter) return { error: "no_charter" };
@@ -98,8 +102,8 @@ export async function submitCharterAction(input: { projectId: string }): Promise
 export async function approveCharterAction(input: { projectId: string; notes?: string; locale: string }): Promise<{ error?: string }> {
   const parsed = transition.safeParse(input);
   if (!parsed.success) return { error: "validation_error" };
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
 
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
@@ -131,8 +135,8 @@ export async function approveCharterAction(input: { projectId: string; notes?: s
 
 /** Reject → Revision Required, with reviewer notes. */
 export async function rejectCharterAction(input: { projectId: string; notes?: string }): Promise<{ error?: string }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
   if (!charter) return { error: "no_charter" };
@@ -148,7 +152,7 @@ export async function rejectCharterAction(input: { projectId: string; notes?: st
 // ── Child entities (roles / governance rules / approval matrix / sign-off) ──
 
 async function charterCtx(projectId: string) {
-  const org = await authed();
+  const org = await managerOrg(projectId);
   if (!org) return null;
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, projectId);
@@ -245,8 +249,8 @@ export async function saveSignoffAction(input: {
 export async function deleteCharterChildAction(input: {
   projectId: string; table: "project_charter_roles" | "project_governance_rules" | "project_approval_matrix"; id: string;
 }): Promise<{ error?: string }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const { error } = await supabase.from(input.table)
     .update({ deleted_at: new Date().toISOString() })
@@ -257,8 +261,8 @@ export async function deleteCharterChildAction(input: {
 // ── AI actions (Phase 4) ────────────────────────────────────────────────────
 
 export async function generateCharterDraftAction(input: { projectId: string; locale: string }): Promise<{ error?: string; count?: number }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const charter = await getCharterByProject(supabase, org.organizationId, input.projectId);
   if (!charter) return { error: "no_charter" };
@@ -281,8 +285,8 @@ export async function generateCharterDraftAction(input: { projectId: string; loc
 
 /** Generate / expand a SINGLE charter field from the user's idea (no save). */
 export async function generateFieldAction(input: { projectId: string; fieldKey: string; idea?: string; locale: string }): Promise<{ error?: string; text?: string }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await contributorOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   if (!VALID_KEYS.has(input.fieldKey)) return { error: "bad_field" };
   const { generateCharterField } = await import("@/lib/charter/ai");
   const text = await generateCharterField(org, input.projectId, input.fieldKey as CharterFieldKey, input.idea ?? "", (input.locale === "es" ? "es" : "en") as Locale);
@@ -290,24 +294,24 @@ export async function generateFieldAction(input: { projectId: string; fieldKey: 
 }
 
 export async function gapAnalysisAction(input: { projectId: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", items: [] as { area: string; severity: string; recommendation: string }[] };
+  const org = await contributorOrg(input.projectId);
+  if (!org) return { error: "forbidden", items: [] as { area: string; severity: string; recommendation: string }[] };
   const { runGapAnalysis } = await import("@/lib/charter/ai");
   const items = await runGapAnalysis(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { items };
 }
 
 export async function scopeCreepAction(input: { projectId: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", flags: [] as { item: string; reason: string }[] };
+  const org = await contributorOrg(input.projectId);
+  if (!org) return { error: "forbidden", flags: [] as { item: string; reason: string }[] };
   const { detectScopeCreep } = await import("@/lib/charter/ai");
   const flags = await detectScopeCreep(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { flags };
 }
 
 export async function stakeholderSummaryAction(input: { projectId: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", summary: "" };
+  const org = await contributorOrg(input.projectId);
+  if (!org) return { error: "forbidden", summary: "" };
   const { generateStakeholderSummary } = await import("@/lib/charter/ai");
   const summary = await generateStakeholderSummary(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { summary };
@@ -348,8 +352,8 @@ export async function generateGovernanceAction(input: { projectId: string; local
 }
 
 export async function askCharterAction(input: { projectId: string; question: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", answer: "" };
+  const org = await contributorOrg(input.projectId);
+  if (!org) return { error: "forbidden", answer: "" };
   if (!input.question?.trim()) return { answer: "" };
   const { askCharter } = await import("@/lib/charter/ai");
   const answer = await askCharter(org, input.projectId, input.question.trim(), (input.locale === "es" ? "es" : "en") as Locale);

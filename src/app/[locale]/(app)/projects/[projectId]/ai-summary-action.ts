@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import { runAi } from "@/lib/ai";
 import type { Locale, I18nField } from "@/types/database";
 import { getI18nValue } from "@/types/database";
@@ -35,12 +35,9 @@ export async function summarizeCommunicationHistoryAction(input: {
   projectId: string;
   locale: string;
 }): Promise<CommSummaryResult> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return emptyResult("not_authenticated");
-  }
+  const gate = await requireProjectContributor(input.projectId);
+  if (!gate.ok) return emptyResult("forbidden");
+  const org = gate.org;
 
   const supabase = createAdminClient();
   const lang = input.locale as Locale;

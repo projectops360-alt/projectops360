@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import {
   validateDrawingFile,
   inferDrawingMetadata,
@@ -22,7 +22,9 @@ import type { EstimateSummary } from "@/lib/drawing-intelligence/costing";
 /** Verify the project belongs to the caller's organization. Returns the org
  *  context, or null when access is denied / project missing. */
 async function assertProjectAccess(projectId: string) {
-  const org = await getOrgContext();
+  const gate = await requireProjectContributor(projectId);
+  if (!gate.ok) return null;
+  const org = gate.org;
   const supabase = createAdminClient();
   const { data: project } = await supabase
     .from("projects")

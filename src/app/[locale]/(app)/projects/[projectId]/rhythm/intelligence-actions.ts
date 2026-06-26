@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, requireProjectContributor } from "@/lib/auth";
 import { logRythmActivity } from "@/lib/rythm/activity-log";
 import { setMeetingRythmStatus } from "@/lib/rythm/processing-service";
 import {
@@ -90,12 +90,9 @@ export interface ProjectMilestoneOption {
 export async function listProjectMilestonesAction(input: {
   projectId: string;
 }): Promise<{ milestones?: ProjectMilestoneOption[]; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z.object({ projectId: z.string().uuid() }).safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
 
@@ -123,12 +120,9 @@ export async function generateMeetingIntelligenceAction(input: {
   meetingId: string;
   locale: string;
 }): Promise<{ intelligence?: RythmIntelligence | null; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({ projectId: z.string().uuid(), meetingId: z.string().uuid(), locale: z.enum(["en", "es"]).default("en") })
     .safeParse(input);
@@ -182,12 +176,9 @@ export async function generateMeetingIntelligenceAction(input: {
 export async function getMeetingIntelligenceAction(input: {
   meetingId: string;
 }): Promise<{ intelligence?: RythmIntelligence | null; error?: string }> {
+  // Read-only, meeting-scoped: org isolation only for now (no projectId in input).
   let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  try { org = await getOrgContext(); } catch { return { error: "not_authenticated" }; }
   const parsed = z.object({ meetingId: z.string().uuid() }).safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
 
@@ -235,12 +226,9 @@ export async function promoteActionItemToTaskAction(input: {
   dueDate?: string | null;
   milestoneId?: string | null;
 }): Promise<{ taskId?: string; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -311,12 +299,9 @@ export async function promoteDecisionAction(input: {
   description?: string;
   owner?: string;
 }): Promise<{ decisionId?: string; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -381,12 +366,9 @@ export async function promoteRiskAction(input: {
   owner?: string;
   confidence?: number;
 }): Promise<{ riskId?: string; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -465,12 +447,9 @@ export async function updateItemOwnerAction(input: {
   index: number;
   owner: string;
 }): Promise<{ ok?: boolean; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -532,12 +511,9 @@ export async function deleteIntelligenceItemAction(input: {
   category: string;
   index: number;
 }): Promise<{ ok?: boolean; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -584,12 +560,9 @@ export async function deleteMeetingIntelligenceAction(input: {
   projectId: string;
   meetingId: string;
 }): Promise<{ ok?: boolean; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z.object({ projectId: z.string().uuid(), meetingId: z.string().uuid() }).safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
 
@@ -628,12 +601,9 @@ export async function applyIntelligenceToProjectAction(input: {
   locale: string;
   milestoneId?: string | null;
 }): Promise<{ counts?: ApplyCounts; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),

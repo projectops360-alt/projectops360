@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import {
   getSpeakerMappings,
   saveSpeakerMappings,
@@ -26,12 +26,9 @@ export async function getSpeakerDataAction(input: {
   meetingId: string;
   transcriptId: string | null;
 }): Promise<{ mappings?: RythmSpeakerMapping[]; options?: RythmSpeakerOption[]; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -62,12 +59,9 @@ export async function saveSpeakerMappingsAction(input: {
   transcriptId: string | null;
   mappings: { originalSpeakerLabel: string; mappedParticipantName: string; mappedParticipantEmail?: string | null }[];
 }): Promise<{ ok?: boolean; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),
@@ -110,12 +104,9 @@ export async function resetSpeakerMappingsAction(input: {
   meetingId: string;
   transcriptId: string | null;
 }): Promise<{ ok?: boolean; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
   const parsed = z
     .object({
       projectId: z.string().uuid(),

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitAndAutoLink } from "@/lib/graph/emit-event";
 import type { Locale } from "@/types/database";
@@ -111,12 +111,9 @@ export async function createCommunicationAction(input: {
   locale: string;
 }): Promise<{ error?: string; communicationId?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = createCommunicationSchema.safeParse({
@@ -228,12 +225,9 @@ export async function updateCommunicationAction(input: {
   locale: string;
 }): Promise<{ error?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = updateCommunicationSchema.safeParse({
@@ -327,6 +321,13 @@ export async function archiveCommunicationAction(
 
   // ── Soft delete ─────────────────────────────────────────────────────────
   const supabase = createAdminClient();
+
+  const { data: __row } = await supabase
+    .from("communication_items").select("project_id")
+    .eq("id", communicationId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!__row?.project_id) return { error: "not_found" };
+  const __g = await requireProjectContributor(__row.project_id as string);
+  if (!__g.ok) return { error: __g.error };
 
   const { error: deleteError } = await supabase
     .from("communication_items")

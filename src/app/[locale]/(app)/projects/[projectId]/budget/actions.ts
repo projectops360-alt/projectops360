@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectManager } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 // ── Edit a budget line (quantity / unit cost) ─────────────────────────────────
@@ -16,12 +16,9 @@ export async function updateBudgetLineAction(input: {
   quantity: number | null;
   unitCost: number | null;
 }): Promise<{ error?: string; total?: number | null }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const gate = await requireProjectManager(input.projectId);
+  if (!gate.ok) return { error: gate.error };
+  const org = gate.org;
 
   const schema = z.object({
     materialId: z.string().uuid(),

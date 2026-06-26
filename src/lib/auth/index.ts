@@ -28,3 +28,11 @@ export {
   canAccessProjectTab,
   type ProjectTab,
 } from "./permissions";
+
+export {
+  type AuthzError,
+  type AuthzResult,
+  requireProjectManager,
+  requireProjectContributor,
+  requireProjectAccess,
+} from "./authz";

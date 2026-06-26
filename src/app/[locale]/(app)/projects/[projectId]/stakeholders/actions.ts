@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, requireProjectManager } from "@/lib/auth";
 import type { Locale } from "@/types/database";
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────────────
@@ -82,12 +82,9 @@ export async function createStakeholderAction(input: {
   locale: string;
 }): Promise<{ error?: string; stakeholderId?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = createStakeholderSchema.safeParse({
@@ -153,12 +150,9 @@ export async function updateStakeholderAction(input: {
   locale: string;
 }): Promise<{ error?: string }> {
   // ── Authenticate ────────────────────────────────────────────────────────
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = updateStakeholderSchema.safeParse({
@@ -224,6 +218,13 @@ export async function archiveStakeholderAction(
 
   // ── Soft delete ─────────────────────────────────────────────────────────
   const supabase = createAdminClient();
+
+  const { data: __row } = await supabase
+    .from("stakeholders").select("project_id")
+    .eq("id", stakeholderId).eq("organization_id", org.organizationId).maybeSingle();
+  if (!__row?.project_id) return { error: "not_found" };
+  const __g = await requireProjectManager(__row.project_id as string);
+  if (!__g.ok) return { error: __g.error };
 
   const { error: deleteError } = await supabase
     .from("stakeholders")

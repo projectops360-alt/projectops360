@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import type { MemorySourceType } from "@/types/database";
@@ -78,12 +78,9 @@ export interface MemoryItemInput {
 export async function createMemoryItemAction(
   input: MemoryItemInput,
 ): Promise<{ error?: string; memoryItemId?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) {
@@ -156,12 +153,9 @@ export async function createMemoryItemAction(
 export async function updateMemoryItemAction(
   input: MemoryItemInput & { memoryItemId: string },
 ): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = updateSchema.safeParse(input);
   if (!parsed.success) {
@@ -224,12 +218,9 @@ export async function archiveMemoryItemAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const supabase = createAdminClient();
 
@@ -270,12 +261,9 @@ export async function reclassifyMemoryItemAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -305,12 +293,9 @@ export async function linkMemoryItemAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string; linkId?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const schema = z.object({
     memoryItemId: z.string().uuid(),
@@ -373,12 +358,9 @@ export async function unlinkMemoryItemAction(input: {
   projectId: string;
   locale: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectContributor(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const supabase = createAdminClient();
   const { error } = await supabase

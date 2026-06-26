@@ -149,5 +149,17 @@ Existe `audit_logs` + helper `logAudit()` y se usa ampliamente. **Carencias:**
 
 ---
 
+## 8b. Registro de implementación
+
+**Fase 0 (RLS P0) — HECHA y verificada en prod** (migración `20260813000000_security_hardening_phase0`): R1/R2/R3/R4/R6 cerradas; exploits de escalada (org role, flags de proyecto) y borrado de audit logs → 0 filas.
+
+**Fase 1 (guards en server actions) — HECHA** vía capa central `src/lib/auth/authz.ts` (`requireProjectManager` / `requireProjectContributor` / `requireProjectAccess`). Módulos gateados:
+- **Manager tier:** charter/gobernanza/sign-offs/aprobación, budget, stakeholders (create/update/archive), execution-map (dependencies, living-graph), delivery (framework setup/activación), milestones (roadmap).
+- **Contributor (manager o miembro del proyecto):** tasks (ownership), decisions, communications, documents, meetings (+IA de extracción), memory, scribe, delivery (backlog/ciclos/refinamiento), drawing-intelligence, rhythm (eventos/reuniones), rhythm/intelligence (promover a tarea/decisión/riesgo), rhythm/speaker, ai-summary. Los `archive*` resuelven el proyecto desde la entidad antes de gatear.
+
+**Remanente Fase 1.5 (entity-ID, org-scoped, bajo riesgo — no escalada, aislado por org):** `rhythm/transcription`, `rhythm/processing`, `rhythm/audio` (operan sobre audioFileId/jobId/meetingId), `links` (traceability, sin `project_id`), `rhythm/intelligence.getMeetingIntelligence` (solo lectura). Gating pendiente requiere resolver el proyecto desde la entidad.
+
+**Pendiente:** Fase 2 (campo-nivel + inmutables más allá de R1/R6), Fase 3 (auditoría IP/ubicación/rol + pantalla PM/PMO + log de intentos no autorizados), Fase 4 (RLS rol-aware en tablas sensibles), Fase 5 (tests de regresión de seguridad automatizados).
+
 ## 9. Criterios de aceptación
 Ver prompt original (puntos 1–18). El sistema está endurecido cuando: el incidente es imposible (✅ tareas), toda mutación sensible exige autorización server-side, RLS impide escalada vía API directa (R1–R3 cerrados), el frontend es solo UX, los intentos no autorizados se loguean, y existen tests que lo prueban — sin romper flujos legítimos PMO/PM ni módulos (Memory, Living Graph, Capacity, Scribe, etc.).

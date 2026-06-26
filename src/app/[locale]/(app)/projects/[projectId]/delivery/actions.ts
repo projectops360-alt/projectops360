@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectManager, requireProjectContributor } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { Locale } from "@/types/database";
 import {
@@ -12,14 +12,16 @@ import { computeReadiness, type WorkItemLike } from "@/lib/refinement/readiness"
 import { recommendFramework, type FrameworkInputs } from "@/lib/delivery/recommend";
 import { BOARD_TEMPLATES, boardTemplateFor, MEETING_RHYTHM, type DeliveryMethod } from "@/lib/delivery/config";
 
-async function authed() {
-  try { return await getOrgContext(); } catch { return null; }
+/** Framework setup/governance is a PM/PMO concern. */
+async function managerOrg(projectId: string) {
+  const gate = await requireProjectManager(projectId);
+  return gate.ok ? gate.org : null;
 }
 
 /** Rule-based recommendation (instant, no AI). Stored in the history table. */
 export async function recommendFrameworkAction(input: { projectId: string; inputs: FrameworkInputs }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" as const };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" as const };
   const rec = recommendFramework(input.inputs);
   const supabase = createAdminClient();
   await supabase.from("project_framework_recommendations").insert({
@@ -50,8 +52,8 @@ export interface FrameworkConfig {
 /** Save/confirm the framework configuration; builds the board template;
  *  records an event + Project Memory. Sets status to "configured". */
 export async function saveFrameworkAction(input: { projectId: string; config: FrameworkConfig; locale: string }): Promise<{ error?: string }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const c = input.config;
 
@@ -102,8 +104,8 @@ export async function saveFrameworkAction(input: { projectId: string; config: Fr
 
 /** Activate the framework (execution starts). */
 export async function activateFrameworkAction(input: { projectId: string }): Promise<{ error?: string }> {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated" };
+  const org = await managerOrg(input.projectId);
+  if (!org) return { error: "forbidden" };
   const supabase = createAdminClient();
   const fw = await getFrameworkByProject(supabase, org.organizationId, input.projectId);
   if (!fw) return { error: "no_framework" };
@@ -115,8 +117,9 @@ export async function activateFrameworkAction(input: { projectId: string }): Pro
 // ── Backlog ─────────────────────────────────────────────────────────────────
 
 async function ctx(projectId: string) {
-  const org = await authed();
-  if (!org) return null;
+  const gate = await requireProjectContributor(projectId);
+  if (!gate.ok) return null;
+  const org = gate.org;
   const supabase = createAdminClient();
   const fw = await getFrameworkByProject(supabase, org.organizationId, projectId);
   return { org, supabase, frameworkId: fw?.id ?? null };
@@ -463,8 +466,9 @@ export async function scopeCheckAction(input: { projectId: string; locale: strin
 }
 
 export async function deliveryStakeholderSummaryAction(input: { projectId: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", summary: "" };
+  const gate = await requireProjectContributor(input.projectId);
+  if (!gate.ok) return { error: "forbidden", summary: "" };
+  const org = gate.org;
   const { generateDeliveryStakeholderSummary } = await import("@/lib/delivery/ai");
   const summary = await generateDeliveryStakeholderSummary(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { summary };
@@ -485,8 +489,9 @@ export async function cycleLessonsAction(input: { projectId: string; cycleId: st
 }
 
 export async function frameworkHealthAction(input: { projectId: string; locale: string }) {
-  const org = await authed();
-  if (!org) return { error: "not_authenticated", recommendation: "" };
+  const gate = await requireProjectContributor(input.projectId);
+  if (!gate.ok) return { error: "forbidden", recommendation: "" };
+  const org = gate.org;
   const { recommendFrameworkHealth } = await import("@/lib/delivery/ai");
   const recommendation = await recommendFrameworkHealth(org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
   return { recommendation };

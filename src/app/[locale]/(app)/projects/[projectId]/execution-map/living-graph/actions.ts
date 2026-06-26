@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectManager } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
 
@@ -16,12 +16,9 @@ import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
 export async function refreshLivingGraphAction(input: {
   projectId: string;
 }): Promise<{ ok?: boolean; removed?: number; error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const gate = await requireProjectManager(input.projectId);
+  if (!gate.ok) return { error: gate.error };
+  const org = gate.org;
   const parsed = z.object({ projectId: z.string().uuid() }).safeParse(input);
   if (!parsed.success) return { error: "invalid_input" };
   const { projectId } = parsed.data;

@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { requireProjectManager } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { TaskDependency, DependencyType } from "@/types/database";
 
@@ -87,12 +87,9 @@ export async function createDependencyAction(input: {
   lag_days?: number;
   projectId: string;
 }): Promise<{ error?: string; dependencyId?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = createDependencySchema.safeParse(input);
   if (!parsed.success) {
@@ -179,12 +176,9 @@ export async function deleteDependencyAction(input: {
   dependencyId: string;
   projectId: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = deleteDependencySchema.safeParse(input);
   if (!parsed.success) {
@@ -226,12 +220,9 @@ export async function deleteDependencyAction(input: {
 export async function getDependenciesAction(input: {
   projectId: string;
 }): Promise<{ error?: string; data?: TaskDependency[] }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = getDependenciesSchema.safeParse(input);
   if (!parsed.success) {
@@ -264,12 +255,9 @@ export async function updateTaskDatesAction(input: {
   end_date?: string;
   projectId: string;
 }): Promise<{ error?: string }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
+  const __g = await requireProjectManager(input.projectId);
+  if (!__g.ok) return { error: __g.error };
+  const org = __g.org;
 
   const parsed = updateTaskDatesSchema.safeParse(input);
   if (!parsed.success) {
