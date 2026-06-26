@@ -364,7 +364,7 @@ export interface TraceabilityLink {
 
 // ── AI Runs ────────────────────────────────────────────────────────────────────
 
-export type AiPromptType = "summary" | "decision_analysis" | "stakeholder_mapping" | "risk_assessment" | "action_extraction" | "communication_history_summary" | "drawing_interpretation" | "memory_classification" | "custom";
+export type AiPromptType = "summary" | "decision_analysis" | "stakeholder_mapping" | "risk_assessment" | "action_extraction" | "communication_history_summary" | "drawing_interpretation" | "memory_classification" | "guide_coaching" | "custom";
 export type AiRunStatus = "pending" | "completed" | "failed" | "cancelled";
 export type AiSourceType = "decision" | "meeting" | "communication" | "document" | "action_item" | "project" | "memory";
 
