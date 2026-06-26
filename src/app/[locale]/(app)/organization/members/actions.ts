@@ -138,15 +138,53 @@ export async function resetWorkspaceUserPasswordAction(input: { userId: string; 
   return {};
 }
 
-/** Remove a workspace user from the organization (soft: status = removed). PMO/admin only. */
+/**
+ * Remove a workspace user from the organization — fully deletes the membership
+ * (they no longer appear in the workspace). The auth account itself is left
+ * intact (the person may belong to other orgs). PMO/admin only.
+ */
 export async function removeWorkspaceUserAction(input: { memberId: string; userId: string }): Promise<{ error?: string }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
   if (input.userId === c.org.userId) return { error: "cannot_remove_self" };
-  const { error } = await c.supabase.from("organization_members").update({ status: "removed" })
+  const { error } = await c.supabase.from("organization_members").delete()
     .eq("id", input.memberId).eq("organization_id", c.org.organizationId);
   if (error) return { error: "unexpected" };
-  await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.memberId, metadata: { removed: true } });
+  await logAudit({ org: c.org, action: "delete", entityType: "organization_members", entityId: input.memberId, metadata: { removed_user: input.userId } });
+  return {};
+}
+
+/**
+ * Permanently delete a user's account — ONLY when they have no activity that
+ * would be orphaned. PMO/admin only, never self.
+ *
+ * Safety: we pre-check "set null" references that would silently orphan data
+ * (assigned tasks, project memberships, PM-of-project, risk ownership). And the
+ * auth delete itself FAILS on "no action" FKs (created projects/meetings/
+ * decisions/tasks/etc.), which we surface as has_activity — so a user who has
+ * interacted with the system is never hard-deleted (use "Remove" instead).
+ * On success, cascade FKs clean up profile + memberships automatically.
+ */
+export async function deleteUserPermanentlyAction(input: { userId: string }): Promise<{ error?: string; activity?: number }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+  if (input.userId === c.org.userId) return { error: "cannot_remove_self" };
+
+  const checks = await Promise.all([
+    c.supabase.from("roadmap_tasks").select("id", { count: "exact", head: true }).eq("assigned_to", input.userId),
+    c.supabase.from("project_team_members").select("id", { count: "exact", head: true }).eq("user_id", input.userId),
+    c.supabase.from("projects").select("id", { count: "exact", head: true }).eq("project_manager_id", input.userId),
+    c.supabase.from("risks").select("id", { count: "exact", head: true }).eq("owner_user_id", input.userId),
+    c.supabase.from("action_items").select("id", { count: "exact", head: true }).eq("assigned_to", input.userId),
+  ]);
+  const activity = checks.reduce((s, r) => s + (r.count ?? 0), 0);
+  if (activity > 0) return { error: "has_activity", activity };
+
+  const { error } = await c.supabase.auth.admin.deleteUser(input.userId);
+  // "No action" FKs (created content) make this fail — never orphan anything.
+  if (error) return { error: "has_activity" };
+
+  await logAudit({ org: c.org, action: "delete", entityType: "organization_members", entityId: input.userId, metadata: { permanently_deleted: true } });
   return {};
 }
 

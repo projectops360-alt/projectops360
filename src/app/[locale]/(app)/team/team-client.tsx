@@ -21,7 +21,7 @@ import {
 } from "./actions";
 import {
   createMemberWithPasswordAction, updateWorkspaceUserAction,
-  resetWorkspaceUserPasswordAction, removeWorkspaceUserAction,
+  resetWorkspaceUserPasswordAction, removeWorkspaceUserAction, deleteUserPermanentlyAction,
 } from "../organization/members/actions";
 
 /** Generate a readable temporary password (no ambiguous chars). */
@@ -383,6 +383,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     weak_password: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
     cannot_change_self_status: tt("You can't change your own status.", "No puedes cambiar tu propio estado."),
     cannot_remove_self: tt("You can't remove yourself.", "No puedes removerte a ti mismo."),
+    has_activity: tt("This user already has activity in the system, so it can't be permanently deleted (it would orphan tasks). Use \"Remove\" instead — they lose access but their history stays intact.", "Este usuario ya tiene actividad en el sistema, así que no se puede eliminar definitivamente (dejaría tareas huérfanas). Usa \"Remover\" — pierde el acceso pero su historial queda intacto."),
     unexpected: tt("Something went wrong.", "Algo salió mal."),
   };
 
@@ -404,9 +405,16 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     if (r.error) setError(r.error); else { setResetDone(pwd); setPwd(""); }
   }
   async function remove() {
-    if (!confirm(tt("Remove this user from the workspace?", "¿Remover a este usuario del workspace?"))) return;
+    if (!confirm(tt("Remove this user from the workspace? They lose access; their history stays.", "¿Remover a este usuario del workspace? Pierde el acceso; su historial queda."))) return;
     setRemoving(true); setError(null);
     const r = await removeWorkspaceUserAction({ memberId: member.memberId, userId: member.userId });
+    setRemoving(false);
+    if (r.error) setError(r.error); else onRemoved();
+  }
+  async function deletePerm() {
+    if (!confirm(tt("Permanently delete this account? This cannot be undone.", "¿Eliminar esta cuenta definitivamente? No se puede deshacer."))) return;
+    setRemoving(true); setError(null);
+    const r = await deleteUserPermanentlyAction({ userId: member.userId });
     setRemoving(false);
     if (r.error) setError(r.error); else onRemoved();
   }
@@ -432,7 +440,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
         <div className="grid grid-cols-2 gap-3">
           <Field label={tt("Status", "Estado")}>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls} disabled={member.isYou}>
-              {MEMBER_STATUSES.map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
+              {MEMBER_STATUSES.filter((s) => s.value !== "removed").map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
             </select>
           </Field>
           <Field label={tt("Department", "Departamento")}><input value={dept} onChange={(e) => setDept(e.target.value)} maxLength={80} className={inputCls} /></Field>
@@ -462,9 +470,14 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
 
       <div className="mt-5 flex items-center justify-between gap-3">
         {!member.isYou ? (
-          <button type="button" onClick={remove} disabled={removing} className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-950/30">
-            {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{tt("Remove", "Remover")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={remove} disabled={removing} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">
+              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}{tt("Remove", "Remover")}
+            </button>
+            <button type="button" onClick={deletePerm} disabled={removing} title={tt("Delete the account permanently (only if it has no activity)", "Eliminar la cuenta definitivamente (solo si no tiene actividad)")} className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-950/30">
+              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{tt("Delete permanently", "Eliminar definitivamente")}
+            </button>
+          </div>
         ) : <span />}
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{tt("Cancel", "Cancelar")}</button>
