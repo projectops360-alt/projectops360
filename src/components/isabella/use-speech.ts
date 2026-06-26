@@ -25,10 +25,36 @@ export function plainForSpeech(text: string): string {
     .trim();
 }
 
+// Isabella is always female. SpeechSynthesis rarely exposes a gender flag, so we
+// score voices by known female/male voice names per platform (Windows/macOS/
+// Chrome/Android) and pick the best FEMALE voice in the conversation language.
+const FEMALE_NAMES = [
+  // Spanish (LatAm + ES)
+  "mónica", "monica", "paulina", "sabina", "helena", "laura", "esperanza", "marisol",
+  "lupe", "camila", "sofía", "sofia", "elena", "ximena", "dalia", "luciana", "valentina",
+  // English (NA + others)
+  "samantha", "victoria", "karen", "moira", "tessa", "fiona", "allison", "ava", "susan",
+  "zira", "aria", "jenny", "michelle", "joanna", "salli", "kimberly", "amy", "emma",
+  "google us english", "google español", "female", "mujer", "femenina", "femenino",
+];
+const MALE_NAMES = [
+  "jorge", "diego", "carlos", "juan", "pablo", "miguel", "raul", "raúl", "enrique",
+  "daniel", "alex", "fred", "david", "mark", "george", "james", "guy", "ravi", "rishi",
+  "male", "hombre", "masculina", "masculino",
+];
+
+function isFemaleVoice(v: SpeechSynthesisVoice): boolean {
+  const n = v.name.toLowerCase();
+  if (MALE_NAMES.some((m) => n.includes(m))) return false;
+  return FEMALE_NAMES.some((f) => n.includes(f));
+}
+
 export interface SpeechApi {
   supported: boolean;
   enabled: boolean;
   speaking: boolean;
+  /** Whether a female voice exists for the language (so the UI can inform gracefully). */
+  hasFemaleVoice: (lang: Locale) => boolean;
   toggleEnabled: () => void;
   speak: (text: string, lang: Locale) => void;
   stop: () => void;
@@ -68,16 +94,40 @@ export function useSpeech(): SpeechApi {
     setSpeaking(false);
   }, []);
 
-  const pickVoice = useCallback((lang: Locale): SpeechSynthesisVoice | null => {
+  const voicesFor = useCallback((lang: Locale): SpeechSynthesisVoice[] => {
     const want = lang === "es" ? "es" : "en";
     const voices = voicesRef.current.length ? voicesRef.current : window.speechSynthesis.getVoices();
-    // Prefer an exact-ish locale, then any voice in the language family.
-    return (
-      voices.find((v) => v.lang?.toLowerCase().startsWith(`${want}-`)) ||
-      voices.find((v) => v.lang?.toLowerCase().startsWith(want)) ||
-      null
-    );
+    return voices.filter((v) => v.lang?.toLowerCase().startsWith(want));
   }, []);
+
+  // Always prefer a FEMALE voice in the language; prefer LatAm Spanish / US
+  // English exact locales; never fall back to a known-male voice when avoidable.
+  const pickVoice = useCallback(
+    (lang: Locale): SpeechSynthesisVoice | null => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+      const inLang = voicesFor(lang);
+      if (inLang.length === 0) return null;
+      const female = inLang.filter(isFemaleVoice);
+      const preferLocale = lang === "es" ? ["es-mx", "es-us", "es-419", "es-co", "es-ar", "es-es"] : ["en-us", "en-ca", "en-gb"];
+      const byLocale = (list: SpeechSynthesisVoice[]) => {
+        for (const loc of preferLocale) {
+          const hit = list.find((v) => v.lang?.toLowerCase() === loc);
+          if (hit) return hit;
+        }
+        return list[0];
+      };
+      if (female.length) return byLocale(female);
+      // No female voice → avoid known-male voices if any neutral ones exist.
+      const notMale = inLang.filter((v) => !MALE_NAMES.some((m) => v.name.toLowerCase().includes(m)));
+      return byLocale(notMale.length ? notMale : inLang);
+    },
+    [voicesFor],
+  );
+
+  const hasFemaleVoice = useCallback(
+    (lang: Locale): boolean => voicesFor(lang).some(isFemaleVoice),
+    [voicesFor],
+  );
 
   const speak = useCallback(
     (text: string, lang: Locale) => {
@@ -115,5 +165,5 @@ export function useSpeech(): SpeechApi {
     });
   }, []);
 
-  return { supported, enabled, speaking, toggleEnabled, speak, stop };
+  return { supported, enabled, speaking, hasFemaleVoice, toggleEnabled, speak, stop };
 }
