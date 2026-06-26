@@ -32,8 +32,9 @@ import { QUICK_ACTIONS } from "@/lib/knowledge-os/config";
 import { resolveExpert } from "@/lib/knowledge-os/experts";
 import { detectLanguage } from "@/lib/knowledge-os/language";
 import { resolveScreen, enrichContextWithScreen } from "@/lib/knowledge-os/screens";
+import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-links";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
-import { ConfidenceBadge } from "@/components/living-guide";
+import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
 import styles from "./isabella-experience.module.css";
 
@@ -72,6 +73,11 @@ export function IsabellaExperience({
   );
   const expertTitle = expert.title[isEs ? "es" : "en"];
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expertTitle };
+
+  // Action links resolve against the UI locale (route follows the UI, not the
+  // conversation language). Same registry the server gave the model → the
+  // renderer only links hrefs that are actually allow-listed.
+  const actionLinks = useMemo(() => buildActionLinks(locale, context), [locale, context]);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -257,6 +263,7 @@ export function IsabellaExperience({
                 <AnswerCard
                   turn={turn}
                   locale={locale}
+                  links={actionLinks}
                   onFeedback={(helpful) => feedback(turn.id, turn.answer!.answerId, helpful)}
                   onFollowup={(q) => ask("question", q)}
                 />
@@ -325,11 +332,13 @@ export function IsabellaExperience({
 function AnswerCard({
   turn,
   locale,
+  links,
   onFeedback,
   onFollowup,
 }: {
   turn: Turn;
   locale: Locale;
+  links: ResolvedLink[];
   onFeedback: (helpful: boolean) => void;
   onFollowup: (q: string) => void;
 }) {
@@ -337,6 +346,8 @@ function AnswerCard({
   const tt = (en: string, es: string) => (isEs ? es : en);
   const a = turn.answer!;
   const [showSources, setShowSources] = useState(false);
+  const linkClass =
+    "inline-flex items-center gap-0.5 font-medium text-brand-300 underline decoration-brand-400/40 underline-offset-2 hover:text-white";
 
   return (
     <div className="rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.04] p-3">
@@ -347,12 +358,16 @@ function AnswerCard({
         )}
       </div>
 
-      <p className="whitespace-pre-line text-sm text-white/90">{a.answer}</p>
+      <div className="text-sm text-white/90">
+        <AnswerText text={a.answer} links={links} linkClassName={linkClass} />
+      </div>
 
       {a.steps.length > 0 && (
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-white/85">
           {a.steps.map((s, i) => (
-            <li key={i}>{s}</li>
+            <li key={i}>
+              <AnswerText text={s} links={links} linkClassName={linkClass} />
+            </li>
           ))}
         </ol>
       )}
