@@ -13,6 +13,8 @@ export default async function MeetingsPage({
 }) {
   const { locale, projectId } = await params;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "meetings");
 
   const t = await getTranslations("meetings");
   const org = await getOrgContext();

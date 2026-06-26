@@ -7,15 +7,20 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, getProjectAccess, isProjectManagerTier } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import type { Locale } from "@/types/database";
 import { PERMISSION_PRESETS, PERMISSION_FLAGS } from "@/lib/team-roles/config";
 import { recordTeamMemory } from "@/lib/team-roles/service";
 
-async function ctx() {
-  try { const org = await getOrgContext(); return { org, supabase: createAdminClient() }; }
-  catch { return null; }
+/** Requires manager tier (PMO/PM/creator/can_manage_team)
+ *  for the given project — so contributors can't mutate the team via raw calls. */
+async function managerCtx(projectId: string) {
+  let org;
+  try { org = await getOrgContext(); } catch { return null; }
+  const access = await getProjectAccess(org, projectId);
+  if (!isProjectManagerTier(access)) return null;
+  return { org, supabase: createAdminClient() };
 }
 
 function flagsFor(level: string, overrides?: Record<string, boolean>): Record<string, boolean> {
@@ -65,7 +70,7 @@ function buildRow(orgId: string, projectId: string, m: ProjectMemberInput) {
 // ── Add a single member (manual / directory / external) ─────────────────────
 
 export async function addProjectMemberAction(input: { projectId: string; member: ProjectMemberInput; locale: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const m = input.member;
   if (!m.user_id && !m.external_contact_id && !m.display_name?.trim() && !m.project_role?.trim())
@@ -80,7 +85,7 @@ export async function addProjectMemberAction(input: { projectId: string; member:
 // ── Add an entire company team → expand to project members ──────────────────
 
 export async function addCompanyTeamToProjectAction(input: { projectId: string; teamId: string; locale: string }): Promise<{ error?: string; added?: number }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { data: tm } = await c.supabase.from("organization_team_members").select("*")
     .eq("organization_team_id", input.teamId).eq("organization_id", c.org.organizationId);
@@ -127,7 +132,7 @@ export async function addStakeholderViewerAction(input: {
   projectId: string; name: string; email?: string; externalContactId?: string; userId?: string;
   accessLevel?: string; canApprove?: boolean; canComment?: boolean; locale: string;
 }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   if (!input.name?.trim() && !input.externalContactId && !input.userId) return { error: "empty" };
   const { error } = await c.supabase.from("stakeholder_access").insert({
@@ -145,7 +150,7 @@ export async function addStakeholderViewerAction(input: {
 }
 
 export async function revokeStakeholderAccessAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { error } = await c.supabase.from("stakeholder_access").update({ status: "revoked" }).eq("id", input.id).eq("organization_id", c.org.organizationId);
   return error ? { error: "unexpected" } : {};
@@ -154,7 +159,7 @@ export async function revokeStakeholderAccessAction(input: { projectId: string; 
 // ── Update / remove member ──────────────────────────────────────────────────
 
 export async function updateProjectMemberAction(input: { projectId: string; id: string; patch: ProjectMemberInput & { applyPreset?: boolean } }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const p = input.patch;
   const patch: Record<string, unknown> = {};
@@ -180,7 +185,7 @@ export async function updateProjectMemberAction(input: { projectId: string; id: 
  *  profile name (the single source of truth) and keeps this org's team-member
  *  rows in sync, so the new name shows everywhere consistently. */
 export async function renameProjectMemberAction(input: { projectId: string; id: string; name: string }): Promise<{ error?: string; scope?: "account" | "project" }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const name = input.name?.trim();
   if (!name) return { error: "name_required" };
@@ -208,7 +213,7 @@ export async function renameProjectMemberAction(input: { projectId: string; id: 
 }
 
 export async function removeProjectMemberAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { error } = await c.supabase.from("project_team_members").update({ status: "removed" }).eq("id", input.id).eq("organization_id", c.org.organizationId);
   return error ? { error: "unexpected" } : {};
@@ -217,7 +222,7 @@ export async function removeProjectMemberAction(input: { projectId: string; id: 
 // ── AI role recommendation ──────────────────────────────────────────────────
 
 export async function recommendRolesAction(input: { projectId: string; locale: string }) {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated", roles: [] };
   const { recommendProjectRoles } = await import("@/lib/team-roles/ai");
   const roles = await recommendProjectRoles(c.org, input.projectId, (input.locale === "es" ? "es" : "en") as Locale);
@@ -226,7 +231,7 @@ export async function recommendRolesAction(input: { projectId: string; locale: s
 
 /** Insert recommended roles as unassigned role placeholders (no person yet). */
 export async function addRecommendedRolesAction(input: { projectId: string; roles: { project_role: string; delivery_role?: string; governance_role?: string; permission_level?: string }[]; locale: string }): Promise<{ error?: string; added?: number }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const rows = (input.roles ?? []).filter((r) => r.project_role?.trim()).map((r) =>
     buildRow(c.org.organizationId, input.projectId, {
@@ -244,7 +249,7 @@ export async function addRecommendedRolesAction(input: { projectId: string; role
 // ── RACI ────────────────────────────────────────────────────────────────────
 
 export async function addRaciAction(input: { projectId: string; entityType: string; entityLabel: string; entityId?: string; memberId: string; raciRole: string; notes?: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { error } = await c.supabase.from("project_raci_assignments").insert({
     organization_id: c.org.organizationId, project_id: input.projectId,
@@ -257,7 +262,7 @@ export async function addRaciAction(input: { projectId: string; entityType: stri
 }
 
 export async function deleteRaciAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { error } = await c.supabase.from("project_raci_assignments").delete().eq("id", input.id).eq("organization_id", c.org.organizationId);
   return error ? { error: "unexpected" } : {};
@@ -265,7 +270,7 @@ export async function deleteRaciAction(input: { projectId: string; id: string })
 
 /** AI RACI draft: assign milestones × team roles, mapping role hints to members. */
 export async function generateRaciDraftAction(input: { projectId: string; locale: string }): Promise<{ error?: string; added?: number }> {
-  const c = await ctx();
+  const c = await managerCtx(input.projectId);
   if (!c) return { error: "not_authenticated" };
   const { data: members } = await c.supabase.from("project_team_members").select("id, project_role")
     .eq("project_id", input.projectId).eq("organization_id", c.org.organizationId).neq("status", "removed");

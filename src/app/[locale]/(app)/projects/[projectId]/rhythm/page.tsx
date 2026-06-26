@@ -17,6 +17,8 @@ export default async function RhythmPage({
   const { locale, projectId } = await params;
   setRequestLocale(locale);
   const lang = locale as Locale;
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "rhythm");
 
   const org = await getOrgContext();
   const supabase = await createClient();

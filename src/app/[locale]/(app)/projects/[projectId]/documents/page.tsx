@@ -13,6 +13,8 @@ export default async function DocumentsPage({
 }) {
   const { locale, projectId } = await params;
   setRequestLocale(locale);
+  const { guardProjectTab } = await import("@/lib/auth/project-guard");
+  await guardProjectTab(projectId, "documents");
 
   const t = await getTranslations("documents");
   const org = await getOrgContext();
