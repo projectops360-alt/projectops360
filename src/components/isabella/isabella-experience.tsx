@@ -1,21 +1,22 @@
 "use client";
 
 // ============================================================================
-// Isabella Experience — immersive executive advisor
+// Isabella Experience — floating holographic advisor window
 // ============================================================================
-// A present advisor: on activation the workspace softly blurs and Isabella
-// materializes on a dedicated stage, alive (breathing/blinking + thinking,
-// speaking, listening, greeting states).
+// Isabella is a window the USER OWNS: a floating, draggable, dockable, resizable
+// presence that never blocks the workflow (no full-screen scrim). She remembers
+// her position/size, can minimize / expand / go fullscreen, and runs in three
+// modes (Assistant · Guide · Executive).
 //
-// This revision:
-//   • THEME-AWARE — the panel follows the app theme by default (no forced black
-//     overlay). Optional immersive modes: app · dark · light · minimal.
-//   • VOICE — optional browser text-to-speech (off by default), conversation
-//     language, with mute/stop. No audio leaves the browser.
-//   • LINKS — answers + steps render safe internal links (allow-listed).
+// • THEME-AWARE — follows the app theme; optional dark/minimal panel tone.
+// • VOICE — optional female TTS (off by default), conversation language.
+// • GUIDED LINKS — answers render "Open <X>" actions that navigate AND keep
+//   Isabella present (she's mounted app-wide), so she takes you there.
+// • 3D-READY — the presence area hosts the holographic placeholder today and the
+//   Ready Player Me + Mixamo 3D figure (React Three Fiber) next, behind the same
+//   PresenceState contract. The old SVG portrait is retired here.
 //
-// Decoupling intact: knowledge stays in Knowledge OS; this calls the SAME action
-// and renders the SAME confidence + sources as the classic panel.
+// Knowledge stays in Knowledge OS — same action, confidence and sources.
 // ============================================================================
 
 import { usePathname } from "next/navigation";
@@ -23,7 +24,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Send, X, ThumbsUp, ThumbsDown, BookOpen, ChevronDown, ChevronRight,
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert, Info,
-  Volume2, VolumeX, Square, Palette, Play,
+  Volume2, VolumeX, Square, Palette, Play, PanelLeft, PanelRight, Minus,
+  Maximize2, Minimize2, GripHorizontal, Compass, Presentation, MessageSquare,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { GuideAnswer, GuideContext, GuideIntent } from "@/lib/knowledge-os/types";
@@ -34,7 +36,9 @@ import { resolveScreen, enrichContextWithScreen } from "@/lib/knowledge-os/scree
 import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-links";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
-import { IsabellaPresence, type PresenceState } from "./avatar";
+import { type PresenceState } from "./avatar";
+import { HologramPlaceholder } from "./hologram/hologram-placeholder";
+import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
 import styles from "./isabella-experience.module.css";
 
@@ -42,14 +46,15 @@ const ICONS: Record<string, typeof ScanSearch> = {
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert,
 };
 
-// "app" follows the application theme (default — never a forced black trap).
-// "dark" forces the premium dark immersive look. "minimal" is app + translucent.
-// A true forced "light" is intentionally not a separate mode: in "app" it already
-// follows the app's light theme. (Forcing light inside a dark app can't be done
-// cleanly given the class-based dark variant.)
-type StageMode = "app" | "dark" | "minimal";
-const MODE_ORDER: StageMode[] = ["app", "dark", "minimal"];
-const MODE_STORAGE = "isabella.stageMode";
+const MODE_ICON: Record<WindowMode, typeof Compass> = {
+  assistant: MessageSquare,
+  guide: Compass,
+  executive: Presentation,
+};
+
+type StageTone = "app" | "dark" | "minimal";
+const TONE_ORDER: StageTone[] = ["app", "dark", "minimal"];
+const TONE_STORAGE = "isabella.stageTone";
 
 interface Turn {
   id: string;
@@ -71,9 +76,10 @@ export function IsabellaExperience({
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
   const pathname = usePathname();
+  const wf = useWindowFrame();
+  const voice = useSpeech();
 
   const expert = resolveExpert({ module: baseContext.module });
-
   const screen = useMemo(() => resolveScreen(pathname || "", locale), [pathname, locale]);
   const context = useMemo(
     () => enrichContextWithScreen(baseContext, screen, pathname || ""),
@@ -88,47 +94,34 @@ export function IsabellaExperience({
   const [focused, setFocused] = useState(false);
   const [greeting, setGreeting] = useState(true);
   const [speaking, setSpeaking] = useState(false);
-  const [closing, setClosing] = useState(false);
-  // Restore the immersive-mode preference up-front (mounts client-side on open,
-  // so there's no SSR/hydration mismatch and no setState-in-effect needed).
-  const [stageMode, setStageMode] = useState<StageMode>(() => {
+  const [guideNote, setGuideNote] = useState<string | null>(null);
+  const [tone, setTone] = useState<StageTone>(() => {
     try {
-      const s = typeof window !== "undefined" ? (window.localStorage.getItem(MODE_STORAGE) as StageMode | null) : null;
-      return s && MODE_ORDER.includes(s) ? s : "app";
-    } catch {
-      return "app";
-    }
+      const s = typeof window !== "undefined" ? (window.localStorage.getItem(TONE_STORAGE) as StageTone | null) : null;
+      return s && TONE_ORDER.includes(s) ? s : "app";
+    } catch { return "app"; }
   });
   const [pending, startTransition] = useTransition();
 
-  const voice = useSpeech();
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  function cycleMode() {
-    setStageMode((m) => {
-      const next = MODE_ORDER[(MODE_ORDER.indexOf(m) + 1) % MODE_ORDER.length];
-      try { window.localStorage.setItem(MODE_STORAGE, next); } catch { /* ignore */ }
-      return next;
-    });
-  }
 
   useEffect(() => {
     const t = setTimeout(() => setGreeting(false), 2000);
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") requestClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function cycleTone() {
+    setTone((m) => {
+      const next = TONE_ORDER[(TONE_ORDER.indexOf(m) + 1) % TONE_ORDER.length];
+      try { window.localStorage.setItem(TONE_STORAGE, next); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   function requestClose() {
     voice.stop();
-    setClosing(true);
-    setTimeout(onClose, 280);
+    onClose();
   }
 
   const presence: PresenceState = pending
@@ -159,6 +152,7 @@ export function IsabellaExperience({
     const label = q || QUICK_ACTIONS.find((a) => a.intent === intent)?.label[isEs ? "es" : "en"] || intent;
     const answerLanguage: Locale = (q ? detectLanguage(q) : null) ?? locale;
 
+    setGuideNote(null);
     setTurns((t) => [...t, { id, question: label, intent }]);
     setInput("");
     setSpeaking(false);
@@ -169,7 +163,6 @@ export function IsabellaExperience({
         setTurns((t) => t.map((x) => (x.id === id ? { ...x, answer } : x)));
         setSpeaking(true);
         setTimeout(() => setSpeaking(false), 3200);
-        // Autoplay ONLY when the user has explicitly enabled voice.
         if (voice.enabled) voice.speak(answer.answer, answer.language);
       } catch {
         setTurns((t) =>
@@ -195,41 +188,71 @@ export function IsabellaExperience({
     });
   }
 
+  // Guided action: she navigates AND stays present (mounted app-wide), then
+  // offers to continue on the new screen.
+  function onNavigate(_href: string, label: string) {
+    setGuideNote(tt(`I took you to ${label}. Want me to explain this screen?`, `Te llevé a ${label}. ¿Quieres que te explique esta pantalla?`));
+  }
+
   function feedback(turnId: string, answerId: string | null, helpful: boolean) {
     setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, feedback: helpful ? "up" : "down" } : x)));
     if (answerId) void submitGuideFeedbackAction(answerId, helpful);
   }
 
   const suggestions = screen?.followups ?? [];
-
-  // "dark" forces the dark theme on the stage subtree; "app"/"minimal" inherit.
-  const themeClass = stageMode === "dark" ? "dark" : "";
+  const themeClass = tone === "dark" ? "dark" : "";
   const panelTone =
-    stageMode === "minimal"
+    tone === "minimal"
       ? "bg-card/85 supports-[backdrop-filter]:bg-card/70 backdrop-blur-xl border-border/60"
       : "bg-card border-border";
-  const modeLabel: Record<StageMode, string> = {
+  const toneLabel: Record<StageTone, string> = {
     app: tt("Follows theme", "Sigue el tema"),
     dark: tt("Dark", "Oscuro"),
     minimal: tt("Minimal", "Mínimo"),
   };
+  const modeLabel: Record<WindowMode, string> = {
+    assistant: tt("Assistant", "Asistente"),
+    guide: tt("Guide", "Guía"),
+    executive: tt("Executive", "Ejecutivo"),
+  };
+  const iconBtn = "rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground";
 
-  const iconBtn =
-    "rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground";
+  // ── Minimized pill ─────────────────────────────────────────────────────────
+  if (wf.frame.minimized) {
+    return (
+      <div style={{ ...wf.style, width: "auto", height: "auto" }} className={`${themeClass}`}>
+        <div
+          onPointerDown={wf.onDragStart}
+          className={`flex cursor-grab items-center gap-2 rounded-full border ${panelTone} py-1.5 pl-1.5 pr-3 text-foreground shadow-xl active:cursor-grabbing`}
+        >
+          <HologramPlaceholder state={presence} size={34} accent={expert.presentation.accent} />
+          <span className="text-sm font-semibold">{expert.displayName}</span>
+          <button onClick={wf.toggleMinimize} className={iconBtn} title={tt("Expand", "Expandir")} aria-label={tt("Expand", "Expandir")}>
+            <Maximize2 className="h-4 w-4" />
+          </button>
+          <button onClick={requestClose} className={iconBtn} title={tt("Close", "Cerrar")} aria-label={tt("Close", "Cerrar")}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`${styles.overlay} ${themeClass}`} role="dialog" aria-modal="true" aria-label={expert.displayName}>
-      <div
-        className={`${styles.scrim} ${stageMode === "minimal" ? styles.scrimMinimal : ""} ${closing ? styles.scrimOut : ""}`}
-        onClick={requestClose}
-        aria-hidden
-      />
-
-      <div className={`${styles.stage} ${panelTone} border-l text-foreground ${closing ? styles.stageOut : ""}`}>
-        {/* ── Presence area ─────────────────────────────────────────────── */}
-        <div className={`${styles.presence} border-b border-border`}>
-          <div className="absolute right-2 top-2 flex items-center gap-0.5">
-            {/* Voice toggle */}
+    <div style={wf.style} className={themeClass} role="dialog" aria-label={expert.displayName}>
+      {wf.frame.fullscreen && <div className="fixed inset-0 -z-10 bg-black/40 backdrop-blur-sm" aria-hidden />}
+      <div className={`flex h-full w-full flex-col overflow-hidden rounded-2xl border ${panelTone} text-foreground shadow-2xl`}>
+        {/* ── Title bar (drag handle) ───────────────────────────────────── */}
+        <div
+          onPointerDown={wf.onDragStart}
+          className={`flex cursor-grab items-center justify-between gap-1 border-b border-border px-2 py-1.5 active:cursor-grabbing ${wf.dragging ? "select-none" : ""}`}
+        >
+          <div className="flex items-center gap-1.5 pl-1">
+            <GripHorizontal className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs font-semibold">{expert.displayName}</span>
+            <span className="text-[10px] text-muted-foreground">· {modeLabel[wf.frame.mode]}</span>
+          </div>
+          <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
             <button
               onClick={voice.toggleEnabled}
               disabled={!voice.supported}
@@ -245,29 +268,59 @@ export function IsabellaExperience({
             >
               {voice.enabled && voice.supported ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
-            {/* Stop speaking */}
             {voice.speaking && (
               <button onClick={voice.stop} className={iconBtn} title={tt("Stop", "Detener")} aria-label={tt("Stop voice", "Detener voz")}>
                 <Square className="h-4 w-4" />
               </button>
             )}
-            {/* Immersive mode */}
-            <button onClick={cycleMode} className={iconBtn} title={`${tt("Display", "Vista")}: ${modeLabel[stageMode]}`} aria-label={tt("Change display mode", "Cambiar modo de vista")}>
+            <button onClick={() => wf.dockTo("left")} className={iconBtn} title={tt("Dock left", "Acoplar izquierda")} aria-label={tt("Dock left", "Acoplar izquierda")}>
+              <PanelLeft className="h-4 w-4" />
+            </button>
+            <button onClick={() => wf.dockTo("right")} className={iconBtn} title={tt("Dock right", "Acoplar derecha")} aria-label={tt("Dock right", "Acoplar derecha")}>
+              <PanelRight className="h-4 w-4" />
+            </button>
+            <button onClick={cycleTone} className={iconBtn} title={`${tt("Display", "Vista")}: ${toneLabel[tone]}`} aria-label={tt("Change display tone", "Cambiar tono")}>
               <Palette className="h-4 w-4" />
             </button>
-            {/* Close */}
+            <button onClick={wf.toggleFullscreen} className={iconBtn} title={wf.frame.fullscreen ? tt("Exit fullscreen", "Salir de pantalla completa") : tt("Fullscreen", "Pantalla completa")} aria-label={tt("Toggle fullscreen", "Alternar pantalla completa")}>
+              {wf.frame.fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+            <button onClick={wf.toggleMinimize} className={iconBtn} title={tt("Minimize", "Minimizar")} aria-label={tt("Minimize", "Minimizar")}>
+              <Minus className="h-4 w-4" />
+            </button>
             <button onClick={requestClose} className={iconBtn} title={tt("Close", "Cerrar")} aria-label={tt("Close", "Cerrar")}>
               <X className="h-4 w-4" />
             </button>
           </div>
+        </div>
 
+        {/* ── Mode switch ───────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+          {(Object.keys(modeLabel) as WindowMode[]).map((m) => {
+            const Icon = MODE_ICON[m];
+            const active = wf.frame.mode === m;
+            return (
+              <button
+                key={m}
+                onClick={() => wf.setMode(m)}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition ${
+                  active ? "bg-brand-500/15 text-brand-700 dark:text-brand-300" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3 w-3" />
+                {modeLabel[m]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── Presence ──────────────────────────────────────────────────── */}
+        <div className={`${styles.presence} border-b border-border`}>
           <div className={`${styles.materialize} relative`}>
-            <div className={styles.platform} aria-hidden />
-            <IsabellaPresence state={presence} size={150} accent={expert.presentation.accent} name={expert.displayName} />
+            <HologramPlaceholder state={presence} size={wf.frame.mode === "executive" ? 184 : 140} accent={expert.presentation.accent} label={expert.displayName} />
           </div>
-
           <div className={styles.nameplate}>
-            <p className="text-base font-semibold text-foreground">{expert.displayName}</p>
+            <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
             <p className="text-[11px] text-muted-foreground">{expertTitle}</p>
             <p className={`${styles.status} mt-1 text-brand-600 dark:text-brand-400`}>
               <span className={styles.statusDot} />
@@ -275,10 +328,7 @@ export function IsabellaExperience({
             </p>
             {voice.enabled && voice.supported && !voice.hasFemaleVoice(locale) && (
               <p className="mt-1 text-[10px] text-muted-foreground">
-                {tt(
-                  "No female voice is installed on this device — using the closest available.",
-                  "No hay una voz femenina instalada en este dispositivo — uso la más cercana disponible.",
-                )}
+                {tt("No female voice installed — using the closest available.", "No hay voz femenina instalada — uso la más cercana.")}
               </p>
             )}
           </div>
@@ -302,7 +352,6 @@ export function IsabellaExperience({
                       )}
                 </p>
               </div>
-
               {suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.map((s, i) => (
@@ -333,6 +382,7 @@ export function IsabellaExperience({
                   links={actionLinks}
                   canSpeak={voice.supported}
                   onSpeak={(text, lang) => voice.speak(text, lang)}
+                  onNavigate={onNavigate}
                   onFeedback={(helpful) => feedback(turn.id, turn.answer!.answerId, helpful)}
                   onFollowup={(q) => ask("question", q)}
                 />
@@ -344,6 +394,18 @@ export function IsabellaExperience({
               )}
             </div>
           ))}
+
+          {guideNote && (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-brand-500/30 bg-brand-500/10 px-3 py-2 text-xs text-foreground">
+              <span>{guideNote}</span>
+              <button
+                onClick={() => { setGuideNote(null); ask("explain_screen", ""); }}
+                className="shrink-0 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-brand-700"
+              >
+                {tt("Yes", "Sí")}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Quick actions ─────────────────────────────────────────────── */}
@@ -367,10 +429,7 @@ export function IsabellaExperience({
         {/* ── Input ─────────────────────────────────────────────────────── */}
         <form
           className="flex items-center gap-2 px-3 py-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask("question", input);
-          }}
+          onSubmit={(e) => { e.preventDefault(); ask("question", input); }}
         >
           <input
             ref={inputRef}
@@ -391,6 +450,18 @@ export function IsabellaExperience({
             <Send className="h-4 w-4" />
           </button>
         </form>
+
+        {/* ── Resize handle (bottom-left) ───────────────────────────────── */}
+        {!wf.frame.fullscreen && (
+          <div
+            onPointerDown={wf.onResizeStart}
+            className="absolute bottom-0 left-0 h-4 w-4 cursor-nesw-resize"
+            title={tt("Resize", "Redimensionar")}
+            aria-hidden
+          >
+            <span className="absolute bottom-1 left-1 h-2 w-2 border-b-2 border-l-2 border-muted-foreground/50" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -404,6 +475,7 @@ function AnswerCard({
   links,
   canSpeak,
   onSpeak,
+  onNavigate,
   onFeedback,
   onFollowup,
 }: {
@@ -412,12 +484,14 @@ function AnswerCard({
   links: ResolvedLink[];
   canSpeak: boolean;
   onSpeak: (text: string, lang: Locale) => void;
+  onNavigate: (href: string, label: string) => void;
   onFeedback: (helpful: boolean) => void;
   onFollowup: (q: string) => void;
 }) {
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
   const a = turn.answer!;
+  const k: "en" | "es" = isEs ? "es" : "en";
   const [showSources, setShowSources] = useState(false);
 
   return (
@@ -442,14 +516,14 @@ function AnswerCard({
       </div>
 
       <div className="text-sm text-foreground">
-        <AnswerText text={a.answer} links={links} />
+        <AnswerText text={a.answer} links={links} locale={k} onNavigate={onNavigate} />
       </div>
 
       {a.steps.length > 0 && (
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground">
           {a.steps.map((s, i) => (
             <li key={i}>
-              <AnswerText text={s} links={links} />
+              <AnswerText text={s} links={links} locale={k} onNavigate={onNavigate} />
             </li>
           ))}
         </ol>

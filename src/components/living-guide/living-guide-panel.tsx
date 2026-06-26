@@ -248,14 +248,14 @@ function AnswerCard({
       </div>
 
       <div className="text-sm text-foreground">
-        <AnswerText text={a.answer} links={links} />
+        <AnswerText text={a.answer} links={links} locale={isEs ? "es" : "en"} />
       </div>
 
       {a.steps.length > 0 && (
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground">
           {a.steps.map((s, i) => (
             <li key={i}>
-              <AnswerText text={s} links={links} />
+              <AnswerText text={s} links={links} locale={isEs ? "es" : "en"} />
             </li>
           ))}
         </ol>

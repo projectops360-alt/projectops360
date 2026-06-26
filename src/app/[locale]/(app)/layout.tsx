@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
+import { LivingGuideWidget } from "@/components/living-guide";
+import type { Locale } from "@/types/database";
 
 export default async function AppLayout({
   children,
@@ -47,6 +49,18 @@ export default async function AppLayout({
       }}
     >
       {children}
+      {/* Isabella is present app-wide, so she persists across navigation and her
+          guided "Open <X>" links can actually take the user there and continue.
+          Screen is resolved client-side from the route. */}
+      <LivingGuideWidget
+        locale={locale as Locale}
+        context={{
+          module: "",
+          role: org.role,
+          userId: org.userId,
+          organizationId: org.organizationId,
+        }}
+      />
     </AppShell>
   );
 }
