@@ -1,4 +1,5 @@
 import { setRequestLocale } from "next-intl/server";
+import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { isBillableSeat } from "@/lib/billing/config";
@@ -12,8 +13,11 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
   const { locale } = await params;
   setRequestLocale(locale);
   const org = await getOrgContext();
+  // This section is restricted to PM and PMO roles (plus legacy owner/admin).
+  const isPmOrPmo = org.isPmoLevel || org.orgRole === "PROJECT_MANAGER" || org.role === "owner" || org.role === "admin";
+  if (!isPmOrPmo) notFound();
   const admin = createAdminClient();
-  const canManage = org.role === "owner" || org.role === "admin";
+  const canManage = isPmOrPmo;
 
   const { data: memberRows } = await admin.from("organization_members")
     .select("id, user_id, role, billing_seat_type, workspace_role, status, department, job_title")

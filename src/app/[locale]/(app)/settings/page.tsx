@@ -1,8 +1,9 @@
 import { setRequestLocale } from "next-intl/server";
-import { Palette, Languages, SlidersHorizontal } from "lucide-react";
+import { Palette, Languages, SlidersHorizontal, KeyRound } from "lucide-react";
 import { getOrgContext } from "@/lib/auth";
 import { ThemeControl } from "@/components/settings/theme-control";
 import { LanguageControl } from "@/components/settings/language-control";
+import { ChangePasswordControl } from "@/components/settings/change-password-control";
 
 export default async function SettingsPage({
   params,
@@ -71,6 +72,34 @@ export default async function SettingsPage({
             </p>
           </div>
           <LanguageControl />
+        </div>
+      </section>
+
+      {/* Security */}
+      <section className="rounded-2xl border border-border bg-card p-6">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-brand-500" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {tt("Security", "Seguridad")}
+          </h2>
+        </div>
+        <div className="mt-4">
+          <p className="text-sm font-medium text-foreground">{tt("Change password", "Cambiar contraseña")}</p>
+          <p className="text-xs text-muted-foreground">
+            {tt("Set a new password for your account (e.g. after a temporary one).", "Define una nueva contraseña para tu cuenta (p. ej. tras una temporal).")}
+          </p>
+          <ChangePasswordControl
+            labels={{
+              newPassword: tt("New password (8+ chars)", "Nueva contraseña (8+ caracteres)"),
+              confirm: tt("Confirm password", "Confirmar contraseña"),
+              update: tt("Update password", "Actualizar contraseña"),
+              updated: tt("Password updated", "Contraseña actualizada"),
+              tooShort: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
+              mismatch: tt("Passwords don't match.", "Las contraseñas no coinciden."),
+              failed: tt("Could not update the password.", "No se pudo actualizar la contraseña."),
+              placeholder: "",
+            }}
+          />
         </div>
       </section>
     </div>

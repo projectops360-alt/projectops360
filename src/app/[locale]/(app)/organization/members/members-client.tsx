@@ -6,9 +6,18 @@
 
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Users, UserPlus, Loader2, Mail } from "lucide-react";
+import { Users, UserPlus, Loader2, Mail, KeyRound, Copy, RefreshCw } from "lucide-react";
 import { SEAT_TYPES, WORKSPACE_ROLES, MEMBER_STATUSES } from "@/lib/billing/config";
-import { updateMemberSeatAction, inviteMemberAction } from "./actions";
+import { updateMemberSeatAction, inviteMemberAction, createMemberWithPasswordAction } from "./actions";
+
+function genPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let s = "";
+  const arr = new Uint32Array(12);
+  (globalThis.crypto ?? window.crypto).getRandomValues(arr);
+  for (let i = 0; i < 12; i++) s += chars[arr[i] % chars.length];
+  return s + "!9"; // ensure length + symbol/number
+}
 
 interface MemberView {
   id: string; userId: string; name: string; email: string | null;
@@ -31,6 +40,14 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
   const [email, setEmail] = useState("");
   const [inviteSeat, setInviteSeat] = useState("full_seat");
   const [msg, setMsg] = useState<string | null>(null);
+  // Create-login (email + temp password, no SMTP needed)
+  const [clOpen, setClOpen] = useState(false);
+  const [clName, setClName] = useState("");
+  const [clEmail, setClEmail] = useState("");
+  const [clPass, setClPass] = useState(genPassword());
+  const [clSeat, setClSeat] = useState("full_seat");
+  const [clResult, setClResult] = useState<{ email: string; password: string } | null>(null);
+  const [clErr, setClErr] = useState<string | null>(null);
 
   const billableCount = members.filter((m) => m.billable).length;
   const freeCount = members.filter((m) => !m.billable && m.status === "active").length;
@@ -45,6 +62,23 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
 
   const update = (id: string, patch: Omit<Parameters<typeof updateMemberSeatAction>[0], "memberId">) => start(async () => { await updateMemberSeatAction({ ...patch, memberId: id }); router.refresh(); });
   const invite = () => { if (!email.trim()) return; start(async () => { const r = await inviteMemberAction({ email, billingSeatType: inviteSeat }); setMsg(r.error ? (isEs ? "No se pudo invitar (¿email configurado?)" : "Couldn't invite (email configured?)") : r.status === "linked" ? (isEs ? "Usuario vinculado" : "User linked") : (isEs ? "Invitación enviada" : "Invite sent")); setEmail(""); router.refresh(); }); };
+  const createLogin = () => {
+    setClErr(null);
+    if (!clEmail.trim()) return;
+    start(async () => {
+      const r = await createMemberWithPasswordAction({ email: clEmail.trim(), password: clPass, displayName: clName, billingSeatType: clSeat });
+      if (r.error) {
+        setClErr(r.error === "invalid_email" ? (isEs ? "Correo inválido." : "Invalid email.")
+          : r.error === "weak_password" ? (isEs ? "La contraseña debe tener 8+ caracteres." : "Password must be 8+ characters.")
+          : r.error === "not_allowed" ? (isEs ? "Solo propietarios/admins." : "Owners/admins only.")
+          : (isEs ? "No se pudo crear la cuenta." : "Couldn't create the account."));
+        return;
+      }
+      setClResult({ email: clEmail.trim(), password: clPass });
+      setClName(""); setClEmail(""); setClPass(genPassword());
+      router.refresh();
+    });
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -69,7 +103,49 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
           </div>
           <select className={`${inp} !py-1.5 text-sm`} value={inviteSeat} onChange={(e) => setInviteSeat(e.target.value)}>{SEAT_TYPES.map((s) => <option key={s.value} value={s.value}>{isEs ? s.es : s.en}</option>)}</select>
           <button onClick={invite} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}{isEs ? "Invitar" : "Invite"}</button>
+          <button onClick={() => setClOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
+            <KeyRound className="h-4 w-4" />{isEs ? "Crear acceso con contraseña" : "Create login with password"}
+          </button>
           {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+        </div>
+      )}
+
+      {/* Create login (email + temporary password — works without email delivery) */}
+      {canManage && clOpen && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <KeyRound className="h-4 w-4 text-brand-500" />{isEs ? "Crear acceso (correo + contraseña temporal)" : "Create login (email + temporary password)"}
+          </div>
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            {isEs ? "Crea la cuenta al instante (sin depender de correo). Comparte la contraseña; la persona la cambia luego en Configuración." : "Creates the account instantly (no email delivery needed). Share the password; the person changes it later in Settings."}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <input className={`${inp} !py-1.5 text-sm`} placeholder={isEs ? "Nombre" : "Name"} value={clName} onChange={(e) => setClName(e.target.value)} />
+            <input className={`${inp} !py-1.5 text-sm`} placeholder="email@empresa.com" value={clEmail} onChange={(e) => setClEmail(e.target.value)} />
+            <div className="flex items-center gap-1">
+              <input className={`${inp} !py-1.5 w-full font-mono text-sm`} value={clPass} onChange={(e) => setClPass(e.target.value)} />
+              <button type="button" onClick={() => setClPass(genPassword())} title={isEs ? "Generar" : "Generate"} className="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted"><RefreshCw className="h-4 w-4" /></button>
+            </div>
+            <select className={`${inp} !py-1.5 text-sm`} value={clSeat} onChange={(e) => setClSeat(e.target.value)}>{SEAT_TYPES.map((s) => <option key={s.value} value={s.value}>{isEs ? s.es : s.en}</option>)}</select>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button onClick={createLogin} disabled={pending || !clEmail.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}{isEs ? "Crear cuenta" : "Create account"}
+            </button>
+            {clErr && <span className="text-xs text-red-600 dark:text-red-400">{clErr}</span>}
+          </div>
+
+          {clResult && (
+            <div className="mt-3 rounded-lg border border-green-300 bg-green-50 p-3 text-xs dark:border-green-800 dark:bg-green-950/30">
+              <p className="mb-1 font-semibold text-green-800 dark:text-green-300">{isEs ? "Cuenta creada — comparte estas credenciales:" : "Account created — share these credentials:"}</p>
+              <div className="flex flex-wrap items-center gap-3 font-mono text-foreground">
+                <span>{clResult.email}</span>
+                <span className="rounded bg-muted px-1.5 py-0.5">{clResult.password}</span>
+                <button type="button" onClick={() => navigator.clipboard?.writeText(`${clResult.email} / ${clResult.password}`)} className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted-foreground hover:bg-muted"><Copy className="h-3 w-3" />{isEs ? "Copiar" : "Copy"}</button>
+              </div>
+              <p className="mt-1 text-[10px] text-muted-foreground">{isEs ? "La persona puede iniciar sesión ya y cambiar su contraseña en Configuración." : "The person can sign in now and change their password in Settings."}</p>
+            </div>
+          )}
         </div>
       )}
 

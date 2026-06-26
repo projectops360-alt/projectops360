@@ -5,10 +5,12 @@ import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { SEAT_TYPES, workspaceRoleToOrgRole, seatTypeToOrgRole } from "@/lib/billing/config";
 
+// This section is for PM and PMO roles only (plus legacy owner/admin).
 async function adminCtx() {
   let org;
   try { org = await getOrgContext(); } catch { return null; }
-  if (org.role !== "owner" && org.role !== "admin") return null;
+  const allowed = org.isPmoLevel || org.orgRole === "PROJECT_MANAGER" || org.role === "owner" || org.role === "admin";
+  if (!allowed) return null;
   return { org, supabase: createAdminClient() };
 }
 
@@ -42,6 +44,61 @@ export async function updateMemberSeatAction(input: {
   if (error) return { error: "unexpected" };
   await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.memberId, metadata: patch });
   return {};
+}
+
+/** Create a login directly with an email + temporary password (no SMTP needed).
+ *  The person can sign in immediately and change the password later in Settings. */
+export async function createMemberWithPasswordAction(input: {
+  email: string; password: string; displayName?: string; billingSeatType?: string; workspaceRole?: string;
+}): Promise<{ error?: string; status?: "created" | "linked" }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+  const email = (input.email ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid_email" };
+  if (!input.password || input.password.length < 8) return { error: "weak_password" };
+  const seat = SEAT_VALUES.includes(input.billingSeatType ?? "") ? input.billingSeatType! : "full_seat";
+  const role = MEMBER_ROLE(seat);
+  const orgRole = input.workspaceRole ? workspaceRoleToOrgRole(input.workspaceRole) : seatTypeToOrgRole(seat);
+  const displayName = input.displayName?.trim() || email.split("@")[0];
+
+  try {
+    const { data: list } = await c.supabase.auth.admin.listUsers();
+    const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
+
+    let userId: string;
+    let status: "created" | "linked";
+    if (existing) {
+      userId = existing.id;
+      status = "linked";
+      // Optionally (re)set the password for an existing account.
+      await c.supabase.auth.admin.updateUserById(userId, { password: input.password });
+    } else {
+      const { data: created, error: cErr } = await c.supabase.auth.admin.createUser({
+        email, password: input.password, email_confirm: true,
+        user_metadata: { display_name: displayName },
+      });
+      if (cErr || !created?.user) return { error: "create_failed" };
+      userId = created.user.id;
+      status = "created";
+    }
+
+    // Attach to THIS org (the signup trigger may have created a separate personal
+    // org; we add membership here and make this the user's default org).
+    await c.supabase.from("organization_members").upsert(
+      { organization_id: c.org.organizationId, user_id: userId, role, org_role: orgRole, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "active" },
+      { onConflict: "organization_id,user_id" });
+    const { data: prof } = await c.supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+    if (prof) {
+      await c.supabase.from("profiles").update({ default_organization_id: c.org.organizationId, display_name: displayName }).eq("id", userId);
+    } else {
+      await c.supabase.from("profiles").insert({ id: userId, organization_id: c.org.organizationId, default_organization_id: c.org.organizationId, display_name: displayName });
+    }
+
+    await logAudit({ org: c.org, action: "create", entityType: "organization_members", entityId: userId, metadata: { created_login: email, seat, org_role: orgRole, status } });
+    return { status };
+  } catch {
+    return { error: "create_failed" };
+  }
 }
 
 /** Invite a new internal member by email (status = invited until accepted). */
