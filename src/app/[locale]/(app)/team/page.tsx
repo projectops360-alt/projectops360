@@ -31,6 +31,7 @@ export default async function TeamPage({
 
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
   const members: TeamMember[] = (membersRes.data ?? []).map((m) => ({
+    userId: m.user_id,
     role: m.role,
     name: profileById.get(m.user_id)?.display_name || (m.user_id === org.userId ? org.displayName || org.email : "—"),
     isYou: m.user_id === org.userId,
