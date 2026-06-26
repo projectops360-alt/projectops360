@@ -11,15 +11,26 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserRound, HardHat, Building2, Wrench, ShieldCheck, Plus, Pencil, Merge,
-  Archive, Mail, X, Loader2,
+  Archive, Mail, X, Loader2, KeyRound, Wand2, Copy, Check,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import {
   createTeamResourceAction, updateTeamResourceAction, mergeTeamResourcesAction,
   archiveTeamResourceAction, inviteResourceAsUserAction,
 } from "./actions";
+import { renameWorkspaceUserAction, createMemberWithPasswordAction } from "../organization/members/actions";
 
-export interface TeamMember { role: string; name: string; isYou: boolean }
+/** Generate a readable temporary password (no ambiguous chars). */
+function genTempPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const buf = new Uint32Array(12);
+  crypto.getRandomValues(buf);
+  let s = "";
+  for (let i = 0; i < 12; i++) s += chars[buf[i] % chars.length];
+  return s;
+}
+
+export interface TeamMember { userId: string; role: string; name: string; isYou: boolean }
 export interface TeamProject { id: string; name: string }
 export interface TeamResource {
   id: string; name: string; resourceType: string; trade: string | null;
@@ -59,9 +70,24 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
   const [editing, setEditing] = useState<TeamResource | null>(null);
   const [inviting, setInviting] = useState<TeamResource | null>(null);
   const [adding, setAdding] = useState(false);
+  const [creatingLogin, setCreatingLogin] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Inline rename of a workspace user.
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editUserName, setEditUserName] = useState("");
 
   const tt = (en: string, es: string) => (isEs ? es : en);
+
+  async function saveUserName(userId: string) {
+    const name = editUserName.trim();
+    setEditUserId(null);
+    if (!name) return;
+    await withBusy("rename:" + userId, async () => {
+      const r = await renameWorkspaceUserAction({ userId, name });
+      if (!r.error) { flash(tt("Renamed", "Renombrado")); router.refresh(); }
+      else flash(tt("Could not rename", "No se pudo renombrar"));
+    });
+  }
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   async function withBusy(key: string, fn: () => Promise<void>) {
@@ -107,10 +133,16 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
           </p>
         </div>
         {canManage && (
-          <button type="button" onClick={() => setAdding(true)}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-            <Plus className="h-4 w-4" />{tt("Add person", "Agregar persona")}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => setCreatingLogin(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30">
+              <KeyRound className="h-4 w-4" />{tt("Create login", "Crear acceso")}
+            </button>
+            <button type="button" onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+              <Plus className="h-4 w-4" />{tt("Add person", "Agregar persona")}
+            </button>
+          </div>
         )}
       </div>
 
@@ -121,12 +153,30 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+            <div key={i} className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{m.name.slice(0, 2).toUpperCase()}</span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
-                <p className="text-xs text-muted-foreground">{roleLabel(m.role)}</p>
+              <div className="min-w-0 flex-1">
+                {editUserId === m.userId ? (
+                  <div className="flex items-center gap-1">
+                    <input autoFocus value={editUserName} onChange={(e) => setEditUserName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveUserName(m.userId); if (e.key === "Escape") setEditUserId(null); }}
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:border-brand-500 focus:outline-none" />
+                    <button onClick={() => saveUserName(m.userId)} className="rounded p-1 text-green-600 hover:bg-muted"><Check className="h-4 w-4" /></button>
+                    <button onClick={() => setEditUserId(null)} className="rounded p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
+                    <p className="text-xs text-muted-foreground">{roleLabel(m.role)}</p>
+                  </>
+                )}
               </div>
+              {canManage && editUserId !== m.userId && (
+                <button type="button" title={tt("Rename", "Renombrar")} onClick={() => { setEditUserId(m.userId); setEditUserName(m.name); }}
+                  className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100">
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -210,6 +260,7 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
         )}
       </section>
 
+      {creatingLogin && <CreateLoginDialog tt={tt} onClose={() => setCreatingLogin(false)} onCreated={() => { flash(tt("Login created", "Acceso creado")); router.refresh(); }} />}
       {adding && <AddDialog tt={tt} projects={projects} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); flash(tt("Added", "Agregado")); router.refresh(); }} />}
       {editing && <EditDialog tt={tt} resource={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); flash(tt("Saved", "Guardado")); router.refresh(); }} />}
       {inviting && <InviteDialog tt={tt} resource={inviting} onClose={() => setInviting(null)} onResult={(msg) => { setInviting(null); flash(msg); router.refresh(); }} />}
@@ -313,6 +364,84 @@ function EditDialog({ tt, resource, onClose, onSaved }: { tt: TT; resource: Team
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}{tt("Save", "Guardar")}
         </button>
       </div>
+    </Dialog>
+  );
+}
+
+function CreateLoginDialog({ tt, onClose, onCreated }: { tt: TT; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [pwd, setPwd] = useState("");
+  const [role, setRole] = useState("member"); const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const seatFor = (r: string) => (r === "admin" ? "admin" : r === "viewer" ? "viewer_free" : "full_seat");
+  const ERR: Record<string, string> = {
+    not_allowed: tt("Only owners/admins can do this.", "Solo propietarios/administradores pueden hacer esto."),
+    invalid_email: tt("Invalid email.", "Correo inválido."),
+    weak_password: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
+    create_failed: tt("Could not create the login.", "No se pudo crear el acceso."),
+  };
+
+  return (
+    <Dialog title={tt("Create login (temporary password)", "Crear acceso (clave temporal)")} onClose={onClose}>
+      {created ? (
+        <div className="space-y-3">
+          <p className="text-sm text-foreground">
+            {tt("Login created. Share these credentials — they'll be asked to change the password on first sign-in:",
+              "Acceso creado. Comparte estas credenciales — se le pedirá cambiar la clave en el primer ingreso:")}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm">
+            <code className="rounded bg-background px-1.5 py-0.5 text-foreground">{created.email}</code>
+            <code className="rounded bg-background px-1.5 py-0.5 text-foreground">{created.password}</code>
+            <button type="button" onClick={() => { navigator.clipboard?.writeText(`${created.email} / ${created.password}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+              className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted">
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{tt("Copy", "Copiar")}
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => { onCreated(); onClose(); }} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">{tt("Done", "Listo")}</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-muted-foreground">
+            {tt("Creates a member who can sign in immediately with a temporary password. No email (SMTP) needed.",
+              "Crea un miembro que puede entrar de inmediato con una clave temporal. No requiere correo (SMTP).")}
+          </p>
+          <div className="space-y-3">
+            <Field label={tt("Name", "Nombre")}><input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={inputCls} /></Field>
+            <Field label={tt("Email", "Correo")}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} className={inputCls} placeholder="persona@empresa.com" /></Field>
+            <Field label={tt("Temporary password", "Clave temporal")}>
+              <div className="flex items-center gap-2">
+                <input value={pwd} onChange={(e) => setPwd(e.target.value)} className={inputCls} placeholder={tt("Min. 8 characters", "Mín. 8 caracteres")} />
+                <button type="button" title={tt("Generate", "Generar")} onClick={() => setPwd(genTempPassword())} className="inline-flex items-center rounded-lg border border-border px-2.5 py-2 text-muted-foreground hover:bg-muted"><Wand2 className="h-4 w-4" /></button>
+              </div>
+            </Field>
+            <Field label={tt("Role", "Rol")}>
+              <select value={role} onChange={(e) => setRole(e.target.value)} className={inputCls}>
+                <option value="member">{tt("Member", "Miembro")}</option>
+                <option value="admin">{tt("Admin", "Administrador")}</option>
+                <option value="viewer">{tt("Viewer", "Lector")}</option>
+              </select>
+            </Field>
+          </div>
+          {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{ERR[error] ?? error}</p>}
+          <div className="mt-5 flex justify-end gap-3">
+            <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{tt("Cancel", "Cancelar")}</button>
+            <button type="button" disabled={!email.trim() || pwd.length < 8 || saving}
+              onClick={async () => {
+                setSaving(true); setError(null);
+                const r = await createMemberWithPasswordAction({ email: email.trim(), password: pwd, displayName: name, billingSeatType: seatFor(role) });
+                setSaving(false);
+                if (r.error) setError(r.error);
+                else setCreated({ email: email.trim(), password: pwd });
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}{tt("Create login", "Crear acceso")}
+            </button>
+          </div>
+        </>
+      )}
     </Dialog>
   );
 }
