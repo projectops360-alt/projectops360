@@ -1,16 +1,23 @@
 // ============================================================================
-// ProjectOps360° — Living Guide™ hybrid retrieval (server-only)
+// ProjectOps360° — Knowledge OS hybrid retrieval (server-only)
 // ============================================================================
 // Vector (match_knowledge) + lexical (match_knowledge_lexical) fused with
-// Reciprocal Rank Fusion. Always scoped to global corpus + caller org, and to
-// the requested language. Degrades gracefully: if OpenAI is unavailable the
-// lexical half still returns results.
+// Reciprocal Rank Fusion. Scoped to global corpus + caller org.
+//
+// MULTILINGUAL: retrieval searches the WHOLE corpus (filter_language = NULL),
+// not just the UI locale's chunks. This is the fix for the bilingual bug where
+// a query in one language was matched only against the other language's chunks
+// (cross-language cosine fell below threshold → empty → "AI Suggestion"). The
+// best match wins regardless of language; the answer is still produced in the
+// user's language (handled in the prompt). The lexical half also receives PM
+// synonym expansion (Language Intelligence Layer). Degrades gracefully.
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import type { ConfidenceTier, RetrievedChunk } from "./types";
 import { GUIDE_EMBEDDING_DIMS, GUIDE_EMBEDDING_MODEL } from "./config";
+import { expandQueryForLexical } from "./language";
 
 interface RawMatch {
   chunk_id: string;
@@ -83,6 +90,11 @@ async function embedQuery(query: string): Promise<number[] | null> {
 
 export interface RetrieveOptions {
   organizationId: string;
+  /**
+   * The user's locale. Reserved for context/telemetry — retrieval is now
+   * multilingual and does NOT filter the corpus by language. The answer is
+   * produced in this language at generation time.
+   */
   language: string;
   matchCount?: number;
   vectorThreshold?: number;
@@ -111,7 +123,8 @@ export async function retrieveKnowledge(
       const { data, error } = await supabase.rpc("match_knowledge", {
         query_embedding: embedding,
         filter_organization_id: opts.organizationId,
-        filter_language: opts.language,
+        // Multilingual: search the whole corpus, not just the UI locale.
+        filter_language: null,
         match_threshold: threshold,
         match_count: matchCount,
       });
@@ -134,9 +147,11 @@ export async function retrieveKnowledge(
     })(),
     (async (): Promise<RetrievedChunk[]> => {
       const { data, error } = await supabase.rpc("match_knowledge_lexical", {
-        query_text: q,
+        // Language Intelligence: expand PM synonyms/acronyms for recall.
+        query_text: expandQueryForLexical(q),
         filter_organization_id: opts.organizationId,
-        filter_language: opts.language,
+        // Multilingual: the RPC parses the query in both languages; search all.
+        filter_language: null,
         match_count: matchCount,
       });
       if (error) {
@@ -158,5 +173,20 @@ export async function retrieveKnowledge(
     })(),
   ]);
 
-  return fuseRrf(vectorList, lexicalList).slice(0, matchCount);
+  // Multilingual search can return the same package in both languages; keep the
+  // single best-ranked chunk per package (the user-language one usually wins on
+  // similarity) so passages stay clean and provenance is unambiguous.
+  return dedupeByPackage(fuseRrf(vectorList, lexicalList)).slice(0, matchCount);
+}
+
+/** Keep only the highest-ranked chunk per package (input is already RRF-sorted). */
+export function dedupeByPackage(chunks: RetrievedChunk[]): RetrievedChunk[] {
+  const seen = new Set<string>();
+  const out: RetrievedChunk[] = [];
+  for (const c of chunks) {
+    if (seen.has(c.packageId)) continue;
+    seen.add(c.packageId);
+    out.push(c);
+  }
+  return out;
 }
