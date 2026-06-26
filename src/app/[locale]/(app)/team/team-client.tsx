@@ -173,7 +173,7 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
               </div>
               {canManage && editUserId !== m.userId && (
                 <button type="button" title={tt("Rename", "Renombrar")} onClick={() => { setEditUserId(m.userId); setEditUserName(m.name); }}
-                  className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100">
+                  className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-brand-600 dark:hover:text-brand-400">
                   <Pencil className="h-4 w-4" />
                 </button>
               )}
