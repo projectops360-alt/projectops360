@@ -36,7 +36,7 @@ import { resolveScreen, enrichContextWithScreen } from "@/lib/knowledge-os/scree
 import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-links";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
-import { type PresenceState } from "./avatar";
+import { IsabellaPresence, type PresenceState } from "./avatar";
 import { HologramPlaceholder } from "./hologram/hologram-placeholder";
 import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
@@ -216,6 +216,7 @@ export function IsabellaExperience({
     executive: tt("Executive", "Ejecutivo"),
   };
   const iconBtn = "rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground";
+  const presenceSize = wf.frame.mode === "executive" ? 200 : 150;
 
   // ── Minimized pill ─────────────────────────────────────────────────────────
   if (wf.frame.minimized) {
@@ -316,8 +317,15 @@ export function IsabellaExperience({
 
         {/* ── Presence ──────────────────────────────────────────────────── */}
         <div className={`${styles.presence} border-b border-border`}>
-          <div className={`${styles.materialize} relative`}>
-            <HologramPlaceholder state={presence} size={wf.frame.mode === "executive" ? 184 : 140} accent={expert.presentation.accent} label={expert.displayName} />
+          <div className={`${styles.materialize} relative`} style={{ width: presenceSize, height: presenceSize }}>
+            {/* Holographic base (also the graceful fallback if the 3D figure
+                can't load). The real-time 3D character renders on top. */}
+            <div className="absolute inset-0">
+              <HologramPlaceholder state={presence} size={presenceSize} accent={expert.presentation.accent} label={expert.displayName} />
+            </div>
+            <div className="absolute inset-0">
+              <IsabellaPresence renderer="three" state={presence} size={presenceSize} accent={expert.presentation.accent} name={expert.displayName} />
+            </div>
           </div>
           <div className={styles.nameplate}>
             <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
