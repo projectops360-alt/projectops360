@@ -17,11 +17,20 @@ export default async function TeamPage({
   const org = await getOrgContext();
   const supabase = createAdminClient();
 
-  const [membersRes, profilesRes, resourcesRes, projectsRes] = await Promise.all([
-    supabase.from("organization_members")
-      .select("id, user_id, role, billing_seat_type, workspace_role, status, department, job_title")
-      .eq("organization_id", org.organizationId),
-    supabase.from("profiles").select("id, display_name").eq("organization_id", org.organizationId),
+  // Fetch members first so we can look up their profiles by user id. A member's
+  // profile.organization_id is their personal/home org and may differ from this
+  // org, so we must NOT filter profiles by organization_id (that hid members and
+  // made renames look like no-ops). Mirror /organization/members: fetch by id.
+  const membersRes = await supabase.from("organization_members")
+    .select("id, user_id, role, billing_seat_type, workspace_role, status, department, job_title")
+    .eq("organization_id", org.organizationId);
+  const memberRows = membersRes.data ?? [];
+  const memberIds = memberRows.map((m) => String(m.user_id));
+
+  const [profilesRes, resourcesRes, projectsRes] = await Promise.all([
+    memberIds.length
+      ? supabase.from("profiles").select("id, display_name").in("id", memberIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
     supabase
       .from("resources")
       .select("id, name, resource_type, trade_key, project_id, status, cost_rate, cost_unit, linked_user_id")
@@ -39,7 +48,7 @@ export default async function TeamPage({
   } catch { /* ignore */ }
 
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
-  const members: TeamMember[] = (membersRes.data ?? []).map((m) => ({
+  const members: TeamMember[] = memberRows.map((m) => ({
     memberId: m.id,
     userId: m.user_id,
     role: m.role,
