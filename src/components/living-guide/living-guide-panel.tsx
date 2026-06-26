@@ -17,9 +17,11 @@ import type { Locale } from "@/types/database";
 import type { GuideAnswer, GuideContext, GuideIntent } from "@/lib/knowledge-os/types";
 import { QUICK_ACTIONS } from "@/lib/knowledge-os/config";
 import { resolveExpert } from "@/lib/knowledge-os/experts";
+import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-links";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "./actions";
 import { LivingGuideAvatar, type AvatarState } from "./living-guide-avatar";
 import { ConfidenceBadge } from "./confidence-badge";
+import { AnswerText } from "./answer-text";
 
 const ICONS: Record<string, typeof ScanSearch> = {
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert,
@@ -50,6 +52,8 @@ export function LivingGuidePanel({
   // current module. Presentation only — the same expert is resolved server-side.
   const expert = resolveExpert({ module: context.module });
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[k] };
+
+  const actionLinks = buildActionLinks(locale, context);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -153,6 +157,7 @@ export function LivingGuidePanel({
               <AnswerCard
                 turn={turn}
                 locale={locale}
+                links={actionLinks}
                 onFeedback={(helpful) => feedback(turn.id, turn.answer!.answerId, helpful)}
                 onFollowup={(q) => ask("question", q)}
               />
@@ -218,11 +223,13 @@ export function LivingGuidePanel({
 function AnswerCard({
   turn,
   locale,
+  links,
   onFeedback,
   onFollowup,
 }: {
   turn: Turn;
   locale: Locale;
+  links: ResolvedLink[];
   onFeedback: (helpful: boolean) => void;
   onFollowup: (q: string) => void;
 }) {
@@ -240,12 +247,16 @@ function AnswerCard({
         )}
       </div>
 
-      <p className="whitespace-pre-line text-sm text-foreground">{a.answer}</p>
+      <div className="text-sm text-foreground">
+        <AnswerText text={a.answer} links={links} />
+      </div>
 
       {a.steps.length > 0 && (
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground">
           {a.steps.map((s, i) => (
-            <li key={i}>{s}</li>
+            <li key={i}>
+              <AnswerText text={s} links={links} />
+            </li>
           ))}
         </ol>
       )}

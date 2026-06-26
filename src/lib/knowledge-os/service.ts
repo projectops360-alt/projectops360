@@ -30,6 +30,7 @@ import type {
 } from "./types";
 import { retrieveKnowledge } from "./retrieval";
 import { computeConfidence } from "./confidence";
+import { buildActionLinks, describeActionLinksForPrompt } from "./action-links";
 import { KNOWLEDGE_OS_BASE_PROMPT_VERSION } from "./config";
 import {
   resolveExpert,
@@ -273,6 +274,10 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
   const { text: passages, refMap } = buildPassages(retrieved);
   const hadVector = retrieved.some((c) => c.similarity != null);
 
+  // Action links resolve against the UI locale (input.locale), so routes point
+  // to the actually-working screen even when the conversation language differs.
+  const actionLinks = describeActionLinksForPrompt(buildActionLinks(input.locale, input.context));
+
   // ── 3. Generate: base prompt + persona overlay, grounded in passages ─────
   const ai = await runAi(org, {
     promptType: "guide_coaching",
@@ -283,6 +288,7 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
       intent: INTENT_HINT[input.intent] ?? input.intent,
       question: input.query || INTENT_HINT[input.intent] || "",
       passages,
+      links: actionLinks,
       language: locale === "es" ? "Spanish" : "English",
     },
     temperature: expert.temperature,

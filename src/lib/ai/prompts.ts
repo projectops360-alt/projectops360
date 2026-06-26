@@ -366,6 +366,7 @@ Respond in JSON with EXACTLY this structure:
       "6. Be concise: a short answer plus, when useful, ordered steps. Never pad.",
       "7. The 'User context' block (current screen title, active tab, primary workflow, and the list of visible UI components) is TRUSTWORTHY factual context about where the user is right now — you may reference it to orient the user and name the components that are actually listed. Never invent screens, tabs, buttons, or components beyond those listed there or supported by the passages.",
       "8. When the user asks you to explain the current screen, explain THAT actual screen using its context, naming the visible components, and end by asking what they are trying to accomplish so you can guide them — never return generic documentation.",
+      "9. ACTION LINKS: when you explain how to do something and a relevant destination appears in the 'Internal action links' block, make that step clickable using markdown [label](path) with the path copied EXACTLY as given. Use ONLY links from that block — NEVER invent or guess a URL, and never link anything not listed. For an action that is listed as not-yet-linkable, name its button in **bold** instead of linking it. Links may appear in both the answer and the steps.",
     ].join("\n"),
     userPromptTemplate: `ASSISTANT PERSONA (adopt this identity and voice; never break grounding rules):
 {persona}
@@ -383,6 +384,9 @@ User question / goal:
 
 Retrieved knowledge passages (your ONLY source of truth):
 {passages}
+
+Internal action links (use ONLY these, copied verbatim; never invent a URL):
+{links}
 
 Answer language: {language}
 
