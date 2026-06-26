@@ -112,8 +112,10 @@ export async function createMemberWithPasswordAction(input: {
       status = "created";
     }
 
-    // Attach the profile to THIS org with the given display name.
-    await c.supabase.from("profiles").upsert({ id: userId, organization_id: c.org.organizationId, display_name: displayName });
+    // Set the name and make THIS org their active/default org. We must NOT touch
+    // profiles.organization_id (a DB guard forbids changing it); the new user
+    // keeps their auto-created personal org as home but defaults into this org.
+    await c.supabase.from("profiles").update({ display_name: displayName, default_organization_id: c.org.organizationId }).eq("id", userId);
     // Add (or refresh) the membership in this org, active immediately.
     await c.supabase.from("organization_members").upsert(
       { organization_id: c.org.organizationId, user_id: userId, role, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "active" },
