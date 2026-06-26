@@ -8,7 +8,7 @@ import {
   FileText, Send, Code, ShieldCheck, AlertCircle,
   GripVertical, Filter, ChevronLeft, ChevronRight,
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
-  CornerDownRight,
+  CornerDownRight, Lock,
 } from "lucide-react";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
@@ -65,6 +65,10 @@ interface WorkboardClientProps {
   dependencies: TaskDependency[];
   /** taskId → assignee display name (resolved server-side). */
   assignees: Record<string, string>;
+  /** True when the user may move any task (manager tier / can_manage_tasks). */
+  canEditAll: boolean;
+  /** Task IDs a contributor may move (their own); ignored when canEditAll. */
+  editableTaskIds: string[];
   locale: Locale;
   translations: WorkboardTranslations;
 }
@@ -128,6 +132,8 @@ interface BoardColumnProps {
   milestoneMap: Map<string, string>;
   predecessorsByTask: Map<string, PredecessorInfo[]>;
   assigneeByTask: Map<string, string>;
+  canEditAll: boolean;
+  editableTaskIds: Set<string>;
   anyResizing: boolean;
   getColumnWidth: (status: TaskStatus) => number;
   setColumnWidth: (status: TaskStatus, width: number) => void;
@@ -155,6 +161,8 @@ function BoardColumn({
   milestoneMap,
   predecessorsByTask,
   assigneeByTask,
+  canEditAll,
+  editableTaskIds,
   anyResizing,
   getColumnWidth,
   setColumnWidth,
@@ -236,7 +244,7 @@ function BoardColumn({
                 className={`flex-1 min-h-[120px] p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
               >
                 {columnTasks.map((task, index) => (
-                  <Draggable key={task.id} draggableId={`task-${task.id}`} index={index} isDragDisabled={anyResizing}>
+                  <Draggable key={task.id} draggableId={`task-${task.id}`} index={index} isDragDisabled={anyResizing || (!canEditAll && !editableTaskIds.has(task.id))}>
                     {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
@@ -246,7 +254,9 @@ function BoardColumn({
                         className={`rounded-lg border border-border bg-card p-2.5 shadow-sm transition-shadow cursor-pointer ${snapshot.isDragging ? "shadow-lg ring-2 ring-brand-500/30" : "hover:shadow-md hover:border-brand-500/30"}`}
                       >
                         <div className="flex items-start gap-1.5">
-                          <GripVertical className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />
+                          {(canEditAll || editableTaskIds.has(task.id))
+                            ? <GripVertical className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />
+                            : <Lock className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />}
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-foreground truncate">{task.title}</p>
                             {task.description && <p className="text-[10px] text-muted-foreground/60 mt-0.5 line-clamp-1">{task.description}</p>}
@@ -331,6 +341,8 @@ export function WorkboardClient({
   tasks: initialTasks,
   dependencies,
   assignees,
+  canEditAll,
+  editableTaskIds,
   locale,
   translations: t,
 }: WorkboardClientProps) {
@@ -405,6 +417,7 @@ export function WorkboardClient({
   // Milestone lookup (declared early so filter options can use it)
   const milestoneMap = new Map(milestones.map((m) => [m.id, m.title]));
   const assigneeByTask = useMemo(() => new Map(Object.entries(assignees)), [assignees]);
+  const editableSet = useMemo(() => new Set(editableTaskIds), [editableTaskIds]);
 
   const sprintOptions = useMemo(() => {
     const names = new Set<string>();
@@ -565,11 +578,15 @@ export function WorkboardClient({
             .replace("{task}", pendingStatusChange.taskTitle)
             .replace("{predecessor}", res.predecessorTitle ?? "—"),
         );
+      } else if (res.error === "not_your_task") {
+        setDependencyWarning(locale === "es"
+          ? "Solo puedes mover tareas asignadas a ti."
+          : "You can only move tasks assigned to you.");
       }
     }
     setPendingStatusChange(null);
     router.refresh();
-  }, [pendingStatusChange, projectId, router, t.errors.dependency_not_met]);
+  }, [pendingStatusChange, projectId, router, t.errors.dependency_not_met, locale]);
 
   const handleStatusCancel = useCallback(() => {
     if (!pendingStatusChange) return;
@@ -766,6 +783,8 @@ export function WorkboardClient({
                           milestoneMap={milestoneMap}
                           predecessorsByTask={predecessorsByTask}
                           assigneeByTask={assigneeByTask}
+                          canEditAll={canEditAll}
+                          editableTaskIds={editableSet}
                           anyResizing={anyResizing}
                           getColumnWidth={getColumnWidth}
                           setColumnWidth={setColumnWidth}

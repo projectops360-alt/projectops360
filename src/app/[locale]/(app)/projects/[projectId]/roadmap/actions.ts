@@ -3,11 +3,35 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, getProjectAccess, isProjectManagerTier } from "@/lib/auth";
+import type { OrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitAndAutoLink } from "@/lib/graph/emit-event";
 import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/roadmap/progress";
 import type { AuditAction, Milestone, RoadmapTask } from "@/types/database";
+
+// ── Task write authorization ────────────────────────────────────────────────
+// A contributor may only change a task that is assigned to them. Manager tier
+// (PMO/PM/creator/can_manage_tasks) may change any task in the project. This
+// prevents one team member from disrupting another's work on the Workboard.
+async function canWriteTask(
+  org: OrgContext,
+  supabase: ReturnType<typeof createAdminClient>,
+  projectId: string,
+  task: { assigned_to?: string | null; project_team_member_id?: string | null } | null,
+): Promise<boolean> {
+  const access = await getProjectAccess(org, projectId);
+  if (isProjectManagerTier(access) || access.flags.can_manage_tasks) return true;
+  if (!task) return false;
+  if (task.assigned_to && task.assigned_to === org.userId) return true;
+  if (task.project_team_member_id) {
+    const { data: tm } = await supabase
+      .from("project_team_members").select("user_id")
+      .eq("id", task.project_team_member_id).maybeSingle();
+    if ((tm as { user_id?: string | null } | null)?.user_id === org.userId) return true;
+  }
+  return false;
+}
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────────────
 
@@ -799,6 +823,16 @@ export async function updateTaskAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  // Ownership: contributors may only edit tasks assigned to them.
+  const { data: existingTask } = await supabase
+    .from("roadmap_tasks")
+    .select("assigned_to, project_team_member_id")
+    .eq("id", data.taskId).eq("organization_id", org.organizationId).eq("project_id", data.projectId)
+    .is("deleted_at", null).maybeSingle();
+  if (!(await canWriteTask(org, supabase, data.projectId, existingTask as Record<string, unknown> | null))) {
+    return { error: "not_your_task" };
+  }
+
   const updateData: Record<string, unknown> = {
     title: data.title,
     description: data.description || null,
@@ -922,12 +956,17 @@ export async function updateTaskStatusAction(input: {
   // Fetch current status for audit before/after
   const { data: currentTask } = await supabase
     .from("roadmap_tasks")
-    .select("status, title, execution_notes")
+    .select("status, title, execution_notes, assigned_to, project_team_member_id")
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
     .is("deleted_at", null)
     .single();
+
+  // Ownership: contributors can only move their own tasks.
+  if (!(await canWriteTask(org, supabase, data.projectId, currentTask as Record<string, unknown> | null))) {
+    return { error: "not_your_task" };
+  }
 
   const previousStatus = (currentTask as { status: string } | null)?.status ?? "unknown";
   const taskTitle = (currentTask as { title: string } | null)?.title ?? "";

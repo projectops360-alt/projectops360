@@ -1,7 +1,7 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getOrgContext } from "@/lib/auth";
+import { getOrgContext, getProjectAccess, isProjectManagerTier } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency } from "@/types/database";
 import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
@@ -115,6 +115,19 @@ export default async function WorkboardPage({
     if (name) assignees[tk.id] = name;
   }
 
+  // ── Who can move which card ──────────────────────────────────────────────────
+  // Managers (PMO/PM/creator/can_manage_tasks) can move any task; a contributor
+  // can only move tasks assigned to them. This is enforced server-side too.
+  const access = await getProjectAccess(org, projectId);
+  const canEditAll = isProjectManagerTier(access) || access.flags.can_manage_tasks;
+  const editableTaskIds = canEditAll
+    ? []
+    : taskRows.filter((tk) => {
+        if (tk.assigned_to && tk.assigned_to === org.userId) return true;
+        const m = tk.project_team_member_id ? tmById.get(tk.project_team_member_id) : null;
+        return !!m && String(m.user_id ?? "") === org.userId;
+      }).map((tk) => tk.id);
+
   return (
     <WorkboardClient
       projectId={projectId}
@@ -123,6 +136,8 @@ export default async function WorkboardPage({
       tasks={sortedTasks}
       dependencies={dependencies}
       assignees={assignees}
+      canEditAll={canEditAll}
+      editableTaskIds={editableTaskIds}
       locale={locale as Locale}
       translations={{
         title: t("title"),
