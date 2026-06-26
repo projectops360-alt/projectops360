@@ -273,6 +273,14 @@ export function IsabellaExperience({
               <span className={styles.statusDot} />
               {statusLabel[presence]}
             </p>
+            {voice.enabled && voice.supported && !voice.hasFemaleVoice(locale) && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {tt(
+                  "No female voice is installed on this device — using the closest available.",
+                  "No hay una voz femenina instalada en este dispositivo — uso la más cercana disponible.",
+                )}
+              </p>
+            )}
           </div>
         </div>
 
