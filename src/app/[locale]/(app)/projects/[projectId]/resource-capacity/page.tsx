@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { computeResourceCapacity } from "@/lib/capacity/service";
 import { buildCapacitySummary, type CapacityLabels } from "@/lib/capacity/insight";
+import { CapacityEditor } from "./capacity-editor";
 import {
   Users, Gauge, Activity, Ban, AlertTriangle, Clock, Wallet, Flag, Sparkles, CheckCircle2,
 } from "lucide-react";
@@ -96,6 +97,9 @@ export default async function ResourceCapacityPage({ params }: { params: Promise
           </div>
         ))}
       </section>
+
+      {/* Capacity capture (PM/PMO can define per-resource capacity here) */}
+      <CapacityEditor projectId={projectId} locale={locale} />
 
       {/* PMO summary */}
       <section className="rounded-2xl border border-border bg-card p-5">
