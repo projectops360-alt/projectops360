@@ -85,7 +85,11 @@ import {
   enrichNodesWithReadiness,
   enrichNodesWithVariance,
 } from "@/lib/graph/labor-graph-mapping";
-import { enrichNodesWithWorkforce } from "@/lib/graph/workforce-graph-mapping";
+import {
+  enrichNodesWithWorkforce,
+  mapWorkforceResourceNodes,
+  mapWorkforceAssignmentEdges,
+} from "@/lib/graph/workforce-graph-mapping";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
@@ -368,6 +372,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return enrichNodesWithWorkforce(displayGraph.nodes, resourceCapacity, taskResourceKey);
   }, [workforceActive, resourceCapacity, displayGraph.nodes, taskResourceKey]);
 
+  // Curated Workforce view (Activities/Events): show ONLY the people + their
+  // assigned tasks, connected by status-colored edges. Idle people appear as
+  // standalone "100% available" cards. This declutters the flat node dump.
+  const workforceGraph = useMemo(() => {
+    if (!workforceActive || !resourceCapacity || viewLevel === "milestones") return null;
+    const resourceNodes = mapWorkforceResourceNodes(resourceCapacity, locale);
+    const assignedTasks = overlayNodes.filter(
+      (n) => n.sourceEntityType === "roadmap_tasks" && taskResourceKey.has(n.sourceEntityId),
+    );
+    const edges = mapWorkforceAssignmentEdges(resourceNodes, assignedTasks, taskResourceKey, resourceCapacity, projectId);
+    return { nodes: [...assignedTasks, ...resourceNodes], edges };
+  }, [workforceActive, resourceCapacity, viewLevel, overlayNodes, taskResourceKey, projectId, locale]);
+
+  const baseNodes = workforceGraph ? workforceGraph.nodes : overlayNodes;
+  const baseEdges = workforceGraph ? workforceGraph.edges : displayGraph.edges;
+
   const analysis = useMemo(
     () => analyzeGraph(displayGraph.nodes, displayGraph.edges),
     [displayGraph],
@@ -385,7 +405,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const filtered = useMemo(() => {
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTime = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null;
-    const nodes = overlayNodes.filter((n) => {
+    const nodes = baseNodes.filter((n) => {
       if (!nodeTypeFilter.has(n.nodeType)) return false;
       if (statusFilter && n.status !== statusFilter) return false;
       if (riskFilter && n.riskLevel !== riskFilter) return false;
@@ -397,7 +417,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       if (fromTime != null && time < fromTime) return false;
       if (toTime != null && time >= toTime) return false;
       if (focusIds && !focusIds.has(n.id)) return false;
+      // The curated Workforce view manages its own node set — skip milestone focus.
       if (
+        !workforceGraph &&
         milestoneFocus &&
         viewLevel !== "milestones" &&
         (!n.milestoneId || !milestoneFocus.has(n.milestoneId))
@@ -407,15 +429,18 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       return true;
     });
     const idSet = new Set(nodes.map((n) => n.id));
-    const edges = displayGraph.edges.filter(
+    const edges = baseEdges.filter(
       (e) =>
-        edgeTypeFilter.has(e.edgeType) &&
+        (workforceGraph || edgeTypeFilter.has(e.edgeType)) &&
         idSet.has(e.sourceNodeId) &&
         idSet.has(e.targetNodeId),
     );
     return { nodes, edges };
   }, [
     displayGraph,
+    baseNodes,
+    baseEdges,
+    workforceGraph,
     overlayNodes,
     analysis,
     nodeTypeFilter,
@@ -1017,6 +1042,16 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const showPanel = selectedNode != null || selectedEdge != null;
 
+  // Progressive disclosure: never dump the full flat activity/event graph. When
+  // there are many nodes and no phase is focused, guide the user to drill into
+  // one milestone (one layer at a time → narrowing to detail). The curated
+  // Workforce view manages its own density, so it's exempt.
+  const tooManyNodes =
+    viewLevel !== "milestones" &&
+    !milestoneFocus &&
+    !workforceGraph &&
+    filtered.nodes.length > 24;
+
   return (
     <div
       ref={containerRef}
@@ -1098,6 +1133,39 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         summary={analysis.summary}
         largeGraphWarning={filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null}
       />
+
+      {/* Progressive disclosure: too many nodes → drill into a phase (layers) */}
+      {tooManyNodes && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <span>
+            {locale === "es"
+              ? `Demasiadas tareas (${filtered.nodes.length}) para leerlas todas. Entra a una fase:`
+              : `Too many tasks (${filtered.nodes.length}) to read at once. Drill into a phase:`}
+          </span>
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                setMilestoneFocus(new Set([e.target.value]));
+                setManualPositions(new Map());
+              }
+            }}
+            className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+          >
+            <option value="">{locale === "es" ? "Elegir fase…" : "Choose a phase…"}</option>
+            {milestones.map((m) => (
+              <option key={m.id} value={m.id}>{m.title}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setViewLevel("milestones")}
+            className="rounded-md border border-amber-500/40 px-2 py-1 font-medium hover:bg-amber-500/10"
+          >
+            {locale === "es" ? "Volver a Milestones" : "Back to Milestones"}
+          </button>
+        </div>
+      )}
 
       {/* Status hints */}
       {isMilestoneLevel && milestonePicks.length === 0 && (

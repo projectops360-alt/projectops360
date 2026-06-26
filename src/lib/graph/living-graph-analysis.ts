@@ -467,14 +467,15 @@ export function nodeOverlayEmphasis(
       return "dimmed";
     }
     case "workforceCapacity": {
-      // Highlight resource nodes and work affected by overloaded resources.
+      // Curated workforce view: everything shown is relevant. Overloaded →
+      // highlight; everyone else stays visible (normal). Only nodes with no
+      // workforce data are dimmed.
       const wf = node.metadata?.workforce as
         | import("@/types/living-graph").WorkforceNodeData
         | undefined;
       if (!wf) return "dimmed";
       if (wf.status === "critical" || wf.status === "overallocated") return "highlight";
-      if (wf.status === "near_capacity") return "normal";
-      return "dimmed";
+      return "normal";
     }
     default:
       return "normal";

@@ -21,6 +21,15 @@ function statusRisk(status: string): LivingGraphRiskLevel | null {
   return null;
 }
 
+/** Red (overloaded) / yellow (near) / green (ok) / gray (no data) per status. */
+export function workforceStatusColor(status: string): string {
+  if (status === "critical") return "#ef4444";
+  if (status === "overallocated") return "#f97316";
+  if (status === "near_capacity") return "#f59e0b";
+  if (status === "needs_review") return "#94a3b8";
+  return "#10b981"; // available | healthy
+}
+
 function rowToWorkforce(r: ResourceCapacityRow, kind: "resource" | "task"): WorkforceNodeData {
   return {
     status: r.status,
@@ -34,10 +43,20 @@ function rowToWorkforce(r: ResourceCapacityRow, kind: "resource" | "task"): Work
   };
 }
 
-/** One synthetic `resource_event` node per resource (with capacity metadata). */
-export function mapWorkforceResourceNodes(result: ResourceCapacityResult): LivingGraphNode[] {
+/** One synthetic `resource_event` node per resource (with capacity metadata).
+ *  Idle resources (no assigned hours) are labeled "100% available". */
+export function mapWorkforceResourceNodes(result: ResourceCapacityResult, locale = "en"): LivingGraphNode[] {
+  const es = locale === "es";
   return result.resources.map((r) => {
     const wf = rowToWorkforce(r, "resource");
+    const idle = (r.assignedHours ?? 0) <= 0;
+    const description = idle
+      ? (es ? "100% disponible · sin trabajo asignado" : "100% available · no work assigned")
+      : (r.utilizationPercent != null
+          ? `${Math.round(r.utilizationPercent)}% ${es ? "utilización" : "utilization"} · ${Math.round(r.assignedHours)}/${Math.round(r.effectivePeriodHours)}h`
+          : (es ? "Sin datos de capacidad" : "No capacity data"));
+    // Idle people read as healthy/available (green), not "needs review".
+    const status = idle && r.hasCapacityData ? "available" : r.status;
     return {
       id: workforceResourceNodeId(r.resourceKey),
       projectId: "",
@@ -45,29 +64,32 @@ export function mapWorkforceResourceNodes(result: ResourceCapacityResult): Livin
       sourceEntityType: "roadmap_tasks", // synthetic; not a real source row
       sourceEntityId: r.resourceKey,
       label: r.role ? `${r.name} · ${r.role}` : r.name,
-      description: r.utilizationPercent != null ? `${Math.round(r.utilizationPercent)}% utilization` : "No capacity data",
-      status: r.status,
+      description,
+      status,
       progress: null,
       startDate: null, endDate: null, durationDays: null,
       occurredAt: new Date().toISOString(), createdAt: "", updatedAt: "",
-      riskLevel: statusRisk(r.status),
-      isBlocked: r.status === "critical",
-      isCritical: r.status === "critical" || r.status === "overallocated",
+      riskLevel: statusRisk(status),
+      isBlocked: status === "critical",
+      isCritical: status === "critical" || status === "overallocated",
       milestoneId: null, milestoneLabel: null, milestoneOrder: null,
       traceabilityScore: null,
-      metadata: { workforce: wf },
+      metadata: { workforce: { ...wf, status }, workforceIdle: idle },
     };
   });
 }
 
-/** assigned_to edges: resource node → its assigned task nodes. */
+/** assigned_to edges: resource node → its assigned task nodes, colored by the
+ *  resource's capacity status (red overloaded / yellow near / green ok). */
 export function mapWorkforceAssignmentEdges(
   resourceNodes: LivingGraphNode[],
   existingNodes: LivingGraphNode[],
   taskResourceKey: Map<string, string>,
+  result: ResourceCapacityResult,
   projectId: string,
 ): LivingGraphEdge[] {
   const resourceNodeByKey = new Map(resourceNodes.map((n) => [n.sourceEntityId, n.id]));
+  const statusByKey = new Map(result.resources.map((r) => [r.resourceKey, r.status]));
   const edges: LivingGraphEdge[] = [];
   for (const node of existingNodes) {
     if (node.sourceEntityType !== "roadmap_tasks") continue;
@@ -75,6 +97,8 @@ export function mapWorkforceAssignmentEdges(
     if (!key) continue;
     const sourceId = resourceNodeByKey.get(key);
     if (!sourceId || sourceId === node.id) continue;
+    const status = statusByKey.get(key) ?? "available";
+    const color = workforceStatusColor(status);
     edges.push({
       id: `workforce-edge:${sourceId}:${node.id}`,
       projectId,
@@ -83,9 +107,9 @@ export function mapWorkforceAssignmentEdges(
       edgeType: "assigned_to",
       weight: 1,
       lagDays: null,
-      isCritical: false,
-      riskLevel: null,
-      metadata: { workforceAssignment: true },
+      isCritical: status === "critical" || status === "overallocated",
+      riskLevel: status === "critical" || status === "overallocated" ? "high" : status === "near_capacity" ? "medium" : "low",
+      metadata: { workforceAssignment: true, workforceColor: color },
     });
   }
   return edges;

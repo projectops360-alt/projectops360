@@ -165,11 +165,16 @@ function LivingGraphEdgeComponent({
   }
 
   const isDimmed = data.emphasis === "dimmed";
-  const stroke = data.isPathMember
-    ? GRAPH_SEMANTIC_COLORS.active
-    : data.isCritical
-      ? GRAPH_SEMANTIC_COLORS.critical
-      : style.stroke;
+  // Workforce assignment edges carry their own status color (red/yellow/green).
+  const workforceColor =
+    typeof edge.metadata.workforceColor === "string" ? edge.metadata.workforceColor : null;
+  const stroke = workforceColor
+    ? workforceColor
+    : data.isPathMember
+      ? GRAPH_SEMANTIC_COLORS.active
+      : data.isCritical
+        ? GRAPH_SEMANTIC_COLORS.critical
+        : style.stroke;
   // Frequency-scaled width: weight 1 → base; heavier transitions get thicker
   const weightBoost = Math.min(3, Math.log2(Math.max(1, edge.weight) + 1));
   const strokeWidth =
