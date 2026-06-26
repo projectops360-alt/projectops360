@@ -1052,6 +1052,27 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     !workforceGraph &&
     filtered.nodes.length > 24;
 
+  // Executive Insights are scoped to what's currently visible (level + phase
+  // focus + filters + overlay). Drill into a phase → the KPIs reflect that phase.
+  const scopedInsights = useMemo(() => {
+    const msIds = new Set<string>();
+    const taskIds = new Set<string>();
+    for (const n of filtered.nodes) {
+      if (n.milestoneId) msIds.add(n.milestoneId);
+      if (n.sourceEntityType === "roadmap_tasks" && !n.id.startsWith("workforce:")) {
+        taskIds.add(n.sourceEntityId);
+      }
+    }
+    const isMs = viewLevel === "milestones";
+    let sMilestones = msIds.size ? milestones.filter((m) => msIds.has(m.id)) : milestones;
+    let sTasks = isMs
+      ? (msIds.size ? tasks.filter((t) => t.milestone_id != null && msIds.has(t.milestone_id)) : tasks)
+      : (taskIds.size ? tasks.filter((t) => taskIds.has(t.id)) : tasks);
+    if (sTasks.length === 0 && sMilestones.length === 0) { sMilestones = milestones; sTasks = tasks; }
+    const scoped = sTasks.length < tasks.length || sMilestones.length < milestones.length;
+    return { milestones: sMilestones, tasks: sTasks, scoped };
+  }, [filtered.nodes, viewLevel, milestones, tasks]);
+
   return (
     <div
       ref={containerRef}
@@ -1310,8 +1331,16 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               </div>
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+              {scopedInsights.scoped && (
+                <p className="flex items-center gap-1.5 rounded-md bg-brand-500/10 px-2 py-1 text-[10px] font-medium text-brand-700 dark:text-brand-300">
+                  <BarChart3 className="h-3 w-3" />
+                  {locale === "es"
+                    ? `Vista actual: ${scopedInsights.tasks.length} tareas · ${scopedInsights.milestones.length} fase(s)`
+                    : `Current view: ${scopedInsights.tasks.length} tasks · ${scopedInsights.milestones.length} phase(s)`}
+                </p>
+              )}
               <LivingGraphMetricsHeader health={health} layout="grid" />
-              <ExecutiveSummaryPanel milestones={milestones} tasks={tasks} locale={locale} defaultOpen compact />
+              <ExecutiveSummaryPanel milestones={scopedInsights.milestones} tasks={scopedInsights.tasks} locale={locale} defaultOpen compact />
             </div>
           </div>
         )}
