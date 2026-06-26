@@ -152,6 +152,52 @@ export function isSafeInternalHref(href: string, allowed: Set<string>): boolean 
   return allowed.has(h);
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Deterministically turn plain mentions of known destinations into safe markdown
+ * links. Models are unreliable at emitting markdown links, so rather than depend
+ * on them we auto-link here: for each deep-linkable destination we link the FIRST
+ * standalone mention of any of its labels (EN or ES — the answer language may
+ * differ from the UI) to the UI-locale href. One link per destination, capped, and
+ * never inside an existing markdown link. Hrefs are always allow-listed routes, so
+ * this can only ever produce safe internal links.
+ */
+export function linkifyAnswer(
+  text: string,
+  uiLocale: Locale,
+  context: GuideContext,
+  max = 4,
+): string {
+  if (!text) return text;
+  const linkable = buildActionLinks(uiLocale, context).filter((l) => l.href);
+  let out = text;
+  let added = 0;
+
+  for (const l of linkable) {
+    if (added >= max) break;
+    if (!l.href) continue;
+    if (out.includes(`](${l.href})`)) continue; // already linked somewhere
+
+    const dest = ACTION_DESTINATIONS.find((d) => d.key === l.key);
+    const labels = dest ? [dest.label.en, dest.label.es] : [l.label];
+    for (const label of labels) {
+      if (!label) continue;
+      // First standalone occurrence not already part of a markdown link.
+      const re = new RegExp(`(^|[^\\p{L}\\]])(${escapeRegExp(label)})(?![\\p{L}])(?!\\]\\()`, "u");
+      const m = re.exec(out);
+      if (!m) continue;
+      const start = m.index + m[1].length;
+      out = `${out.slice(0, start)}[${label}](${l.href})${out.slice(start + label.length)}`;
+      added++;
+      break; // one link per destination
+    }
+  }
+  return out;
+}
+
 /** Build the prompt block listing the links Isabella may use, verbatim. */
 export function describeActionLinksForPrompt(links: ResolvedLink[]): string {
   const linkable = links.filter((l) => l.href);

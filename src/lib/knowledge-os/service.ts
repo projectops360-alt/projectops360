@@ -30,7 +30,7 @@ import type {
 } from "./types";
 import { retrieveKnowledge } from "./retrieval";
 import { computeConfidence } from "./confidence";
-import { buildActionLinks, describeActionLinksForPrompt } from "./action-links";
+import { buildActionLinks, describeActionLinksForPrompt, linkifyAnswer } from "./action-links";
 import { KNOWLEDGE_OS_BASE_PROMPT_VERSION } from "./config";
 import {
   resolveExpert,
@@ -311,7 +311,7 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
     return {
       answerId,
       grounded: true,
-      answer: top[0].body,
+      answer: linkifyAnswer(top[0].body, input.locale, input.context),
       steps: [],
       followups: [],
       tier,
@@ -345,13 +345,19 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
     hadVectorConfirmation: hadVector,
   });
 
-  const steps = Array.isArray(parsed.steps) ? parsed.steps.map(String).filter(Boolean).slice(0, 8) : [];
+  // Deterministically add safe internal links (routes follow the UI locale).
+  const linkify = (s: string) => linkifyAnswer(s, input.locale, input.context);
+  const steps = Array.isArray(parsed.steps)
+    ? parsed.steps.map(String).filter(Boolean).slice(0, 8).map(linkify)
+    : [];
   const followups = Array.isArray(parsed.followups)
     ? parsed.followups.map(String).filter(Boolean).slice(0, 3)
     : [];
-  const answerText = typeof parsed.answer === "string" && parsed.answer.trim()
-    ? parsed.answer.trim()
-    : emptyAnswer(locale).answer;
+  const answerText = linkify(
+    typeof parsed.answer === "string" && parsed.answer.trim()
+      ? parsed.answer.trim()
+      : emptyAnswer(locale).answer,
+  );
 
   const answerId = await persistAnswer(org, input, expert, {
     grounded,
