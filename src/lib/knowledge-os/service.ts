@@ -45,6 +45,34 @@ const INTENT_HINT: Record<string, string> = {
   common_mistakes: "The user wants to know common mistakes to avoid.",
 };
 
+// Bilingual topic seeds per intent — used to ground RETRIEVAL (not the answer).
+// They steer quick actions and short/generic queries (e.g. "explain this
+// screen" / "explícame esta pantalla") toward the relevant Knowledge Packages
+// regardless of language, instead of a generic English meta-hint.
+const INTENT_TOPIC: Record<string, string> = {
+  explain_screen: "overview what is this screen resumen qué es esta pantalla",
+  step_by_step: "how to step by step cómo paso a paso",
+  best_practices: "best practices buenas prácticas recommendations recomendaciones",
+  common_mistakes: "common mistakes errors to avoid errores comunes a evitar",
+  question: "",
+};
+
+/**
+ * Build the RETRIEVAL query (distinct from what the model sees). Context-aware:
+ * always grounds retrieval in the current module/screen so the coach answers
+ * about WHERE the user is — and bilingual intent topics make quick actions and
+ * short queries reliable in both English and Spanish. The user's typed query
+ * still dominates ranking; the context terms only add recall.
+ */
+function buildRetrievalQuery(input: AskGuideInput): string {
+  const c = input.context;
+  const moduleTopic = c.module ? c.module.replace(/_/g, " ") : "";
+  const screenTopic = c.screen ? c.screen.replace(/_/g, " ") : "";
+  const intentTopic = INTENT_TOPIC[input.intent] ?? "";
+  const parts = [input.query.trim(), intentTopic, moduleTopic, screenTopic].filter(Boolean);
+  return parts.join(" ").trim() || INTENT_HINT[input.intent] || "";
+}
+
 function serializeContext(input: AskGuideInput): string {
   const c = input.context;
   const parts = [
@@ -200,8 +228,8 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
   const expert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[locale === "es" ? "es" : "en"] };
 
-  // ── 1. Retrieve (hybrid, org+global, language-scoped) ────────────────────
-  const retrieved = await retrieveKnowledge(input.query || INTENT_HINT[input.intent] || "", {
+  // ── 1. Retrieve (hybrid, multilingual, context-aware) ────────────────────
+  const retrieved = await retrieveKnowledge(buildRetrievalQuery(input), {
     organizationId: org.organizationId,
     language: locale,
   });
