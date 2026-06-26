@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { redirect } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { setRequestLocale } from "next-intl/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
@@ -21,6 +22,14 @@ export default async function AppLayout({
     org = await getOrgContext();
   } catch {
     redirect(locale === routing.defaultLocale ? "/login" : `/${locale}/login`);
+  }
+
+  // Force a password change on first login (members created with a temporary
+  // password). Redirects to the standalone /change-password screen until done.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.user_metadata?.must_change_password === true) {
+    redirect(locale === routing.defaultLocale ? "/change-password" : `/${locale}/change-password`);
   }
 
   return (

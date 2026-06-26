@@ -40,6 +40,93 @@ export async function updateMemberSeatAction(input: {
   return {};
 }
 
+/** Rename a workspace collaborator (updates their display name). PMO/admin only. */
+export async function renameWorkspaceUserAction(input: { userId: string; name: string }): Promise<{ error?: string }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+  const name = (input.name ?? "").trim();
+  if (!name) return { error: "empty_name" };
+  if (name.length > 120) return { error: "name_too_long" };
+
+  // Only rename users who belong to the caller's organization.
+  const { data: member } = await c.supabase
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", c.org.organizationId)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+  if (!member) return { error: "not_found" };
+
+  const { error } = await c.supabase.from("profiles").update({ display_name: name }).eq("id", input.userId);
+  if (error) return { error: "unexpected" };
+  await logAudit({ org: c.org, action: "update", entityType: "profiles", entityId: input.userId, metadata: { renamed_to: name } });
+  return {};
+}
+
+/**
+ * Create a login directly with an email + temporary password (no SMTP needed).
+ * The person can sign in immediately; they are forced to change the password on
+ * first login (must_change_password flag). PMO/admin only.
+ *
+ * Security: server-only service_role; owner/admin gate; email validated;
+ * password length enforced; the password is never logged (audit records only
+ * the email/seat); the user is attached to the caller's org with the right role.
+ */
+export async function createMemberWithPasswordAction(input: {
+  email: string; password: string; displayName?: string; billingSeatType?: string; workspaceRole?: string;
+}): Promise<{ error?: string; status?: "created" | "linked" }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+
+  const email = (input.email ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid_email" };
+  if (!input.password || input.password.length < 8) return { error: "weak_password" };
+
+  const seat = SEAT_VALUES.includes(input.billingSeatType ?? "") ? input.billingSeatType! : "full_seat";
+  const role = MEMBER_ROLE(seat);
+  const displayName = input.displayName?.trim() || email.split("@")[0];
+
+  try {
+    const { data: list } = await c.supabase.auth.admin.listUsers();
+    const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
+
+    let userId: string;
+    let status: "created" | "linked";
+    if (existing) {
+      // Account exists — (re)set the temporary password and link into this org.
+      userId = existing.id;
+      status = "linked";
+      await c.supabase.auth.admin.updateUserById(userId, {
+        password: input.password,
+        user_metadata: { ...(existing.user_metadata ?? {}), must_change_password: true },
+      });
+    } else {
+      const { data: created, error: cErr } = await c.supabase.auth.admin.createUser({
+        email,
+        password: input.password,
+        email_confirm: true, // no SMTP confirmation needed
+        user_metadata: { display_name: displayName, must_change_password: true },
+      });
+      if (cErr || !created?.user) return { error: "create_failed" };
+      userId = created.user.id;
+      status = "created";
+    }
+
+    // Attach the profile to THIS org with the given display name.
+    await c.supabase.from("profiles").upsert({ id: userId, organization_id: c.org.organizationId, display_name: displayName });
+    // Add (or refresh) the membership in this org, active immediately.
+    await c.supabase.from("organization_members").upsert(
+      { organization_id: c.org.organizationId, user_id: userId, role, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "active" },
+      { onConflict: "organization_id,user_id" });
+
+    // Audit — NEVER record the password.
+    await logAudit({ org: c.org, action: "create", entityType: "organization_members", entityId: userId, metadata: { created_login: email, seat, status } });
+    return { status };
+  } catch {
+    return { error: "create_failed" };
+  }
+}
+
 /** Invite a new internal member by email (status = invited until accepted). */
 export async function inviteMemberAction(input: { email: string; billingSeatType?: string; workspaceRole?: string }): Promise<{ error?: string; status?: "linked" | "invited" }> {
   const c = await adminCtx();
