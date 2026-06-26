@@ -64,6 +64,93 @@ export async function renameWorkspaceUserAction(input: { userId: string; name: s
 }
 
 /**
+ * Full control over a workspace user: name, email, seat/role, workspace role,
+ * status, department, job title. PMO/admin only. Email changes go through the
+ * auth admin API (no SMTP). organization_id is never touched (DB-guarded).
+ */
+export async function updateWorkspaceUserAction(input: {
+  memberId: string; userId: string;
+  name?: string; email?: string;
+  billingSeatType?: string; workspaceRole?: string; status?: string;
+  department?: string; jobTitle?: string;
+}): Promise<{ error?: string }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+
+  // Name (profiles.display_name) — never touch organization_id.
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) return { error: "empty_name" };
+    if (name.length > 120) return { error: "name_too_long" };
+    await c.supabase.from("profiles").update({ display_name: name }).eq("id", input.userId);
+  }
+
+  // Email (auth admin, no SMTP).
+  if (input.email !== undefined && input.email.trim()) {
+    const email = input.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid_email" };
+    const { error: eErr } = await c.supabase.auth.admin.updateUserById(input.userId, { email, email_confirm: true });
+    if (eErr) return { error: "email_in_use" };
+  }
+
+  // Membership fields.
+  const patch: Record<string, unknown> = {};
+  if (input.billingSeatType !== undefined && SEAT_VALUES.includes(input.billingSeatType)) {
+    patch.billing_seat_type = input.billingSeatType;
+    patch.role = MEMBER_ROLE(input.billingSeatType);
+  }
+  if (input.workspaceRole !== undefined) patch.workspace_role = input.workspaceRole || null;
+  if (input.status !== undefined && ["invited", "active", "suspended", "removed"].includes(input.status)) {
+    // Don't let an admin lock themselves out.
+    if (input.userId === c.org.userId && input.status !== "active") return { error: "cannot_change_self_status" };
+    patch.status = input.status;
+  }
+  if (input.department !== undefined) patch.department = input.department.trim() || null;
+  if (input.jobTitle !== undefined) patch.job_title = input.jobTitle.trim() || null;
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await c.supabase.from("organization_members").update(patch).eq("id", input.memberId).eq("organization_id", c.org.organizationId);
+    if (error) return { error: "unexpected" };
+  }
+
+  await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.memberId, metadata: { ...patch, renamed: input.name ? true : undefined, email_changed: input.email ? true : undefined } });
+  return {};
+}
+
+/** Set a new temporary password for a workspace user; forces change on next login. PMO/admin only. */
+export async function resetWorkspaceUserPasswordAction(input: { userId: string; password: string }): Promise<{ error?: string }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+  if (!input.password || input.password.length < 8) return { error: "weak_password" };
+
+  const { data: member } = await c.supabase.from("organization_members")
+    .select("user_id").eq("organization_id", c.org.organizationId).eq("user_id", input.userId).maybeSingle();
+  if (!member) return { error: "not_found" };
+
+  const { data: u } = await c.supabase.auth.admin.getUserById(input.userId);
+  const { error } = await c.supabase.auth.admin.updateUserById(input.userId, {
+    password: input.password,
+    user_metadata: { ...(u?.user?.user_metadata ?? {}), must_change_password: true },
+  });
+  if (error) return { error: "unexpected" };
+  // NEVER log the password.
+  await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.userId, metadata: { password_reset: true } });
+  return {};
+}
+
+/** Remove a workspace user from the organization (soft: status = removed). PMO/admin only. */
+export async function removeWorkspaceUserAction(input: { memberId: string; userId: string }): Promise<{ error?: string }> {
+  const c = await adminCtx();
+  if (!c) return { error: "not_allowed" };
+  if (input.userId === c.org.userId) return { error: "cannot_remove_self" };
+  const { error } = await c.supabase.from("organization_members").update({ status: "removed" })
+    .eq("id", input.memberId).eq("organization_id", c.org.organizationId);
+  if (error) return { error: "unexpected" };
+  await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.memberId, metadata: { removed: true } });
+  return {};
+}
+
+/**
  * Create a login directly with an email + temporary password (no SMTP needed).
  * The person can sign in immediately; they are forced to change the password on
  * first login (must_change_password flag). PMO/admin only.

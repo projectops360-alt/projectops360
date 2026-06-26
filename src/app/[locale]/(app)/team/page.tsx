@@ -18,7 +18,9 @@ export default async function TeamPage({
   const supabase = createAdminClient();
 
   const [membersRes, profilesRes, resourcesRes, projectsRes] = await Promise.all([
-    supabase.from("organization_members").select("user_id, role").eq("organization_id", org.organizationId),
+    supabase.from("organization_members")
+      .select("id, user_id, role, billing_seat_type, workspace_role, status, department, job_title")
+      .eq("organization_id", org.organizationId),
     supabase.from("profiles").select("id, display_name").eq("organization_id", org.organizationId),
     supabase
       .from("resources")
@@ -29,11 +31,25 @@ export default async function TeamPage({
     supabase.from("projects").select("id, title_i18n, slug").eq("organization_id", org.organizationId).is("deleted_at", null),
   ]);
 
+  // Emails (best-effort, from the auth admin API).
+  const emailById = new Map<string, string>();
+  try {
+    const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+    for (const u of list?.users ?? []) if (u.email) emailById.set(u.id, u.email);
+  } catch { /* ignore */ }
+
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
   const members: TeamMember[] = (membersRes.data ?? []).map((m) => ({
+    memberId: m.id,
     userId: m.user_id,
     role: m.role,
     name: profileById.get(m.user_id)?.display_name || (m.user_id === org.userId ? org.displayName || org.email : "—"),
+    email: emailById.get(m.user_id) ?? null,
+    seatType: (m.billing_seat_type as string) ?? null,
+    workspaceRole: (m.workspace_role as string) ?? null,
+    status: (m.status as string) ?? "active",
+    department: (m.department as string) ?? null,
+    jobTitle: (m.job_title as string) ?? null,
     isYou: m.user_id === org.userId,
   }));
 

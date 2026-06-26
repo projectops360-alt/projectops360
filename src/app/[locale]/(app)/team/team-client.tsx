@@ -11,14 +11,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserRound, HardHat, Building2, Wrench, ShieldCheck, Plus, Pencil, Merge,
-  Archive, Mail, X, Loader2, KeyRound, Wand2, Copy, Check,
+  Archive, Mail, X, Loader2, KeyRound, Wand2, Copy, Check, Trash2, UserCog,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
+import { SEAT_TYPES, WORKSPACE_ROLES, MEMBER_STATUSES } from "@/lib/billing/config";
 import {
   createTeamResourceAction, updateTeamResourceAction, mergeTeamResourcesAction,
   archiveTeamResourceAction, inviteResourceAsUserAction,
 } from "./actions";
-import { renameWorkspaceUserAction, createMemberWithPasswordAction } from "../organization/members/actions";
+import {
+  createMemberWithPasswordAction, updateWorkspaceUserAction,
+  resetWorkspaceUserPasswordAction, removeWorkspaceUserAction,
+} from "../organization/members/actions";
 
 /** Generate a readable temporary password (no ambiguous chars). */
 function genTempPassword(): string {
@@ -30,7 +34,11 @@ function genTempPassword(): string {
   return s;
 }
 
-export interface TeamMember { userId: string; role: string; name: string; isYou: boolean }
+export interface TeamMember {
+  memberId: string; userId: string; role: string; name: string; isYou: boolean;
+  email: string | null; seatType: string | null; workspaceRole: string | null;
+  status: string; department: string | null; jobTitle: string | null;
+}
 export interface TeamProject { id: string; name: string }
 export interface TeamResource {
   id: string; name: string; resourceType: string; trade: string | null;
@@ -71,23 +79,10 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
   const [inviting, setInviting] = useState<TeamResource | null>(null);
   const [adding, setAdding] = useState(false);
   const [creatingLogin, setCreatingLogin] = useState(false);
+  const [editingUser, setEditingUser] = useState<TeamMember | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  // Inline rename of a workspace user.
-  const [editUserId, setEditUserId] = useState<string | null>(null);
-  const [editUserName, setEditUserName] = useState("");
 
   const tt = (en: string, es: string) => (isEs ? es : en);
-
-  async function saveUserName(userId: string) {
-    const name = editUserName.trim();
-    setEditUserId(null);
-    if (!name) return;
-    await withBusy("rename:" + userId, async () => {
-      const r = await renameWorkspaceUserAction({ userId, name });
-      if (!r.error) { flash(tt("Renamed", "Renombrado")); router.refresh(); }
-      else flash(tt("Could not rename", "No se pudo renombrar"));
-    });
-  }
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   async function withBusy(key: string, fn: () => Promise<void>) {
@@ -153,28 +148,17 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m, i) => (
-            <div key={i} className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+            <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{m.name.slice(0, 2).toUpperCase()}</span>
               <div className="min-w-0 flex-1">
-                {editUserId === m.userId ? (
-                  <div className="flex items-center gap-1">
-                    <input autoFocus value={editUserName} onChange={(e) => setEditUserName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") saveUserName(m.userId); if (e.key === "Escape") setEditUserId(null); }}
-                      className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground focus:border-brand-500 focus:outline-none" />
-                    <button onClick={() => saveUserName(m.userId)} className="rounded p-1 text-green-600 hover:bg-muted"><Check className="h-4 w-4" /></button>
-                    <button onClick={() => setEditUserId(null)} className="rounded p-1 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
-                  </div>
-                ) : (
-                  <>
-                    <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
-                    <p className="text-xs text-muted-foreground">{roleLabel(m.role)}</p>
-                  </>
-                )}
+                <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
+                <p className="truncate text-xs text-muted-foreground">{roleLabel(m.role)}{m.email && <> · {m.email}</>}</p>
+                {m.status !== "active" && <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">{m.status}</p>}
               </div>
-              {canManage && editUserId !== m.userId && (
-                <button type="button" title={tt("Rename", "Renombrar")} onClick={() => { setEditUserId(m.userId); setEditUserName(m.name); }}
-                  className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-brand-600 dark:hover:text-brand-400">
-                  <Pencil className="h-4 w-4" />
+              {canManage && (
+                <button type="button" title={tt("Manage user", "Gestionar usuario")} onClick={() => setEditingUser(m)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400">
+                  <UserCog className="h-4 w-4" />{tt("Manage", "Gestionar")}
                 </button>
               )}
             </div>
@@ -260,6 +244,10 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
         )}
       </section>
 
+      {editingUser && <EditUserDialog tt={tt} member={editingUser}
+        onClose={() => setEditingUser(null)}
+        onSaved={() => { setEditingUser(null); flash(tt("Saved", "Guardado")); router.refresh(); }}
+        onRemoved={() => { setEditingUser(null); flash(tt("Removed", "Removido")); router.refresh(); }} />}
       {creatingLogin && <CreateLoginDialog tt={tt} onClose={() => setCreatingLogin(false)} onCreated={() => { flash(tt("Login created", "Acceso creado")); router.refresh(); }} />}
       {adding && <AddDialog tt={tt} projects={projects} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); flash(tt("Added", "Agregado")); router.refresh(); }} />}
       {editing && <EditDialog tt={tt} resource={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); flash(tt("Saved", "Guardado")); router.refresh(); }} />}
@@ -363,6 +351,125 @@ function EditDialog({ tt, resource, onClose, onSaved }: { tt: TT; resource: Team
           className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}{tt("Save", "Guardar")}
         </button>
+      </div>
+    </Dialog>
+  );
+}
+
+function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
+  tt: TT; member: TeamMember; onClose: () => void; onSaved: () => void; onRemoved: () => void;
+}) {
+  const [name, setName] = useState(member.name === "—" ? "" : member.name);
+  const [email, setEmail] = useState(member.email ?? "");
+  const [seat, setSeat] = useState(member.seatType ?? "full_seat");
+  const [wsRole, setWsRole] = useState(member.workspaceRole ?? "");
+  const [status, setStatus] = useState(member.status);
+  const [dept, setDept] = useState(member.department ?? "");
+  const [jobTitle, setJobTitle] = useState(member.jobTitle ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [pwd, setPwd] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetDone, setResetDone] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const ERR: Record<string, string> = {
+    not_allowed: tt("Not allowed.", "No autorizado."),
+    invalid_email: tt("Invalid email.", "Correo inválido."),
+    email_in_use: tt("That email is already in use.", "Ese correo ya está en uso."),
+    empty_name: tt("Name cannot be empty.", "El nombre no puede estar vacío."),
+    weak_password: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
+    cannot_change_self_status: tt("You can't change your own status.", "No puedes cambiar tu propio estado."),
+    cannot_remove_self: tt("You can't remove yourself.", "No puedes removerte a ti mismo."),
+    unexpected: tt("Something went wrong.", "Algo salió mal."),
+  };
+
+  async function save() {
+    setSaving(true); setError(null);
+    const r = await updateWorkspaceUserAction({
+      memberId: member.memberId, userId: member.userId,
+      name, email: email.trim() && email.trim().toLowerCase() !== (member.email ?? "").toLowerCase() ? email : undefined,
+      billingSeatType: seat, workspaceRole: wsRole, status, department: dept, jobTitle,
+    });
+    setSaving(false);
+    if (r.error) setError(r.error); else onSaved();
+  }
+  async function resetPassword() {
+    if (pwd.length < 8) { setError("weak_password"); return; }
+    setResetting(true); setError(null);
+    const r = await resetWorkspaceUserPasswordAction({ userId: member.userId, password: pwd });
+    setResetting(false);
+    if (r.error) setError(r.error); else { setResetDone(pwd); setPwd(""); }
+  }
+  async function remove() {
+    if (!confirm(tt("Remove this user from the workspace?", "¿Remover a este usuario del workspace?"))) return;
+    setRemoving(true); setError(null);
+    const r = await removeWorkspaceUserAction({ memberId: member.memberId, userId: member.userId });
+    setRemoving(false);
+    if (r.error) setError(r.error); else onRemoved();
+  }
+
+  return (
+    <Dialog title={tt("Manage user", "Gestionar usuario")} onClose={onClose}>
+      <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+        <Field label={tt("Name", "Nombre")}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={inputCls} /></Field>
+        <Field label={tt("Email", "Correo")}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} className={inputCls} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={tt("Seat", "Asiento")}>
+            <select value={seat} onChange={(e) => setSeat(e.target.value)} className={inputCls}>
+              {SEAT_TYPES.map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
+            </select>
+          </Field>
+          <Field label={tt("Workspace role", "Rol en el workspace")}>
+            <select value={wsRole} onChange={(e) => setWsRole(e.target.value)} className={inputCls}>
+              <option value="">—</option>
+              {WORKSPACE_ROLES.map((r) => <option key={r.value} value={r.value}>{tt(r.en, r.es)}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={tt("Status", "Estado")}>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls} disabled={member.isYou}>
+              {MEMBER_STATUSES.map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
+            </select>
+          </Field>
+          <Field label={tt("Department", "Departamento")}><input value={dept} onChange={(e) => setDept(e.target.value)} maxLength={80} className={inputCls} /></Field>
+        </div>
+        <Field label={tt("Job title", "Cargo")}><input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={80} className={inputCls} /></Field>
+
+        {/* Security: reset password */}
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><KeyRound className="h-3.5 w-3.5" />{tt("Reset password", "Restablecer contraseña")}</p>
+          {resetDone ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-foreground">{tt("New temporary password (they'll change it on next login):", "Nueva clave temporal (la cambiará al ingresar):")}</span>
+              <code className="rounded bg-background px-1.5 py-0.5 text-foreground">{resetDone}</code>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(resetDone); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted-foreground hover:bg-muted">{copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}{tt("Copy", "Copiar")}</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={tt("New temp password", "Nueva clave temporal")} className={`${inputCls} flex-1`} />
+              <button type="button" title={tt("Generate", "Generar")} onClick={() => setPwd(genTempPassword())} className="inline-flex items-center rounded-lg border border-border px-2.5 py-2 text-muted-foreground hover:bg-muted"><Wand2 className="h-4 w-4" /></button>
+              <button type="button" onClick={resetPassword} disabled={resetting || pwd.length < 8} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{resetting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{tt("Set", "Aplicar")}</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{ERR[error] ?? error}</p>}
+
+      <div className="mt-5 flex items-center justify-between gap-3">
+        {!member.isYou ? (
+          <button type="button" onClick={remove} disabled={removing} className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-950/30">
+            {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{tt("Remove", "Remover")}
+          </button>
+        ) : <span />}
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{tt("Cancel", "Cancelar")}</button>
+          <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{tt("Save changes", "Guardar cambios")}</button>
+        </div>
       </div>
     </Dialog>
   );
