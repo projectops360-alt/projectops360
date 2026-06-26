@@ -12,21 +12,28 @@
   justify-content: flex-end;
 }
 
-/* Workspace dimmer: softly darkens + blurs everything behind the stage. */
+/* Workspace dimmer: a soft, theme-neutral blur (NOT a black trap — the panel
+   itself follows the app/selected theme). */
 .scrim {
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 100% at 80% 30%, rgba(76, 29, 149, 0.28), rgba(8, 7, 18, 0.55));
-  backdrop-filter: blur(7px) saturate(110%);
-  -webkit-backdrop-filter: blur(7px) saturate(110%);
+  background: rgba(15, 14, 28, 0.34);
+  backdrop-filter: blur(6px) saturate(108%);
+  -webkit-backdrop-filter: blur(6px) saturate(108%);
   opacity: 0;
   animation: scrimIn 420ms ease forwards;
+}
+/* Minimal mode: even lighter, mostly just a blur. */
+.scrimMinimal {
+  background: rgba(15, 14, 28, 0.14);
 }
 .scrimOut { animation: scrimOut 280ms ease forwards; }
 @keyframes scrimIn { to { opacity: 1; } }
 @keyframes scrimOut { from { opacity: 1; } to { opacity: 0; } }
 
-/* The presentation panel that hosts Isabella + the conversation. */
+/* The presentation panel that hosts Isabella + the conversation. Colors come
+   from Tailwind theme tokens on the element (so it follows light/dark), NOT from
+   here — this rule is layout + motion only. */
 .stage {
   position: relative;
   display: flex;
@@ -34,9 +41,7 @@
   height: 100%;
   width: 100%;
   max-width: 460px;
-  background: linear-gradient(180deg, rgba(23, 21, 43, 0.96), rgba(15, 14, 28, 0.98));
-  border-left: 1px solid rgba(124, 58, 237, 0.28);
-  box-shadow: -30px 0 80px -20px rgba(0, 0, 0, 0.6);
+  box-shadow: -30px 0 80px -24px rgba(0, 0, 0, 0.45);
   transform: translateX(28px);
   opacity: 0;
   animation: stageIn 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -45,16 +50,15 @@
 @keyframes stageIn { to { transform: translateX(0); opacity: 1; } }
 @keyframes stageOut { to { transform: translateX(36px); opacity: 0; } }
 
-/* Presence area where the avatar materializes and stays present. */
+/* Presence area where the avatar materializes and stays present. The violet
+   wash is an accent that reads in both light and dark themes. */
 .presence {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 26px 20px 16px;
-  background:
-    radial-gradient(80% 60% at 50% 12%, rgba(124, 58, 237, 0.20), transparent 70%);
-  border-bottom: 1px solid rgba(124, 58, 237, 0.16);
+  background: radial-gradient(80% 60% at 50% 12%, rgba(124, 58, 237, 0.16), transparent 70%);
 }
 
 .materialize {
