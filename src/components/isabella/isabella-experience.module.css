@@ -1,0 +1,127 @@
+/* ==========================================================================
+   Isabella Experience — immersive presentation stage
+   Premium entrance/exit + materialization. Transform/opacity/backdrop-filter
+   only. Honors reduced-motion.
+   ========================================================================== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Workspace dimmer: softly darkens + blurs everything behind the stage. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 100% at 80% 30%, rgba(76, 29, 149, 0.28), rgba(8, 7, 18, 0.55));
+  backdrop-filter: blur(7px) saturate(110%);
+  -webkit-backdrop-filter: blur(7px) saturate(110%);
+  opacity: 0;
+  animation: scrimIn 420ms ease forwards;
+}
+.scrimOut { animation: scrimOut 280ms ease forwards; }
+@keyframes scrimIn { to { opacity: 1; } }
+@keyframes scrimOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* The presentation panel that hosts Isabella + the conversation. */
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 460px;
+  background: linear-gradient(180deg, rgba(23, 21, 43, 0.96), rgba(15, 14, 28, 0.98));
+  border-left: 1px solid rgba(124, 58, 237, 0.28);
+  box-shadow: -30px 0 80px -20px rgba(0, 0, 0, 0.6);
+  transform: translateX(28px);
+  opacity: 0;
+  animation: stageIn 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.stageOut { animation: stageOut 300ms ease forwards; }
+@keyframes stageIn { to { transform: translateX(0); opacity: 1; } }
+@keyframes stageOut { to { transform: translateX(36px); opacity: 0; } }
+
+/* Presence area where the avatar materializes and stays present. */
+.presence {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 26px 20px 16px;
+  background:
+    radial-gradient(80% 60% at 50% 12%, rgba(124, 58, 237, 0.20), transparent 70%);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.16);
+}
+
+.materialize {
+  animation: materialize 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes materialize {
+  0% { opacity: 0; transform: translateY(10px) scale(0.92); filter: blur(8px); }
+  60% { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* Soft platform glow under the avatar. */
+.platform {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  width: 180px;
+  height: 26px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(124, 58, 237, 0.45), transparent);
+  filter: blur(3px);
+  animation: platformPulse 4.6s ease-in-out infinite;
+}
+@keyframes platformPulse {
+  0%, 100% { opacity: 0.45; transform: translateX(-50%) scaleX(1); }
+  50% { opacity: 0.7; transform: translateX(-50%) scaleX(1.06); }
+}
+
+/* Name plate fades up after the avatar. */
+.nameplate {
+  margin-top: 12px;
+  text-align: center;
+  animation: fadeUp 700ms ease 220ms both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Status line (idle/thinking/speaking/listening) micro-label. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: statusBlink 1.6s ease-in-out infinite;
+}
+@keyframes statusBlink {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* New answer gently rises in. */
+.turnIn { animation: fadeUp 360ms ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim, .scrimOut, .stage, .stageOut, .materialize, .platform, .nameplate,
+  .turnIn, .statusDot {
+    animation: none !important;
+  }
+  .stage { transform: none; opacity: 1; }
+  .scrim { opacity: 1; }
+}

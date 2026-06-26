@@ -44,6 +44,59 @@ export const PM_SYNONYM_GROUPS: string[][] = [
   ["restrict", "restringir", "limit", "limitar"],
 ];
 
+// ── Conversation language detection ─────────────────────────────────────────
+// Phase 1.2: the CONVERSATION language must follow the user's latest message,
+// not the UI locale. A user may run the UI in English yet ask in Spanish (or
+// vice versa) and Isabella must reply in the language they actually wrote.
+//
+// Lightweight, dependency-free heuristic: Spanish-only characters are a hard
+// signal; otherwise we score high-frequency stopwords for each language. Short
+// or ambiguous inputs return null so the caller keeps the current language.
+
+const ES_STOPWORDS = new Set([
+  "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del", "que",
+  "qué", "cómo", "como", "por", "para", "con", "sin", "esta", "este", "esto",
+  "esa", "ese", "eso", "pantalla", "puedo", "puede", "quiero", "necesito",
+  "dónde", "donde", "cuándo", "cuando", "porqué", "porque", "es", "son", "está",
+  "están", "hacer", "tengo", "mi", "tu", "su", "y", "o", "pero", "más", "muy",
+  "ayuda", "ayúdame", "explícame", "explicame", "muéstrame", "muestrame",
+  "usuario", "usuarios", "equipo", "proyecto", "permisos", "rol", "roles",
+]);
+
+const EN_STOPWORDS = new Set([
+  "the", "a", "an", "of", "to", "in", "on", "for", "with", "without", "this",
+  "that", "these", "those", "what", "how", "why", "where", "when", "who", "is",
+  "are", "do", "does", "can", "could", "should", "would", "i", "you", "my",
+  "your", "and", "or", "but", "more", "help", "explain", "show", "screen",
+  "user", "users", "team", "project", "permission", "permissions", "role",
+]);
+
+/**
+ * Detect whether a free-text message is Spanish or English. Returns the detected
+ * `Locale` or `null` when there is not enough signal (too short / ambiguous) so
+ * the caller can keep the conversation in its current language.
+ */
+export function detectLanguage(text: string): "en" | "es" | null {
+  const raw = (text || "").trim();
+  if (raw.length < 3) return null;
+
+  // Hard signal: characters that only appear in Spanish.
+  if (/[ñ¿¡]/.test(raw) || /[áéíóúü]/i.test(raw)) return "es";
+
+  const words = normalizeTerm(raw).split(/[^a-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return null;
+
+  let es = 0;
+  let en = 0;
+  for (const w of words) {
+    if (ES_STOPWORDS.has(w)) es++;
+    if (EN_STOPWORDS.has(w)) en++;
+  }
+
+  if (es === en) return null; // ambiguous — keep current language
+  return es > en ? "es" : "en";
+}
+
 /** Lowercase + strip diacritics for accent/case-insensitive matching. */
 export function normalizeTerm(text: string): string {
   return text

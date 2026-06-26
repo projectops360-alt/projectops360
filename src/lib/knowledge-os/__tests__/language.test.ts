@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { expandQueryForLexical, normalizeTerm } from "../language";
+import { expandQueryForLexical, normalizeTerm, detectLanguage } from "../language";
+import { resolveScreen, enrichContextWithScreen } from "../screens";
 import { dedupeByPackage } from "../retrieval";
 import type { RetrievedChunk } from "../types";
 
@@ -44,6 +45,53 @@ describe("expandQueryForLexical", () => {
     // 'pm' must not trigger inside 'experiment' / 'compmassion'
     const out = expandQueryForLexical("the experiment compass");
     expect(out).toBe("the experiment compass");
+  });
+});
+
+describe("detectLanguage (conversation language)", () => {
+  it("detects Spanish from diacritics/ñ/¿", () => {
+    expect(detectLanguage("¿Cómo agrego un usuario?")).toBe("es");
+    expect(detectLanguage("explícame esta pantalla")).toBe("es");
+  });
+  it("detects Spanish from stopwords without diacritics", () => {
+    expect(detectLanguage("como puedo crear un usuario nuevo")).toBe("es");
+  });
+  it("detects English", () => {
+    expect(detectLanguage("How do I add a new user to the team?")).toBe("en");
+    expect(detectLanguage("explain this screen for me")).toBe("en");
+  });
+  it("returns null when too short or ambiguous", () => {
+    expect(detectLanguage("ok")).toBeNull();
+    expect(detectLanguage("Isabella")).toBeNull();
+  });
+});
+
+describe("resolveScreen (screen intelligence)", () => {
+  it("resolves the team route to People & Team with components", () => {
+    const r = resolveScreen("/team", "en");
+    expect(r?.module).toBe("people_permissions");
+    expect(r?.pageTitle).toBe("People & Team");
+    expect(r?.components.length).toBeGreaterThan(0);
+    expect(r?.followups.length).toBeGreaterThan(0);
+  });
+  it("strips the locale prefix and localizes", () => {
+    const r = resolveScreen("/es/team", "es");
+    expect(r?.pageTitle).toBe("Personas y Equipo");
+  });
+  it("prefers the longest matching prefix", () => {
+    const r = resolveScreen("/organization/members", "en");
+    expect(r?.screen).toBe("organization_members");
+  });
+  it("returns null for an unknown route", () => {
+    expect(resolveScreen("/totally/unknown", "en")).toBeNull();
+  });
+  it("enrichContextWithScreen merges screen awareness without losing identity", () => {
+    const base = { module: "people_permissions", role: "owner", userId: "u1" };
+    const merged = enrichContextWithScreen(base, resolveScreen("/team", "en"), "/team");
+    expect(merged.role).toBe("owner");
+    expect(merged.pageTitle).toBe("People & Team");
+    expect(merged.components?.length).toBeGreaterThan(0);
+    expect(merged.pathname).toBe("/team");
   });
 });
 
