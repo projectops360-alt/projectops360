@@ -105,6 +105,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
   const [delivery, setDelivery] = useState("");
   const [governance, setGovernance] = useState("");
   const [perm, setPerm] = useState("contributor");
+  const [manualName, setManualName] = useState("");
 
   const refresh = () => router.refresh();
   const onProjRole = p.team; // alias
@@ -113,7 +114,10 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
   const addTeam = () => { if (!teamId) return; start(async () => { await addCompanyTeamToProjectAction({ projectId: p.projectId, teamId, locale: p.locale }); setTeamId(""); refresh(); }); };
   const addExternal = () => { const e = p.externals.find((x) => String(x.id) === extId); if (!e) return; start(async () => { await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: e.contact_type === "vendor" ? "vendor" : "external_contact", external_contact_id: extId, display_name: String(e.name), project_role: role, delivery_role: delivery, governance_role: governance, permission_level: perm || "external_contributor" } }); setExtId(""); setRole(""); refresh(); }); };
   const addInvite = () => { if (!email.trim()) return; start(async () => { await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "external_contact", display_name: email.trim(), project_role: role, permission_level: perm || "external_viewer", responsibility: isEs ? "Invitado por correo (pendiente)" : "Invited by email (pending)" } }); setEmail(""); refresh(); }); };
-  const addManual = () => { if (!role.trim()) return; start(async () => { await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "internal_user", display_name: null, project_role: role, delivery_role: delivery, governance_role: governance, permission_level: perm } }); setRole(""); setDelivery(""); setGovernance(""); refresh(); }); };
+  // "New member": add a brand-new named person directly (no login needed) with a
+  // role. A name OR a role is enough; the person becomes a real project member
+  // and can receive a capacity allocation in Resource Capacity.
+  const addManual = () => { if (!manualName.trim() && !role.trim()) return; start(async () => { await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "internal_user", display_name: manualName.trim() || null, project_role: role, delivery_role: delivery, governance_role: governance, permission_level: perm } }); setManualName(""); setRole(""); setDelivery(""); setGovernance(""); refresh(); }); };
 
   const recommend = () => start(async () => { const r = await recommendRolesAction({ projectId: p.projectId, locale: p.locale }); if ("roles" in r) setRecs(r.roles); });
   const addAllRecs = () => { if (!recs) return; start(async () => { await addRecommendedRolesAction({ projectId: p.projectId, locale: p.locale, roles: recs }); setRecs(null); refresh(); }); };
@@ -157,7 +161,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
 
         {/* Mode selector */}
         <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
-          {([["directory", isEs ? "Directorio" : "Directory", UserCog], ["team", isEs ? "Equipo de empresa" : "Company team", Building2], ["external", isEs ? "Contacto externo" : "External contact", Users], ["invite", isEs ? "Invitar por correo" : "Invite by email", Mail], ["manual", isEs ? "Rol manual" : "Manual role", Plus]] as const).map(([m, label, Icon]) => (
+          {([["directory", isEs ? "Directorio" : "Directory", UserCog], ["team", isEs ? "Equipo de empresa" : "Company team", Building2], ["external", isEs ? "Contacto externo" : "External contact", Users], ["invite", isEs ? "Invitar por correo" : "Invite by email", Mail], ["manual", isEs ? "Persona nueva" : "New member", Plus]] as const).map(([m, label, Icon]) => (
             <button key={m} onClick={() => setMode(m)} className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 ${mode === m ? "bg-brand-600 text-white" : "border border-border text-muted-foreground hover:bg-muted"}`}><Icon className="h-3.5 w-3.5" />{label}</button>
           ))}
         </div>
@@ -183,6 +187,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
             </select>
           )}
           {mode === "invite" && <input className={inp} placeholder="email@empresa.com" value={email} onChange={(e) => setEmail(e.target.value)} />}
+          {mode === "manual" && <input className={inp} placeholder={isEs ? "Nombre de la persona" : "Person's name"} value={manualName} onChange={(e) => setManualName(e.target.value)} />}
 
           {mode !== "team" && (
             <>
