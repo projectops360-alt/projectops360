@@ -1,0 +1,74 @@
+/* ==========================================================================
+   Isabella — holographic placeholder (pending the RPM 3D figure)
+   A holographic projector base + light column. Transform/opacity only.
+   ========================================================================== */
+
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+/* Vertical light column the figure will stand in. */
+.column {
+  position: absolute;
+  bottom: 14%;
+  left: 50%;
+  width: 38%;
+  height: 70%;
+  transform: translateX(-50%);
+  background: linear-gradient(to top, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.04) 60%, transparent);
+  filter: blur(6px);
+  animation: column 4.4s ease-in-out infinite;
+}
+@keyframes column {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+
+/* Spinning projector rings at the base. */
+.ring {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(124, 58, 237, 0.5);
+  transform-origin: center;
+}
+.ringOuter { animation: spin 9s linear infinite; }
+.ringInner { animation: spin 6s linear infinite reverse; border-color: rgba(99, 102, 241, 0.55); }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Floating scan particles. */
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(167, 139, 250, 0.9);
+  animation: rise 3.6s ease-in-out infinite;
+}
+@keyframes rise {
+  0% { transform: translateY(8px); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: translateY(-26px); opacity: 0; }
+}
+
+.core {
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, rgba(167, 139, 250, 0.95), rgba(124, 58, 237, 0.85) 55%, rgba(49, 46, 129, 0.9));
+  box-shadow: 0 0 28px rgba(124, 58, 237, 0.55);
+  animation: breathe 4.6s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .column, .ringOuter, .ringInner, .particle, .core { animation: none !important; }
+}

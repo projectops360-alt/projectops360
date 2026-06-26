@@ -4,7 +4,6 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { TeamClient, type TeamMember, type TeamResource, type TeamProject } from "./team-client";
-import { LivingGuideWidget } from "@/components/living-guide";
 
 export default async function TeamPage({
   params,
@@ -83,26 +82,14 @@ export default async function TeamPage({
 
   const canManage = org.role === "owner" || org.role === "admin";
 
+  // Isabella is mounted app-wide in the (app) layout, so she is present here too.
   return (
-    <>
-      <TeamClient
-        locale={locale as Locale}
-        members={members}
-        resources={resources}
-        projects={projects}
-        canManage={canManage}
-      />
-      <LivingGuideWidget
-        locale={locale as Locale}
-        context={{
-          module: "people_permissions",
-          screen: "team_directory",
-          role: org.role,
-          userId: org.userId,
-          organizationId: org.organizationId,
-          permissions: canManage ? ["manage_members"] : ["view_only"],
-        }}
-      />
-    </>
+    <TeamClient
+      locale={locale as Locale}
+      members={members}
+      resources={resources}
+      projects={projects}
+      canManage={canManage}
+    />
   );
 }
