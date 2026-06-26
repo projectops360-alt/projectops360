@@ -68,16 +68,23 @@ function buildRetrievalQuery(input: AskGuideInput): string {
   const c = input.context;
   const moduleTopic = c.module ? c.module.replace(/_/g, " ") : "";
   const screenTopic = c.screen ? c.screen.replace(/_/g, " ") : "";
+  const titleTopic = c.pageTitle ?? "";
   const intentTopic = INTENT_TOPIC[input.intent] ?? "";
-  const parts = [input.query.trim(), intentTopic, moduleTopic, screenTopic].filter(Boolean);
+  const parts = [input.query.trim(), intentTopic, titleTopic, moduleTopic, screenTopic].filter(Boolean);
   return parts.join(" ").trim() || INTENT_HINT[input.intent] || "";
 }
 
 function serializeContext(input: AskGuideInput): string {
   const c = input.context;
+  // Screen Intelligence (Phase 1.2): describe WHERE the user is and WHAT is on
+  // the screen so explanations are about the actual page, not generic docs.
   const parts = [
+    c.pageTitle && `Screen the user is viewing: ${c.pageTitle}`,
     c.module && `Module: ${c.module}`,
-    c.screen && `Screen: ${c.screen}`,
+    c.screen && `Screen id: ${c.screen}`,
+    c.tab && `Active tab/section: ${c.tab}`,
+    c.workflow && `Primary workflow here: ${c.workflow}`,
+    c.components?.length && `Visible UI components on this screen: ${c.components.join(", ")}`,
     c.role && `Current user role: ${c.role}`,
     c.action && `Current action: ${c.action}`,
     c.permissions?.length && `Capabilities: ${c.permissions.join(", ")}`,
@@ -157,7 +164,7 @@ async function persistAnswer(
         user_id: org.userId,
         project_id: input.context.projectId ?? null,
         query_text: input.query,
-        answer_language: input.locale,
+        answer_language: input.answerLanguage ?? input.locale,
         surface: input.context.screen ?? input.context.module ?? null,
         context_payload: input.context as unknown as Record<string, unknown>,
         intent: input.intent,
@@ -220,7 +227,11 @@ function emptyAnswer(locale: Locale): Pick<GuideAnswer, "answer" | "steps" | "fo
  * default). Never throws.
  */
 export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Promise<GuideAnswer> {
-  const locale = input.locale;
+  // Conversation language (Phase 1.2) drives the ANSWER; it follows the user's
+  // latest message and may differ from the UI locale. Retrieval already searches
+  // the whole corpus regardless of language, so a Spanish question still reaches
+  // English-authored knowledge — only the reply is rendered in this language.
+  const locale = input.answerLanguage ?? input.locale;
   const queryHash = createHash("sha256").update(`${input.intent}:${input.query}`).digest("hex").slice(0, 32);
   const surface = input.context.screen ?? input.context.module;
 

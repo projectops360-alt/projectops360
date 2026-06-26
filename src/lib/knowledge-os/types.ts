@@ -46,6 +46,12 @@ export interface GuideContext {
   permissions?: string[];    // coarse capability hints for phrasing
   action?: string;           // current workflow/action when available
   projectId?: string;
+  // ── Screen Intelligence (Phase 1.2) — what the user is actually looking at ──
+  pathname?: string;         // resolved client-side route, e.g. "/team"
+  pageTitle?: string;        // human screen title, e.g. "People & Team"
+  tab?: string;              // active tab/section when applicable
+  workflow?: string;         // the primary workflow on this screen
+  components?: string[];     // visible UI components (buttons/cards/tables/…)
 }
 
 /** One retrieved chunk with provenance, after hybrid fusion. */
@@ -96,8 +102,14 @@ export interface AskGuideInput {
   query: string;
   intent: GuideIntent;
   context: GuideContext;
-  /** UI language; the answer is produced in this language. */
+  /** UI language (chrome/labels). */
   locale: Locale;
+  /**
+   * Conversation language — the language Isabella answers in. Phase 1.2: this
+   * follows the language of the user's latest message, NOT the UI locale. When
+   * omitted, the service falls back to {@link locale}.
+   */
+  answerLanguage?: Locale;
   /** Optional explicit AI Workforce expert; otherwise resolved by module → Isabella. */
   expertKey?: string;
 }

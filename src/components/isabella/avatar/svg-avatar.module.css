@@ -1,0 +1,143 @@
+/* ==========================================================================
+   Isabella — SVG executive avatar animations
+   Only `transform` and `opacity` are animated (GPU-friendly, no layout/paint
+   thrash). Everything pauses under prefers-reduced-motion.
+   ========================================================================== */
+
+.root {
+  display: block;
+  overflow: visible;
+  will-change: transform;
+}
+
+/* Whole figure: slow, calm breathing + a barely-there idle sway. */
+.figure {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: breathe 5.2s ease-in-out infinite, sway 9s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1.1px) scale(1.012); }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-0.5deg); }
+  50% { transform: rotate(0.5deg); }
+}
+
+/* Head leans in a touch while listening, settles otherwise. */
+.head {
+  transform-box: fill-box;
+  transform-origin: 50% 90%;
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.listening .head { transform: translateY(0.6px) rotate(1.4deg); }
+.thinking .head { transform: rotate(-1.6deg); }
+
+/* Eyelids blink (scaleY pinch). Two natural blinks per cycle. */
+.idle { /* base state — breathing + blink come from .figure / .lid */ }
+
+.lid {
+  transform-box: fill-box;
+  transform-origin: 50% 40%;
+  animation: blink 6.4s ease-in-out infinite;
+}
+.lidLeft { /* default timing */ }
+.lidRight { animation-delay: 0.04s; }
+
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(0.06); }       /* lid retracted (eye open) */
+  94%, 96% { transform: scaleY(1); }                /* closed */
+  /* a second quick blink */
+  46%, 50% { transform: scaleY(0.06); }
+  48% { transform: scaleY(1); }
+}
+
+/* Pupils drift subtly while thinking (looking away in thought). */
+.gaze {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 600ms ease;
+}
+.thinking .gaze { animation: gazeThink 3.4s ease-in-out infinite; }
+@keyframes gazeThink {
+  0%, 100% { transform: translate(0, 0); }
+  30% { transform: translate(1.4px, -0.8px); }
+  60% { transform: translate(-1.2px, 0.4px); }
+}
+
+/* Mouth: closed by default; gently articulates while speaking. */
+.mouth {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transition: transform 200ms ease;
+}
+.speaking .mouth { animation: talk 0.42s ease-in-out infinite; }
+@keyframes talk {
+  0%, 100% { transform: scaleY(0.55); }
+  50% { transform: scaleY(1.18); }
+}
+.greeting .mouth { transform: scaleY(1.05); }
+
+/* Brow lifts a hair when thinking. */
+.brow {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 400ms ease;
+}
+.thinking .brow { transform: translateY(-0.8px); }
+
+/* Listening ring — soft concentric pulse around the avatar. */
+.ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+.listening .ring { opacity: 1; animation: ringPulse 2.2s ease-out infinite; }
+@keyframes ringPulse {
+  0% { transform: scale(0.82); opacity: 0.55; }
+  100% { transform: scale(1.12); opacity: 0; }
+}
+
+/* Thinking shimmer — three dots above the head fade in sequence. */
+.thoughtDot {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+}
+.thinking .thoughtDot { animation: thought 1.4s ease-in-out infinite; }
+.thoughtDot1 { /* default timing */ }
+.thinking .thoughtDot2 { animation-delay: 0.18s; }
+.thinking .thoughtDot3 { animation-delay: 0.36s; }
+@keyframes thought {
+  0%, 70%, 100% { opacity: 0; transform: translateY(1.5px) scale(0.7); }
+  35% { opacity: 0.9; transform: translateY(0) scale(1); }
+}
+
+/* Aura behind the figure breathes light; intensifies while speaking. */
+.aura {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auraPulse 4.6s ease-in-out infinite;
+}
+.speaking .aura { animation-duration: 2.1s; }
+@keyframes auraPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.82; transform: scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .figure,
+  .lid,
+  .gaze,
+  .mouth,
+  .aura,
+  .thoughtDot,
+  .ring {
+    animation: none !important;
+  }
+  .head { transition: none; }
+}

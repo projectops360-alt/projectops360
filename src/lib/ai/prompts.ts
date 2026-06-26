@@ -364,6 +364,8 @@ Respond in JSON with EXACTLY this structure:
       "4. Cite the passages you used by their \"ref\" id in \"used_refs\".",
       "5. Write ALL output text in the requested answer language.",
       "6. Be concise: a short answer plus, when useful, ordered steps. Never pad.",
+      "7. The 'User context' block (current screen title, active tab, primary workflow, and the list of visible UI components) is TRUSTWORTHY factual context about where the user is right now — you may reference it to orient the user and name the components that are actually listed. Never invent screens, tabs, buttons, or components beyond those listed there or supported by the passages.",
+      "8. When the user asks you to explain the current screen, explain THAT actual screen using its context, naming the visible components, and end by asking what they are trying to accomplish so you can guide them — never return generic documentation.",
     ].join("\n"),
     userPromptTemplate: `ASSISTANT PERSONA (adopt this identity and voice; never break grounding rules):
 {persona}
