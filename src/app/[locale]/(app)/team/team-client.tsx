@@ -9,9 +9,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import {
   Users, UserRound, HardHat, Building2, Wrench, ShieldCheck, Plus, Pencil, Merge,
-  Archive, Mail, X, Loader2, Check,
+  Archive, Mail, X, Loader2, Check, Settings2, FolderKanban,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import {
@@ -118,11 +119,32 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
           </p>
         </div>
         {canManage && (
-          <button type="button" onClick={() => setAdding(true)}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
-            <Plus className="h-4 w-4" />{tt("Add person", "Agregar persona")}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href="/organization/members"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              <Settings2 className="h-4 w-4" />{tt("Manage roles & seats", "Gestionar roles y asientos")}
+            </Link>
+            <button type="button" onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+              <Plus className="h-4 w-4" />{tt("Add person", "Agregar persona")}
+            </button>
+          </div>
         )}
+      </div>
+
+      {/* What each layer is for — clears up the three "people" concepts */}
+      <div className="rounded-xl border border-dashed border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+        <p>
+          <strong className="text-foreground">{tt("Workspace users", "Usuarios del workspace")}</strong>{" "}
+          {tt("have a login. Change their role/seat, suspend or remove them in",
+            "tienen acceso. Cambia su rol/asiento, suspéndelos o elimínalos en")}{" "}
+          <Link href="/organization/members" className="font-medium text-brand-600 hover:underline dark:text-brand-400">{tt("Members", "Miembros")}</Link>.{" "}
+          {tt("To put someone on a specific project (with a project role) or remove them from it, open that project's",
+            "Para asignar a alguien a un proyecto específico (con un rol de proyecto) o quitarlo de él, abre la pestaña")}{" "}
+          <span className="inline-flex items-center gap-1 font-medium text-foreground"><FolderKanban className="h-3 w-3" />{tt("Team tab", "Equipo del proyecto")}</span>.{" "}
+          {tt("People & crews below are a reusable directory (no login).",
+            "Las personas y cuadrillas de abajo son un directorio reutilizable (sin acceso).")}
+        </p>
       </div>
 
       {/* Workspace users */}
