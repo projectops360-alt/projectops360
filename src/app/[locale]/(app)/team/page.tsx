@@ -4,6 +4,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { TeamClient, type TeamMember, type TeamResource, type TeamProject } from "./team-client";
+import { LivingGuideWidget } from "@/components/living-guide";
 
 export default async function TeamPage({
   params,
@@ -55,12 +56,25 @@ export default async function TeamPage({
   }));
 
   return (
-    <TeamClient
-      locale={locale as Locale}
-      members={members}
-      resources={resources}
-      projects={projects}
-      canManage={org.role === "owner" || org.role === "admin"}
-    />
+    <>
+      <TeamClient
+        locale={locale as Locale}
+        members={members}
+        resources={resources}
+        projects={projects}
+        canManage={org.role === "owner" || org.role === "admin"}
+      />
+      <LivingGuideWidget
+        locale={locale as Locale}
+        context={{
+          module: "people_permissions",
+          screen: "team_directory",
+          role: org.orgRole,
+          userId: org.userId,
+          organizationId: org.organizationId,
+          permissions: org.isPmoLevel ? ["org_wide_visibility", "manage_members"] : ["project_scoped"],
+        }}
+      />
+    </>
   );
 }
