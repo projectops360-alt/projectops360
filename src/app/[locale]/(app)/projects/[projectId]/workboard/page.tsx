@@ -116,10 +116,11 @@ export default async function WorkboardPage({
   }
 
   // ── Who can move which card ──────────────────────────────────────────────────
-  // Managers (PMO/PM/creator/can_manage_tasks) can move any task; a contributor
-  // can only move tasks assigned to them. This is enforced server-side too.
+  // Only the manager tier (PMO/PM/creator/can_manage_team) can move any task; a
+  // contributor — even with can_manage_tasks — can only move tasks assigned to
+  // them. Mirrors canWriteTask() in roadmap/actions.ts (enforced server-side).
   const access = await getProjectAccess(org, projectId);
-  const canEditAll = isProjectManagerTier(access) || access.flags.can_manage_tasks;
+  const canEditAll = isProjectManagerTier(access);
   const editableTaskIds = canEditAll
     ? []
     : taskRows.filter((tk) => {

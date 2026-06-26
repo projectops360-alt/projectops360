@@ -11,9 +11,14 @@ import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/road
 import type { AuditAction, Milestone, RoadmapTask } from "@/types/database";
 
 // ── Task write authorization ────────────────────────────────────────────────
-// A contributor may only change a task that is assigned to them. Manager tier
-// (PMO/PM/creator/can_manage_tasks) may change any task in the project. This
-// prevents one team member from disrupting another's work on the Workboard.
+// Only the manager tier (PMO / PM / project creator / can_manage_team) may
+// change ANY task in the project. A contributor — regardless of the
+// can_manage_tasks flag — may only change a task that is assigned to them.
+// This prevents one team member from disrupting another's work on the Workboard.
+//
+// NOTE: can_manage_tasks deliberately does NOT grant cross-task authority. A
+// Developer needs it to create/update their own tasks, but it must never let
+// them touch someone else's. Cross-task control is a manager-tier concern only.
 async function canWriteTask(
   org: OrgContext,
   supabase: ReturnType<typeof createAdminClient>,
@@ -21,7 +26,7 @@ async function canWriteTask(
   task: { assigned_to?: string | null; project_team_member_id?: string | null } | null,
 ): Promise<boolean> {
   const access = await getProjectAccess(org, projectId);
-  if (isProjectManagerTier(access) || access.flags.can_manage_tasks) return true;
+  if (isProjectManagerTier(access)) return true;
   if (!task) return false;
   if (task.assigned_to && task.assigned_to === org.userId) return true;
   if (task.project_team_member_id) {
@@ -31,6 +36,11 @@ async function canWriteTask(
     if ((tm as { user_id?: string | null } | null)?.user_id === org.userId) return true;
   }
   return false;
+}
+
+/** Structural changes (milestones, ordering) are a manager-tier concern only. */
+async function isManager(org: OrgContext, projectId: string): Promise<boolean> {
+  return isProjectManagerTier(await getProjectAccess(org, projectId));
 }
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────────────
@@ -493,6 +503,7 @@ export async function createMilestoneAction(input: {
   }
 
   const data = parsed.data;
+  if (!(await isManager(org, data.projectId))) return { error: "forbidden" };
   const supabase = createAdminClient();
 
   // Auto-assign order_index: if not specified (0), place at end
@@ -580,6 +591,7 @@ export async function updateMilestoneAction(input: {
   }
 
   const data = parsed.data;
+  if (!(await isManager(org, data.projectId))) return { error: "forbidden" };
   const supabase = createAdminClient();
 
   const updateData: Record<string, unknown> = {
@@ -1135,6 +1147,16 @@ export async function recordPromptSentAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  // Ownership: contributors may only act on tasks assigned to them.
+  const { data: promptTask } = await supabase
+    .from("roadmap_tasks")
+    .select("assigned_to, project_team_member_id")
+    .eq("id", data.taskId).eq("organization_id", org.organizationId).eq("project_id", data.projectId)
+    .is("deleted_at", null).maybeSingle();
+  if (!(await canWriteTask(org, supabase, data.projectId, promptTask as Record<string, unknown> | null))) {
+    return { error: "not_your_task" };
+  }
+
   const updateData: Record<string, unknown> = {
     last_prompt_sent_at: new Date().toISOString(),
   };
@@ -1329,6 +1351,16 @@ export async function archiveTaskAction(
 
   const supabase = createAdminClient();
 
+  // Ownership: contributors may only archive tasks assigned to them.
+  const { data: archiveTask } = await supabase
+    .from("roadmap_tasks")
+    .select("assigned_to, project_team_member_id")
+    .eq("id", taskId).eq("organization_id", org.organizationId).eq("project_id", projectId)
+    .is("deleted_at", null).maybeSingle();
+  if (!(await canWriteTask(org, supabase, projectId, archiveTask as Record<string, unknown> | null))) {
+    return { error: "not_your_task" };
+  }
+
   // Soft-delete the task
   const { error: deleteError } = await supabase
     .from("roadmap_tasks")
@@ -1383,6 +1415,7 @@ export async function archiveMilestoneAction(
     return { error: "not_authenticated" };
   }
 
+  if (!(await isManager(org, projectId))) return { error: "forbidden" };
   const supabase = createAdminClient();
 
   // Capture the task ids first so we can also clean their Living Graph nodes.
@@ -1475,6 +1508,7 @@ export async function moveMilestoneAction(
     return { error: "not_authenticated" };
   }
 
+  if (!(await isManager(org, projectId))) return { error: "forbidden" };
   const supabase = createAdminClient();
 
   const { data: milestones, error } = await supabase
@@ -1526,6 +1560,7 @@ export async function reorderMilestonesAction(
     return { error: "not_authenticated" };
   }
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) return {};
+  if (!(await isManager(org, projectId))) return { error: "forbidden" };
 
   const supabase = createAdminClient();
   await Promise.all(
