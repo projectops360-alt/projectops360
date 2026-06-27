@@ -18,9 +18,11 @@ are later sprints.
 **Implementation (2026-06-27):**
 - `workboard/page.tsx` resolves names from `profiles` (person, `assigned_to`) and `resources`
   (crew/team/vendor, `assigned_resource_id`) into an `assigneeNames` map passed to the client.
-- Each card renders an **"Owner: <name>"** line (👤 icon, truncates gracefully), or amber
-  **"Unassigned"** when no owner resolves. **Real data only — never an invented name**; a failed
-  lookup falls back to "Unassigned" (`src/lib/roadmap/task-owner.ts`, unit-tested).
+- Each card shows **avatar (or initials) · name · role** (👤 fallback, truncates gracefully), amber
+  **"Unassigned"** when no owner, or **"Assigned user unavailable"** when an owner id resolves to no
+  name. Role from `project_team_members.project_role` (person) / `resources.resource_type` (group);
+  avatar from `profiles.avatar_url`. **Real data only — never invented**
+  (`src/lib/roadmap/task-owner.ts`, unit-tested).
 - Drag-and-drop, status columns, and filters are unchanged.
 
 ## 2. Critical Path — Single Source of Truth

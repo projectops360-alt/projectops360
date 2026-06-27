@@ -6,6 +6,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency } from "@/types/database";
 import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
+import type { AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { workboardColumnLabels, type DeliveryMethod } from "@/lib/delivery/config";
 import { WorkboardClient } from "./workboard-dynamic";
 
@@ -97,21 +98,39 @@ export default async function WorkboardPage({
         .filter((x): x is string => !!x),
     ),
   ];
+  // Resolve name + avatar + role per assignee (person via profiles/team-member,
+  // group resource via resources). Project role comes from project_team_members.
   const admin = createAdminClient();
-  const [profilesRes, resourcesRes] = await Promise.all([
+  const [profilesRes, teamRes, resourcesRes] = await Promise.all([
     assigneeIds.length
-      ? admin.from("profiles").select("id, display_name").in("id", assigneeIds)
-      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+      ? admin.from("profiles").select("id, display_name, avatar_url").in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null; avatar_url: string | null }[] }),
     assigneeIds.length
-      ? admin.from("resources").select("id, name").eq("project_id", projectId).in("id", assigneeIds)
-      : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
+      ? admin.from("project_team_members").select("user_id, project_role, display_name")
+          .eq("project_id", projectId).in("user_id", assigneeIds)
+      : Promise.resolve({ data: [] as { user_id: string | null; project_role: string | null; display_name: string | null }[] }),
+    assigneeIds.length
+      ? admin.from("resources").select("id, name, resource_type").eq("project_id", projectId).in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; name: string | null; resource_type: string | null }[] }),
   ]);
-  const assigneeNames: Record<string, string> = {};
-  for (const p of (profilesRes.data ?? []) as { id: string; display_name: string | null }[]) {
-    if (p.display_name) assigneeNames[p.id] = p.display_name;
+  const assignees: Record<string, AssigneeInfo> = {};
+  const ensure = (id: string): AssigneeInfo =>
+    (assignees[id] ??= { name: null, role: null, avatarUrl: null });
+  for (const p of (profilesRes.data ?? []) as { id: string; display_name: string | null; avatar_url: string | null }[]) {
+    const a = ensure(p.id);
+    if (p.display_name) a.name = p.display_name;
+    if (p.avatar_url) a.avatarUrl = p.avatar_url;
   }
-  for (const r of (resourcesRes.data ?? []) as { id: string; name: string | null }[]) {
-    if (r.name) assigneeNames[r.id] = r.name;
+  for (const m of (teamRes.data ?? []) as { user_id: string | null; project_role: string | null; display_name: string | null }[]) {
+    if (!m.user_id) continue;
+    const a = ensure(m.user_id);
+    if (!a.name && m.display_name) a.name = m.display_name; // cross-org fallback
+    if (m.project_role) a.role = m.project_role;
+  }
+  for (const r of (resourcesRes.data ?? []) as { id: string; name: string | null; resource_type: string | null }[]) {
+    const a = ensure(r.id);
+    if (r.name) a.name = r.name;
+    if (!a.role && r.resource_type) a.role = r.resource_type.replace(/_/g, " ");
   }
 
   // Sort tasks respecting dependency order (predecessors before successors),
@@ -129,7 +148,7 @@ export default async function WorkboardPage({
       milestones={(milestones ?? []) as Milestone[]}
       tasks={sortedTasks}
       dependencies={dependencies}
-      assigneeNames={assigneeNames}
+      assignees={assignees}
       locale={locale as Locale}
       translations={{
         title: t("title"),
@@ -137,6 +156,7 @@ export default async function WorkboardPage({
         empty: t("empty"),
         owner: t("owner"),
         unassigned: t("unassigned"),
+        assignedUserUnavailable: t("assignedUserUnavailable"),
         dragHint: t("dragHint"),
         columns: {
           not_started: columnOverrides.not_started ?? t("columns.not_started"),

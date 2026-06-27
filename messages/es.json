@@ -305,6 +305,7 @@
     "dragHint": "Arrastra una tarjeta a otra columna para cambiar su estado.",
     "owner": "Responsable",
     "unassigned": "Sin asignar",
+    "assignedUserUnavailable": "Responsable no disponible",
     "columns": {
       "not_started": "Sin iniciar",
       "prompt_ready": "Prompt listo",

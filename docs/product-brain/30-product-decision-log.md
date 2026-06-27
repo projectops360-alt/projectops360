@@ -24,9 +24,12 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
   role (when available)**, or **"Unassigned"** when there is no owner. **Reason:** a PM must know
   who owns each task without opening the detail panel — operationally required, not decorative.
 - **Rule:** real assignment data only; never invent a name; a failed lookup → "Unassigned".
-- **Status: Partial** — Sprint #1 shipped the **name** + **"Unassigned"** state and fixed the RLS
-  name-resolution bug. **Pending follow-up:** avatar/initials and role on the card. CAP-020,
-  [doc 26](26-sprint-01-operational-clarity.md).
+- **Status: Shipped** — Sprint #1 + follow-up (2026-06-27): the card shows **avatar (or initials)
+  · name · role**, with **"Unassigned"** when no owner and **"Assigned user unavailable"** when an
+  owner id resolves to no name. Role comes from `project_team_members.project_role` (person) or
+  `resources.resource_type` (group); avatar from `profiles.avatar_url`. Names resolved via the
+  admin client (RLS-safe, cross-org). Real data only. CAP-020,
+  [doc 26](26-sprint-01-operational-clarity.md). Helper `src/lib/roadmap/task-owner.ts` (unit-tested).
 
 ## PD-003 — Variance View requires a baseline
 - **Decision:** Variance View shows real variance only when an approved **baseline** exists
@@ -79,7 +82,6 @@ Framework (CAP-039, baseline) · Project Memory (CAP-006, history). See
 [22-modules.md](22-modules.md).
 
 ## Follow-ups still open
-- **PD-002:** avatar/initials + role on Workboard cards.
 - **PD-006:** verify any disconnected Risk/SOP nodes are explained-only, not edge/layout bugs.
 - A standalone **Workboard** module doc and a **Variance/Baseline** module doc could be created when
   those areas next get focused work (today they live in the sprint docs + this log).

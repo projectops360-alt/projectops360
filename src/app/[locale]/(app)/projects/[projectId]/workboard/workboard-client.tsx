@@ -11,7 +11,7 @@ import {
   CornerDownRight, User,
 } from "lucide-react";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
-import { resolveTaskOwnerName } from "@/lib/roadmap/task-owner";
+import { resolveTaskOwner, type AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
 import { TaskFormDialog, type TaskFormTranslations } from "@/components/roadmap/task-form-dialog";
 import {
@@ -38,6 +38,7 @@ interface WorkboardTranslations {
   dependsOn: string;
   owner: string;
   unassigned: string;
+  assignedUserUnavailable: string;
   groupLabels: Record<string, string>;
   columnVisibility: string;
   showAll: string;
@@ -66,7 +67,7 @@ interface WorkboardClientProps {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   dependencies: TaskDependency[];
-  assigneeNames: Record<string, string>;
+  assignees: Record<string, AssigneeInfo>;
   locale: Locale;
   translations: WorkboardTranslations;
 }
@@ -129,7 +130,7 @@ interface BoardColumnProps {
   columnTasks: RoadmapTask[];
   milestoneMap: Map<string, string>;
   predecessorsByTask: Map<string, PredecessorInfo[]>;
-  assigneeNames: Record<string, string>;
+  assignees: Record<string, AssigneeInfo>;
   anyResizing: boolean;
   getColumnWidth: (status: TaskStatus) => number;
   setColumnWidth: (status: TaskStatus, width: number) => void;
@@ -149,6 +150,7 @@ interface BoardColumnProps {
     dependsOn: string;
     owner: string;
     unassigned: string;
+    assignedUserUnavailable: string;
   };
 }
 
@@ -158,7 +160,7 @@ function BoardColumn({
   columnTasks,
   milestoneMap,
   predecessorsByTask,
-  assigneeNames,
+  assignees,
   anyResizing,
   getColumnWidth,
   setColumnWidth,
@@ -273,18 +275,45 @@ function BoardColumn({
                               </span>
                               {task.is_blocked && <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />}
                             </div>
-                            {/* Sprint #1 — task ownership: who owns this work (real data; never invented). */}
+                            {/* Sprint #1 — task ownership: who owns this work (avatar/initials +
+                                name + role; real data only, never invented). */}
                             {(() => {
-                              const ownerName = resolveTaskOwnerName(task, assigneeNames);
+                              const owner = resolveTaskOwner(task, assignees);
+                              if (owner.state === "assigned") {
+                                return (
+                                  <div
+                                    className="mt-1.5 flex items-center gap-1.5"
+                                    title={owner.role ? `${owner.name} · ${owner.role}` : owner.name}
+                                  >
+                                    {owner.avatarUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={owner.avatarUrl}
+                                        alt=""
+                                        className="h-5 w-5 shrink-0 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[8px] font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                                        {owner.initials}
+                                      </span>
+                                    )}
+                                    <span className="min-w-0 leading-tight">
+                                      <span className="block truncate text-[10px] font-medium text-foreground">{owner.name}</span>
+                                      {owner.role && (
+                                        <span className="block truncate text-[9px] text-muted-foreground">{owner.role}</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              const label = owner.state === "unavailable" ? t.assignedUserUnavailable : t.unassigned;
                               return (
                                 <p
-                                  className={`mt-1 flex items-center gap-1 text-[10px] ${ownerName ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400"}`}
-                                  title={ownerName ? `${t.owner}: ${ownerName}` : t.unassigned}
+                                  className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400"
+                                  title={label}
                                 >
                                   <User className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="truncate">
-                                    {ownerName ? `${t.owner}: ${ownerName}` : t.unassigned}
-                                  </span>
+                                  <span className="truncate">{label}</span>
                                 </p>
                               );
                             })()}
@@ -338,7 +367,7 @@ export function WorkboardClient({
   milestones,
   tasks: initialTasks,
   dependencies,
-  assigneeNames,
+  assignees,
   locale,
   translations: t,
 }: WorkboardClientProps) {
@@ -772,7 +801,7 @@ export function WorkboardClient({
                           columnTasks={tasksByStatus[status]}
                           milestoneMap={milestoneMap}
                           predecessorsByTask={predecessorsByTask}
-                          assigneeNames={assigneeNames}
+                          assignees={assignees}
                           anyResizing={anyResizing}
                           getColumnWidth={getColumnWidth}
                           setColumnWidth={setColumnWidth}
@@ -792,6 +821,7 @@ export function WorkboardClient({
                             dependsOn: t.dependsOn,
                             owner: t.owner,
                             unassigned: t.unassigned,
+                            assignedUserUnavailable: t.assignedUserUnavailable,
                           }}
                         />
                       ))}
