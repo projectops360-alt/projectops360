@@ -73,6 +73,7 @@ function orderFromId(id: string): number {
 function sectionForId(id: string): string {
   if (id.startsWith("adrs/")) return "ADRs";
   if (/README$/i.test(id)) return "Folders";
+  if (id === "module-documentation-template") return "Modules";
   const base = id.split("/").pop() ?? id;
   const n = parseInt((base.match(/^(\d+)/) ?? [])[1] ?? "-1", 10);
   if (n >= 0 && n <= 4) return "Overview";
