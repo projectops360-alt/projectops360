@@ -71,6 +71,42 @@ Impact · Severity · Investigation status · Owner · Next action.
   doc 18) implements the correct rules but is **not wired**.
 - **Owner:** Product. **Next action:** wire the engine into the Living Graph + Isabella (doc 18).
 
+## REG-007 — Living Graph Labor/Workforce Load Layer "lost"
+- **Description:** The Living Graph previously had a Labor/Workforce layer to see **who is
+  overloaded, who is available, and which activity/task is causing the overload**, with
+  resource nodes connected to their assigned work. The product owner reported it as lost.
+- **Observed:** Not visible in production.
+- **Expected:** Workforce/labor load signals by person/resource and by assigned activity/task,
+  on the Living Graph.
+- **Impact:** High — it is a core execution-intelligence capability of the primary surface.
+  **Severity:** High.
+- **Investigation status (audited 2026-06-27): RESTORED IN CODE — root cause was a DEPLOYMENT
+  promotion gap, not a code deletion.** Findings:
+  - The capability **exists and is fully wired**: `lib/graph/workforce-graph-mapping.ts`
+    (`mapWorkforceResourceNodes`, `mapWorkforceAssignmentEdges`, `enrichNodesWithWorkforce`) +
+    the construction `lib/graph/labor-graph-mapping.ts`; overlays `workforceCapacity` /
+    `laborCapacity` are selectable in `living-graph-toolbar.tsx`; the server page computes and
+    passes `resourceCapacity` (`computeResourceCapacity`) into `living-graph-view.tsx`; i18n
+    labels present ("Workforce Intelligence" / "Labor Capacity View").
+  - It was lost on `master` during the feat/rythm divergence (this is the Living-Graph facet of
+    [REG-005](#reg-005--living-graph-prominence-reduced--not-as-intended)) and **restored in code
+    via PR #23** (2026-06-27).
+  - **Why it appeared lost:** the production domain alias was frozen on commit `e7d004c` (#22)
+    — a CLI-pinned deployment — so none of PRs #23–#28 reached the live URL until the alias was
+    promoted via `vercel --prod` on 2026-06-27. See [[vercel-deployment]] (deploy memory) and
+    DEBT for the promotion-gap lesson.
+- **Status:** Code = restored; Production = now live after alias promotion. **Open items:**
+  discoverability — the people-nodes + assignment-edges view appears in the **Activities/Events**
+  view level (not the default **Milestones** level), and requires captured capacity data
+  (`hasResources`). Recommend a follow-up to auto-surface it when the Workforce/Labor overlay is
+  selected.
+- **Protection rule (binding):** future changes to the Living Graph, Resource Capacity
+  Intelligence, Labor Capacity, or the Workforce Intelligence Layer **must not remove** the
+  ability to see who is overloaded/available and which activity/task causes the overload. Any
+  change that would must be an explicit, recorded decision.
+- **Owner:** Product. **Next action:** verify in-app (see doc 12 §"Recovered Labor/Workforce Load
+  Layer"); optional discoverability improvement.
+
 ---
 
 ### Resolved
