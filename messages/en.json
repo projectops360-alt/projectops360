@@ -1576,6 +1576,7 @@
       "blockedOnly": "Blocked only",
       "criticalOnly": "Critical path only",
       "all": "All",
+      "activeCount": "{count} filters active",
       "reset": "Reset filters"
     },
     "nodeTypes": {

@@ -107,6 +107,7 @@ import {
   type OverlaySignals,
 } from "@/lib/graph/overlay-metadata";
 import { localizedHref } from "@/i18n/href";
+import { useGraphUiPref, countActiveGraphFilters } from "@/lib/graph/graph-ui-prefs";
 import { LivingGraphSimulationPanel } from "./living-graph-simulation-panel";
 import {
   LivingGraphEditDialogs,
@@ -243,7 +244,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const containerRef = useRef<HTMLDivElement>(null);
   const [recalculating, setRecalculating] = useState(false);
   // Floating "Insights" panel (executive KPIs + summary) over the canvas.
-  const [insightsOpen, setInsightsOpen] = useState(false);
+  // Sprint #2 — persisted so the user's graph workspace is remembered.
+  const [insightsOpen, setInsightsOpen] = useGraphUiPref<boolean>("insightsOpen", false);
 
   async function handleRecalculate() {
     setRecalculating(true);
@@ -256,7 +258,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }
 
   // ── State ──
-  const [overlay, setOverlay] = useState<LivingGraphOverlay>("normal");
+  // Sprint #2 — overlay/layout/level are persisted view preferences (layout
+  // only; no graph business logic). A ?overlay= deep-link still wins (below).
+  const [overlay, setOverlay] = useGraphUiPref<LivingGraphOverlay>("overlay", "normal");
   // Deep-link support: the Execution Map "Open Critical Path in Living Graph"
   // CTA links with ?overlay=criticalPath. Applied post-mount to avoid a
   // hydration mismatch (Sprint #1 — Critical Path source-of-truth consolidation).
@@ -265,9 +269,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     const o = new URLSearchParams(window.location.search).get("overlay");
     if (o === "criticalPath") setOverlay("criticalPath");
   }, []);
-  const [layoutMode, setLayoutMode] = useState<LivingGraphLayoutMode>("hierarchical");
+  const [layoutMode, setLayoutMode] = useGraphUiPref<LivingGraphLayoutMode>("layoutMode", "hierarchical");
   // High-level milestone flowchart by default; drill into activities/events
-  const [viewLevel, setViewLevel] = useState<LivingGraphViewLevel>("milestones");
+  const [viewLevel, setViewLevel] = useGraphUiPref<LivingGraphViewLevel>("viewLevel", "milestones");
   // Milestones picked for drill-down (max 2)
   const [milestonePicks, setMilestonePicks] = useState<string[]>([]);
   // Drill-down filter: only show activities of these milestones
@@ -1214,6 +1218,18 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         focusMode={focusMode}
         onToggleFocus={() => setFocusMode((v) => !v)}
         onResetFilters={handleResetFilters}
+        activeFilterCount={countActiveGraphFilters({
+          statusFilter,
+          riskFilter,
+          blockedOnly,
+          criticalOnly,
+          dateFrom,
+          dateTo,
+          nodeTypeFilter,
+          edgeTypeFilter,
+          totalNodeTypes: ALL_NODE_TYPES.length,
+          totalEdgeTypes: ALL_EDGE_TYPES.length,
+        })}
         summary={analysis.summary}
         largeGraphWarning={filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null}
       />

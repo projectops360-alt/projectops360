@@ -93,6 +93,8 @@ export interface LivingGraphToolbarProps {
   focusMode: boolean;
   onToggleFocus: () => void;
   onResetFilters: () => void;
+  /** Sprint #2 — number of filters currently narrowing the graph (badge). */
+  activeFilterCount: number;
   summary: GraphMetricSummary;
   largeGraphWarning: boolean;
 }
@@ -205,13 +207,21 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
           title={t("filters.label")}
           className={cn(
             "inline-flex h-8 items-center gap-1 rounded-md border px-2 text-xs transition-colors",
-            showFilters
+            showFilters || props.activeFilterCount > 0
               ? "border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400"
               : "border-border bg-card text-foreground hover:bg-muted",
           )}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
           {t("filters.label")}
+          {props.activeFilterCount > 0 && (
+            <span
+              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold tabular-nums text-white"
+              aria-label={t("filters.activeCount", { count: props.activeFilterCount })}
+            >
+              {props.activeFilterCount}
+            </span>
+          )}
         </button>
         {props.viewLevel !== "milestones" && (
           <button
