@@ -305,6 +305,7 @@
     "dragHint": "Drag a task card to another column to change its status.",
     "owner": "Owner",
     "unassigned": "Unassigned",
+    "assignedUserUnavailable": "Assigned user unavailable",
     "columns": {
       "not_started": "Not Started",
       "prompt_ready": "Prompt Ready",
