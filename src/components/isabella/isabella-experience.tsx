@@ -26,6 +26,7 @@ import {
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert, Info,
   Volume2, VolumeX, Square, Palette, Play, PanelLeft, PanelRight, Minus,
   Maximize2, Minimize2, GripHorizontal, Compass, Presentation, MessageSquare,
+  BadgeCheck,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { GuideAnswer, GuideContext, GuideIntent } from "@/lib/knowledge-os/types";
@@ -380,6 +381,16 @@ export function IsabellaExperience({
             <div className={styles.nameplate}>
               <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
               <p className="text-[11px] text-muted-foreground">{expertTitle}</p>
+              <span
+                className="mt-1 inline-flex items-center gap-1 rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-400"
+                title={tt(
+                  "Isabella answers from the Product Brain, project data, and Project Memory.",
+                  "Isabella responde desde el Product Brain, los datos del proyecto y la Memoria del Proyecto.",
+                )}
+              >
+                <BadgeCheck className="h-3 w-3" aria-hidden />
+                {tt("Grounded in Product Intelligence", "Fundamentada en Inteligencia de Producto")}
+              </span>
               <p className={`${styles.status} mt-1 text-brand-600 dark:text-brand-400`}>
                 <span className={styles.statusDot} />
                 {statusLabel[presence]}

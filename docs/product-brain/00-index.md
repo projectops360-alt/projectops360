@@ -62,6 +62,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [28-sprint-03-overlay-clarity.md](28-sprint-03-overlay-clarity.md) | **Sprint #3** — Living Graph overlay clarity & intelligence |
 | [29-sprint-04-navigation-evidence.md](29-sprint-04-navigation-evidence.md) | **Sprint #4** — Living Graph navigation hub & evidence drill-down |
 | [30-product-decision-log.md](30-product-decision-log.md) | **Product Decision Log** — binding decisions (PD-001…PD-007) |
+| [31-dr-isabella-product-intelligence.md](31-dr-isabella-product-intelligence.md) | **Dr. Isabella** — Product Intelligence Expert: Product-Brain grounding, knowledge hierarchy, authority order, sources & verification |
 
 ### Sub-repositories
 

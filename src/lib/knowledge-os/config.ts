@@ -11,7 +11,7 @@ import type { ConfidenceTier, GuideIntent } from "./types";
  * for reproducibility (ADD Q15). The persona overlay version is carried per
  * expert (e.g. isabella@1.0.0) and stored separately in persona_version.
  */
-export const KNOWLEDGE_OS_BASE_PROMPT_VERSION = "knowledge-os-base@1.2.0";
+export const KNOWLEDGE_OS_BASE_PROMPT_VERSION = "knowledge-os-base@1.3.0";
 
 /** Embedding model + dims — kept in one place so re-embedding is a config swap. */
 export const GUIDE_EMBEDDING_MODEL = "text-embedding-3-small";

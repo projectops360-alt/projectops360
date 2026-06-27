@@ -9,8 +9,8 @@ const base = (): ActiveFilterArgs => ({
   criticalOnly: false,
   dateFrom: "",
   dateTo: "",
-  nodeTypeFilter: new Set<ProcessNodeType>(["task", "milestone"] as ProcessNodeType[]),
-  edgeTypeFilter: new Set<ProcessEdgeType>(["dependency", "blocks"] as ProcessEdgeType[]),
+  nodeTypeFilter: new Set<ProcessNodeType>(["task", "milestone"] as unknown as ProcessNodeType[]),
+  edgeTypeFilter: new Set<ProcessEdgeType>(["dependency", "blocks"] as unknown as ProcessEdgeType[]),
   totalNodeTypes: 2,
   totalEdgeTypes: 2,
 });
@@ -31,8 +31,8 @@ describe("countActiveGraphFilters (Sprint #2 — active filters badge)", () => {
 
   it("counts a node/edge-type set as active only when something is hidden", () => {
     const a = base();
-    expect(countActiveGraphFilters({ ...a, nodeTypeFilter: new Set(["task"] as ProcessNodeType[]) })).toBe(1);
-    expect(countActiveGraphFilters({ ...a, edgeTypeFilter: new Set(["dependency"] as ProcessEdgeType[]) })).toBe(1);
+    expect(countActiveGraphFilters({ ...a, nodeTypeFilter: new Set(["task"] as unknown as ProcessNodeType[]) })).toBe(1);
+    expect(countActiveGraphFilters({ ...a, edgeTypeFilter: new Set(["dependency"] as unknown as ProcessEdgeType[]) })).toBe(1);
   });
 
   it("sums multiple active filters", () => {

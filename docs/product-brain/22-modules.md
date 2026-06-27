@@ -32,7 +32,7 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) · ⚠️ [REG-007](10-regression-log.md) |
 | Labor Capacity (construction view) | Partial (catalog) — *construction-specific; see [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md)* | ~70% | 009 | CAP-010 | 7 |
 | Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 |
-| Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) | ~70% | 005 | CAP-002/004 | 4 |
+| Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) · ✅ [Dr. Isabella](31-dr-isabella-product-intelligence.md) Product-Brain grounding | ~80% | 005 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
 | Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) |
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 |
@@ -84,10 +84,15 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Related:** CAP-001 · [ADR-004](adrs/ADR-004-knowledge-os-substrate.md) · [Doc 15](15-knowledge-os.md).
 
 ## Isabella / AI Workforce
-- **Purpose:** Primary AI presence that explains and recommends.
-- **Status:** Implemented presence (~70%); live-state explanations pending.
-- **AI:** Knowledge OS + (future) Execution Status Engine. **Boundaries:** AI assists, humans decide.
-- **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md).
+- **Purpose:** Primary AI presence that explains and recommends; now the **Product Intelligence layer**.
+- **Status:** Implemented presence (~80%); **Product-Brain grounded** (Dr. Isabella) — answers
+  ProjectOps360° questions from the curated Product Brain corpus with sources + verification paths.
+- **AI:** Knowledge OS hybrid retrieval over `product_intelligence` + `people_permissions` packages.
+  **Boundaries:** AI assists, humans decide; engines (status/rollup/capacity) are never overridden.
+- **Knowledge sources:** **every module is a knowledge source for Isabella** via curated Product
+  Brain packages — Living Graph, Workboard, Project Memory/Scribe, Resource Capacity, Execution
+  Status Engine, regressions (REG-008/009/010), ADRs, and Product Decisions.
+- **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md) · [Doc 31 — Dr. Isabella](31-dr-isabella-product-intelligence.md).
 
 ## Project Memory & Scribe
 - **Purpose:** Per-project institutional memory; fast capture → structured items.
