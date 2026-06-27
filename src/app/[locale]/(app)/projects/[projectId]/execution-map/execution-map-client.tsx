@@ -5,7 +5,7 @@ import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   Map, LayoutList, Columns3, ListTodo, Calendar,
-  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2,
+  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2, ArrowRight,
 } from "lucide-react";
 import type { Milestone, MilestoneStatus, RoadmapTask, TaskStatus, TaskPriority, Locale, TaskDependency, DependencyType } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
@@ -672,14 +672,27 @@ export function ExecutionMapClient({
 
       {activeTab === "critical-path" && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+          <GitBranch className="h-12 w-12 text-brand-500 mb-4" />
           <h3 className="text-lg font-semibold text-foreground">
             {locale === "es" ? "Ruta Crítica" : "Critical Path"}
           </h3>
           <p className="mt-2 text-sm text-muted-foreground max-w-md">
             {locale === "es"
-              ? "El análisis de ruta crítica estará disponible próximamente. Esta vista mostrará la cadena de tareas más larga, los tiempos de holgura y las fechas más tempranas y tardías."
-              : "Critical path analysis will be available soon. This view will show the longest task chain, slack times, and earliest/latest dates."}
+              ? "La Ruta Crítica está disponible en el Living Graph, donde puedes verla junto con las dependencias, los hitos y el impacto en cascada."
+              : "Critical Path is available in the Living Graph, where it can be viewed together with dependencies, milestones, and downstream impact."}
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/living-graph?overlay=criticalPath`))}
+            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+          >
+            {locale === "es" ? "Abrir Ruta Crítica en el Living Graph" : "Open Critical Path in Living Graph"}
+            <ArrowRight className="h-4 w-4" />
+          </button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {locale === "es"
+              ? 'En el Living Graph, elige el overlay "Ruta crítica".'
+              : 'In the Living Graph, choose the "Critical Path" overlay.'}
           </p>
         </div>
       )}

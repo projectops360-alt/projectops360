@@ -303,6 +303,8 @@
     "description": "Arrastra y suelta tareas entre columnas para actualizar su estado.",
     "empty": "Sin tareas",
     "dragHint": "Arrastra una tarjeta a otra columna para cambiar su estado.",
+    "owner": "Responsable",
+    "unassigned": "Sin asignar",
     "columns": {
       "not_started": "Sin iniciar",
       "prompt_ready": "Prompt listo",

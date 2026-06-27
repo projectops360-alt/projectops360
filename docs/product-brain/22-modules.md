@@ -33,7 +33,8 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
-| Task / Milestone / WBS / Dependency / Critical Path | Pending | ~85% | 006 | CAP-019/020/021/022/023 | 11 |
+| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards |
+| Task / Milestone / WBS / Dependency / Critical Path | Pending | ~85% | 006 | CAP-019/020/021/022/023 | 11 · ✅ [Sprint #1](26-sprint-01-operational-clarity.md) Critical Path source of truth |
 | Reports · Dashboards | Pending | ~70% / Partial | — | CAP-024/025 | 12 |
 | Project Charter & Governance | Pending | ~80% | — | CAP-034 | 13 |
 | People / Team · Security (RBAC) | Pending | ~70% / Partial | 008 (proposed) | CAP-028/029 | 14 (security-critical) |

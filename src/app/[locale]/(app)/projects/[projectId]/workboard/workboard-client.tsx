@@ -8,9 +8,10 @@ import {
   FileText, Send, Code, ShieldCheck, AlertCircle,
   GripVertical, Filter, ChevronLeft, ChevronRight,
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
-  CornerDownRight,
+  CornerDownRight, User,
 } from "lucide-react";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
+import { resolveTaskOwnerName } from "@/lib/roadmap/task-owner";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
 import { TaskFormDialog, type TaskFormTranslations } from "@/components/roadmap/task-form-dialog";
 import {
@@ -35,6 +36,8 @@ interface WorkboardTranslations {
   allMilestones: string;
   noMilestone: string;
   dependsOn: string;
+  owner: string;
+  unassigned: string;
   groupLabels: Record<string, string>;
   columnVisibility: string;
   showAll: string;
@@ -63,6 +66,7 @@ interface WorkboardClientProps {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   dependencies: TaskDependency[];
+  assigneeNames: Record<string, string>;
   locale: Locale;
   translations: WorkboardTranslations;
 }
@@ -125,6 +129,7 @@ interface BoardColumnProps {
   columnTasks: RoadmapTask[];
   milestoneMap: Map<string, string>;
   predecessorsByTask: Map<string, PredecessorInfo[]>;
+  assigneeNames: Record<string, string>;
   anyResizing: boolean;
   getColumnWidth: (status: TaskStatus) => number;
   setColumnWidth: (status: TaskStatus, width: number) => void;
@@ -142,6 +147,8 @@ interface BoardColumnProps {
     resetWidth: string;
     priorityLabels: Record<TaskPriority, string>;
     dependsOn: string;
+    owner: string;
+    unassigned: string;
   };
 }
 
@@ -151,6 +158,7 @@ function BoardColumn({
   columnTasks,
   milestoneMap,
   predecessorsByTask,
+  assigneeNames,
   anyResizing,
   getColumnWidth,
   setColumnWidth,
@@ -265,6 +273,21 @@ function BoardColumn({
                               </span>
                               {task.is_blocked && <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />}
                             </div>
+                            {/* Sprint #1 — task ownership: who owns this work (real data; never invented). */}
+                            {(() => {
+                              const ownerName = resolveTaskOwnerName(task, assigneeNames);
+                              return (
+                                <p
+                                  className={`mt-1 flex items-center gap-1 text-[10px] ${ownerName ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400"}`}
+                                  title={ownerName ? `${t.owner}: ${ownerName}` : t.unassigned}
+                                >
+                                  <User className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate">
+                                    {ownerName ? `${t.owner}: ${ownerName}` : t.unassigned}
+                                  </span>
+                                </p>
+                              );
+                            })()}
                             {task.estimate_hours && <span className="text-[10px] text-muted-foreground/60 mt-0.5">{task.estimate_hours}h</span>}
                             {task.progress > 0 && (
                               <div className="mt-1.5 flex items-center gap-1">
@@ -315,6 +338,7 @@ export function WorkboardClient({
   milestones,
   tasks: initialTasks,
   dependencies,
+  assigneeNames,
   locale,
   translations: t,
 }: WorkboardClientProps) {
@@ -748,6 +772,7 @@ export function WorkboardClient({
                           columnTasks={tasksByStatus[status]}
                           milestoneMap={milestoneMap}
                           predecessorsByTask={predecessorsByTask}
+                          assigneeNames={assigneeNames}
                           anyResizing={anyResizing}
                           getColumnWidth={getColumnWidth}
                           setColumnWidth={setColumnWidth}
@@ -765,6 +790,8 @@ export function WorkboardClient({
                             resetWidth: t.resetWidth,
                             priorityLabels: t.priorityLabels,
                             dependsOn: t.dependsOn,
+                            owner: t.owner,
+                            unassigned: t.unassigned,
                           }}
                         />
                       ))}
