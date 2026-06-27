@@ -1636,6 +1636,8 @@
       "fitView": "Fit view",
       "fullscreen": "Fullscreen",
       "exitFullscreen": "Exit fullscreen",
+      "focusGraph": "Focus mode — make the graph the protagonist",
+      "exitFocus": "Exit focus mode",
       "close": "Close panel",
       "findPath": "Find path from this node",
       "findPathPending": "Now click the target node…",

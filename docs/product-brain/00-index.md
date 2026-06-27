@@ -58,6 +58,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [module-documentation-template.md](module-documentation-template.md) | **Module doc template** — reusable per-module structure |
 | [25-ux-design-debt.md](25-ux-design-debt.md) | **UX / Design Debt** — incl. UX-004 (Isabella compact layout) |
 | [26-sprint-01-operational-clarity.md](26-sprint-01-operational-clarity.md) | **Sprint #1** — Workboard ownership + Critical Path source of truth |
+| [27-sprint-02-living-graph-focus.md](27-sprint-02-living-graph-focus.md) | **Sprint #2** — Living Graph focus & usability (Focus Mode) |
 
 ### Sub-repositories
 

@@ -292,6 +292,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const [pathModeFromId, setPathModeFromId] = useState<string | null>(null);
   const [pathResult, setPathResult] = useState<string[] | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Sprint #2 — Focus Mode: an in-page focus that makes the graph the protagonist
+  // (covers page chrome, hides helper text, maximizes the canvas). Distinct from
+  // the browser fullscreen API above.
+  const [focusMode, setFocusMode] = useState(false);
   const [simulation, setSimulation] = useState<LivingGraphSimulationState | null>(null);
   // Timeline playback
   const [playbackIndex, setPlaybackIndex] = useState(-1);
@@ -1084,7 +1088,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   return (
     <div
       ref={containerRef}
-      className="flex h-[calc(100vh-120px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
+      className={
+        focusMode
+          ? "fixed inset-0 z-40 flex flex-col gap-2 bg-background p-3"
+          : "flex h-[calc(100vh-120px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
+      }
     >
       {/* Executive KPIs + summary now live in a floating "Insights" panel ON the
           canvas (see below) so the Living Graph owns the full viewport height. */}
@@ -1158,6 +1166,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         onFitView={() => void fitView({ padding: 0.15, duration: 300 })}
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
+        focusMode={focusMode}
+        onToggleFocus={() => setFocusMode((v) => !v)}
         onResetFilters={handleResetFilters}
         summary={analysis.summary}
         largeGraphWarning={filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null}
@@ -1196,9 +1206,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         </div>
       )}
 
-      {/* Status hints */}
-      {isMilestoneLevel && milestonePicks.length === 0 && (
+      {/* Status hints (hidden in Focus Mode to maximize the canvas) */}
+      {!focusMode && isMilestoneLevel && milestonePicks.length === 0 && (
         <p className="text-[11px] text-muted-foreground">{t("drill.hint")}</p>
+      )}
+      {/* Sprint #2 — overlay discoverability: the people + assignment-edges view
+          renders in the Activities level (not the default Milestones level). */}
+      {workforceActive && viewLevel === "milestones" && (
+        <p role="status" className="flex items-center gap-1.5 rounded-md border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs text-brand-600 dark:text-brand-400">
+          <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {locale === "es"
+            ? "Cambia a la vista \"Actividades\" para ver a las personas y sus asignaciones."
+            : "Switch to the \"Activities\" view to see people and their assignments."}
+        </p>
       )}
       {pathModeFromId && (
         <p role="status" className="rounded-md border border-brand-500/40 bg-brand-500/10 px-3 py-1.5 text-xs text-brand-600 dark:text-brand-400">
