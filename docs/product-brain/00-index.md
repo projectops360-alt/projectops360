@@ -60,6 +60,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [26-sprint-01-operational-clarity.md](26-sprint-01-operational-clarity.md) | **Sprint #1** — Workboard ownership + Critical Path source of truth |
 | [27-sprint-02-living-graph-focus.md](27-sprint-02-living-graph-focus.md) | **Sprint #2** — Living Graph focus & usability (Focus Mode) |
 | [28-sprint-03-overlay-clarity.md](28-sprint-03-overlay-clarity.md) | **Sprint #3** — Living Graph overlay clarity & intelligence |
+| [29-sprint-04-navigation-evidence.md](29-sprint-04-navigation-evidence.md) | **Sprint #4** — Living Graph navigation hub & evidence drill-down |
 
 ### Sub-repositories
 

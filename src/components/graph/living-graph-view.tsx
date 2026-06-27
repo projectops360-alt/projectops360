@@ -1537,6 +1537,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               selectedEdge={selectedEdge}
               analysis={analysis}
               overlay={overlay}
+              projectId={projectId}
+              onNavigate={(href) => router.push(localizedHref(locale, href))}
               simulation={simulation}
               pathModeFromId={pathModeFromId}
               onFindPathFrom={(id) => setPathModeFromId((cur) => (cur === id ? null : id))}
