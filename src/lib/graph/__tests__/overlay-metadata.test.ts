@@ -3,6 +3,7 @@ import {
   OVERLAY_META,
   ADVANCED_OVERLAYS,
   resolveOverlayState,
+  countDistinctEventDays,
 } from "@/lib/graph/overlay-metadata";
 
 describe("resolveOverlayState (Sprint #3 overlay clarity)", () => {
@@ -43,5 +44,25 @@ describe("OVERLAY_META", () => {
 
   it("variance overlay offers a CTA to set up a baseline", () => {
     expect(OVERLAY_META.variance!.cta?.href?.("proj-1")).toContain("/projects/proj-1/");
+  });
+
+  it("each advanced overlay declares a recommended layout", () => {
+    for (const id of ["risk", "sopCandidate", "variance", "timeline", "simulation"] as const) {
+      expect(OVERLAY_META[id]!.recommendedLayout).toBeTruthy();
+    }
+    expect(OVERLAY_META.timeline!.recommendedLayout).toBe("timeline");
+  });
+});
+
+describe("countDistinctEventDays (Timeline real-history signal)", () => {
+  it("one-shot import (all same day) → 1 distinct day (empty playback)", () => {
+    const same = ["2026-06-27T01:00:00Z", "2026-06-27T05:00:00Z", "2026-06-27T23:00:00Z"];
+    expect(countDistinctEventDays(same)).toBe(1);
+  });
+  it("real evolution across days → multiple distinct days", () => {
+    expect(countDistinctEventDays(["2026-06-25T01:00:00Z", "2026-06-26T01:00:00Z", "2026-06-27T01:00:00Z"])).toBe(3);
+  });
+  it("ignores null/short values safely", () => {
+    expect(countDistinctEventDays([null, undefined, "", "2026-06-27T00:00:00Z"])).toBe(1);
   });
 });

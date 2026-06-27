@@ -103,6 +103,7 @@ import { OverlayInfo } from "./overlay-info";
 import {
   ADVANCED_OVERLAYS,
   resolveOverlayState,
+  countDistinctEventDays,
   type OverlaySignals,
 } from "@/lib/graph/overlay-metadata";
 import { localizedHref } from "@/i18n/href";
@@ -436,8 +437,12 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           totalCount: nodes.filter((n) => n.metadata?.variance != null).length,
           disconnectedCount: 0,
         };
-      case "timeline":
-        return { totalCount: data.events.length, disconnectedCount: 0 };
+      case "timeline": {
+        // Real history = events spread across ≥2 distinct days. A single-day
+        // (one-shot import) project has no evolution to replay → empty state.
+        const distinctDays = countDistinctEventDays(data.events.map((e) => e.occurredAt));
+        return { totalCount: distinctDays >= 2 ? data.events.length : 0, disconnectedCount: 0 };
+      }
       case "simulation":
         return { totalCount: simulation ? 1 : 0, disconnectedCount: 0 };
       default:

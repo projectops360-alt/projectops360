@@ -1761,6 +1761,8 @@
     },
     "simulation": {
       "title": "Escenarios what-if",
+      "sandboxLabel": "Solo simulación — no se cambió ningún dato del proyecto.",
+      "applyUnavailable": "Aplicar la simulación aún no está disponible",
       "selectNode": "Selecciona un nodo para ejecutar una simulación what-if sobre él.",
       "scenarios": {
         "delay1d": "Retrasar 1 día",
