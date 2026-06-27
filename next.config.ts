@@ -17,13 +17,6 @@ const nextConfig: NextConfig = {
     // Tree-shake named icon imports from lucide-react so only used icons ship.
     optimizePackageImports: ["lucide-react"],
   },
-  // Ensure the Product Intelligence Center server route can read the
-  // Product Intelligence™ markdown at runtime on Vercel. These files live
-  // outside src/ and would otherwise not be traced into the function bundle.
-  outputFileTracingIncludes: {
-    "/[locale]/(app)/product-intelligence": ["./docs/product-brain/**/*.md"],
-    "/[locale]/(app)/product-intelligence/**": ["./docs/product-brain/**/*.md"],
-  },
 };
 
 export default withNextIntl(nextConfig);

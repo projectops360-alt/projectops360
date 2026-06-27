@@ -3,21 +3,22 @@ import "server-only";
 // ============================================================================
 // ProjectOps360° — Product Intelligence™ document loader (server-only)
 // ============================================================================
-// Reads the Product Intelligence™ markdown from `docs/product-brain/` at request
-// time and builds a navigable, searchable index. The folder lives outside `src/`,
-// so `next.config.ts` traces it into this route's function bundle
-// (`outputFileTracingIncludes`).
+// Builds a navigable, searchable index from the Product Intelligence™ corpus.
 //
-// SECURITY: this module is `server-only` and is only ever invoked AFTER the page
-// has verified the caller's role (owner/admin). Document content never reaches an
-// unauthenticated client and is never served from an open API route. Document ids
-// are validated to prevent path traversal outside the docs root.
+// Content is sourced from a BUILD-GENERATED module (content.generated.ts), which
+// the generator (scripts/generate-product-brain-content.mjs) produces from
+// docs/product-brain/ on every build. This guarantees availability at runtime on
+// Vercel without filesystem tracing of files outside src/. GitHub remains the
+// version-control source of truth.
+//
+// SECURITY: this module is `server-only` and is only invoked AFTER the page has
+// verified the caller's role (owner/admin). Content never reaches an
+// unauthenticated client and is never served from an open API route. Document
+// ids are validated to prevent unexpected lookups.
 // ============================================================================
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { RAW_PRODUCT_BRAIN_DOCS } from "./content.generated";
 
-const ROOT = path.join(process.cwd(), "docs", "product-brain");
 const GITHUB_BASE =
   "https://github.com/projectops360-alt/projectops360/blob/master/docs/product-brain";
 
@@ -39,29 +40,25 @@ export interface ProductBrainDoc extends ProductBrainDocMeta {
 }
 
 export interface ProductBrainSearchEntry extends ProductBrainDocMeta {
-  /** Lowercased plain-text content for client-side search. */
   searchText: string;
 }
 
-// ── id validation (anti path-traversal) ──────────────────────────────────────
+export const DEFAULT_DOC_ID = "00-index";
+
+// ── id validation ─────────────────────────────────────────────────────────────
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/;
-
 function isSafeId(id: string): boolean {
-  if (!ID_RE.test(id)) return false;
-  if (id.includes("..")) return false;
-  if (id.startsWith("/")) return false;
-  return true;
+  return ID_RE.test(id) && !id.includes("..") && !id.startsWith("/");
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── derivation helpers ──────────────────────────────────────────────────────
 
 function titleFromContent(content: string, fallbackId: string): string {
   for (const line of content.split("\n")) {
     const m = line.match(/^#\s+(.*\S)\s*$/);
     if (m) return m[1].replace(/\s*\(.*\)\s*$/, "").trim() || m[1].trim();
   }
-  // Fallback: prettify the file name.
   const base = fallbackId.split("/").pop() ?? fallbackId;
   return base.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -78,19 +75,21 @@ function sectionForId(id: string): string {
   if (/README$/i.test(id)) return "Folders";
   const base = id.split("/").pop() ?? id;
   const n = parseInt((base.match(/^(\d+)/) ?? [])[1] ?? "-1", 10);
-  if (n === 0) return "Overview";
-  if (n >= 1 && n <= 4) return "Overview";
+  if (n >= 0 && n <= 4) return "Overview";
   if (n === 5 || n === 6) return "Registries";
   if (n === 7) return "ADRs";
   if (n >= 8 && n <= 11) return "Governance";
   if (n >= 12 && n <= 18) return "Strategy";
   if (n >= 19 && n <= 21) return "Foundation";
+  if (n === 22) return "Modules";
+  if (n === 23) return "Governance";
   return "Docs";
 }
 
 const SECTION_ORDER = [
   "Overview",
   "Foundation",
+  "Modules",
   "Registries",
   "Governance",
   "Strategy",
@@ -104,135 +103,8 @@ export function sectionRank(section: string): number {
   return i === -1 ? SECTION_ORDER.length : i;
 }
 
-// ── directory walk ──────────────────────────────────────────────────────────
-
-async function walk(dir: string): Promise<string[]> {
-  const out: string[] = [];
-  let entries: import("node:fs").Dirent[];
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return out;
-  }
-  for (const entry of entries) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...(await walk(abs)));
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
-      out.push(abs);
-    }
-  }
-  return out;
-}
-
-function toId(abs: string): string {
-  const rel = path.relative(ROOT, abs).split(path.sep).join("/");
-  return rel.replace(/\.md$/i, "");
-}
-
-// ── public API ────────────────────────────────────────────────────────────────
-
-/** Lightweight index (no content) — for the navigation tree. */
-export async function getProductBrainIndex(): Promise<ProductBrainDocMeta[]> {
-  const files = await walk(ROOT);
-  const metas = await Promise.all(
-    files.map(async (abs) => {
-      const id = toId(abs);
-      const relPath = path.relative(ROOT, abs).split(path.sep).join("/");
-      let content = "";
-      try {
-        content = await fs.readFile(abs, "utf8");
-      } catch {
-        /* unreadable file — fall back to filename title */
-      }
-      const meta: ProductBrainDocMeta = {
-        id,
-        title: titleFromContent(content, id),
-        relPath,
-        section: sectionForId(id),
-        order: orderFromId(id),
-        githubUrl: `${GITHUB_BASE}/${relPath}`,
-      };
-      return meta;
-    }),
-  );
-  return sortMetas(metas);
-}
-
-/** Full search index (includes plain-text content). Only sent to authorized clients. */
-export async function getProductBrainSearchIndex(): Promise<ProductBrainSearchEntry[]> {
-  const files = await walk(ROOT);
-  const entries = await Promise.all(
-    files.map(async (abs) => {
-      const id = toId(abs);
-      const relPath = path.relative(ROOT, abs).split(path.sep).join("/");
-      let content = "";
-      try {
-        content = await fs.readFile(abs, "utf8");
-      } catch {
-        /* ignore */
-      }
-      const entry: ProductBrainSearchEntry = {
-        id,
-        title: titleFromContent(content, id),
-        relPath,
-        section: sectionForId(id),
-        order: orderFromId(id),
-        githubUrl: `${GITHUB_BASE}/${relPath}`,
-        searchText: `${id}\n${content}`.toLowerCase(),
-      };
-      return entry;
-    }),
-  );
-  return sortMetas(entries);
-}
-
-/**
- * Full docs WITH content, sorted. Sent only to authorized clients so the Center
- * can navigate + full-text search instantly (the corpus is small). Access is
- * gated by the page BEFORE this is called.
- */
-export async function getAllProductBrainDocs(): Promise<ProductBrainDoc[]> {
-  const files = await walk(ROOT);
-  const docs = await Promise.all(
-    files.map(async (abs) => {
-      const id = toId(abs);
-      const relPath = path.relative(ROOT, abs).split(path.sep).join("/");
-      let content = "";
-      try {
-        content = await fs.readFile(abs, "utf8");
-      } catch {
-        /* ignore unreadable file */
-      }
-      const d: ProductBrainDoc = {
-        id,
-        title: titleFromContent(content, id),
-        relPath,
-        section: sectionForId(id),
-        order: orderFromId(id),
-        githubUrl: `${GITHUB_BASE}/${relPath}`,
-        content,
-      };
-      return d;
-    }),
-  );
-  return sortMetas(docs);
-}
-
-/** Read a single document by id. Returns null when not found or id is unsafe. */
-export async function getProductBrainDoc(id: string): Promise<ProductBrainDoc | null> {
-  if (!isSafeId(id)) return null;
-  const abs = path.join(ROOT, `${id}.md`);
-  // Defense in depth: ensure the resolved path stays inside ROOT.
-  const resolved = path.resolve(abs);
-  if (resolved !== abs || !resolved.startsWith(path.resolve(ROOT))) return null;
-  let content: string;
-  try {
-    content = await fs.readFile(abs, "utf8");
-  } catch {
-    return null;
-  }
-  const relPath = `${id}.md`;
+function toDoc(relPath: string, content: string): ProductBrainDoc {
+  const id = relPath.replace(/\.md$/i, "");
   return {
     id,
     title: titleFromContent(content, id),
@@ -244,8 +116,6 @@ export async function getProductBrainDoc(id: string): Promise<ProductBrainDoc | 
   };
 }
 
-export const DEFAULT_DOC_ID = "00-index";
-
 function sortMetas<T extends ProductBrainDocMeta>(metas: T[]): T[] {
   return [...metas].sort((a, b) => {
     const sr = sectionRank(a.section) - sectionRank(b.section);
@@ -253,4 +123,42 @@ function sortMetas<T extends ProductBrainDocMeta>(metas: T[]): T[] {
     if (a.order !== b.order) return a.order - b.order;
     return a.id.localeCompare(b.id);
   });
+}
+
+// ── public API (synchronous — content is bundled) ─────────────────────────────
+
+function allDocs(): ProductBrainDoc[] {
+  return RAW_PRODUCT_BRAIN_DOCS.map((d) => toDoc(d.relPath, d.content));
+}
+
+export function getAllProductBrainDocs(): ProductBrainDoc[] {
+  return sortMetas(allDocs());
+}
+
+export function getProductBrainIndex(): ProductBrainDocMeta[] {
+  return sortMetas(
+    allDocs().map(({ content: _content, ...meta }) => {
+      void _content;
+      return meta;
+    }),
+  );
+}
+
+export function getProductBrainSearchIndex(): ProductBrainSearchEntry[] {
+  return sortMetas(
+    allDocs().map((d) => ({
+      id: d.id,
+      title: d.title,
+      relPath: d.relPath,
+      section: d.section,
+      order: d.order,
+      githubUrl: d.githubUrl,
+      searchText: `${d.id}\n${d.content}`.toLowerCase(),
+    })),
+  );
+}
+
+export function getProductBrainDoc(id: string): ProductBrainDoc | null {
+  if (!isSafeId(id)) return null;
+  return allDocs().find((d) => d.id === id) ?? null;
 }
