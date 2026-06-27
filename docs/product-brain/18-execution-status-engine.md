@@ -24,10 +24,14 @@ never mixed:
 - Every result carries a deterministic, **bilingual** explanation for Isabella.
 
 ## Current implementation (audited 2026-06-27)
-- **Prototype only:** `src/lib/execution/status-engine.ts` exists in the working tree with the
-  core deciders (`resolveExecutionStatus`, `resolveDependencyStatus`, `resolveRiskStatus`,
-  `buildExecutionExplanation`, `resolveExecutionState`) and types.
-- **Not committed, not wired, no tests, no consumers.** (DEBT-007.)
+- **Core engine committed:** `src/lib/execution/status-engine.ts` (`resolveExecutionStatus`,
+  `resolveDependencyStatus`, `resolveRiskStatus`, `buildExecutionExplanation`,
+  `resolveExecutionState`) + types.
+- **First consumer wired — the Living Graph** (REG-008): `src/lib/graph/living-graph-status.ts`
+  adapts graph nodes to engine signals; the graph now derives Blocked/Waiting from the engine and
+  shows them separately. Covered by `src/lib/graph/__tests__/living-graph-status.test.ts`.
+- **Still pending:** task/milestone adapters for dashboards, Isabella explanations, Command Center,
+  reports, notifications. (DEBT-007 partially resolved — engine is committed + has a real consumer.)
 - Health is intentionally computed separately (project-scoped) — reuses `lib/execution/health.ts`
   mapped to the 5-level scale.
 - Foundations already exist to feed it: `readiness.ts` distinguishes predecessor vs real

@@ -49,6 +49,10 @@ import type { ResourceCapacityResult } from "@/lib/capacity/service";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Terminal task statuses — a completed task has no ACTIVE impediment, so a stale
+// is_blocked flag on it must never read as blocked in the graph (REG-008 / ADR-006).
+const TASK_COMPLETED_STATUSES = new Set(["done", "tested"]);
+
 type TaskEnrichment = Pick<
   RoadmapTask,
   | "id"
@@ -143,10 +147,12 @@ function normalizeNode(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     riskLevel,
+    // A completed task is never blocked, even with a stale is_blocked flag (REG-008).
     isBlocked:
-      row.node_type === "blocker_event" ||
-      (task?.is_blocked ?? false) ||
-      meta.is_blocked === true,
+      !(task != null && TASK_COMPLETED_STATUSES.has(task.status)) &&
+      (row.node_type === "blocker_event" ||
+        (task?.is_blocked ?? false) ||
+        meta.is_blocked === true),
     isCritical: task?.is_critical ?? false,
     milestoneId,
     milestoneLabel,
