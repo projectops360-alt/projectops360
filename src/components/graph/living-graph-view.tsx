@@ -99,6 +99,13 @@ import { LivingGraphTimeline } from "./living-graph-timeline";
 import { LivingGraphDetailPanel } from "./living-graph-detail-panel";
 import { LivingGraphMetricsHeader } from "./living-graph-metrics-header";
 import { LivingGraphLegend } from "./living-graph-legend";
+import { OverlayInfo } from "./overlay-info";
+import {
+  ADVANCED_OVERLAYS,
+  resolveOverlayState,
+  type OverlaySignals,
+} from "@/lib/graph/overlay-metadata";
+import { localizedHref } from "@/i18n/href";
 import { LivingGraphSimulationPanel } from "./living-graph-simulation-panel";
 import {
   LivingGraphEditDialogs,
@@ -404,6 +411,39 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     () => analyzeGraph(displayGraph.nodes, displayGraph.edges),
     [displayGraph],
   );
+
+  // Sprint #3 — deterministic clarity signals for the active advanced overlay
+  // (how many relevant items exist, and how many are disconnected). Drives the
+  // empty / incomplete / ready state of the overlay clarity card. No invented data.
+  const overlaySignals = useMemo<OverlaySignals>(() => {
+    const nodes = [...analysis.adjacency.nodeById.values()];
+    const degree = (id: string) =>
+      (analysis.adjacency.out.get(id)?.length ?? 0) + (analysis.adjacency.inc.get(id)?.length ?? 0);
+    switch (overlay) {
+      case "risk": {
+        const riskNodes = nodes.filter((n) => n.nodeType === "risk_event");
+        const riskyWork = nodes.filter((n) => n.riskLevel === "high" || n.riskLevel === "medium");
+        const disconnected = riskNodes.filter((n) => degree(n.id) === 0).length;
+        return { totalCount: riskNodes.length + riskyWork.length, disconnectedCount: disconnected };
+      }
+      case "sopCandidate": {
+        let total = 0;
+        for (const m of analysis.metrics.values()) if (m.sopCandidateScore >= 0.6) total++;
+        return { totalCount: total, disconnectedCount: 0 };
+      }
+      case "variance":
+        return {
+          totalCount: nodes.filter((n) => n.metadata?.variance != null).length,
+          disconnectedCount: 0,
+        };
+      case "timeline":
+        return { totalCount: data.events.length, disconnectedCount: 0 };
+      case "simulation":
+        return { totalCount: simulation ? 1 : 0, disconnectedCount: 0 };
+      default:
+        return { totalCount: 1, disconnectedCount: 0 };
+    }
+  }, [overlay, analysis, data.events, simulation]);
 
   // Executive metrics for the premium dashboard header
   const health = useMemo(() => computeGraphHealth(analysis), [analysis]);
@@ -1309,6 +1349,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         }}
       >
         <LivingGraphLegend />
+
+        {/* Sprint #3 — overlay clarity: what am I looking at, why are nodes here,
+            what to do next + empty/incomplete state, for the advanced overlays. */}
+        {ADVANCED_OVERLAYS.includes(overlay) && (
+          <OverlayInfo
+            key={overlay}
+            overlay={overlay}
+            state={resolveOverlayState(overlaySignals)}
+            signals={overlaySignals}
+            locale={locale}
+            projectId={projectId}
+            onNavigate={(href) => router.push(localizedHref(locale, href))}
+          />
+        )}
 
         {/* Floating Insights (executive KPIs + summary) — hidden while a node
             detail panel occupies the right side. Graph keeps full height. */}
