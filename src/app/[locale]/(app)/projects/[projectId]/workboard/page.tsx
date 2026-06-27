@@ -1,6 +1,7 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency } from "@/types/database";
@@ -85,10 +86,25 @@ export default async function WorkboardPage({
   // Sprint #1 — Workboard ownership visibility: resolve assignee names so each
   // card can show who owns the work (assigned_to = person; assigned_resource_id
   // = crew/team/vendor). Real data only — never invented.
+  // We look up by the exact assigned ids using the admin client: RLS on profiles
+  // hides other users' rows from the authenticated client, and assignees may be
+  // cross-org members (profile lives in another org). Access is already gated by
+  // getOrgContext + the project-ownership check above; we only read names.
+  const assigneeIds = [
+    ...new Set(
+      (tasks ?? [])
+        .flatMap((t) => [t.assigned_to, t.assigned_resource_id])
+        .filter((x): x is string => !!x),
+    ),
+  ];
+  const admin = createAdminClient();
   const [profilesRes, resourcesRes] = await Promise.all([
-    supabase.from("profiles").select("id, display_name").eq("organization_id", org.organizationId),
-    supabase.from("resources").select("id, name").eq("project_id", projectId)
-      .eq("organization_id", org.organizationId).is("deleted_at", null),
+    assigneeIds.length
+      ? admin.from("profiles").select("id, display_name").in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null }[] }),
+    assigneeIds.length
+      ? admin.from("resources").select("id, name").eq("project_id", projectId).in("id", assigneeIds)
+      : Promise.resolve({ data: [] as { id: string; name: string | null }[] }),
   ]);
   const assigneeNames: Record<string, string> = {};
   for (const p of (profilesRes.data ?? []) as { id: string; display_name: string | null }[]) {
