@@ -72,7 +72,7 @@ export default async function ResourceCapacityPage({ params }: { params: Promise
     { label: isEs ? "Sobreasignadas" : "Overallocated", value: `${n(t.totalOverallocatedHours)}h`, tone: t.totalOverallocatedHours > 0 ? "text-red-600 dark:text-red-400" : undefined, icon: AlertTriangle, sub: `${t.overallocatedResourceCount + t.criticalResourceCount} ${L.resourcesWord.toLowerCase()}` },
     { label: isEs ? "Disponibilidad" : "Availability", value: pct(t.workforceAvailabilityPercent), icon: Users, sub: `${isEs ? "overhead" : "overhead"} ${pct(t.projectOverheadPercent)}` },
     { label: isEs ? "Cuellos de botella" : "Bottlenecks", value: `${t.criticalResourceCount}`, tone: t.criticalResourceCount > 0 ? "text-red-600 dark:text-red-400" : undefined, icon: Ban, sub: isEs ? "críticos" : "critical" },
-    { label: isEs ? "Hitos en riesgo" : "At-risk Milestones", value: `${t.atRiskMilestoneCount}`, tone: t.atRiskMilestoneCount > 0 ? "text-amber-600 dark:text-amber-400" : undefined, icon: Flag, sub: "" },
+    { label: isEs ? "Hitos en riesgo" : "At-risk Milestones", value: `${t.atRiskMilestoneCount}`, tone: t.atRiskMilestoneCount > 0 ? "text-amber-600 dark:text-amber-400" : undefined, icon: Flag, sub: isEs ? "riesgo alto + medio" : "high + medium risk" },
   ];
 
   return (

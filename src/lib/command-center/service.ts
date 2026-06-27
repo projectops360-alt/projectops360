@@ -9,6 +9,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { localizedHref } from "@/i18n/href";
 import type { I18nField } from "@/types/database";
+import { hasActiveBlocker } from "@/lib/execution/task-activity";
 
 const DONE = new Set(["done", "tested"]);
 const STARTED = new Set(["prompt_ready", "sent_to_ai", "in_progress", "implemented"]);
@@ -111,10 +112,11 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
 
   // ── Aggregates ──────────────────────────────────────────────────────────
   const totalTasks = tasks.length;
-  const blocked = tasks.filter((t) => t.status === "blocked" || t.is_blocked);
+  // REG-010: stale is_blocked on a completed task is not a blocker.
+  const blocked = tasks.filter((t) => hasActiveBlocker(t));
   const overdue = tasks.filter((t) => t.end_date && t.end_date < new Date().toISOString().slice(0, 10) && !DONE.has(t.status));
   const critical = tasks.filter((t) => t.is_critical);
-  const blockedCritical = critical.filter((t) => t.status === "blocked" || t.is_blocked);
+  const blockedCritical = critical.filter((t) => hasActiveBlocker(t));
   const openTasks = tasks.filter((t) => !DONE.has(t.status) && t.status !== "deferred");
   const unassigned = openTasks.filter((t) => !t.assigned_to && !t.assigned_resource_id);
   const openRisks = risks.filter((r) => r.status === "open" || r.status === "mitigating");
@@ -187,7 +189,7 @@ export async function getCommandCenterSummary(organizationId: string, locale = "
     .map((t, i) => ({
       order: i + 1, task: t.title, project: t.project_id ? projectName.get(t.project_id) ?? "—" : "—",
       status: t.status === "blocked" ? "Blocked" : DONE.has(t.status) ? "On Track" : STARTED.has(t.status) ? "In Progress" : "Ready",
-      risk: (t.status === "blocked" || t.is_blocked) ? "red" : (t.slack_days ?? 99) <= 3 ? "amber" : "green",
+      risk: hasActiveBlocker(t) ? "red" : (t.slack_days ?? 99) <= 3 ? "amber" : "green",
       blocker: t.blocker_reason || null, float: t.slack_days,
       href: t.project_id ? link(`/projects/${t.project_id}/workboard?task=${t.id}`) : undefined,
     }));

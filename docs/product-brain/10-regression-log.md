@@ -167,6 +167,51 @@ Impact · Severity · Investigation status · Owner · Next action.
 - **Owner:** Product. **Verify:** Project Memory → "ProjectOps Scribe" → Dictate → Analyze →
   review → Save.
 
+## REG-010 — Cross-module metric rollup inconsistency
+- **Description:** The same execution facts were computed independently in several places with
+  divergent rules, so different surfaces disagreed for the **same project** ("Mobile App Design").
+- **Observed (2026-06-27, prod fixture "Mobile App Design"):**
+  - Living Graph header showed **0 blocked**, but Executive Insights / PMO Summary showed
+    **"Blockers: 1"** — the "1" was a **completed** task ("Delivery Date Compliance Report",
+    status `done`) carrying a **stale `is_blocked = true`** flag (REG-008 family).
+  - Resource Capacity **"At-risk Milestones" KPI card** showed **1** while the **"Capacity risks"
+    list** showed **2** — the card counted `high` only; the list counted `high + medium`.
+  - Metrics did not declare scope, so non-comparable numbers were visually compared.
+- **Root cause:** duplicated rollup logic. `health.ts`, `command-center/service.ts`, and
+  `executive-summary-panel.tsx` each counted blockers as `status === "blocked" || is_blocked`
+  **without excluding terminal tasks**, so a stale flag on a Done task inflated the count. The
+  Living Graph header already used the deterministic resolver (REG-008), hence the disagreement.
+  Capacity card and list used different risk-level scopes.
+- **Fix (durable, data-source level — not frontend formatting):**
+  - New canonical module `src/lib/execution/task-activity.ts` — the single source of truth for
+    `isActiveStatus / isTerminalStatus / isCompletedStatus / hasActiveBlocker / isUnassigned`.
+    A terminal task (`done`, `tested`, `implemented`, `deferred`, `cancelled`) is **never** an
+    active blocker, regardless of a stale flag.
+  - Rewired `health.ts`, `command-center/service.ts`, and `executive-summary-panel.tsx` to use
+    `hasActiveBlocker` → all blocker counts now agree with the Living Graph header.
+  - New `src/lib/project-rollups/project-rollup-engine.ts` — deterministic project rollup
+    (`activeBlockers`, `waitingOnDependency`, `overdue`, `unassignedActive`, `missingEstimateActive`,
+    `priorityActive`, `milestoneHealth`, `counts`). Every metric carries an explicit **scope** and
+    dev-only `evidenceIds`. No-owner / missing-estimate are **capacity warnings, not blockers**.
+  - Capacity service: `atRiskMilestoneCount` now counts `high + medium` (matches the list);
+    `high`-only feeds the health index as `severeCapacityGapMilestoneCount`. Card sub-label states
+    the scope ("high + medium risk").
+- **Note on the milestone false-"Blocked" badge:** not reproducible in current data —
+  `getComputedMilestoneStatus` derives status from `status === "blocked"` task counts (0 for
+  "Launch and Performance Tracking"), and the `status_override_*` columns **do not exist in prod**
+  (the override branch is dead). The earlier observation was a stale deploy / transient blocked
+  task; the deterministic logic is correct.
+- **Status: FIXED (2026-06-27).** Tests `task-activity.test.ts` + `project-rollup-engine.test.ts`
+  (incl. the Done+stale-flag fixture) green; typecheck clean.
+- **Protection rule (binding):** any surface reporting blockers/waiting/capacity/priority/milestone
+  rollups **must** use `task-activity.ts` rules (or the rollup engine). Completed/terminal tasks
+  must never count as active blockers, waiting, or capacity risks. Every metric must declare its
+  scope; only same-scope numbers are comparable. Related:
+  [REG-006](#reg-006--confusing-blocked-vs-waiting-on-dependency),
+  [REG-008](#reg-008--living-graph-false-blocked).
+- **Owner:** Product. **Verify:** open "Mobile App Design" → Living Graph header blockers ==
+  Executive Insights blockers == PMO Summary blockers; Resource Capacity card == list.
+
 ---
 
 ### Resolved
