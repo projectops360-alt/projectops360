@@ -23,7 +23,7 @@ export interface AppShellProps {
 
 export function AppShell({ children, user, org }: AppShellProps) {
   return (
-    <AppFrame header={<Header user={user} org={org} />}>
+    <AppFrame header={<Header user={user} org={org} />} role={org?.role}>
       {children}
     </AppFrame>
   );

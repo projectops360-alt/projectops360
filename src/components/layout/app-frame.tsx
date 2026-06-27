@@ -13,9 +13,12 @@ const STORAGE_KEY = "po360.sidebarCollapsed";
 export function AppFrame({
   header,
   children,
+  role,
 }: {
   header: React.ReactNode;
   children: React.ReactNode;
+  /** Org role of the current user — drives role-gated sidebar items. */
+  role?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -42,7 +45,7 @@ export function AppFrame({
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} />
       <div className={cn("transition-[padding] duration-200", collapsed ? "pl-16" : "pl-64")}>
         {header}
         <main className="p-6">{children}</main>
