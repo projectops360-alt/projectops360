@@ -5,6 +5,8 @@
   },
   "nav": {
     "commandCenter": "Command Center",
+    "pmCenter": "PM Center",
+    "myWork": "My Work",
     "projects": "Projects",
     "executionMap": "Execution Map",
     "workboard": "Workboard",
@@ -29,6 +31,7 @@
     "projectMemory": "Project Memory",
     "settings": "Settings",
     "laborCapacity": "Labor Capacity",
+    "resourceCapacity": "Resource Capacity",
     "drawingIntelligence": "BIM",
     "rhythm": "Rhythm",
     "rythm": "Rythm",
@@ -573,7 +576,10 @@
     "userMenu": {
       "profile": "Profile",
       "settings": "Settings",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "organizations": "Organizations",
+      "themeDark": "Dark mode",
+      "themeLight": "Light mode"
     },
     "callback": {
       "title": "Confirming your email…",
@@ -1448,6 +1454,8 @@
   "livingGraph": {
     "title": "Living Graph",
     "subtitle": "Process intelligence map — explore what happened, what depends on what, and what happens if something slips.",
+    "recalculate": "Recalculate",
+    "recalculateHint": "Rebuild the graph from current data (removes deleted milestones/tasks).",
     "backToExecutionMap": "Execution Map",
     "summary": "{nodes} nodes · {edges} edges · {blocked} blocked",
     "noSelection": "Select a node or edge to inspect it.",
@@ -1477,6 +1485,7 @@
       "sopCandidate": "SOP Candidate View",
       "blocker": "Blocker View",
       "laborCapacity": "Labor Capacity View",
+      "workforceCapacity": "Workforce Intelligence",
       "readiness": "Workface Readiness",
       "variance": "Variance View",
       "timeline": "Timeline Playback",

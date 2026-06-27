@@ -18,6 +18,7 @@ import {
   Layers,
   Users,
   Mic,
+  Gauge,
 } from "lucide-react";
 
 import type { ProjectModule } from "@/types/database";
@@ -87,6 +88,12 @@ const TAB_ITEMS: TabItem[] = [
     icon: HardHat,
     matchPattern: "/projects/[projectId]/labor-capacity",
     module: "labor_capacity",
+  },
+  {
+    titleKey: "resourceCapacity",
+    href: "/projects/[projectId]/resource-capacity",
+    icon: Gauge,
+    matchPattern: "/projects/[projectId]/resource-capacity",
   },
   {
     titleKey: "drawingIntelligence",

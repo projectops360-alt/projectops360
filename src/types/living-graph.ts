@@ -103,7 +103,8 @@ export type LivingGraphOverlay =
   | "simulation"
   | "laborCapacity"
   | "readiness"
-  | "variance";
+  | "variance"
+  | "workforceCapacity";
 
 export type LivingGraphLayoutMode = "hierarchical" | "timeline" | "force";
 
@@ -197,6 +198,21 @@ export interface VarianceNodeData {
   causeConfidence: number;
   /** Trend direction compared to trade peers. */
   trendDirection: "improving" | "worsening" | "stable" | "insufficient_data";
+}
+
+/** Generic Resource Capacity (Workforce Intelligence Layer) metadata attached
+ *  to resource nodes and to task/milestone nodes affected by capacity. */
+export interface WorkforceNodeData {
+  /** available | healthy | near_capacity | overallocated | critical | needs_review */
+  status: string;
+  utilizationPercent: number | null;
+  resourceName: string | null;
+  role: string | null;
+  effectiveHours: number | null;
+  assignedHours: number | null;
+  overallocatedHours: number | null;
+  /** "resource" for resource nodes, "task" / "milestone" for enriched nodes. */
+  kind: "resource" | "task" | "milestone";
 }
 
 /** Project-level summary shown in the toolbar / header. */
