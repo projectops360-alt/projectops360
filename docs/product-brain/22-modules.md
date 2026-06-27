@@ -29,7 +29,7 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 |
 | Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) | ~70% | 005 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
-| Project Memory & Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 |
+| Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) |
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |

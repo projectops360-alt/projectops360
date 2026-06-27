@@ -138,6 +138,35 @@ Impact · Severity · Investigation status · Owner · Next action.
   dependencies or from a flag on a completed item. Header counts must come from the same resolver
   as the node indicators. Related: [REG-006](#reg-006--confusing-blocked-vs-waiting-on-dependency).
 
+## REG-009 — Project Memory voice notes → actions/decisions lost
+- **Description:** Project Memory previously let users capture a note by **voice (dictation)**,
+  have AI structure it, review the extracted actions/decisions/risks, and save approved items into
+  Project Memory. This is **ProjectOps Scribe**. The capability was missing.
+- **Observed:** No "ProjectOps Scribe" / voice entry point in Project Memory in production.
+- **Expected:** Voice note → transcript → AI extraction (actions/decisions/follow-ups/risks) →
+  human review → save into Project Memory, with the original transcript + source excerpts preserved.
+- **Impact:** High — removes a core capture mechanism. **Severity:** High.
+- **Root cause (audited 2026-06-27): code lost in the feat/rythm divergence (same family as
+  REG-004/005/007).** ProjectOps Scribe (`src/lib/scribe/ai.ts`,
+  `components/memory/scribe-modal.tsx`, `components/memory/use-dictation.ts`,
+  `memory/scribe-actions.ts`, and the Scribe wiring in `memory-client.tsx`) existed **only on
+  `feat/rythm`** — **zero scribe files on `master`** — even though the migrations
+  (`20260805_project_scribe`, `20260810_scribe_traceability`) were applied to prod
+  (`project_scribe_items` = 14 rows). The voice "transcription" is **browser Web Speech API
+  dictation** (no AssemblyAI / no env var), distinct from the Rythm meeting-audio flow.
+- **Status: RESTORED (2026-06-27).** Brought the Scribe files onto `master`; replaced the one RBAC
+  guard (`requireProjectContributor`) with master's `getOrgContext` + project-ownership check; added
+  `project_backlog_items` to `EmbeddableEntityType` so Scribe-created work items are searchable.
+  Prod schema already had the tables/columns. Build green; deployed + promoted.
+- **Anti-hallucination (preserved):** the AI extracts only what the capture supports, requires a
+  verbatim `source_excerpt` per item, uses `null` for missing owner/date, marks uncertain items
+  `needs_review`, and **never creates entities without human approval**.
+- **Protection rule (binding):** future Project Memory / ProjectOps Scribe / AI-extraction /
+  transcription / UI changes **must not remove** the voice-note → actions/decisions → review →
+  Project Memory workflow. Project Memory remains the permanent evidence store.
+- **Owner:** Product. **Verify:** Project Memory → "ProjectOps Scribe" → Dictate → Analyze →
+  review → Save.
+
 ---
 
 ### Resolved
