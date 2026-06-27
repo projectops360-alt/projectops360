@@ -13,10 +13,10 @@ for any major architectural decision and for any change that would contradict an
 | [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) | Isabella is the primary AI Workforce interface | Accepted | P1 |
 | [ADR-006](adrs/ADR-006-independent-status-dimensions.md) | Execution/Dependency/Health/Risk are independent dimensions | Accepted | P4 |
 | [ADR-007](adrs/ADR-007-product-brain-is-source-of-truth.md) | Product Brain is the source of truth for product evolution | Accepted | All |
+| [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md) | Reconcile Resource Capacity (generic) & Labor Capacity (construction) engines | Accepted | P3 |
 
 ## Proposed / future ADRs (not yet written)
 - ADR-008 — RBAC model on `master` (reconcile `feat/rythm` RBAC vs permissive org-context).
-- ADR-009 — Reconcile `lib/capacity` (generic) vs `lib/labor/capacity` (construction).
 - ADR-010 — `rhythm` vs `rythm` consolidation (meetings).
 - ADR-011 — Issue Management as a distinct entity from Risk Management.
 
