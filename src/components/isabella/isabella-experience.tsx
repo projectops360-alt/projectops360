@@ -22,7 +22,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  Send, X, ThumbsUp, ThumbsDown, BookOpen, ChevronDown, ChevronRight,
+  Send, X, ThumbsUp, ThumbsDown, BookOpen, ChevronDown, ChevronUp, ChevronRight,
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert, Info,
   Volume2, VolumeX, Square, Palette, Play, PanelLeft, PanelRight, Minus,
   Maximize2, Minimize2, GripHorizontal, Compass, Presentation, MessageSquare,
@@ -108,6 +108,10 @@ export function IsabellaExperience({
     } catch { return "app"; }
   });
   const [pending, startTransition] = useTransition();
+  // UX-004 — Compact Isabella Response Layout: the large hologram is the idle
+  // presentation; once a conversation starts the answer wins. The user may
+  // manually expand the avatar back without it hiding the current response.
+  const [avatarExpanded, setAvatarExpanded] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -223,6 +227,10 @@ export function IsabellaExperience({
   };
   const iconBtn = "rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground";
   const presenceSize = wf.frame.mode === "executive" ? 200 : 150;
+  // State A (idle): large hologram. State B (active): compact header so the
+  // answer is immediately visible. State C: user expanded the avatar manually.
+  const hasConversation = turns.length > 0;
+  const compactPresence = hasConversation && !avatarExpanded;
 
   // ── Minimized pill ─────────────────────────────────────────────────────────
   if (wf.frame.minimized) {
@@ -321,34 +329,69 @@ export function IsabellaExperience({
           })}
         </div>
 
-        {/* ── Presence ──────────────────────────────────────────────────── */}
-        <div className={`${styles.presence} border-b border-border`}>
-          <div className={`${styles.materialize} relative`} style={{ width: presenceSize, height: presenceSize }}>
-            {/* Holographic base (also the graceful fallback if the 3D figure
-                can't load). The real-time 3D character renders on top. */}
-            <div className="absolute inset-0">
-              <HologramPlaceholder state={presence} size={presenceSize} accent={expert.presentation.accent} label={expert.displayName} />
+        {/* ── Presence (UX-004) ─────────────────────────────────────────── */}
+        {compactPresence ? (
+          // State B — active conversation: compact one-line header so the answer
+          // is immediately visible. Small avatar · name · mode · status.
+          <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <HologramPlaceholder state={presence} size={30} accent={expert.presentation.accent} />
+              <span className="truncate text-xs font-semibold text-foreground">{expert.displayName}</span>
+              <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">· {modeLabel[wf.frame.mode]}</span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-brand-600 dark:text-brand-400">
+                <span className={styles.statusDot} />
+                {statusLabel[presence]}
+              </span>
             </div>
-            {HAS_3D_AVATAR && (
+            <button
+              onClick={() => setAvatarExpanded(true)}
+              className={`${iconBtn} shrink-0`}
+              title={tt("Show Isabella", "Mostrar a Isabella")}
+              aria-label={tt("Expand Isabella avatar", "Expandir el avatar de Isabella")}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          // State A (idle) / State C (manually expanded): the full hologram.
+          <div className={`${styles.presence} relative border-b border-border`}>
+            {hasConversation && (
+              <button
+                onClick={() => setAvatarExpanded(false)}
+                className={`absolute right-1.5 top-1.5 z-10 ${iconBtn}`}
+                title={tt("Collapse", "Contraer")}
+                aria-label={tt("Collapse Isabella avatar", "Contraer el avatar de Isabella")}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+            )}
+            <div className={`${styles.materialize} relative`} style={{ width: presenceSize, height: presenceSize }}>
+              {/* Holographic base (also the graceful fallback if the 3D figure
+                  can't load). The real-time 3D character renders on top. */}
               <div className="absolute inset-0">
-                <IsabellaPresence renderer="three" state={presence} size={presenceSize} accent={expert.presentation.accent} name={expert.displayName} />
+                <HologramPlaceholder state={presence} size={presenceSize} accent={expert.presentation.accent} label={expert.displayName} />
               </div>
-            )}
-          </div>
-          <div className={styles.nameplate}>
-            <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
-            <p className="text-[11px] text-muted-foreground">{expertTitle}</p>
-            <p className={`${styles.status} mt-1 text-brand-600 dark:text-brand-400`}>
-              <span className={styles.statusDot} />
-              {statusLabel[presence]}
-            </p>
-            {voice.enabled && voice.supported && (voiceUnavailable || !voice.hasFemaleVoice(locale)) && (
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                {tt("Female voice unavailable on this device.", "Voz femenina no disponible en este dispositivo.")}
+              {HAS_3D_AVATAR && (
+                <div className="absolute inset-0">
+                  <IsabellaPresence renderer="three" state={presence} size={presenceSize} accent={expert.presentation.accent} name={expert.displayName} />
+                </div>
+              )}
+            </div>
+            <div className={styles.nameplate}>
+              <p className="text-sm font-semibold text-foreground">{expert.displayName}</p>
+              <p className="text-[11px] text-muted-foreground">{expertTitle}</p>
+              <p className={`${styles.status} mt-1 text-brand-600 dark:text-brand-400`}>
+                <span className={styles.statusDot} />
+                {statusLabel[presence]}
               </p>
-            )}
+              {voice.enabled && voice.supported && (voiceUnavailable || !voice.hasFemaleVoice(locale)) && (
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {tt("Female voice unavailable on this device.", "Voz femenina no disponible en este dispositivo.")}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Conversation ──────────────────────────────────────────────── */}
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">

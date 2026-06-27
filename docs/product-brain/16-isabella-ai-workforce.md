@@ -27,6 +27,14 @@ Isabella does **not yet explain live execution state.** The intended behavior:
 This requires the Execution Status Engine (doc 18) to feed Isabella the deterministic
 explanation for the focused entity/node.
 
+## UX / Layout — Content wins ([UX-004](25-ux-design-debt.md))
+The Isabella panel (`components/isabella/isabella-experience.tsx`) has three layout states:
+**A — Idle** (full hologram + name/role/status + suggested prompts), **B — Active** (compact
+one-line header once a question is asked, so the answer is immediately visible and the conversation
+area gets priority height), **C — Expanded** (user can re-show the hologram without hiding the
+response). **Binding rule:** decorative avatar/header elements must never obscure or compete with
+generated answer content. Resolved 2026-06-27.
+
 ## Next actions
 1. Pipe the Execution Status Engine's explanation into Isabella's context for the focused node.
 2. Living Graph node → "ask Isabella" wired to that explanation.
