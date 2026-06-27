@@ -57,6 +57,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [23-governance-rules.md](23-governance-rules.md) | **Governance Rules** — incl. *Product Intelligence First* |
 | [module-documentation-template.md](module-documentation-template.md) | **Module doc template** — reusable per-module structure |
 | [25-ux-design-debt.md](25-ux-design-debt.md) | **UX / Design Debt** — incl. UX-004 (Isabella compact layout) |
+| [26-sprint-01-operational-clarity.md](26-sprint-01-operational-clarity.md) | **Sprint #1** — Workboard ownership + Critical Path source of truth |
 
 ### Sub-repositories
 

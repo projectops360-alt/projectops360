@@ -82,6 +82,22 @@ export default async function WorkboardPage({
   // Dependencies table may not exist yet (before migration is applied) — treat errors as empty
   const dependencies = (depsResult.data as TaskDependency[] | null) ?? [];
 
+  // Sprint #1 — Workboard ownership visibility: resolve assignee names so each
+  // card can show who owns the work (assigned_to = person; assigned_resource_id
+  // = crew/team/vendor). Real data only — never invented.
+  const [profilesRes, resourcesRes] = await Promise.all([
+    supabase.from("profiles").select("id, display_name").eq("organization_id", org.organizationId),
+    supabase.from("resources").select("id, name").eq("project_id", projectId)
+      .eq("organization_id", org.organizationId).is("deleted_at", null),
+  ]);
+  const assigneeNames: Record<string, string> = {};
+  for (const p of (profilesRes.data ?? []) as { id: string; display_name: string | null }[]) {
+    if (p.display_name) assigneeNames[p.id] = p.display_name;
+  }
+  for (const r of (resourcesRes.data ?? []) as { id: string; name: string | null }[]) {
+    if (r.name) assigneeNames[r.id] = r.name;
+  }
+
   // Sort tasks respecting dependency order (predecessors before successors),
   // grouped by milestone in milestone order_index order
   const { sorted: sortedTasks } = topologicalSortTasks(
@@ -97,11 +113,14 @@ export default async function WorkboardPage({
       milestones={(milestones ?? []) as Milestone[]}
       tasks={sortedTasks}
       dependencies={dependencies}
+      assigneeNames={assigneeNames}
       locale={locale as Locale}
       translations={{
         title: t("title"),
         description: t("description"),
         empty: t("empty"),
+        owner: t("owner"),
+        unassigned: t("unassigned"),
         dragHint: t("dragHint"),
         columns: {
           not_started: columnOverrides.not_started ?? t("columns.not_started"),

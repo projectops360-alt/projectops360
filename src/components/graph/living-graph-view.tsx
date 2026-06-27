@@ -249,6 +249,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // ── State ──
   const [overlay, setOverlay] = useState<LivingGraphOverlay>("normal");
+  // Deep-link support: the Execution Map "Open Critical Path in Living Graph"
+  // CTA links with ?overlay=criticalPath. Applied post-mount to avoid a
+  // hydration mismatch (Sprint #1 — Critical Path source-of-truth consolidation).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const o = new URLSearchParams(window.location.search).get("overlay");
+    if (o === "criticalPath") setOverlay("criticalPath");
+  }, []);
   const [layoutMode, setLayoutMode] = useState<LivingGraphLayoutMode>("hierarchical");
   // High-level milestone flowchart by default; drill into activities/events
   const [viewLevel, setViewLevel] = useState<LivingGraphViewLevel>("milestones");
