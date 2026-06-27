@@ -160,6 +160,13 @@ is not progress. A purely cosmetic change requires an ADR justifying it
 5. **Command Center evidence drill-down** (gap #9) + **navigation hub** deep links (gap #1).
 6. **Richer impact analysis** (gap #7).
 
+## 13b. Governing product decisions
+Binding decisions recorded in the [Product Decision Log](30-product-decision-log.md):
+**PD-001** Critical Path lives in the Living Graph · **PD-003** Variance requires a baseline ·
+**PD-004** Timeline Playback requires real history · **PD-005** What-if is sandbox-first
+(simulation only) · **PD-006** Risk/SOP disconnected nodes must be explained · **PD-007** Focus
+Mode (the graph is the protagonist).
+
 ## 14. Related ADRs
 [ADR-002](adrs/ADR-002-living-graph-primary-surface.md) (primary surface) ·
 [ADR-006](adrs/ADR-006-independent-status-dimensions.md) (independent status dims) ·

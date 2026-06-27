@@ -7,6 +7,11 @@ permissions apply, what it connects to, and what it must NOT do.*
 
 > Where a module has not been fully reviewed yet, it is marked **"Documentation pending
 > review."** Nothing here is faked — gaps are shown honestly.
+>
+> Binding product decisions affecting these modules are in the
+> [Product Decision Log](30-product-decision-log.md) (PD-001 Critical Path · PD-002 Workboard
+> ownership · PD-003 Variance baseline · PD-004 Timeline history · PD-005 What-if sandbox · PD-006
+> Risk/SOP disconnected nodes · PD-007 Focus Mode).
 
 Per-module template: **Purpose · Status · Users · Data · AI · Permissions · Connects to ·
 Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
