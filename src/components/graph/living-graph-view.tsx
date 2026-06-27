@@ -31,9 +31,10 @@ import {
   type NodeChange,
   type OnNodeDrag,
 } from "@xyflow/react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
-import { Share2, MonitorSmartphone, Route, Sparkles, X } from "lucide-react";
+import { ExecutiveSummaryPanel } from "./executive-summary-panel";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -84,6 +85,12 @@ import {
   enrichNodesWithReadiness,
   enrichNodesWithVariance,
 } from "@/lib/graph/labor-graph-mapping";
+import {
+  enrichNodesWithWorkforce,
+  mapWorkforceResourceNodes,
+  mapWorkforceAssignmentEdges,
+} from "@/lib/graph/workforce-graph-mapping";
+import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
 import { LivingGraphEdge } from "./living-graph-edge";
@@ -137,11 +144,13 @@ export interface LivingGraphViewProps {
   varianceResult?: import("@/lib/labor/productivity-variance").ProductivityVarianceResult;
   /** Variance cause classification results (optional — enables variance overlay detail). */
   varianceCauses?: import("@/lib/labor/variance-cause-classification").VarianceCauseResult[];
+  /** Generic resource capacity result (optional — enables the workforceCapacity overlay). */
+  resourceCapacity?: ResourceCapacityResult;
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -208,6 +217,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             laborVariance={laborVariance}
             varianceResult={varianceResult}
             varianceCauses={varianceCauses}
+            resourceCapacity={resourceCapacity}
           />
         </ReactFlowProvider>
       </div>
@@ -217,11 +227,25 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
+  const locale = useLocale() as Locale;
   const router = useRouter();
   const { fitView, setCenter, getIntersectingNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  // Floating "Insights" panel (executive KPIs + summary) over the canvas.
+  const [insightsOpen, setInsightsOpen] = useState(false);
+
+  async function handleRecalculate() {
+    setRecalculating(true);
+    const { refreshLivingGraphAction } = await import(
+      "@/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/actions"
+    );
+    await refreshLivingGraphAction({ projectId });
+    setRecalculating(false);
+    router.refresh();
+  }
 
   // ── State ──
   const [overlay, setOverlay] = useState<LivingGraphOverlay>("normal");
@@ -305,6 +329,25 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     };
   }, [data, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities]);
 
+  // ── Task → capacity-resource map (for the Workforce Intelligence Layer) ──
+  const taskResourceKey = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!resourceCapacity) return map;
+    const byTm = new Map<string, string>(); const byUser = new Map<string, string>();
+    for (const r of resourceCapacity.resources) {
+      if (r.teamMemberId) byTm.set(r.teamMemberId, r.resourceKey);
+      if (r.userId) byUser.set(r.userId, r.resourceKey);
+    }
+    for (const t of tasks) {
+      const tmId = (t as { project_team_member_id?: string | null }).project_team_member_id;
+      const k =
+        (tmId ? byTm.get(tmId) : undefined)
+        ?? (t.assigned_to ? byUser.get(t.assigned_to) : undefined);
+      if (k) map.set(t.id, k);
+    }
+    return map;
+  }, [resourceCapacity, tasks]);
+
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
@@ -318,6 +361,32 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
   }, [viewLevel, laborEnrichedData, simplifyEdges]);
+
+  // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
+  //    with capacity status so at-risk work lights up. No resource nodes are
+  //    injected into the flow — the per-person roster lives in a side panel,
+  //    which works on the readable Milestones view without any drill-down.
+  const workforceActive = overlay === "workforceCapacity" && !!resourceCapacity?.hasResources;
+  const overlayNodes = useMemo(() => {
+    if (!workforceActive || !resourceCapacity) return displayGraph.nodes;
+    return enrichNodesWithWorkforce(displayGraph.nodes, resourceCapacity, taskResourceKey);
+  }, [workforceActive, resourceCapacity, displayGraph.nodes, taskResourceKey]);
+
+  // Curated Workforce view (Activities/Events): show ONLY the people + their
+  // assigned tasks, connected by status-colored edges. Idle people appear as
+  // standalone "100% available" cards. This declutters the flat node dump.
+  const workforceGraph = useMemo(() => {
+    if (!workforceActive || !resourceCapacity || viewLevel === "milestones") return null;
+    const resourceNodes = mapWorkforceResourceNodes(resourceCapacity, locale);
+    const assignedTasks = overlayNodes.filter(
+      (n) => n.sourceEntityType === "roadmap_tasks" && taskResourceKey.has(n.sourceEntityId),
+    );
+    const edges = mapWorkforceAssignmentEdges(resourceNodes, assignedTasks, taskResourceKey, resourceCapacity, projectId);
+    return { nodes: [...assignedTasks, ...resourceNodes], edges };
+  }, [workforceActive, resourceCapacity, viewLevel, overlayNodes, taskResourceKey, projectId, locale]);
+
+  const baseNodes = workforceGraph ? workforceGraph.nodes : overlayNodes;
+  const baseEdges = workforceGraph ? workforceGraph.edges : displayGraph.edges;
 
   const analysis = useMemo(
     () => analyzeGraph(displayGraph.nodes, displayGraph.edges),
@@ -336,7 +405,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const filtered = useMemo(() => {
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTime = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null;
-    const nodes = displayGraph.nodes.filter((n) => {
+    const nodes = baseNodes.filter((n) => {
       if (!nodeTypeFilter.has(n.nodeType)) return false;
       if (statusFilter && n.status !== statusFilter) return false;
       if (riskFilter && n.riskLevel !== riskFilter) return false;
@@ -348,7 +417,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       if (fromTime != null && time < fromTime) return false;
       if (toTime != null && time >= toTime) return false;
       if (focusIds && !focusIds.has(n.id)) return false;
+      // The curated Workforce view manages its own node set — skip milestone focus.
       if (
+        !workforceGraph &&
         milestoneFocus &&
         viewLevel !== "milestones" &&
         (!n.milestoneId || !milestoneFocus.has(n.milestoneId))
@@ -358,15 +429,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       return true;
     });
     const idSet = new Set(nodes.map((n) => n.id));
-    const edges = displayGraph.edges.filter(
+    const edges = baseEdges.filter(
       (e) =>
-        edgeTypeFilter.has(e.edgeType) &&
+        (workforceGraph || edgeTypeFilter.has(e.edgeType)) &&
         idSet.has(e.sourceNodeId) &&
         idSet.has(e.targetNodeId),
     );
     return { nodes, edges };
   }, [
     displayGraph,
+    baseNodes,
+    baseEdges,
+    workforceGraph,
+    overlayNodes,
     analysis,
     nodeTypeFilter,
     edgeTypeFilter,
@@ -967,13 +1042,44 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const showPanel = selectedNode != null || selectedEdge != null;
 
+  // Progressive disclosure: never dump the full flat activity/event graph. When
+  // there are many nodes and no phase is focused, guide the user to drill into
+  // one milestone (one layer at a time → narrowing to detail). The curated
+  // Workforce view manages its own density, so it's exempt.
+  const tooManyNodes =
+    viewLevel !== "milestones" &&
+    !milestoneFocus &&
+    !workforceGraph &&
+    filtered.nodes.length > 24;
+
+  // Executive Insights are scoped to what's currently visible (level + phase
+  // focus + filters + overlay). Drill into a phase → the KPIs reflect that phase.
+  const scopedInsights = useMemo(() => {
+    const msIds = new Set<string>();
+    const taskIds = new Set<string>();
+    for (const n of filtered.nodes) {
+      if (n.milestoneId) msIds.add(n.milestoneId);
+      if (n.sourceEntityType === "roadmap_tasks" && !n.id.startsWith("workforce:")) {
+        taskIds.add(n.sourceEntityId);
+      }
+    }
+    const isMs = viewLevel === "milestones";
+    let sMilestones = msIds.size ? milestones.filter((m) => msIds.has(m.id)) : milestones;
+    let sTasks = isMs
+      ? (msIds.size ? tasks.filter((t) => t.milestone_id != null && msIds.has(t.milestone_id)) : tasks)
+      : (taskIds.size ? tasks.filter((t) => taskIds.has(t.id)) : tasks);
+    if (sTasks.length === 0 && sMilestones.length === 0) { sMilestones = milestones; sTasks = tasks; }
+    const scoped = sTasks.length < tasks.length || sMilestones.length < milestones.length;
+    return { milestones: sMilestones, tasks: sTasks, scoped };
+  }, [filtered.nodes, viewLevel, milestones, tasks]);
+
   return (
     <div
       ref={containerRef}
-      className="flex h-[calc(100vh-220px)] min-h-[640px] flex-col gap-2 rounded-lg bg-background"
+      className="flex h-[calc(100vh-120px)] min-h-[680px] flex-col gap-2 rounded-lg bg-background"
     >
-      {/* Executive insight header */}
-      <LivingGraphMetricsHeader health={health} />
+      {/* Executive KPIs + summary now live in a floating "Insights" panel ON the
+          canvas (see below) so the Living Graph owns the full viewport height. */}
 
       <LivingGraphToolbar
         overlay={overlay}
@@ -1048,6 +1154,39 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         summary={analysis.summary}
         largeGraphWarning={filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null}
       />
+
+      {/* Progressive disclosure: too many nodes → drill into a phase (layers) */}
+      {tooManyNodes && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <span>
+            {locale === "es"
+              ? `Demasiadas tareas (${filtered.nodes.length}) para leerlas todas. Entra a una fase:`
+              : `Too many tasks (${filtered.nodes.length}) to read at once. Drill into a phase:`}
+          </span>
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                setMilestoneFocus(new Set([e.target.value]));
+                setManualPositions(new Map());
+              }
+            }}
+            className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+          >
+            <option value="">{locale === "es" ? "Elegir fase…" : "Choose a phase…"}</option>
+            {milestones.map((m) => (
+              <option key={m.id} value={m.id}>{m.title}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setViewLevel("milestones")}
+            className="rounded-md border border-amber-500/40 px-2 py-1 font-medium hover:bg-amber-500/10"
+          >
+            {locale === "es" ? "Volver a Milestones" : "Back to Milestones"}
+          </button>
+        </div>
+      )}
 
       {/* Status hints */}
       {isMilestoneLevel && milestonePicks.length === 0 && (
@@ -1142,6 +1281,115 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         }}
       >
         <LivingGraphLegend />
+
+        {/* Floating Insights (executive KPIs + summary) — hidden while a node
+            detail panel occupies the right side. Graph keeps full height. */}
+        {!showPanel && !insightsOpen && (
+          <button
+            type="button"
+            onClick={() => setInsightsOpen(true)}
+            className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-md backdrop-blur transition-colors hover:bg-muted"
+          >
+            <BarChart3 className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+            {locale === "es" ? "Indicadores" : "Insights"}
+            <span
+              className="rounded px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums"
+              style={{
+                color: health.healthScore >= 75 ? "#10b981" : health.healthScore >= 50 ? "#f59e0b" : "#ef4444",
+                background: "rgba(100,116,139,0.12)",
+              }}
+            >
+              {health.healthScore}
+            </span>
+          </button>
+        )}
+        {!showPanel && insightsOpen && (
+          <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <BarChart3 className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+                {locale === "es" ? "Indicadores ejecutivos" : "Executive Insights"}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleRecalculate}
+                  disabled={recalculating}
+                  title={t("recalculateHint")}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                >
+                  {recalculating ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInsightsOpen(false)}
+                  aria-label={t("actions.close")}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+              {scopedInsights.scoped && (
+                <p className="flex items-center gap-1.5 rounded-md bg-brand-500/10 px-2 py-1 text-[10px] font-medium text-brand-700 dark:text-brand-300">
+                  <BarChart3 className="h-3 w-3" />
+                  {locale === "es"
+                    ? `Vista actual: ${scopedInsights.tasks.length} tareas · ${scopedInsights.milestones.length} fase(s)`
+                    : `Current view: ${scopedInsights.tasks.length} tasks · ${scopedInsights.milestones.length} phase(s)`}
+                </p>
+              )}
+              <LivingGraphMetricsHeader health={health} layout="grid" />
+              <ExecutiveSummaryPanel milestones={scopedInsights.milestones} tasks={scopedInsights.tasks} locale={locale} defaultOpen compact />
+            </div>
+          </div>
+        )}
+
+        {/* Workforce roster — per-person utilization, shown with the Workforce
+            overlay. Works on the readable Milestones view; at-risk cards light
+            up in the graph while this lists who is overloaded. */}
+        {workforceActive && resourceCapacity && (
+          <div className="absolute left-3 top-14 z-20 flex max-h-[calc(100%-4.5rem)] w-[256px] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
+            <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Users className="h-3.5 w-3.5 text-brand-500" aria-hidden />
+              {locale === "es" ? "Fuerza laboral" : "Workforce"}
+              <span className="ml-auto font-normal normal-case text-[11px]">
+                {resourceCapacity.resources.length} · {locale === "es" ? "4 sem" : "4 wks"}
+              </span>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-2.5">
+              {[...resourceCapacity.resources]
+                .sort((a, b) => (b.utilizationPercent ?? -1) - (a.utilizationPercent ?? -1))
+                .map((r) => {
+                  const u = r.utilizationPercent;
+                  const color =
+                    r.status === "critical" ? "#ef4444"
+                    : r.status === "overallocated" ? "#f97316"
+                    : r.status === "near_capacity" ? "#f59e0b"
+                    : r.status === "needs_review" ? "#94a3b8"
+                    : "#10b981";
+                  return (
+                    <div key={r.resourceKey}>
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="min-w-0 truncate font-medium text-foreground" title={r.role ?? undefined}>{r.name}</span>
+                        <span className="shrink-0 font-mono font-bold tabular-nums" style={{ color }}>
+                          {u == null ? "—" : `${Math.round(u)}%`}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, u ?? 0)}%`, background: color }} />
+                      </div>
+                      <div className="mt-0.5 flex justify-between text-[10px] text-muted-foreground">
+                        <span className="truncate">{r.role ?? "—"}</span>
+                        <span className="shrink-0">{Math.round(r.assignedHours)}/{Math.round(r.effectivePeriodHours)}h</span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
         {overlay === "simulation" && selectedNode && (
           <LivingGraphSimulationPanel
             selectedNode={selectedNode}

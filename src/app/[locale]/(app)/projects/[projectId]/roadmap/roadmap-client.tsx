@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
-import { ArrowLeft, Map, LayoutList, Columns3, ListTodo, Network, PlusCircle, Calendar } from "lucide-react";
+import { ArrowLeft, Map, LayoutList, Columns3, ListTodo, PlusCircle, Calendar } from "lucide-react";
 import type { Milestone, MilestoneStatus, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
 import type { NextStepRecommendation } from "@/lib/roadmap/recommendation";
@@ -11,7 +11,6 @@ import { RoadmapHero } from "@/components/roadmap/roadmap-hero";
 import { NextStepPanel } from "@/components/roadmap/next-step-panel";
 import { ExecutionDashboard } from "@/components/roadmap/execution-dashboard";
 import { VisualRoadmapTimeline } from "@/components/roadmap/visual-roadmap-timeline";
-import { FlowRoadmap, type FlowRoadmapTranslations } from "@/components/roadmap/flow-roadmap";
 import { GanttRoadmap } from "@/components/roadmap/gantt-roadmap";
 import { MilestoneBoard } from "@/components/roadmap/milestone-board";
 import { TaskListByMilestone } from "@/components/roadmap/task-list-by-milestone";
@@ -20,7 +19,7 @@ import { TaskFormDialog } from "@/components/roadmap/task-form-dialog";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type ViewMode = "timeline" | "board" | "tasks" | "flow" | "gantt";
+type ViewMode = "timeline" | "board" | "tasks" | "gantt";
 
 interface TaskCount {
   total: number;
@@ -391,40 +390,6 @@ export function RoadmapClient({
     noNext: locale === "es" ? "Sin siguiente hito" : "No next milestone",
   };
 
-  // Flow view translations
-  const es = locale === "es";
-  const flowTranslations: FlowRoadmapTranslations = {
-    statusLabels: t.statusLabels,
-    priorityLabels: t.priorityLabels,
-    liveProcessFlow: es ? "Flujo de proceso en vivo" : "Live process flow",
-    conformance: es ? "conformidad" : "conformance",
-    currentPhase: es ? "Fase actual" : "Current phase",
-    tasks: t.tasks,
-    noTasks: t.noTasks,
-    reworkNeeded: es ? "{count} tareas bloqueadas — requiere retrabajo" : "{count} blocked tasks — rework needed",
-    kpiMilestonesCompleted: es ? "Hitos completados" : "Milestones completed",
-    kpiOverallProgress: es ? "Progreso general" : "Overall progress",
-    kpiTasksCompleted: es ? "Tareas completadas" : "Tasks completed",
-    kpiInProgress: es ? "En progreso" : "In progress",
-    kpiBlockers: es ? "Bloqueos" : "Blockers",
-    kpiRemainingEffort: es ? "Esfuerzo restante" : "Remaining effort",
-    kpiOfTotal: es ? "de {total}" : "of {total}",
-    kpiNoBlockers: es ? "Sin bloqueos" : "No blockers",
-    kpiTracked: es ? "de {total} registradas" : "of {total} tracked",
-    milestoneDistribution: es ? "Distribución de hitos" : "Milestone distribution",
-    conformanceCheck: es ? "Conformidad" : "Conformance check",
-    taskByPriority: es ? "Tareas por prioridad" : "Tasks by priority",
-    blockersRecommendations: es ? "Bloqueos y recomendaciones" : "Blockers & recommendations",
-    noBlockers: es ? "Sin bloqueos. El flujo avanza sin problemas." : "No blockers. Flow is running smoothly.",
-    completed: es ? "Completados" : "Completed",
-    inProgress: es ? "En progreso" : "In progress",
-    planned: es ? "Planificados" : "Planned",
-    blocked: es ? "Bloqueados" : "Blocked",
-    unblockSuggestion: es ? "Prioriza desbloquear para restaurar el flujo" : "Prioritize unblocking to restore flow",
-    legend: es ? "Leyenda" : "Legend",
-    legendActiveFlow: es ? "Flujo activo" : "Active flow",
-    legendPendingPath: es ? "Ruta pendiente" : "Pending path",
-  };
 
   if (milestones.length === 0) {
     return (
@@ -598,18 +563,6 @@ export function RoadmapClient({
           </button>
           <button
             type="button"
-            onClick={() => setViewMode("flow")}
-            className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === "flow"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Network className="h-3.5 w-3.5" />
-            {locale === "es" ? "Flujo" : "Flow"}
-          </button>
-          <button
-            type="button"
             onClick={() => setViewMode("gantt")}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               viewMode === "gantt"
@@ -640,16 +593,6 @@ export function RoadmapClient({
             schedule: locale === "es" ? "Cronograma" : "Schedule",
             milestone: locale === "es" ? "Hito" : "Milestone",
           }}
-        />
-      ) : viewMode === "flow" ? (
-        <FlowRoadmap
-          milestones={milestones}
-          tasks={tasks}
-          progress={progress}
-          tasksByMilestone={tasksByMilestone}
-          taskCounts={taskCounts}
-          locale={locale}
-          translations={flowTranslations}
         />
       ) : viewMode === "timeline" ? (
         <VisualRoadmapTimeline

@@ -5,6 +5,8 @@
   },
   "nav": {
     "commandCenter": "Centro de Mando",
+    "pmCenter": "Centro del PM",
+    "myWork": "Mi Trabajo",
     "projects": "Proyectos",
     "executionMap": "Mapa de Ejecución",
     "workboard": "Tablero de Trabajo",
@@ -29,6 +31,7 @@
     "projectMemory": "Memoria del Proyecto",
     "settings": "Configuración",
     "laborCapacity": "Capacidad Laboral",
+    "resourceCapacity": "Capacidad de Recursos",
     "drawingIntelligence": "BIM",
     "rhythm": "Ritmo",
     "rythm": "Rythm",
@@ -573,7 +576,10 @@
     "userMenu": {
       "profile": "Perfil",
       "settings": "Configuración",
-      "signOut": "Cerrar sesión"
+      "signOut": "Cerrar sesión",
+      "organizations": "Organizaciones",
+      "themeDark": "Modo oscuro",
+      "themeLight": "Modo claro"
     },
     "callback": {
       "title": "Confirmando tu correo…",
@@ -1448,6 +1454,8 @@
   "livingGraph": {
     "title": "Grafo Vivo",
     "subtitle": "Mapa de inteligencia del proceso — explora qué pasó, qué depende de qué y qué sucede si algo se retrasa.",
+    "recalculate": "Recalcular",
+    "recalculateHint": "Reconstruye el grafo con los datos actuales (quita milestones/tareas borrados).",
     "backToExecutionMap": "Execution Map",
     "summary": "{nodes} nodos · {edges} aristas · {blocked} bloqueados",
     "noSelection": "Selecciona un nodo o una arista para inspeccionarla.",
@@ -1477,6 +1485,7 @@
       "sopCandidate": "Vista de candidatos a SOP",
       "blocker": "Vista de bloqueos",
       "laborCapacity": "Vista de capacidad laboral",
+      "workforceCapacity": "Inteligencia de Fuerza Laboral",
       "readiness": "Preparación de Frente de Obra",
       "variance": "Vista de Varianza",
       "timeline": "Reproducción temporal",

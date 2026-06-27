@@ -11,6 +11,8 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
 import { getOrgContext } from "@/lib/auth";
 import type {
   ProcessNode,
@@ -41,6 +43,8 @@ import { computeProductivityVariance } from "@/lib/labor/productivity-variance";
 import type { ProductivityVarianceResult } from "@/lib/labor/productivity-variance";
 import { classifyAllVarianceCauses } from "@/lib/labor/variance-cause-classification";
 import type { VarianceCauseResult } from "@/lib/labor/variance-cause-classification";
+import { computeResourceCapacity } from "@/lib/capacity/service";
+import type { ResourceCapacityResult } from "@/lib/capacity/service";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -203,6 +207,15 @@ export default async function LivingGraphPage({
 
   if (!project) {
     notFound();
+  }
+
+  // Auto-clean orphan graph nodes (milestones/tasks deleted earlier) before
+  // reading, so the graph never shows entities that no longer exist. Cheap and
+  // best-effort — the heavier full rebuild stays behind the "Recalculate" button.
+  try {
+    await removeOrphanGraphNodes(createAdminClient(), org.organizationId, projectId);
+  } catch (err) {
+    console.error("Living Graph auto-clean failed:", err);
   }
 
   // Graph data + project-scoped enrichment, all in one parallel wave.
@@ -422,6 +435,14 @@ export default async function LivingGraphPage({
     }
   }
 
+  // Generic Resource Capacity (Workforce Intelligence Layer) — non-fatal.
+  let resourceCapacity: ResourceCapacityResult | undefined;
+  try {
+    resourceCapacity = await computeResourceCapacity(org, projectId, { weeks: 4 });
+  } catch {
+    // No capacity data — the workforce overlay simply stays empty.
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
@@ -451,6 +472,7 @@ export default async function LivingGraphPage({
         laborVariance={laborVariance}
         varianceResult={varianceResult}
         varianceCauses={varianceCauses}
+        resourceCapacity={resourceCapacity}
       />
     </div>
   );
