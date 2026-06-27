@@ -22,13 +22,13 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Module | Doc status | Impl confidence | Related ADRs | Related CAPs | Next audit priority |
 |--------|-----------|-----------------|--------------|--------------|---------------------|
 | Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) |
-| Resource Capacity Intelligence | Partial ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003 | CAP-009 | 1 |
-| Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) | ~20% | 006 | CAP-016 | 2 |
+| Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) |
+| Labor Capacity (construction view) | Partial (catalog) — *construction-specific; see [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md)* | ~70% | 009 | CAP-010 | 7 |
+| Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) | ~20% | 006 | CAP-016 | 1 |
 | Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 |
 | Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) | ~70% | 005 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
 | Project Memory & Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 |
-| Labor Capacity | Pending | ~70% | 009 (proposed) | CAP-010 | 7 |
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
