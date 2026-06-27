@@ -107,6 +107,37 @@ Impact · Severity · Investigation status · Owner · Next action.
 - **Owner:** Product. **Next action:** verify in-app (see doc 12 §"Recovered Labor/Workforce Load
   Layer"); optional discoverability improvement.
 
+## REG-008 — Living Graph shows a resolved/false Blocked state
+- **Description:** The Living Graph header showed a blocked count (e.g. "8 nodes · 7 edges · 1
+  blocked") for project *Mobile App Design* while the Status Report showed the project on track
+  with no active blocker. The graph conflated a stale blocker flag with an active impediment.
+- **Observed:** Header "1 blocked"; Status Report: 18/27 done, 9 in progress, on track, some tasks
+  waiting on predecessors. Disagreement.
+- **Expected:** Blocked only with an explicit **active** unresolved impediment. Waiting on a
+  predecessor shows as **Waiting on Dependency**, not Blocked.
+- **Impact:** High — false blockers destroy trust in the graph and executive health. **Severity:** High.
+- **Root cause (audited 2026-06-27):** the single "blocked" node was task **"Delivery Date
+  Compliance Report"** — `status = done`, `progress = 100`, but with a **stale `is_blocked = true`
+  flag** (old reason: "no one in the org can do this task") that was never cleared when the work
+  completed. 0 tasks had `status='blocked'`, 0 `blocker_event` nodes. The graph's `node.isBlocked`
+  derivation used `task.is_blocked` blindly (and milestone aggregation propagated it), while the
+  Status Report counted active blockers → mismatch.
+- **Status: RESOLVED (2026-06-27).** Deterministic fix (not a label patch):
+  - The Living Graph now consumes the **Execution Status Engine** via
+    `src/lib/graph/living-graph-status.ts` (`resolveNodeExecutionStatus`, `computeGraphStatuses`).
+  - **A completed/cancelled item is never Blocked** — fixed at the source in `normalizeNode`
+    (completed task → `isBlocked = false`) and in the engine (terminal lifecycle wins).
+  - **Blocked requires an explicit active impediment; Waiting on Dependency** (unfinished
+    predecessor) is computed and **counted separately**. Header now shows
+    "… · {blocked} blocked · {waiting} waiting"; the node renders 🔗 for waiting, 🚫 for blocked.
+  - Unit tests in `src/lib/graph/__tests__/living-graph-status.test.ts` cover the cases.
+  - Note: the stale DB flag is harmless now (code ignores it on completed tasks); the durable fix
+    is the code, so no prod data mutation was required.
+- **Protection rule (binding):** the Living Graph must derive node state from the Execution Status
+  Engine (or an equivalent deterministic resolver). It must **never** compute Blocked ad hoc from
+  dependencies or from a flag on a completed item. Header counts must come from the same resolver
+  as the node indicators. Related: [REG-006](#reg-006--confusing-blocked-vs-waiting-on-dependency).
+
 ---
 
 ### Resolved

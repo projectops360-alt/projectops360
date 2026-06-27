@@ -12,7 +12,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
-import { Lock, ShieldAlert, FileQuestion, CheckCircle2, HardHat } from "lucide-react";
+import { Lock, Link2, ShieldAlert, FileQuestion, CheckCircle2, HardHat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NODE_TYPE_STYLES,
@@ -138,11 +138,20 @@ function LivingGraphNodeComponent({
             <span className="shrink-0 font-mono tabular-nums">{durationLabel}</span>
           )}
           <span className="ml-auto flex shrink-0 items-center gap-1">
-            {node.isBlocked && (
+            {/* Execution status indicator (ADR-006): Blocked requires an explicit
+                impediment; waiting on a predecessor is a distinct, non-blocked state. */}
+            {metrics?.executionStatus === "blocked" && (
               <Lock
                 className="h-3 w-3"
                 style={{ color: GRAPH_SEMANTIC_COLORS.blocked }}
                 aria-label={t("detailPanel.blocked")}
+              />
+            )}
+            {metrics?.executionStatus === "waiting_on_dependency" && (
+              <Link2
+                className="h-3 w-3"
+                style={{ color: GRAPH_SEMANTIC_COLORS.rework }}
+                aria-label={t("detailPanel.waitingOnDependency")}
               />
             )}
             {node.riskLevel && node.riskLevel !== "low" && (

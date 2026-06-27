@@ -267,6 +267,7 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
             nodes: props.summary.nodeCount,
             edges: props.summary.edgeCount,
             blocked: props.summary.blockedCount,
+            waiting: props.summary.waitingCount,
           })}
         </span>
       </div>

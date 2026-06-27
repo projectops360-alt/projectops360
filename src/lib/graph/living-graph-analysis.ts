@@ -19,6 +19,8 @@ import type {
   LivingGraphInsight,
   GraphMetricSummary,
 } from "@/types/living-graph";
+import type { ExecutionStatus } from "@/lib/execution/status-engine";
+import { resolveNodeExecutionStatus } from "./living-graph-status";
 
 // ── Adjacency ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,8 @@ export interface NodeMetrics {
   laborRiskScore: number;
   isOrphan: boolean;
   inCycle: boolean;
+  /** Deterministic Execution Status (ADR-006) — single source for node state. */
+  executionStatus: ExecutionStatus;
 }
 
 export interface GraphAnalysis {
@@ -267,6 +271,7 @@ export function analyzeGraph(
 
   const metrics = new Map<string, NodeMetrics>();
   let blockedCount = 0;
+  let waitingCount = 0;
   let bottleneckCount = 0;
   let orphanCount = 0;
 
@@ -331,8 +336,15 @@ export function analyzeGraph(
 
     const isOrphan = degree === 0;
     if (isOrphan) orphanCount++;
-    if (node.isBlocked) blockedCount++;
     if (bottleneckScore >= 0.6) bottleneckCount++;
+
+    // Deterministic execution status (ADR-006). Blocked requires an explicit
+    // active impediment AND a non-terminal item — a completed task with a stale
+    // is_blocked flag is NOT blocked (REG-008). Waiting on a predecessor is
+    // counted separately, never as blocked.
+    const executionStatus = resolveNodeExecutionStatus(node, adjacency);
+    if (executionStatus === "blocked") blockedCount++;
+    else if (executionStatus === "waiting_on_dependency") waitingCount++;
 
     // Labor risk score from metadata.laborRisk.shortageRisk
     const laborRiskScore = (() => {
@@ -364,6 +376,7 @@ export function analyzeGraph(
       laborRiskScore,
       isOrphan,
       inCycle: cycleMembers.has(node.id),
+      executionStatus,
     });
   }
 
@@ -378,6 +391,7 @@ export function analyzeGraph(
     orphanCount,
     cycleCount: cycles.length,
     blockedCount,
+    waitingCount,
     bottleneckCount,
     criticalPathLength: criticalPathIds.length,
     maxDepth: criticalPathIds.length > 0 ? criticalPathIds.length - 1 : 0,

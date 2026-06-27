@@ -221,7 +221,10 @@ export interface GraphMetricSummary {
   edgeCount: number;
   orphanCount: number;
   cycleCount: number;
+  /** Items with an explicit active impediment (ADR-006). Never dependency-derived. */
   blockedCount: number;
+  /** Items waiting on unfinished predecessor(s) — NOT blocked (ADR-006). */
+  waitingCount: number;
   bottleneckCount: number;
   criticalPathLength: number;
   maxDepth: number;

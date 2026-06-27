@@ -140,8 +140,17 @@ limitation:** the people-nodes view shows in **Activities/Events** level, not th
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration
 is not progress. A purely cosmetic change requires an ADR justifying it
-([ADR-002](adrs/ADR-002-living-graph-primary-surface.md)). The graph must never infer "Blocked"
-from dependencies ([ADR-006](adrs/ADR-006-independent-status-dimensions.md)).
+([ADR-002](adrs/ADR-002-living-graph-primary-surface.md)).
+
+**Status truth ([REG-008](10-regression-log.md), partially resolves [REG-006](10-regression-log.md)):**
+- **Blocked is not Waiting.** The graph must never infer "Blocked" from dependencies, and never
+  from a stale flag on a **completed** item ([ADR-006](adrs/ADR-006-independent-status-dimensions.md)).
+- **Node states come from the Execution Status Engine** (`lib/graph/living-graph-status.ts` →
+  `lib/execution/status-engine.ts`), not ad-hoc logic.
+- **Header counts derive from the same resolver as the node indicators** — they must agree.
+- **Resolved blockers must not appear** in graph summary counts (terminal lifecycle wins).
+- **Waiting on Dependency uses a different indicator** (🔗) from Blocked (🚫); the header shows
+  blocked and waiting separately.
 
 ## 13. Future Roadmap (recommended sequence)
 1. **Wire the Execution Status Engine** → fixes gaps #2/#3/#4 (the highest-leverage move).
