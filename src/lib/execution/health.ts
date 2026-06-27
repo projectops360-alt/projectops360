@@ -21,6 +21,7 @@ import type {
 import type { CriticalPathResult } from "./critical-path";
 import { calculateTaskReadiness, type TaskReadinessContext } from "./readiness";
 import { MATERIAL_AVAILABLE_STATUSES, RFI_BLOCKING_STATUSES } from "./constants";
+import { hasActiveBlocker } from "./task-activity";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,10 @@ export function calculateProjectHealth(input: ProjectHealthInput): ProjectHealth
     const findings: HealthFinding[] = [];
     let score = 100;
 
-    const blocked = activeTasks.filter((t) => t.status === "blocked" || t.is_blocked);
+    // REG-010: a completed/terminal task is NEVER a blocker (a stale is_blocked
+    // flag on a Done task must not inflate Executive Insights). Single source of
+    // truth: hasActiveBlocker() — same rule the Living Graph header uses.
+    const blocked = activeTasks.filter((t) => hasActiveBlocker(t));
     if (blocked.length > 0) {
       score -= Math.min(40, blocked.length * 10);
       findings.push({

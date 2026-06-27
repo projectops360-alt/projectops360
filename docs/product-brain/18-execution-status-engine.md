@@ -56,3 +56,21 @@ executive reports, and notifications must all consume (ADR-006).
 
 > This engine is the backbone of Pillar P4 (Execution Truth). Do not duplicate status logic
 > elsewhere (DEBT-006).
+
+## Shared primitives (REG-010)
+Two modules enforce "one source of truth" for the counts every surface shows:
+
+- **`src/lib/execution/task-activity.ts`** — the canonical predicates
+  `isActiveStatus / isTerminalStatus / isCompletedStatus / hasActiveBlocker / isUnassigned`.
+  A terminal task (`done`, `tested`, `implemented`, `deferred`, `cancelled`) is **never** an
+  active blocker, even with a stale `is_blocked` flag. `health.ts`,
+  `command-center/service.ts`, and the Executive Summary panel all consume `hasActiveBlocker`.
+- **`src/lib/project-rollups/project-rollup-engine.ts`** — `computeProjectExecutionRollup` returns
+  scoped metrics (`activeBlockers`, `waitingOnDependency`, `overdue`, `unassignedActive`,
+  `missingEstimateActive`, `priorityActive`, `milestoneHealth`, `counts`). Every metric declares a
+  bilingual **scope** and carries dev-only `evidenceIds`. No-owner / missing-estimate are
+  **capacity warnings, not blockers**.
+
+> Binding (REG-010): never re-derive blocker/waiting/capacity/priority counts ad hoc. Use these
+> primitives so the Living Graph header, Executive Insights, PMO Summary, and Resource Capacity
+> agree for the same project. Compare two numbers only when their scopes match.

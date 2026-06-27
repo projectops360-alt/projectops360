@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, ListChecks } from "lucide-react";
 import type { Milestone, MilestoneStatusDisplay, RoadmapTask, Locale } from "@/types/database";
 import { getComputedMilestoneStatus } from "@/lib/roadmap/progress";
+import { hasActiveBlocker } from "@/lib/execution/task-activity";
 
 // Unifies the former "Flow" executive dashboard (KPIs + insights) inside the
 // Living Graph. Everything is derived from milestones + tasks — no extra data.
@@ -58,7 +59,9 @@ export function ExecutiveSummaryPanel({
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.status === "done").length;
   const inProgress = tasks.filter((t) => t.status === "in_progress").length;
-  const blocked = tasks.filter((t) => t.is_blocked || t.status === "blocked");
+  // REG-010: completed/terminal tasks with a stale is_blocked flag are not
+  // blockers. Same rule as the Living Graph header and Executive Insights.
+  const blocked = tasks.filter((t) => hasActiveBlocker(t));
   const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const remainingEffort = tasks
     .filter((t) => t.status !== "done")

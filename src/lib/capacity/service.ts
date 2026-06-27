@@ -272,7 +272,13 @@ export async function computeResourceCapacity(org: OrgContext, projectId: string
     else if (required > 0 && involved.size === 0) risk = "low";
     return { milestoneId: id, name: String(m.title ?? "—"), requiredHours: required, resourcesInvolved: involved.size, overloadedResources: overloaded, tasksWithoutOwner: noOwner, tasksWithoutEstimate: noEst, capacityRiskLevel: risk };
   });
-  const atRiskMilestoneCount = milestoneRows.filter((m) => m.capacityRiskLevel === "high").length;
+  // REG-010: the "At-risk Milestones" KPI card and the "Capacity risks" list
+  // must use the SAME scope. The list shows high+medium, so the card counts
+  // high+medium. "Severe" (high only) feeds the health index, not the card.
+  const atRiskMilestoneCount = milestoneRows.filter(
+    (m) => m.capacityRiskLevel === "high" || m.capacityRiskLevel === "medium",
+  ).length;
+  const severeCapacityGapMilestoneCount = milestoneRows.filter((m) => m.capacityRiskLevel === "high").length;
 
   // ── Totals ────────────────────────────────────────────────────────────────
   const totalNominal = round2(rows.reduce((s, r) => s + r.nominalPeriodHours, 0));
@@ -308,7 +314,7 @@ export async function computeResourceCapacity(org: OrgContext, projectId: string
     overallocatedResourceCount: overallocCount,
     unassignedCriticalTaskCount,
     missingEstimateCount,
-    severeCapacityGapMilestoneCount: atRiskMilestoneCount,
+    severeCapacityGapMilestoneCount,
     overheadExceedsThreshold: (overheadPct ?? 0) > 35,
     effectiveBelow70PctOfNominal: totalNominal > 0 && totalEffective < totalNominal * 0.7,
     missingCriticalRoleCount: 0, // role coverage analysis lands in a later phase
