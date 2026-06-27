@@ -113,6 +113,29 @@ Each: *current → expected · risk · path · priority · needs-ADR? · needs-P
 10. **Anti-pattern protection is doc-only.** Expected: reviewers reject decorative-only changes.
     Priority: ongoing (see §12).
 
+## 11a. Recovered Labor / Workforce Load Layer ([REG-007](10-regression-log.md))
+This capability previously existed, was lost on `master` (REG-005 facet), and was **restored in
+code (PR #23)**; it became visible in production only after the alias promotion on 2026-06-27 (the
+deployment-promotion gap). It is now **protected** — it must never be removed again. The Living
+Graph MUST support:
+- **Resource / labor nodes** (people/crews) with capacity status.
+- **Assignment edges** between resources and their activities/tasks, colored by overload
+  (red = overallocated/critical · amber = near capacity · green = available/healthy).
+- **Workload status badges** and **overloaded vs available** indicators per resource.
+- **Activity-level workload impact** — *which task/activity is causing the overload* (the
+  assignment edges from an overloaded resource point to exactly those tasks).
+- **Milestone impact** from overloaded resources; **missing-assignment / missing-estimate** warnings.
+- **Construction:** the `laborCapacity` overlay (`labor-graph-mapping.ts`) keeps crew/trade labels.
+- **All project types:** the `workforceCapacity` overlay (`workforce-graph-mapping.ts`) over the
+  generic Resource Capacity engine ([doc 13](13-resource-capacity-intelligence.md), [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md)).
+
+**How to see it (verification):** Execution Map → Living Graph → overlay selector → **Workforce**
+(or **Labor** for construction) → set the view level to **Activities** → resource nodes appear with
+overload colors and assignment edges to the tasks driving the load; click a resource node for its
+workload detail. *(Requires captured capacity data — `hasResources`.)* **Known discoverability
+limitation:** the people-nodes view shows in **Activities/Events** level, not the default
+**Milestones** level — a follow-up should auto-surface it when the overlay is selected.
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration

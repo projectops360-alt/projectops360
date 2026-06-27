@@ -115,6 +115,12 @@ parallel capacity systems** — the reconciliation is governed by
 becomes a construction view/profile over it; no duplicated capacity math.
 
 ## 11. Living Graph integration (Workforce Intelligence Layer)
+> **Foundational requirement ([REG-007](10-regression-log.md)):** restoring/protecting the Living
+> Graph workforce-load view ("who is overloaded, who is available, which activity causes it") is a
+> baseline requirement of this module — it was lost and is now recovered (PR #23, live after the
+> 2026-06-27 alias promotion). It must never be removed again. See
+> [doc 12 §11a](12-living-graph-strategy.md).
+
 Resource Capacity must drive — not decorate — the graph. It should surface: resource nodes, role
 nodes, capacity-risk signals, assignment edges, overloaded-resource highlights, tasks/milestones
 impacted by capacity, project workforce-health summary, overhead/availability signals, and
