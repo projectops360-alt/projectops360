@@ -1636,6 +1636,8 @@
       "fitView": "Ajustar vista",
       "fullscreen": "Pantalla completa",
       "exitFullscreen": "Salir de pantalla completa",
+      "focusGraph": "Modo enfoque — el grafo como protagonista",
+      "exitFocus": "Salir del modo enfoque",
       "close": "Cerrar panel",
       "findPath": "Buscar ruta desde este nodo",
       "findPathPending": "Ahora haz clic en el nodo destino…",

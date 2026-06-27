@@ -86,6 +86,7 @@ function sectionForId(id: string): string {
   if (n === 23) return "Governance";
   if (n === 25) return "Governance";
   if (n === 26) return "Governance";
+  if (n === 27) return "Governance";
   return "Docs";
 }
 

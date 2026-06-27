@@ -19,6 +19,7 @@ import {
   XCircle,
   Locate,
   Wand2,
+  Focus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NODE_TYPE_STYLES, EDGE_TYPE_STYLES } from "@/lib/graph/living-graph-styles";
@@ -89,6 +90,8 @@ export interface LivingGraphToolbarProps {
   onFitView: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
+  focusMode: boolean;
+  onToggleFocus: () => void;
   onResetFilters: () => void;
   summary: GraphMetricSummary;
   largeGraphWarning: boolean;
@@ -246,6 +249,19 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
           className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-muted"
         >
           <Crosshair className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <button
+          type="button"
+          onClick={props.onToggleFocus}
+          title={props.focusMode ? t("actions.exitFocus") : t("actions.focusGraph")}
+          aria-label={props.focusMode ? t("actions.exitFocus") : t("actions.focusGraph")}
+          aria-pressed={props.focusMode}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-md border text-foreground hover:bg-muted",
+            props.focusMode ? "border-brand-500 bg-brand-500/15 text-brand-600 dark:text-brand-400" : "border-border bg-card",
+          )}
+        >
+          <Focus className="h-3.5 w-3.5" aria-hidden />
         </button>
         <button
           type="button"
