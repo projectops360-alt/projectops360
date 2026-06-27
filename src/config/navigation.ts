@@ -13,6 +13,7 @@ import {
   Users,
   Settings,
   CreditCard,
+  Brain,
 } from "lucide-react";
 
 export type NavItem = {
@@ -41,4 +42,13 @@ export const sidebarNav: NavItem[] = [
 export const bottomNav: NavItem[] = [
   { title: "billing", href: "/organization/billing", icon: CreditCard },
   { title: "settings", href: "/settings", icon: Settings },
+];
+
+/**
+ * Internal, role-gated navigation. Only rendered for users who pass the
+ * server-enforced access check (owner/admin) — see lib/product-brain/access.
+ * The route itself also enforces access server-side; hiding here is UX only.
+ */
+export const internalNav: NavItem[] = [
+  { title: "productIntelligence", href: "/product-intelligence", icon: Brain },
 ];

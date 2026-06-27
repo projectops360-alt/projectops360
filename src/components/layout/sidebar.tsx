@@ -5,7 +5,8 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sidebarNav, bottomNav, type NavItem } from "@/config/navigation";
+import { sidebarNav, bottomNav, internalNav, type NavItem } from "@/config/navigation";
+import { canViewProductIntelligence } from "@/lib/product-brain/access";
 import { Logo } from "@/components/shared/logo";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
@@ -63,7 +64,7 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
+export function Sidebar({ collapsed = false, onToggle, role }: { collapsed?: boolean; onToggle?: () => void; role?: string }) {
   const pathname = usePathname();
   const tNav = useTranslations("nav");
   const projectId = extractProjectId(pathname);
@@ -71,6 +72,8 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
   // Separate global and project-scoped items
   const globalItems = sidebarNav.filter((item) => !item.projectScoped);
   const projectItems = sidebarNav.filter((item) => item.projectScoped);
+  // Internal, role-gated items (server route also enforces access).
+  const internalItems = canViewProductIntelligence(role) ? internalNav : [];
 
   // Resolve project-scoped hrefs with the current projectId
   function resolveHref(item: NavItem): string {
@@ -128,6 +131,22 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
           <>
             <div className="my-2 border-t border-white/10" />
             {projectItems.map((item) => (
+              <NavButton
+                key={item.href}
+                item={item}
+                active={isActive(pathname, resolveHref(item))}
+                resolvedHref={resolveHref(item)}
+                collapsed={collapsed}
+              />
+            ))}
+          </>
+        )}
+
+        {/* ── Internal (role-gated) section ── */}
+        {internalItems.length > 0 && (
+          <>
+            <div className="my-2 border-t border-white/10" />
+            {internalItems.map((item) => (
               <NavButton
                 key={item.href}
                 item={item}
