@@ -1576,6 +1576,7 @@
       "blockedOnly": "Solo bloqueados",
       "criticalOnly": "Solo ruta crítica",
       "all": "Todos",
+      "activeCount": "{count} filtros activos",
       "reset": "Restablecer filtros"
     },
     "nodeTypes": {

@@ -450,17 +450,20 @@ export default async function LivingGraphPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("subtitle")}</p>
+    <div className="space-y-2">
+      {/* Sprint #2 — slim, single-row header so the graph owns the viewport.
+          Title stays; the subtitle becomes a compact inline hint (hidden on
+          narrow screens). The graph canvas below is the protagonist. */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h1 className="text-lg font-bold tracking-tight text-foreground">{t("title")}</h1>
+          <p className="hidden truncate text-xs text-muted-foreground md:block">{t("subtitle")}</p>
         </div>
         <Link
           href={`/projects/${projectId}/execution-map`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           {t("backToExecutionMap")}
         </Link>
       </div>

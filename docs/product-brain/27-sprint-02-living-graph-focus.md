@@ -33,6 +33,26 @@ A usability/focus improvement — **not** a data-engine refactor. The Living Gra
 - **Canvas space:** the container already uses viewport height (`100vh-120px`, `min-h 680px`); Focus
   Mode removes the page chrome to give the graph the whole viewport.
 
+## Pass 2 (2026-06-27) — persistence, filter badge, compact header
+A second usability pass closing the remaining gaps from the "graph is the protagonist" review.
+**Layout/interaction only — no graph business logic touched.**
+- **Persisted view preferences** (`src/lib/graph/graph-ui-prefs.ts`, `useGraphUiPref`): the overlay,
+  layout mode, detail level, and the Insights panel open/closed state now persist to `localStorage`
+  (namespace `po360.livingGraph.`). SSR-safe (hydrates after mount → no hydration mismatch). The
+  `?overlay=` deep-link still wins on arrival. Search text is intentionally **not** persisted.
+- **Active-filters badge** (`countActiveGraphFilters` + `living-graph-toolbar.tsx`): the Filters
+  button shows a count badge ("N filters active") and stays highlighted whenever filters are
+  narrowing the graph, even while the advanced panel is collapsed — so a hidden filter is never
+  silently applied. New i18n key `livingGraph.filters.activeCount` (en/es).
+- **Compact page header** (`execution-map/living-graph/page.tsx`): the title block became a slim
+  single row (smaller title, subtitle as an inline muted hint hidden on narrow screens, smaller back
+  link, `space-y-2`), reclaiming ~32px of permanent vertical space above the canvas in normal mode.
+- **Isabella:** confirmed the assistant is a **user-owned draggable/dockable/minimizable window**
+  (it carries its own position via the workspace frame), so it does not permanently compete with the
+  graph; the user can dock it or minimize it to a pill. Left as-is by design (no risk refactor).
+- **Tests:** `graph-ui-prefs.test.ts` covers the active-filter count rules; existing suite green;
+  typecheck clean.
+
 ## What was intentionally NOT changed
 Overlay semantics, engines, capacity/AI logic, the Workforce/Labor layers, Critical Path,
 Waiting-vs-Blocked indicators, and the Sprint #1 Workboard/Roadmap changes — all intact (274 tests
