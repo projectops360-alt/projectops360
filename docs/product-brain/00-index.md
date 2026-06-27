@@ -55,6 +55,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [21-product-principles.md](21-product-principles.md) | **Product Principles** — engineering/product trade-offs |
 | [22-modules.md](22-modules.md) | **Module Catalog** — what each module does/uses/connects to |
 | [23-governance-rules.md](23-governance-rules.md) | **Governance Rules** — incl. *Product Intelligence First* |
+| [module-documentation-template.md](module-documentation-template.md) | **Module doc template** — reusable per-module structure |
 
 ### Sub-repositories
 
