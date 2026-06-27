@@ -20,8 +20,13 @@ import {
   ShieldAlert,
   XCircle,
   ClipboardCheck,
+  ExternalLink,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getI18nValue } from "@/types/database";
+import { getNodeNavActions } from "@/lib/graph/node-navigation";
+import type { ExecutionStatus } from "@/lib/execution/status-engine";
 import type {
   LivingGraphNode,
   LivingGraphEdge,
@@ -53,11 +58,26 @@ const SCENARIOS: LivingGraphSimulationScenario[] = [
   "increaseDuration",
 ];
 
+/** Sprint #4 — bilingual labels for the deterministic execution status. */
+const EXEC_STATUS_LABEL: Record<ExecutionStatus, { en: string; es: string }> = {
+  draft: { en: "Draft", es: "Borrador" },
+  ready: { en: "Ready", es: "Listo" },
+  in_progress: { en: "In progress", es: "En progreso" },
+  waiting: { en: "Waiting", es: "En espera" },
+  waiting_on_dependency: { en: "Waiting on dependency", es: "Esperando dependencia" },
+  blocked: { en: "Blocked", es: "Bloqueado" },
+  on_hold: { en: "On hold", es: "En pausa" },
+  completed: { en: "Completed", es: "Completado" },
+  cancelled: { en: "Cancelled", es: "Cancelado" },
+};
+
 export interface LivingGraphDetailPanelProps {
   selectedNode: LivingGraphNode | null;
   selectedEdge: LivingGraphEdge | null;
   analysis: GraphAnalysis;
   overlay: LivingGraphOverlay;
+  projectId: string;
+  onNavigate: (href: string) => void;
   simulation: LivingGraphSimulationState | null;
   pathModeFromId: string | null;
   onFindPathFrom: (nodeId: string) => void;
@@ -92,6 +112,8 @@ function LivingGraphDetailPanelComponent({
   selectedEdge,
   analysis,
   overlay,
+  projectId,
+  onNavigate,
   simulation,
   pathModeFromId,
   onFindPathFrom,
@@ -104,6 +126,8 @@ function LivingGraphDetailPanelComponent({
 }: LivingGraphDetailPanelProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale();
+  const isEs = locale === "es";
+  const tr = (f: { en?: string; es?: string }) => (isEs ? f.es : f.en) ?? f.en ?? "";
 
   const fmt = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }),
@@ -182,6 +206,11 @@ function LivingGraphDetailPanelComponent({
             <Field label={t("detailPanel.status")}>
               {selectedNode.status ? selectedNode.status.replaceAll("_", " ") : "—"}
             </Field>
+            {metrics?.executionStatus && (
+              <Field label={isEs ? "Estado de ejecución" : "Execution status"}>
+                {tr(EXEC_STATUS_LABEL[metrics.executionStatus])}
+              </Field>
+            )}
             <Field label={t("detailPanel.progress")}>
               {selectedNode.progress != null ? `${selectedNode.progress}%` : "—"}
             </Field>
@@ -320,6 +349,56 @@ function LivingGraphDetailPanelComponent({
               </p>
             </div>
           )}
+
+          {/* Sprint #4 — evidence/relationship state + navigate to the real record */}
+          {incoming.length === 0 && outgoing.length === 0 && (
+            <p className="rounded-md border border-border bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+              {isEs
+                ? "Este nodo aún no está vinculado a otros registros del proyecto."
+                : "This node is not yet linked to other project records."}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {isEs ? "Ir al registro" : "Go to record"}
+            </h4>
+            {getNodeNavActions(selectedNode, projectId).map((a) =>
+              a.enabled && a.href ? (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => onNavigate(a.href!)}
+                  className="inline-flex w-full items-center gap-2 rounded-md bg-brand-600 px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-brand-700"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  {tr(a.label_i18n)}
+                </button>
+              ) : (
+                <div
+                  key={a.id}
+                  className="flex items-start gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-[11px] text-muted-foreground"
+                  title={a.disabledReason_i18n ? tr(a.disabledReason_i18n) : undefined}
+                >
+                  <Ban className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>
+                    <span className="font-medium text-foreground/80">{tr(a.label_i18n)}</span>
+                    {a.disabledReason_i18n ? ` — ${tr(a.disabledReason_i18n)}` : ""}
+                  </span>
+                </div>
+              ),
+            )}
+            {/* Isabella explanation — grounded handoff lands in a later sprint. */}
+            <button
+              type="button"
+              disabled
+              title={isEs ? "Próximamente: explicación de Isabella sobre este nodo" : "Coming soon: Isabella explanation for this node"}
+              className="inline-flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground opacity-70"
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              {isEs ? "Preguntar a Isabella sobre este nodo" : "Ask Isabella about this node"}
+              <span className="ml-auto text-[9px] uppercase tracking-wide">{isEs ? "pronto" : "soon"}</span>
+            </button>
+          </div>
 
           {/* Actions */}
           <div className="space-y-1.5">
