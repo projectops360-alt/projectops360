@@ -41,6 +41,21 @@ Overlay engines/semantics, capacity/AI logic, the Workforce/Labor layers, Critic
 Waiting-vs-Blocked, Focus Mode (Sprint #2), and the Sprint #1 Workboard/Roadmap changes — all
 intact (280 tests green).
 
+## Refinements (2026-06-27)
+- **Overlay metadata** now also carries **`recommendedLayout`** (Part G complete): each overlay
+  declares its best level + layout.
+- **Timeline real-history detection:** the empty state ("requires project history") now triggers
+  when events span **< 2 distinct days** (`countDistinctEventDays`) — a one-shot import has no
+  evolution to replay, so we never show fake playback (PD-004).
+- **What-if sandbox labels:** the simulation block always shows **"Simulation only — no project
+  data changed"** and an explicit **"Apply simulation is not available yet"** (PD-005) — the
+  deterministic what-if never mutates real data and there is no apply path yet.
+- **Already shipped earlier:** Focus Mode (Sprint #2, [doc 27](27-sprint-02-living-graph-focus.md)),
+  Variance baseline empty state, Risk/SOP disconnected-node explanations (this doc).
+- **Honest follow-up:** Risk/SOP *node-level* detail enrichment (severity/probability/owner/source
+  in the node panel) needs the risk/SOP record fields mapped into graph node metadata — not yet
+  done; the disconnected-node *explanations* and counts are in place.
+
 ## Protection rule
 An overlay that cannot answer "what am I looking at / why is this node here / what next" is not an
 intelligence view and must show a useful empty/incomplete state rather than a confusing graph.

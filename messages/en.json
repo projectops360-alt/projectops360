@@ -1761,6 +1761,8 @@
     },
     "simulation": {
       "title": "What-if scenarios",
+      "sandboxLabel": "Simulation only — no project data changed.",
+      "applyUnavailable": "Apply simulation is not available yet",
       "selectNode": "Select a node to run a what-if simulation on it.",
       "scenarios": {
         "delay1d": "Delay 1 day",

@@ -458,6 +458,10 @@ function LivingGraphDetailPanelComponent({
               <h4 className="text-[11px] font-medium text-orange-600 dark:text-orange-400">
                 {t("simulation.title")}
               </h4>
+              {/* PD-005 — sandbox-first: simulation never mutates real data. */}
+              <p className="rounded bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-700 dark:text-orange-300">
+                {t("simulation.sandboxLabel")}
+              </p>
               <div className="grid grid-cols-2 gap-1.5">
                 {SCENARIOS.map((s) => (
                   <button
@@ -505,6 +509,14 @@ function LivingGraphDetailPanelComponent({
                     </span>
                   </p>
                   <p className="text-[10px] text-muted-foreground">{t("simulation.mitigation")}</p>
+                  <button
+                    type="button"
+                    disabled
+                    title={t("simulation.applyUnavailable")}
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-2 py-1 text-[10px] font-medium text-muted-foreground opacity-70"
+                  >
+                    {t("simulation.applyUnavailable")}
+                  </button>
                 </div>
               )}
             </div>

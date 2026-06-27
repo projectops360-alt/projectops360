@@ -12,7 +12,11 @@
 // ============================================================================
 
 import type { I18nField } from "@/types/database";
-import type { LivingGraphOverlay, LivingGraphViewLevel } from "@/types/living-graph";
+import type {
+  LivingGraphOverlay,
+  LivingGraphViewLevel,
+  LivingGraphLayoutMode,
+} from "@/types/living-graph";
 
 export type OverlayDataState = "ready" | "incomplete" | "empty";
 
@@ -42,6 +46,7 @@ export interface OverlayMeta {
   /** Shown when data exists but is partial (e.g. disconnected nodes). */
   incompleteMessage_i18n: I18nField;
   recommendedLevel?: LivingGraphViewLevel;
+  recommendedLayout?: LivingGraphLayoutMode;
   cta?: OverlayCta;
   /** Product Intelligence doc that governs this overlay. */
   relatedDoc: string;
@@ -61,6 +66,7 @@ export const OVERLAY_META: Partial<Record<LivingGraphOverlay, OverlayMeta>> = {
   risk: {
     id: "risk",
     label_i18n: { en: "Risk View", es: "Vista de Riesgos" },
+    recommendedLayout: "hierarchical",
     purpose_i18n: {
       en: "Shows project risks and the work they threaten — so you can act on the risks that matter.",
       es: "Muestra los riesgos del proyecto y el trabajo que amenazan — para actuar sobre los que importan.",
@@ -95,6 +101,7 @@ export const OVERLAY_META: Partial<Record<LivingGraphOverlay, OverlayMeta>> = {
   sopCandidate: {
     id: "sopCandidate",
     label_i18n: { en: "SOP Candidate View", es: "Vista de Candidatos a SOP" },
+    recommendedLayout: "force",
     purpose_i18n: {
       en: "Highlights clean, well-evidenced, repeatable work that could become a Standard Operating Procedure.",
       es: "Resalta trabajo limpio, bien evidenciado y repetible que podría convertirse en un Procedimiento Estándar (SOP).",
@@ -127,6 +134,7 @@ export const OVERLAY_META: Partial<Record<LivingGraphOverlay, OverlayMeta>> = {
   variance: {
     id: "variance",
     label_i18n: { en: "Variance View", es: "Vista de Variación" },
+    recommendedLayout: "hierarchical",
     purpose_i18n: {
       en: "Answers \"what changed vs the plan?\" — deviation between planned and actual/forecast.",
       es: "Responde \"¿qué cambió vs el plan?\" — la desviación entre lo planificado y lo real/pronosticado.",
@@ -166,6 +174,7 @@ export const OVERLAY_META: Partial<Record<LivingGraphOverlay, OverlayMeta>> = {
   timeline: {
     id: "timeline",
     label_i18n: { en: "Timeline Playback", es: "Reproducción de Línea de Tiempo" },
+    recommendedLayout: "timeline",
     purpose_i18n: {
       en: "Answers \"how did the project get here?\" — replays how the graph changed over time.",
       es: "Responde \"¿cómo llegó aquí el proyecto?\" — reproduce cómo cambió el grafo en el tiempo.",
@@ -199,6 +208,7 @@ export const OVERLAY_META: Partial<Record<LivingGraphOverlay, OverlayMeta>> = {
   simulation: {
     id: "simulation",
     label_i18n: { en: "What-if Simulation", es: "Simulación What-if" },
+    recommendedLayout: "hierarchical",
     purpose_i18n: {
       en: "Answers \"what happens if something changes?\" — test impact before touching the real project.",
       es: "Responde \"¿qué pasa si algo cambia?\" — prueba el impacto antes de tocar el proyecto real.",
@@ -250,4 +260,18 @@ export function resolveOverlayState(signals: OverlaySignals): OverlayDataState {
   if (signals.totalCount <= 0) return "empty";
   if (signals.disconnectedCount > 0) return "incomplete";
   return "ready";
+}
+
+/**
+ * Distinct calendar days across event timestamps — the deterministic signal for
+ * whether Timeline Playback has REAL history to replay. A project whose events
+ * all share one day (e.g. created in a single import) has no evolution to play,
+ * so the overlay shows the "requires history" empty state instead of fake playback.
+ */
+export function countDistinctEventDays(isoDates: (string | null | undefined)[]): number {
+  const days = new Set<string>();
+  for (const d of isoDates) {
+    if (typeof d === "string" && d.length >= 10) days.add(d.slice(0, 10));
+  }
+  return days.size;
 }
