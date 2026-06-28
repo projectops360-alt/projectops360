@@ -366,6 +366,46 @@ Impact · Severity · Investigation status · Owner · Next action.
   home** as a PMO → a **Portfolio Briefing** appears. Open Isabella outside a project as a
   non-PMO → only the generic guide prompt.
 
+## REG-014 — Isabella Welcome Hero lifecycle reverted
+- **Description:** Isabella's approved compact-layout behavior (UX-004) was partially reverted. The
+  large Welcome Hero/avatar stayed visible even after **active content** (a Project Briefing) appeared,
+  wasting conversation space and pushing useful information below the fold.
+- **Observed (2026-06-28):** opening Isabella inside a project showed the **large avatar + the Project
+  Briefing stacked together** — the hero occupied ~40–45% of the panel above the briefing.
+- **Expected:** the full Welcome Hero appears only in a true **empty welcome** state. Once there is
+  any active content or interaction, Isabella collapses into a **compact header** (≤70px) and the
+  content is readable immediately.
+- **Impact:** High — Isabella feels like it is going backwards; the user loses usable workspace right
+  after Isabella produces useful project intelligence. **Severity:** High.
+- **Root cause (audited 2026-06-28):** the compact/expanded decision used
+  `hasConversation = turns.length > 0`. The REG-013 Project Briefing renders in the conversation area
+  but is **not a `turn`**, so with a briefing and zero turns `compactPresence` was `false` → the full
+  hero rendered above the briefing. The briefing was never counted as **active content**. Single
+  component (`isabella-experience.tsx`), no duplicate/legacy hero — a missing condition, not a stale
+  file.
+- **Status: RESOLVED (2026-06-28).** Durable fix (state machine + UX contract, not a one-off tweak):
+  - The layout rule now lives in a **Product UX Contract** (UX-001) —
+    `src/lib/product-ux-contracts/contracts.ts` (`resolveIsabellaLayoutState`,
+    `isCompactHeaderRequired`, `isFullHeroVisible`). The component imports it, so there is ONE source
+    of truth. ACTIVE_CONTENT = any of: a (Project **or** Portfolio) briefing active, ≥1 turn, a
+    pending request, or the first typed character. A **briefing counts as active assistant content.**
+  - The full hero is now **always mounted but CSS-collapses** (`.heroWrap` max-height/opacity →0,
+    ~300ms, honors `prefers-reduced-motion`); on first load with a briefing it mounts
+    already-collapsed (no hero flash, no stacking). The compact header is ≤70px and carries the
+    "Grounded in Product Intelligence" badge + presence.
+  - The empty greeting card shows only in EMPTY_WELCOME.
+  - Protected by `src/lib/product-ux-contracts/__tests__/isabella-welcome-hero.test.ts` — fails if the
+    full hero would ever appear automatically while a briefing or messages exist.
+- **Protection rule (binding):** future Isabella UI changes **must preserve the approved Welcome Hero
+  lifecycle** (UX-001). The large hero must never reappear automatically during an active conversation
+  or while a briefing/content exists; it may return only on New Conversation / Reset / empty history,
+  or by an explicit user re-expand (UX-004). The avatar is a welcome affordance, not permanent chrome.
+  Related: [UX-001](32-product-ux-contracts.md), [REG-013](#reg-013), UX-004
+  ([25-ux-design-debt.md](25-ux-design-debt.md)), [No silent regressions rule].
+- **Owner:** Product. **Verify:** open a project → Isabella → only a **compact header** above the
+  Project Briefing (no large avatar stacked); type/ask in an empty (no-project) state → the hero
+  collapses smoothly; dismiss the briefing with no conversation → the full hero returns.
+
 ---
 
 ### Resolved

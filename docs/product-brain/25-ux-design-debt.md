@@ -32,8 +32,15 @@ expected · status · protection rule.
 - **Protection rule (binding):** future Isabella UI changes **must not** allow decorative
   avatar/header elements to obscure or compete with generated answer content. The compact
   active-conversation state must be preserved.
+- **Promoted to a Product UX Contract:** this behavior is now **UX-001**
+  ([doc 32](32-product-ux-contracts.md)) — APPROVED, with a code-level rule
+  (`src/lib/product-ux-contracts/contracts.ts`) and regression tests. It was reverted once when the
+  REG-013 Project Briefing (which is **active content**) was not counted as a trigger; see
+  **[REG-014](10-regression-log.md#reg-014)** for the recovery. The trigger now includes briefings,
+  turns, pending requests, and the first typed character.
 - **Owner:** Product/UX. **Verify:** open Isabella → ask a question → the hologram collapses to a
   compact header and the answer is visible immediately; the chevron re-expands/collapses the avatar.
+  Open Isabella inside a project → only a compact header above the Project Briefing (no stacked hero).
 
 ## UX-006 — Project Navigation Simplification
 - **Description:** The project-level navigation (`ProjectTabs`, the single sticky bar that serves
