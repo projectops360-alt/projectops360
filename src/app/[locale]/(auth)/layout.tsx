@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { setRequestLocale } from "next-intl/server";
 
 export default function AuthLayout({
   children,
@@ -7,23 +6,37 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-950 to-brand-900 px-4">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      {/* soft premium brand glow (subtle, adapts to theme) */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-[-200px] h-[560px] w-[900px] -translate-x-1/2 blur-[60px]"
+        style={{ background: "radial-gradient(ellipse, rgba(0,122,77,0.16), transparent 65%)" }}
+      />
+
+      <div className="relative w-full max-w-md">
         {/* ── Logo ── */}
-        <div className="mb-8 flex justify-center">
-          <div className="rounded-xl bg-white/10 p-3 backdrop-blur-sm">
-            <Image
-              src="/logo.png"
-              alt="ProjectOps360°"
-              width={120}
-              height={48}
-              className="h-12 w-auto"
-              priority
-            />
-          </div>
+        <div className="mb-9 flex justify-center">
+          {/* light theme: dark-green wordmark · dark theme: 3D mark */}
+          <Image
+            src="/logo-full.png"
+            alt="ProjectOps360°"
+            width={295}
+            height={102}
+            className="block h-16 w-auto dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo-3d.webp"
+            alt="ProjectOps360°"
+            width={295}
+            height={102}
+            className="hidden h-16 w-auto dark:block"
+            priority
+          />
         </div>
         {/* ── Card ── */}
-        <div className="rounded-2xl border border-white/10 bg-card p-8 shadow-2xl">
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-[0_24px_70px_-30px_rgba(6,78,59,0.35)]">
           {children}
         </div>
       </div>
