@@ -8,8 +8,8 @@ export function LogoStage({ className = "" }: { className?: string }) {
       {/* spotlight pool above the logo */}
       <span
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[-55%] h-[150%] w-[78%] -translate-x-1/2 rounded-full opacity-70 blur-2xl"
-        style={{ background: "radial-gradient(ellipse at center, rgba(60,229,164,.5), transparent 70%)" }}
+        className="pointer-events-none absolute left-1/2 top-[-55%] h-[150%] w-[78%] -translate-x-1/2 rounded-full opacity-40 blur-2xl"
+        style={{ background: "radial-gradient(ellipse at center, rgba(0,122,77,.28), transparent 70%)" }}
       />
       {/* the wordmark, filled with the top-lit gradient */}
       <span aria-hidden className="lp-logo-stage absolute inset-0" />

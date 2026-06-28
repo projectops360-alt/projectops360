@@ -18,6 +18,57 @@
     "ctaPrimary": "Solicitar acceso anticipado",
     "ctaSecondary": "Ver cómo funciona"
   },
+  "heroGraph": {
+    "window": "app.projectops360.com · Living Graph",
+    "title": "Living Graph",
+    "subtitle": "Visualiza cómo todo se conecta. Detecta impacto. Anticipa desviaciones.",
+    "live": "En tiempo real",
+    "share": "Compartir",
+    "saveView": "Guardar vista",
+    "pending": "Pendiente",
+    "toolbar": {
+      "project": "Implementación NorthPeak",
+      "view": "Vista: Ejecución",
+      "filters": "Filtros"
+    },
+    "sidebar": {
+      "workboard": "Workboard",
+      "livingGraph": "Living Graph",
+      "projects": "Proyectos",
+      "schedule": "Cronograma",
+      "risks": "Riesgos",
+      "decisions": "Decisiones",
+      "memory": "Memoria del proyecto",
+      "bim": "Planos y BIM",
+      "reports": "Reportes",
+      "analytics": "Analítica",
+      "settings": "Configuración"
+    },
+    "user": {
+      "name": "Efraín Prada",
+      "role": "Director de PMO"
+    },
+    "nodes": {
+      "start": "Inicio del Proyecto",
+      "req": "Requerimientos",
+      "design": "Diseño de Solución",
+      "config": "Configuración",
+      "integrations": "Integraciones",
+      "training": "Capacitación",
+      "deploy": "Despliegue",
+      "golive": "Go Live"
+    },
+    "chip": {
+      "milestone": "HITO",
+      "phase": "FASE"
+    },
+    "legend": {
+      "completed": "Completado",
+      "inProgress": "En progreso",
+      "atRisk": "En riesgo",
+      "pending": "Pendiente"
+    }
+  },
   "executionMap": {
     "title": "Mapa de ejecución",
     "live": "En vivo",
@@ -176,7 +227,11 @@
     "chips": ["Definir alcance", "Estructurar el trabajo", "Detectar riesgos", "Resumir comunicación", "Preservar memoria", "Siguiente mejor acción"],
     "noReplace": "Pero la IA no reemplaza tu experiencia.",
     "sharper": "Te da mejor visibilidad, análisis más rápido y mayor soporte a la decisión — para que tu criterio sea más agudo, no menos importante.",
-    "closing": "ProjectOps 360° te ayuda a liderar proyectos con inteligencia, control y confianza."
+    "closing": "ProjectOps 360° te ayuda a liderar proyectos con inteligencia, control y confianza.",
+    "panelTitle": "Isabella",
+    "panelRole": "Asesora de proyectos · IA",
+    "panelLive": "Activa",
+    "panelControl": "Tú mantienes el control. La IA asiste, tú decides."
   },
   "about": {
     "eyebrow": "Quiénes somos",
