@@ -121,6 +121,8 @@ export default async function ProjectDetailPage({
     allDocs,
     snapshotMilestonesResult,
     snapshotTasksResult,
+    depsResult,
+    risksResult,
   ] = await Promise.all([
     // 1. Communications — count + recent 5
     supabase
@@ -215,6 +217,21 @@ export default async function ProjectDetailPage({
       .is("deleted_at", null)
       .order("milestone_id", { ascending: true })
       .order("order_index", { ascending: true }),
+
+    // 12-13. Status summary inputs (REG-015): dependencies (for waiting-on-dep)
+    // and open risks — so the dashboard Status card uses the SAME deterministic
+    // engine as Isabella's briefing (REG-013), not a parallel metric.
+    supabase
+      .from("task_dependencies")
+      .select("predecessor_id, successor_id")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId),
+    supabase
+      .from("risks")
+      .select("severity, status")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null),
   ]);
 
   // Extract counts
@@ -420,6 +437,24 @@ export default async function ProjectDetailPage({
     (snapshotTasks ?? []) as RoadmapTask[],
   );
 
+  // ── Status summary inputs (REG-015) ───────────────────────────────────────
+  const statusDependencies = (depsResult.data ?? []).map((d) => ({
+    predecessorId: d.predecessor_id as string,
+    successorId: d.successor_id as string,
+  }));
+  const OPEN_RISK = new Set(["open", "mitigating"]);
+  const HIGH_RISK = new Set(["high", "critical"]);
+  const statusRisks = risksResult.error
+    ? null
+    : (() => {
+        const rows = (risksResult.data ?? []) as Array<{ severity: string | null; status: string | null }>;
+        const open = rows.filter((r) => r.status != null && OPEN_RISK.has(r.status));
+        return { open: open.length, high: open.filter((r) => r.severity != null && HIGH_RISK.has(r.severity)).length };
+      })();
+  // Briefing scope from org role (mirrors REG-013): viewers get external-safe.
+  const statusScope: "full" | "member" | "external" =
+    org.role === "owner" || org.role === "admin" ? "full" : org.role === "viewer" ? "external" : "member";
+
   // ── Translations ────────────────────────────────────────────────────────────
 
   const aiCommSummaryTranslations: AiCommSummaryTranslations = {
@@ -593,12 +628,16 @@ export default async function ProjectDetailPage({
       <ProjectDashboard
         projectId={projectId}
         locale={locale}
+        projectName={title}
         data={dashboardData}
         translations={dashboardTranslations}
         entityLabels={entityLabels}
         milestones={(snapshotMilestones ?? []) as Milestone[]}
         tasks={(snapshotTasks ?? []) as RoadmapTask[]}
         roadmapProgress={roadmapProgress}
+        statusDependencies={statusDependencies}
+        statusRisks={statusRisks}
+        statusScope={statusScope}
       />
     </div>
   );

@@ -118,6 +118,26 @@ export const PRODUCT_BRAIN_ITEMS: ProductBrainItem[] = [
     relatedItems: ["UX-001", "REG-013"], tags: ["isabella", "ux", "layout"],
   }),
 
+  mk({
+    itemKey: "REG-015", type: "regression", title: "Project Status not surfaced on the main dashboard",
+    module: "Command Center / Dashboard", status: "resolved", severity: "high", testStatus: "protected",
+    sourcePath: "10-regression-log.md", sourceSection: "REG-015",
+    summary: "The Overview dashboard had no explained Status summary (only a separate tab); Closeout was buried at the bottom.",
+    expectedBehavior: "A prominent Project Status card on the dashboard with explained health (blocked vs waiting, overdue, at-risk, capacity), using the shared briefing engine; Status route preserved.",
+    protectionRule: "Navigation simplification must not remove the Project Status capability; relocate to Command Center with prominence.",
+    testFiles: ["src/components/layout/__tests__/project-tabs-nav.test.ts", "src/lib/project-briefing/__tests__/briefing-engine.test.ts"],
+    verificationSteps: ["Open a project → Overview → Project Status card near the top → View full status → /status"],
+    relatedItems: ["REG-013", "UX-006", "UX-009"], tags: ["command-center", "status", "dashboard"],
+  }),
+  mk({
+    itemKey: "UX-009", type: "ux_contract", title: "Closeout Report dashboard prominence",
+    module: "Reports / Closeout Report", status: "implemented", severity: "medium", testStatus: "manual_only",
+    sourcePath: "32-product-ux-contracts.md", sourceSection: "UX-009",
+    decision: "Closeout Report is a key executive artifact: promote it to a 'Reports & Executive Outputs' card near the top of the dashboard, not buried below activity cards.",
+    testFiles: ["src/components/layout/__tests__/project-tabs-nav.test.ts"],
+    relatedItems: ["REG-015"], tags: ["reports", "closeout", "dashboard"],
+  }),
+
   // ── UX Contracts ──────────────────────────────────────────────────────────
   mk({
     itemKey: "UX-001", type: "ux_contract", title: "Isabella Welcome Hero Lifecycle",

@@ -16,6 +16,7 @@
 | UX-003 | Navigation never hides/orphans a strategic module (BIM visible-or-explained) | **APPROVED** (test exists; contract to be formalized) | [REG-012](10-regression-log.md#reg-012) · UX-006 | `src/components/layout/__tests__/project-tabs-nav.test.ts` |
 | UX-004 | Metric rollups are consistent across surfaces (terminal tasks never blockers) | **APPROVED** (test exists; contract to be formalized) | [REG-010](10-regression-log.md#reg-010) · REG-008 | `src/lib/project-rollups/__tests__/project-rollup-engine.test.ts` · `task-activity.test.ts` |
 | UX-008 | Living Graph edges are explainable (task tooltip) | **APPROVED** | — (usability; reuses REG-008/010 status rules) | `src/lib/graph/__tests__/edge-task-tooltip.test.ts` |
+| UX-009 | Closeout Report has dashboard prominence | **APPROVED** | [REG-015](10-regression-log.md#reg-015) | `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status placement) |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
 > listed here so the contract registry is the single index. Promote each to a full `contracts.ts`

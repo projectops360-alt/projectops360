@@ -23,6 +23,21 @@ view, with the Living Graph as the drill-down (ADR-002) and Isabella as the expl
 - **Gap:** not yet consolidated into one executive surface; does not consume the Execution
   Status Engine (CAP-016); drill-down to Living Graph not wired as the standard pattern.
 
+## Home for Status & reports (REG-015 / UX-009 — binding)
+Command Center / Dashboard is the home for project health, **status**, executive summaries, recent
+activity, traceability, reports, and key actions.
+- **Project Status belongs inside Command Center.** The Overview dashboard surfaces a prominent
+  **Project Status** card near the top — explained health (band), % complete, blockers vs waiting,
+  overdue, at-risk milestones, capacity warnings, top recommended attention, and a "View full status"
+  link to `/status`. It is computed by the **same deterministic engine as Isabella's briefing**
+  (REG-013, `buildProjectBriefing`) so the numbers agree everywhere (REG-008/010) — no parallel
+  metric logic.
+- **Closeout Report belongs inside Command Center / Reports and must be easy to find** (UX-009):
+  promoted to a "Reports & Executive Outputs" card near the top, not buried below activity cards.
+- **Status and Closeout share the project rollup/status source** where applicable.
+- Navigation simplification (UX-006) must never make Status disappear; if removed from a tab it must
+  be relocated to Command Center with prominence. See [REG-015](10-regression-log.md#reg-015).
+
 ## Dependencies
 CAP-016 (status engine), CAP-009 (capacity), CAP-017 (risk), CAP-023 (critical path), CAP-005
 (graph drill-down), CAP-002 (Isabella).

@@ -406,6 +406,43 @@ Impact · Severity · Investigation status · Owner · Next action.
   Project Briefing (no large avatar stacked); type/ask in an empty (no-project) state → the hero
   collapses smoothly; dismiss the briefing with no conversation → the full hero returns.
 
+## REG-015 — Project Status not surfaced on the main project dashboard
+- **Description:** After navigation simplification (UX-006), explained Project Status was reachable
+  only via the **Status** tab; the main project **dashboard (Overview / Command Center)** did not
+  surface a status summary, so "how is this project doing?" required leaving the dashboard. The
+  Closeout Report (UX-009) was also buried at the bottom of the dashboard sidebar.
+- **Observed (2026-06-28):** the Overview dashboard had a 5-KPI health strip but no explained Status
+  card; Status lived only as a separate tab; Closeout sat below all activity/traceability/document
+  cards.
+- **Expected:** Project Status must be **prominent inside Command Center / Dashboard** with an
+  explained health summary (blocked vs waiting, overdue, at-risk milestones, capacity warnings,
+  recommended attention) using **deterministic rollup data**, while staying simplified in nav.
+- **Impact:** High — PMs/PMOs need quick explained status without hunting. **Severity:** High.
+- **Root cause:** the capability was **never deleted** — the `/status` route and the Status tab (in
+  the **Command Center** nav group) are intact. The gap was that the dashboard itself never rendered
+  a status summary, and Closeout was low in the layout.
+- **Status: RESOLVED (2026-06-28).** Fix (reuses existing engines, no parallel metric):
+  - A prominent **Project Status** card now sits near the top of the dashboard, computed by the SAME
+    deterministic engine as Isabella's briefing (REG-013, `buildProjectBriefing` →
+    `project-rollup-engine` / `task-activity`), so blocked vs waiting are separated and stale-done
+    tasks never count as active blockers (REG-008/010). It links to the full `/status` report.
+  - The `/status` route is unchanged and still works (no redirect needed); Status stays in the
+    Command Center nav group (not in More/Settings).
+  - **UX-009** — Closeout Report promoted to a "Reports & Executive Outputs" card near the top
+    (alongside the Status report link), removed from the buried bottom slot. Recent Activity,
+    Pending Traceability, and Key Documents remain.
+  - Files: `app/.../projects/[projectId]/{page.tsx,dashboard-client.tsx}`. Guard:
+    `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status stays in Command Center).
+- **Protection rule (binding):** navigation simplification must not remove the Project Status
+  capability. If Status leaves the top-level/tab nav it must be relocated to Command Center with
+  clear prominence; the dashboard must answer "how is this project doing / what needs attention /
+  what report can I give leadership". Related: [UX-006](25-ux-design-debt.md), [REG-013](#reg-013),
+  [REG-010](#reg-010--cross-module-metric-rollup-inconsistency), [No silent regressions rule].
+- **Owner:** Product. **Verify:** open a project → Overview → a Project Status card (health band,
+  %complete, blockers/waiting/overdue/at-risk, top-3 attention, "View full status") sits near the
+  top; the Closeout Report appears in "Reports & Executive Outputs" near the top, not at the bottom;
+  the Status tab and `/status` still work.
+
 ---
 
 ### Resolved
