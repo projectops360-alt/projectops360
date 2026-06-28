@@ -65,6 +65,8 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
     ["pi-isabella-briefing-no-invention", /never invents/i],
     ["pi-isabella-briefing-no-invention", /NEVER counted as active blockers/i],
     ["pi-isabella-briefing-no-invention", /don't have enough data/i],
+    ["pi-isabella-portfolio-briefing", /one level up/i],
+    ["pi-isabella-portfolio-briefing", /Members and viewers do not receive/i],
   ];
 
   it.each(facts)("%s states the expected fact", (slug, re) => {

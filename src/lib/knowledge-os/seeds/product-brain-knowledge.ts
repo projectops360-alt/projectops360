@@ -496,6 +496,27 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
         "Verifica: un proyecto con 0 bloqueos muestra \"No se detectan bloqueos activos\"; un flag obsoleto en una tarea completada nunca aparece como bloqueo.",
     },
   },
+  {
+    slug: "pi-isabella-portfolio-briefing",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO); 10-regression-log.md → REG-013",
+    authority: "regression",
+    en: {
+      title: "Does Isabella give the PMO a portfolio briefing too?",
+      body:
+        "Yes. The PM gets a project briefing inside a project; the PMO gets the same help one level up. When Isabella opens OUTSIDE a project for an owner/admin (PMO), she proactively shows a deterministic Portfolio Briefing across all projects: overall health, what looks good, what needs attention (blocked critical-path work, active blockers, at-risk milestones, high-impact risks, overdue, unassigned, pending decisions), the projects that need attention most (ranked, each with a drill-in link), the top recommended actions, and verify links (Command Center, Reports, Projects). It uses the same canonical rules as the Command Center (task-activity + roadmap progress), so the numbers agree — there is no AI call on open and nothing is invented. Members and viewers do not receive the portfolio briefing.\n" +
+        "Source: 16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO).\n" +
+        "Verify: as a PMO (owner/admin) open Isabella on the Command Center/home → a Portfolio Briefing appears; as a non-PMO outside a project → only the generic prompt.",
+    },
+    es: {
+      title: "¿Isabella también le da al PMO un briefing del portafolio?",
+      body:
+        "Sí. El PM recibe un briefing del proyecto dentro de un proyecto; el PMO recibe la misma ayuda un nivel más arriba. Cuando Isabella se abre FUERA de un proyecto para un owner/admin (PMO), muestra proactivamente un Briefing del Portafolio determinista sobre todos los proyectos: salud general, lo que va bien, lo que requiere atención (trabajo bloqueado de ruta crítica, bloqueos activos, hitos en riesgo, riesgos de alto impacto, vencidos, sin responsable, decisiones pendientes), los proyectos que más requieren atención (priorizados, cada uno con enlace para entrar), las principales acciones recomendadas, y enlaces de verificación (Command Center, Reportes, Proyectos). Usa las mismas reglas canónicas que el Command Center (task-activity + roadmap), así que los números coinciden — no hay llamada de IA al abrir y no inventa nada. Los miembros y viewers no reciben el briefing del portafolio.\n" +
+        "Fuente: 16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO).\n" +
+        "Verifica: como PMO (owner/admin) abre Isabella en el Command Center/home → aparece un Briefing del Portafolio; como no-PMO fuera de un proyecto → solo el prompt genérico.",
+    },
+  },
 ];
 
 /** Slugs every curated Product Brain package must include (used by tests). */

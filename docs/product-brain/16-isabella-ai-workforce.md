@@ -69,6 +69,18 @@ doing? What should I pay attention to? What should I do next?"*
 · Verify in app. Implemented in `components/isabella/project-briefing.tsx`, rendered by
 `isabella-experience.tsx` above the generic prompt when a project context exists.
 
+### Portfolio Health Briefing (PMO)
+Symmetric to the per-project briefing, but **org-wide for the PMO**. When Isabella opens **outside a
+project** for an **owner/admin (PMO)** she proactively summarizes the whole portfolio: overall
+health, what looks good, what needs attention (blocked critical-path work, active blockers, at-risk
+milestones, high-impact risks, overdue, unassigned, pending decisions), the **projects that need
+attention most** (ranked, each with a drill-in link), the top recommended actions, and verify links
+(Command Center, Reports, Projects). Same guarantees: **deterministic** (reuses `task-activity.ts` +
+`roadmap/progress.ts`, agrees with the Command Center), **no AI on open**, no hallucination, Refresh
++ session Dismiss. Members/viewers do **not** receive the portfolio briefing (PMO scope). Code:
+`lib/portfolio-briefing/*` + `components/isabella/portfolio-briefing.tsx`. The PM gets project help;
+the PMO gets the same help one level up.
+
 **Protection rule (binding):** future Isabella UI, mode, Product Brain, or layout changes **must not
 remove** the project-aware automatic briefing behavior. See [REG-013](10-regression-log.md#reg-013).
 
