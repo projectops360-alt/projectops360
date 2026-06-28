@@ -13,6 +13,9 @@ import { getOrgContext } from "@/lib/auth";
 import { askKnowledgeOs, recordGuideFeedback } from "@/lib/knowledge-os/service";
 import { indexPendingKnowledge } from "@/lib/knowledge-os/indexer";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
+import { getProjectBriefing } from "@/lib/project-briefing/service";
+import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
+import type { Locale } from "@/types/database";
 
 /** Ask the Living Guide. Returns a fully-attributed answer. */
 export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideAnswer> {
@@ -28,6 +31,18 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
     },
   };
   return askKnowledgeOs(org, safeInput);
+}
+
+/**
+ * Generate Isabella's deterministic Project Health Briefing (REG-013). The
+ * project is re-validated against the trusted session org inside the service;
+ * the client-supplied projectId is only a lookup key, never an authorization.
+ */
+export async function getProjectBriefingAction(
+  projectId: string,
+  locale: Locale,
+): Promise<ProjectBriefingResult> {
+  return getProjectBriefing(projectId, locale);
 }
 
 /** Record 👍/👎 feedback against a previously generated answer. */

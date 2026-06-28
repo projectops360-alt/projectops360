@@ -38,6 +38,7 @@ import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-l
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
+import { ProjectBriefing } from "./project-briefing";
 import { HologramPlaceholder } from "./hologram/hologram-placeholder";
 import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
@@ -93,6 +94,19 @@ export function IsabellaExperience({
   const expertTitle = expert.title[isEs ? "es" : "en"];
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expertTitle };
   const actionLinks = useMemo(() => buildActionLinks(locale, context), [locale, context]);
+
+  // REG-013 — Project Health Briefing. When Isabella opens inside a project she
+  // proactively shows a deterministic briefing; dismissal is session-scoped.
+  const projectId = context.projectId ?? null;
+  const [briefingHidden, setBriefingHidden] = useState(false);
+  useEffect(() => {
+    if (!projectId) return;
+    try {
+      setBriefingHidden(window.sessionStorage.getItem(`isabella.briefing.dismissed:${projectId}`) === "1");
+    } catch {
+      setBriefingHidden(false);
+    }
+  }, [projectId]);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -406,6 +420,15 @@ export function IsabellaExperience({
 
         {/* ── Conversation ──────────────────────────────────────────────── */}
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          {/* REG-013 — proactive Project Health Briefing (project context only) */}
+          {projectId && !briefingHidden && (
+            <ProjectBriefing
+              key={projectId}
+              locale={locale}
+              projectId={projectId}
+              onDismissed={() => setBriefingHidden(true)}
+            />
+          )}
           {turns.length === 0 && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-border bg-background p-4">

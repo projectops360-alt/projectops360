@@ -59,6 +59,12 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
     ["pi-verify-false-blockers", /Mobile App Design/i],
     ["pi-verify-false-blockers", /0 blocked/i],
     ["pi-product-brain-gap", /does not define/i],
+    ["pi-isabella-project-briefing", /project-aware/i],
+    ["pi-isabella-project-briefing", /no AI call on open/i],
+    ["pi-isabella-project-briefing", /generic guide prompt/i],
+    ["pi-isabella-briefing-no-invention", /never invents/i],
+    ["pi-isabella-briefing-no-invention", /NEVER counted as active blockers/i],
+    ["pi-isabella-briefing-no-invention", /don't have enough data/i],
   ];
 
   it.each(facts)("%s states the expected fact", (slug, re) => {
