@@ -54,7 +54,9 @@ async function runJson(org: OrgContext, projectId: string, prompt: string): Prom
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
 
-function buildPrompt(text: string, locale: Locale): string {
+// Exported for REG-009 regression tests (anti-hallucination prompt contract).
+// Pure — no AI call, no side effects.
+export function buildPrompt(text: string, locale: Locale): string {
   const lang = locale === "es" ? "español" : "English";
   const today = new Date().toISOString().slice(0, 10);
   return [
@@ -97,7 +99,9 @@ function buildPrompt(text: string, locale: Locale): string {
 
 // ── Normalization ─────────────────────────────────────────────────────────────
 
-function mapItems(json: Record<string, unknown>): ScribeItem[] {
+// Exported for REG-009 regression tests (anti-hallucination normalization).
+// Pure — normalizes model output without inventing data or writing anything.
+export function mapItems(json: Record<string, unknown>): ScribeItem[] {
   const out: ScribeItem[] = [];
   const push = (
     type: ScribeItemType,
