@@ -12,6 +12,14 @@
 | Contract | Title | Status | Guards | Source |
 |----------|-------|--------|--------|--------|
 | UX-001 | Isabella Welcome Hero Lifecycle | **APPROVED** | [REG-014](10-regression-log.md#reg-014) | `contracts.ts` · `isabella-welcome-hero.test.ts` |
+| UX-002 | Living Graph Saved Layouts are presentation-only | **APPROVED** (test exists; contract to be formalized in `contracts.ts`) | [UX-007 / PD-008](30-product-decision-log.md) | `src/lib/graph/__tests__/graph-layout-storage.test.ts` |
+| UX-003 | Navigation never hides/orphans a strategic module (BIM visible-or-explained) | **APPROVED** (test exists; contract to be formalized) | [REG-012](10-regression-log.md#reg-012) · UX-006 | `src/components/layout/__tests__/project-tabs-nav.test.ts` |
+| UX-004 | Metric rollups are consistent across surfaces (terminal tasks never blockers) | **APPROVED** (test exists; contract to be formalized) | [REG-010](10-regression-log.md#reg-010) · REG-008 | `src/lib/project-rollups/__tests__/project-rollup-engine.test.ts` · `task-activity.test.ts` |
+
+> **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
+> listed here so the contract registry is the single index. Promote each to a full `contracts.ts`
+> entry (like UX-001) when its rule is next touched — the test is the binding part, the registry row
+> makes it discoverable.
 
 ---
 

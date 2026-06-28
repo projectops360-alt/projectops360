@@ -1,0 +1,58 @@
+# ============================================================================
+# ProjectOps360° — CI (regression-protection gate)
+# ============================================================================
+# The executable wall behind the Product Brain. Every PR and every push to
+# master must pass typecheck + the full test suite + a production build. The
+# regression tests (REG-008/010/013/014, UX-001, navigation, saved layouts, …)
+# run here, so a change that reintroduces a solved problem turns CI red and
+# (with branch protection) cannot be merged.
+#
+# Rule: No green CI, no merge. No green test, no closed regression.
+# See docs/product-brain/regression-test-map.md and 11-ai-development-rules.md.
+# ============================================================================
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test (regression suite)
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+        env:
+          # Build-time placeholders only — NO real secrets. The app reads real
+          # values at runtime; these just let the production build complete in CI
+          # without contacting any service.
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+          NEXT_PUBLIC_SITE_URL: https://projectops360.vercel.app
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
