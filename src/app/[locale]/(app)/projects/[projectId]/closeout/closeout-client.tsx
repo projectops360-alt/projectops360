@@ -26,7 +26,7 @@ import {
   CLOSEOUT_STEP_KEYS, type CloseoutState, type CloseoutCta,
 } from "@/lib/rhythm/closeout-workflow";
 import type { CloseoutRiskRecord } from "@/lib/rhythm/closeout-criteria";
-import { generateCloseoutNarrativeAction } from "./actions";
+import { generateCloseoutNarrativeAction, resolveRiskAction } from "./actions";
 
 interface Props {
   locale: string;
@@ -163,7 +163,7 @@ export function CloseoutReportClient({
       </div>
 
       {/* ── Readiness gate (screen only) ─────────────────────────────────────── */}
-      <ReadinessPanel readiness={readiness} isEs={isEs} base={base} />
+      <ReadinessPanel readiness={readiness} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canRunCloseout} />
 
       <div id="closeout-report-print" className="space-y-6 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         {/* Header */}
@@ -333,7 +333,7 @@ export function CloseoutReportClient({
 
 // ── Readiness gate panel (screen only) ──────────────────────────────────────
 
-function ReadinessPanel({ readiness, isEs, base }: { readiness: CloseoutReadiness; isEs: boolean; base: string }) {
+function ReadinessPanel({ readiness, isEs, base, projectId, locale, canResolve }: { readiness: CloseoutReadiness; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean }) {
   const { ready, failCount, warnCount, checks, score } = readiness;
   return (
     <div className="mb-4 rounded-xl border border-border bg-card p-4 print:hidden">
@@ -357,13 +357,13 @@ function ReadinessPanel({ readiness, isEs, base }: { readiness: CloseoutReadines
         </div>
       </div>
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} base={base} />)}
+        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canResolve} />)}
       </div>
     </div>
   );
 }
 
-function CheckRow({ check, isEs, base }: { check: ReadinessCheck; isEs: boolean; base: string }) {
+function CheckRow({ check, isEs, base, projectId, locale, canResolve }: { check: ReadinessCheck; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean }) {
   // REG-017 — record-backed checks (open risks) reveal the EXACT records inline,
   // so a count like "2 open risk(s)" is always clickable down to the 2 records.
   const [expanded, setExpanded] = useState(false);
@@ -432,7 +432,7 @@ function CheckRow({ check, isEs, base }: { check: ReadinessCheck; isEs: boolean;
             <p className="text-[11px] text-muted-foreground">{isEs ? "No hay riesgos abiertos." : "No open risks."}</p>
           ) : (
             <ul className="space-y-1">
-              {records.map((r) => <RiskLine key={r.id} risk={r} isEs={isEs} />)}
+              {records.map((r) => <RiskLine key={r.id} risk={r} isEs={isEs} projectId={projectId} locale={locale} canResolve={canResolve} />)}
             </ul>
           )}
           {isDev && check.diagnostics && <DevDiagnostics diagnostics={check.diagnostics} />}
@@ -442,7 +442,20 @@ function CheckRow({ check, isEs, base }: { check: ReadinessCheck; isEs: boolean;
   );
 }
 
-function RiskLine({ risk, isEs }: { risk: CloseoutRiskRecord; isEs: boolean }) {
+function RiskLine({ risk, isEs, projectId, locale, canResolve }: { risk: CloseoutRiskRecord; isEs: boolean; projectId: string; locale: string; canResolve: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState(false);
+
+  function handleResolve() {
+    setError(false);
+    start(async () => {
+      const res = await resolveRiskAction(projectId, risk.id, locale as Locale);
+      if (res.ok) router.refresh();
+      else setError(true);
+    });
+  }
+
   return (
     <li className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1">
       <div className="flex min-w-0 items-center gap-1.5">
@@ -450,9 +463,27 @@ function RiskLine({ risk, isEs }: { risk: CloseoutRiskRecord; isEs: boolean }) {
         <span className="truncate text-[11px] font-medium text-foreground">{risk.title}</span>
         <span className="shrink-0 text-[10px] text-muted-foreground">· {risk.ownerName ?? (isEs ? "sin responsable" : "unassigned")}</span>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1.5">
         <SeverityBadge severity={risk.severity} />
         <RiskStatusBadge status={risk.status} isEs={isEs} />
+        {canResolve && (
+          <button
+            type="button"
+            onClick={handleResolve}
+            disabled={pending}
+            title={error ? (isEs ? "No se pudo resolver. Inténtalo de nuevo." : "Could not resolve. Try again.") : undefined}
+            className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+              error
+                ? "border-red-300 text-red-600 hover:border-red-500 dark:text-red-400"
+                : "border-border bg-background text-foreground hover:border-green-500 hover:text-green-600 dark:hover:text-green-400"
+            }`}
+          >
+            {pending
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <CheckCircle2 className="h-3 w-3" />}
+            {isEs ? "Resolver" : "Resolve"}
+          </button>
+        )}
       </div>
     </li>
   );
