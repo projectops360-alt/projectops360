@@ -263,6 +263,54 @@ Impact · Severity · Investigation status · Owner · Next action.
   visit `/projects/:id/rythm` → lands on `/rhythm` with no error; `/projects/:id/rythm/<anything>`
   → `/rhythm`; Project Memory + ProjectOps Scribe routes unchanged.
 
+## REG-012 — BIM Module Missing from Navigation
+- **Description:** The BIM module is no longer visible in the project navigation. BIM is the
+  **Drawing Intelligence** capability (user-facing label "BIM" since commit `84bdee5` —
+  *"rename Drawing Intelligence → BIM"*), surfaced as the project tab `drawingIntelligence`
+  (`/projects/:projectId/drawing-intelligence`) and as an AI Operator hub card. This appears to be
+  a navigation/visibility regression rather than a routing deletion.
+- **Observed (audited 2026-06-27):** the BIM tab is **gated by the `drawing_intelligence` module**
+  (`project-tabs-config.ts` → `module: "drawing_intelligence"`), which is only in the default
+  module set for **construction** project types (`data_center/residential/commercial/infrastructure/
+  industrial`). For `software_development` and `general` projects the tab is **silently hidden with
+  no explanation** — the same filter that hides truly-irrelevant tabs also hides a strategic module.
+  Compounding it, the project menu had **13 flat tabs** (UX-006), so even when present BIM competed
+  for attention in an overcrowded bar.
+- **Expected behavior:** BIM must be available in the project workspace for projects where BIM is
+  enabled or relevant, and **discoverable** (not silently removed) elsewhere. It must live in an
+  appropriate grouped navigation area (a dedicated **Technical / BIM** group), never buried only in
+  Settings or so deep users cannot find it.
+- **Impact:** **Critical** for construction and technical projects. BIM is a strategic ProjectOps360°
+  capability and must remain discoverable. **Severity:** Critical.
+- **Root cause:** two compounding factors —
+  1. **Module gating without a visibility fallback.** The nav filter `(!tab.module || enabledModules
+     .includes(tab.module))` treats BIM like any optional tab, so non-construction projects lost it
+     entirely with no "not enabled here" affordance.
+  2. **Navigation overcrowding (UX-006).** A flat 13-item tab bar with no grouping meant a leaner
+     menu was overdue, and the simplification work risked hiding strategic modules if done naively.
+  The **BIM route itself was never deleted** — `/projects/:projectId/drawing-intelligence` still
+  renders and degrades gracefully (missing drawing tables → empty lists; only `notFound()` when the
+  project itself is absent), so direct/deep links never server-crash.
+- **Status: RESOLVED (2026-06-27).** Fix (durable — grouping + visibility contract, not a label patch):
+  - Restructured the project nav into **grouped navigation** (`TAB_GROUPS` in
+    `project-tabs-config.ts`): **Command Center · Planning · Execution · Resources · Intelligence ·
+    Technical / BIM · More**. `TAB_ITEMS` is now derived (`flatMap`) so existing importers/tests keep
+    working. See **UX-006** and **PD-009**.
+  - BIM lives in a dedicated **Technical / BIM** group. For projects where `drawing_intelligence`
+    is not enabled, BIM is **kept visible as a disabled, explained entry** ("BIM is not enabled for
+    this project") via `keepDisabledWhenModuleMissing` — never silently removed.
+  - All legacy routes preserved; `/projects/:projectId/drawing-intelligence` unchanged and still
+    crash-safe.
+- **Protection rule (binding):** **navigation simplification must never remove or orphan an existing
+  strategic module.** Grouping reduces clutter by organizing capabilities **by user intent**, never by
+  hiding them. BIM must remain visible through an appropriate grouped navigation area (Technical / BIM)
+  or a context-aware, explained disabled entry. Related: [REG-011](#reg-011--rythmrhythm-duplicate-navigation-and-broken-route)
+  (single visible home per capability), [No silent regressions rule].
+- **Owner:** Product. **Verify:** open any **construction** project → **Technical / BIM** group shows
+  **BIM** → it opens Drawing Intelligence. Open a **software/general** project → **Technical / BIM**
+  shows **BIM disabled** with the "not enabled" tooltip. Visit `/projects/:id/drawing-intelligence`
+  directly → renders without a server error.
+
 ---
 
 ### Resolved

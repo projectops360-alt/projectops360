@@ -141,8 +141,28 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Status:** Team Implemented (~70%); RBAC **Partial / regression-risk** on `master`.
 - **Boundaries:** authorization must be server-side. **Related:** CAP-028/029 · DEBT-002.
 
+## Navigation / Shell (Project Workspace)
+- **Purpose:** The project-level navigation (`ProjectTabs`, one sticky bar serving desktop + mobile)
+  that routes between every project module.
+- **Status:** Implemented. **Affected by [UX-006](25-ux-design-debt.md) + [REG-012](10-regression-log.md#reg-012--bim-module-missing-from-navigation).**
+  Restructured from a **flat 13-tab bar** into **grouped navigation** (`TAB_GROUPS`): Command Center ·
+  Planning · Execution · Resources · Intelligence · **Technical / BIM** · More.
+- **Boundaries (must-not):** simplification must **never** hide, orphan, or degrade a strategic module
+  (BIM, Living Graph, Resource Capacity, Project Memory). Grouping organizes by **user intent**, not by
+  removal. Operational modules must not be demoted into Settings. One visible home per capability
+  (REG-011). **Related:** [PD-009](30-product-decision-log.md), [UX-006](25-ux-design-debt.md).
+
 ## Drawing Intelligence / BIM
-- **Status:** Partial (~55%). Documentation pending deeper review. **Related:** CAP-035.
+- **Status:** Partial (~55%). Documentation pending deeper review. **Affected by
+  [REG-012](10-regression-log.md#reg-012--bim-module-missing-from-navigation):** BIM had disappeared
+  from the project menu for non-construction projects (module-gated with no visibility fallback).
+  **Now placed in the dedicated Technical / BIM nav group** ([PD-009](30-product-decision-log.md));
+  shown disabled-with-explanation where `drawing_intelligence` is not enabled, never silently removed.
+  Route `/projects/:projectId/drawing-intelligence` preserved and crash-safe. **Related:** CAP-035.
+
+> **Execution** and **Resources** module areas are also touched by UX-006/REG-012 navigation grouping
+> (Execution hosts Workboard/Execution Map; Resources hosts Team & Roles/Stakeholders/Resource
+> Capacity/Labor Capacity). Resource Capacity stays operational under **Resources**, never Settings-only.
 
 ## Adaptive Delivery Framework · Project Import Intelligence · Billing
 - **Status:** Delivery Implemented (~70%); Import Implemented (~75%); Billing Partial (~50%).

@@ -101,6 +101,37 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
   `src/components/graph/living-graph-layout-controls.tsx`, wired in `living-graph-view.tsx`.
   CAP-005, ADR-002. Shared/team layout = Decided (not yet built).
 
+## PD-009 — BIM Navigation Placement (UX-006 / REG-012)
+- **Decision:** **BIM must remain discoverable in ProjectOps360°.** Navigation simplification groups
+  capabilities by user intent; it must never remove, orphan, or bury a strategic module. BIM (the
+  Drawing Intelligence capability, user-facing label "BIM") gets a **dedicated Technical / BIM group**
+  in the grouped project navigation.
+- **Preferred placement (in priority order):**
+  - **Technical / BIM** — a dedicated technical group (**chosen**: keeps BIM strategic and obvious for
+    construction/technical projects). Houses BIM / Drawings / Models / Technical Assets / Construction
+    documents as they ship.
+  - or **Execution → BIM** — acceptable if fewer top-level groups are required.
+  - or **More → Technical / BIM** — only if **More** is clearly visible and BIM is not hidden.
+  - For construction / BIM-enabled projects, BIM must be **visible and not buried**.
+- **Visibility contract (binding):**
+  - BIM is **visible** when the project type is construction, when `drawing_intelligence` is enabled,
+    or when the product otherwise treats BIM as available — respecting RBAC.
+  - When BIM is **not enabled**, the product must **not silently remove** it: show a **disabled,
+    explained entry** ("BIM is not enabled for this project") rather than nothing, so the capability
+    is never invisible to a user who expects it. (`keepDisabledWhenModuleMissing` in
+    `project-tabs-config.ts`.)
+  - Existing BIM deep links (`/projects/:projectId/drawing-intelligence`) must keep working and never
+    server-crash.
+- **Resource Capacity placement (binding, related):** Resource Capacity is **operational**, not admin.
+  It lives under **Resources / People & Capacity** — **never only in Settings**.
+- **Settings boundary (binding, related):** Settings holds project settings, permissions/access,
+  integrations, notifications, templates, advanced/admin — **not** the primary home for operational
+  modules (Team execution, Stakeholders, Resource Capacity, BIM, Workboard, Project Memory).
+- **Status: Shipped** — UX-006 grouped nav; `src/components/layout/project-tabs-config.ts`
+  (`TAB_GROUPS`, Technical / BIM group) + `project-tabs.tsx`. Resolves
+  [REG-012](10-regression-log.md#reg-012--bim-module-missing-from-navigation); implements
+  [UX-006](25-ux-design-debt.md). CAP-035.
+
 ---
 
 ## Affected modules
