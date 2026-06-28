@@ -160,6 +160,35 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
   light design tokens + graph keyframes in `landing.css`; every landing section restyled to the light
   system; `execution-map.tsx` (old dark hero mock) removed. **Status: Shipped** — `/landing`.
 
+## PD-010 — Product Brain Control Center (in-app governance cockpit)
+- **Decision:** ProjectOps360° exposes Product Brain / Product Intelligence **inside the app** as a
+  trackable governance Control Center, not only as markdown. It indexes product decisions,
+  regressions, UX contracts, ADRs/CAPs, modules, known gaps, and AI development rules with **status +
+  test-protection** metadata, search/filters, a detail drawer, an "Ask Isabella about this item"
+  bridge, and a Markdown export.
+- **Reason:** markdown alone made governance state hard to track and let solved issues regress.
+  Owner and AI developers need a visible, searchable, status-driven system of record.
+- **Storage:** **hybrid (Option C)** — markdown (`docs/product-brain`) remains the **source of
+  truth**; the app adds a structured index (`src/lib/product-brain-center/registry.ts`) that cites
+  each item's `source_path`/`section`. Every item shows whether it is **protected by an executable
+  test** (links to the regression-test map).
+- **Access (TASK 10A — binding security):** the Control Center is internal and sensitive. Access is a
+  **strict server-side EMAIL allowlist**, NOT role and NOT UI hiding. The single source of truth is
+  `src/lib/product-brain/access.server.ts` (`isProductBrainAllowedEmail`), configured via
+  `PRODUCT_BRAIN_ALLOWED_EMAILS` (fallback defaults: `efrain.pradas@gmail.com`, `pmo@xxx-demi.io` —
+  *placeholder; set the real PMO address in env*). The route (`/product-intelligence`) returns
+  `notFound()` for non-allowed users (existence not revealed) and loads no data; the nav item, the
+  server actions (Isabella bridge + export), and Isabella's item answers all enforce the same
+  allowlist. Isabella refuses internal Product Brain content for non-allowed accounts.
+- **Protection rule:** major decisions, regressions, UX contracts, ADRs, CAPs and module rules must
+  be traceable from the Control Center, each showing its test-protection status. The allowlist is
+  enforced server-side and covered by `src/lib/product-brain/__tests__/access.test.ts`; the registry
+  + selectors by `src/lib/product-brain-center/__tests__/registry.test.ts`.
+- **Implementation:** route `app/[locale]/(app)/product-intelligence/page.tsx`;
+  `components/product-brain/control-center.tsx` (+ embeds the existing docs viewer as the Documents
+  tab — no capability removed); `lib/product-brain-center/{types,registry,select}.ts`;
+  `lib/product-brain/{access.ts,access.server.ts}`. **Status: Shipped.**
+
 ---
 
 ## Affected modules

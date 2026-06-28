@@ -19,11 +19,13 @@ export interface AppShellProps {
   children: React.ReactNode;
   user?: UserData;
   org?: OrgData;
+  /** Server-computed: may the current user see the Product Brain Control Center? */
+  canViewProductBrain?: boolean;
 }
 
-export function AppShell({ children, user, org }: AppShellProps) {
+export function AppShell({ children, user, org, canViewProductBrain = false }: AppShellProps) {
   return (
-    <AppFrame header={<Header user={user} org={org} />} role={org?.role}>
+    <AppFrame header={<Header user={user} org={org} />} role={org?.role} canViewProductBrain={canViewProductBrain}>
       {children}
     </AppFrame>
   );

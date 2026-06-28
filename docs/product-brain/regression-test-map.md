@@ -21,6 +21,7 @@
 | UX-007 | Living Graph | Saved layouts are **presentation-only** — they never change tasks/dependencies/edges/status | `src/lib/graph/__tests__/graph-layout-storage.test.ts` · `src/lib/graph/__tests__/graph-ui-prefs.test.ts` | **protected** |
 | REG-006 | Execution Status | Blocked vs Waiting-on-Dependency are independent dimensions; waiting is not a problem state | `src/lib/graph/__tests__/living-graph-status.test.ts` (+ `src/lib/execution/status-engine.ts` rules) | **protected** |
 | REG-009 | Project Memory / Scribe | Voice/paste → AI structure → review → save into Project Memory; anti-hallucination (verbatim excerpt, null for missing, needs_review default, human approval) | `src/lib/scribe/__tests__/scribe-ai.test.ts` | **protected** |
+| SEC-PB-ALLOWLIST | Navigation / Shell | Product Brain Control Center is restricted to a strict server-side email allowlist (PD-010 / TASK 10A); unauthorized users get 404 and no data via page/nav/actions/Isabella/export | `src/lib/product-brain/__tests__/access.test.ts` · `src/lib/product-brain-center/__tests__/registry.test.ts` | **protected** |
 
 ## Open gaps (tests owed)
 
