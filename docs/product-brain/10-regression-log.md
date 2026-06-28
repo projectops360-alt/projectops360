@@ -212,6 +212,57 @@ Impact · Severity · Investigation status · Owner · Next action.
 - **Owner:** Product. **Verify:** open "Mobile App Design" → Living Graph header blockers ==
   Executive Insights blockers == PMO Summary blockers; Resource Capacity card == list.
 
+## REG-011 — Rythm/Rhythm duplicate navigation and broken route
+- **Description:** Project navigation exposed **two** visible, near-identically named menu items —
+  **Rhythm** (`/rhythm`, "Ritmo", Rhythm Center calendar+meetings) and **Rythm** (`/rythm`, "Rythm",
+  meeting/audio intelligence). One of them, `/projects/:projectId/rythm`, failed to load with a
+  server error.
+- **Observed (prod):** `/rythm` rendered *"This page couldn't load — A server error occurred. Reload
+  to try again."* Two visible nav items for the same meeting/conversation capability.
+- **Expected:** Exactly **one** visible Rythm/Rhythm module in navigation; every old and canonical
+  route safe (load or redirect — never crash).
+- **Impact:** High — a broken route plus duplicate module names make the product feel unstable and
+  erode trust. **Severity:** High.
+- **Root cause (audited 2026-06-27):** the **`master` vs `feat/rythm` divergence** (DEBT-001 /
+  DEBT-004 family). The standalone Rythm dashboard on `master` queries `project_rythm_meetings`
+  (see `lib/rythm/meeting-service.ts`), **a table that never reached production**. In prod the Rythm
+  audio capability was folded into the Rhythm Center schema (migrations `rythm_audio_into_rhythm`,
+  `rythm_*` 20260620–20260621); the prod Rythm tables are
+  `project_rythm_{audio_files,transcripts,processing_jobs,activity_log,speaker_mappings,intelligence}`
+  — **no `*_meetings` table**. So every `/rythm` request threw a Postgres "relation does not exist"
+  error from the server component → generic error screen. It was **not** a missing env var,
+  auth/guard failure, or browser-only API call.
+- **Product decision — Rythm canonical naming (binding):** the two surfaces are **consolidated into
+  one canonical meeting module: Rhythm Center.**
+  - **Canonical visible label:** **"Ritmo" / Rhythm** (the working, prod-backed, documented module).
+  - **Canonical route:** `/projects/:projectId/rhythm`.
+  - **Backward-compatible alias:** `/projects/:projectId/rythm` (and `/rythm/:meetingId`) **redirect**
+    to `/rhythm`. Old bookmarks and deep links stay safe.
+  - **Rationale:** making `/rythm` canonical instead would have required hiding the *working* Rhythm
+    Center calendar (a second regression) and applying the never-shipped `project_rythm_meetings`
+    migration to prod (risk + schema divergence). Prod already treats audio as part of Rhythm, so
+    Rhythm-canonical is the only choice that keeps production healthy and deletes no working feature.
+- **Status: RESOLVED (2026-06-27).** Fix (durable — removes the broken query path, not a try/catch
+  mask):
+  - Removed the duplicate **"rythm"** tab from `src/components/layout/project-tabs.tsx` (single
+    ProjectTabs nav serves desktop + mobile) — only **"Ritmo"/Rhythm** remains.
+  - Converted `app/.../projects/[projectId]/rythm/page.tsx` and `.../rythm/[meetingId]/page.tsx`
+    into locale-aware **redirects** to `/rhythm` (same pattern as the `roadmap → execution-map`
+    alias). No code reaches the phantom `project_rythm_meetings` query anymore.
+  - The `lib/rythm` + `components/rythm` cluster is **kept (dormant)**, not deleted — it can be
+    re-wired into Rhythm Center when audio intelligence is properly shipped on the prod schema.
+- **Conceptual model (recorded):** **Rythm** = meeting/audio intelligence (lives within Rhythm
+  Center) · **ProjectOps Scribe** = quick dictated/pasted capture (REG-009) · **Project Memory** =
+  permanent evidence store · **Isabella** = retrieval/explanation interface. No capability has two
+  visible homes.
+- **Protection rule (binding):** navigation must **never** expose two visible modules for the same
+  capability. A single capability = one visible nav item + one canonical route; every legacy route
+  must be an explicit redirect/alias, never a crash. Resolves **DEBT-004**. Related: DEBT-001,
+  [REG-009](#reg-009--project-memory-voice-notes--actionsdecisions-lost).
+- **Owner:** Product. **Verify:** open any project → only one "Ritmo" tab (desktop + mobile);
+  visit `/projects/:id/rythm` → lands on `/rhythm` with no error; `/projects/:id/rythm/<anything>`
+  → `/rhythm`; Project Memory + ProjectOps Scribe routes unchanged.
+
 ---
 
 ### Resolved

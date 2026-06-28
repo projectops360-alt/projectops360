@@ -4,22 +4,7 @@ import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Map,
-  Columns3,
-  BookOpen,
-  Settings,
-  HardHat,
-  DraftingCompass,
-  FileBarChart,
-  CalendarClock,
-  ShieldCheck,
-  Layers,
-  Users,
-  Mic,
-  Gauge,
-} from "lucide-react";
+import { TAB_ITEMS } from "./project-tabs-config";
 
 import type { ProjectModule } from "@/types/database";
 
@@ -34,105 +19,8 @@ interface ProjectTabsProps {
   enabledModules?: ProjectModule[];
 }
 
-interface TabItem {
-  titleKey: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  matchPattern: string;
-  /** Module gate: the tab is hidden when the project doesn't enable it. */
-  module?: ProjectModule;
-}
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const TAB_ITEMS: TabItem[] = [
-  {
-    titleKey: "commandCenter",
-    href: "/projects/[projectId]",
-    icon: LayoutDashboard,
-    matchPattern: "/projects/[projectId]",
-  },
-  {
-    titleKey: "charterGovernance",
-    href: "/projects/[projectId]/charter",
-    icon: ShieldCheck,
-    matchPattern: "/projects/[projectId]/charter",
-  },
-  {
-    titleKey: "deliveryFramework",
-    href: "/projects/[projectId]/delivery",
-    icon: Layers,
-    matchPattern: "/projects/[projectId]/delivery",
-  },
-  {
-    titleKey: "teamRoles",
-    href: "/projects/[projectId]/team",
-    icon: Users,
-    matchPattern: "/projects/[projectId]/team",
-  },
-  {
-    titleKey: "workboard",
-    href: "/projects/[projectId]/workboard",
-    icon: Columns3,
-    matchPattern: "/projects/[projectId]/workboard",
-  },
-  {
-    titleKey: "executionMap",
-    href: "/projects/[projectId]/execution-map",
-    icon: Map,
-    matchPattern: "/projects/[projectId]/execution-map",
-  },
-  {
-    titleKey: "laborCapacity",
-    href: "/projects/[projectId]/labor-capacity",
-    icon: HardHat,
-    matchPattern: "/projects/[projectId]/labor-capacity",
-    module: "labor_capacity",
-  },
-  {
-    titleKey: "resourceCapacity",
-    href: "/projects/[projectId]/resource-capacity",
-    icon: Gauge,
-    matchPattern: "/projects/[projectId]/resource-capacity",
-  },
-  {
-    titleKey: "drawingIntelligence",
-    href: "/projects/[projectId]/drawing-intelligence",
-    icon: DraftingCompass,
-    matchPattern: "/projects/[projectId]/drawing-intelligence",
-    module: "drawing_intelligence",
-  },
-  {
-    titleKey: "projectMemory",
-    href: "/projects/[projectId]/memory",
-    icon: BookOpen,
-    matchPattern: "/projects/[projectId]/memory",
-  },
-  {
-    titleKey: "rhythm",
-    href: "/projects/[projectId]/rhythm",
-    icon: CalendarClock,
-    matchPattern: "/projects/[projectId]/rhythm",
-  },
-  {
-    titleKey: "rythm",
-    href: "/projects/[projectId]/rythm",
-    icon: Mic,
-    matchPattern: "/projects/[projectId]/rythm",
-  },
-  {
-    titleKey: "statusReport",
-    href: "/projects/[projectId]/status",
-    icon: FileBarChart,
-    matchPattern: "/projects/[projectId]/status",
-  },
-  {
-    titleKey: "settings",
-    href: "/projects/[projectId]/settings",
-    icon: Settings,
-    matchPattern: "/projects/[projectId]/settings",
-  },
-];
+// TAB_ITEMS lives in ./project-tabs-config (pure data) so it can be unit-tested
+// without the client/next-intl import chain — see project-tabs-nav.test.ts.
 
 // ── Component ────────────────────────────────────────────────────────────────
 
