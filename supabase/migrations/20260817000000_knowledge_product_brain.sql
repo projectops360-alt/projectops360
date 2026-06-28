@@ -20,6 +20,7 @@ WITH pkg AS (
     (NULL, 'pi-living-graph-what-is', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-critical-path-source-of-truth', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-focus-mode', 'product_intelligence', 'published', 'en'),
+    (NULL, 'pi-living-graph-saved-layouts', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-blocked-vs-waiting', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-completed-not-blockers', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-execution-status-engine', 'product_intelligence', 'published', 'en'),
@@ -46,6 +47,7 @@ ver AS (
     ('pi-living-graph-what-is', 'verified', '12-living-graph-strategy.md → Overview; 22-modules.md → Living Graph'),
     ('pi-critical-path-source-of-truth', 'verified', 'Product Decision — Critical Path Source of Truth; 12-living-graph-strategy.md → Critical Path'),
     ('pi-focus-mode', 'verified', '27-sprint-02-living-graph-focus.md → Decisions; ADR-002'),
+    ('pi-living-graph-saved-layouts', 'verified', 'Product Decision PD-008 (UX-007); 12-living-graph-strategy.md → Manual workspace organization'),
     ('pi-blocked-vs-waiting', 'verified', '18-execution-status-engine.md; ADR-006; REG-006'),
     ('pi-completed-not-blockers', 'verified', 'ADR-006; REG-008; REG-010; src/lib/execution/task-activity.ts'),
     ('pi-execution-status-engine', 'verified', '18-execution-status-engine.md; ADR-006'),
@@ -88,6 +90,12 @@ Verify: Living Graph toolbar → "Focus Graph" button; exit with the same button
     ('pi-focus-mode', 'es', '¿Qué hace el Modo Enfoque?', 'El Modo Enfoque hace del Living Graph el protagonista colapsando la interfaz secundaria: oculta el título/subtítulo de la página, el texto de ayuda y las leyendas, colapsa los Indicadores y expande el lienzo a toda la ventana para que el grafo tenga el máximo espacio legible. Es solo de diseño/interacción — no cambia la generación de nodos, el estado, los bloqueos ni ningún motor. Las preferencias de vista (overlay, layout, nivel, indicadores) se recuerdan localmente.
 Fuente: 27-sprint-02-living-graph-focus.md → Decisions.
 Verifica: barra del Living Graph → botón "Focus Graph"; sal con el mismo botón.'),
+    ('pi-living-graph-saved-layouts', 'en', 'How do I save the Living Graph layout?', 'In ProjectOps360°, you can manually arrange nodes in the Living Graph and click Save Layout. The saved layout is visual only — it does NOT change tasks, dependencies, blockers, edges, execution status, capacity, or project data; it stores node positions and the viewport. It is saved for the current project and graph context (view level + layout mode) and is personal to you. Switching layout mode or level loads that context''s saved layout rather than destroying your arrangement. You can reset to auto-layout, reset to your saved layout, or clear it at any time. When the graph changes, existing nodes with saved positions are restored and new nodes are placed automatically (a notice tells you the layout was partially applied); deleted nodes are ignored. Saving never changes graph edges or relationships — node position is presentation state only.
+Source: Product Decision PD-008 (UX-007) / 12-living-graph-strategy.md → Manual workspace organization.
+Verify: Execution Map → Living Graph → drag nodes → Save Layout (top-center); refresh and the arrangement returns. Use the layout menu to reset to auto-layout or clear.'),
+    ('pi-living-graph-saved-layouts', 'es', '¿Cómo guardo el diseño del Living Graph?', 'En ProjectOps360°, puedes acomodar manualmente los nodos del Living Graph y hacer clic en Guardar diseño. El diseño guardado es solo visual — NO cambia tareas, dependencias, bloqueos, aristas, estado de ejecución, capacidad ni datos del proyecto; almacena las posiciones de los nodos y el viewport. Se guarda para el proyecto y el contexto de grafo actual (nivel de vista + modo de diseño) y es personal tuyo. Cambiar de modo de diseño o de nivel carga el diseño guardado de ese contexto en lugar de destruir tu disposición. Puedes restaurar el diseño automático, restaurar tu diseño guardado o borrarlo cuando quieras. Cuando el grafo cambia, los nodos existentes con posición guardada se restauran y los nodos nuevos se colocan automáticamente (un aviso indica que el diseño se aplicó parcialmente); los nodos eliminados se ignoran. Guardar nunca cambia las aristas ni las relaciones del grafo — la posición del nodo es solo estado de presentación.
+Fuente: Decisión de Producto PD-008 (UX-007) / 12-living-graph-strategy.md → Manual workspace organization.
+Verifica: Execution Map → Living Graph → arrastra nodos → Guardar diseño (arriba al centro); recarga y la disposición vuelve. Usa el menú de diseño para restaurar el automático o borrar.'),
     ('pi-blocked-vs-waiting', 'en', 'What is the difference between blocked and waiting?', 'In ProjectOps360°, Blocked and Waiting are different execution states. Blocked requires explicit, unresolved impediment evidence — a recorded blocker (status "blocked" or an is_blocked flag on a non-terminal task). Waiting on dependency means a predecessor/dependency is not yet satisfied; it is NOT a blocker and must never be shown as one. Blocked is never inferred from dependencies.
 Source: ADR-006 / Execution Status Engine (18-execution-status-engine.md).
 Verify: Living Graph header shows blocked and waiting as separate counts.'),

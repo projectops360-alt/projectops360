@@ -26,7 +26,7 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 
 | Module | Doc status | Impl confidence | Related ADRs | Related CAPs | Next audit priority |
 |--------|-----------|-----------------|--------------|--------------|---------------------|
-| Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) · ⚠️ [REG-007](10-regression-log.md) · ✅ [REG-008](10-regression-log.md) fixed · ✅ [Sprint #2](27-sprint-02-living-graph-focus.md) focus/usability · ✅ [Sprint #3](28-sprint-03-overlay-clarity.md) overlay clarity · ✅ [Sprint #4](29-sprint-04-navigation-evidence.md) navigation/evidence |
+| Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) · ⚠️ [REG-007](10-regression-log.md) · ✅ [REG-008](10-regression-log.md) fixed · ✅ [Sprint #2](27-sprint-02-living-graph-focus.md) focus/usability · ✅ [Sprint #3](28-sprint-03-overlay-clarity.md) overlay clarity · ✅ [Sprint #4](29-sprint-04-navigation-evidence.md) navigation/evidence · ✅ **UX-007** Saved Layouts ([PD-008](30-product-decision-log.md)) |
 | Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) — now consumed by the graph | ~30% | 006 | CAP-016 | ✅ [REG-008](10-regression-log.md) wiring (graph) |
 | Reports / Status Report | Pending | ~70% | — | CAP-024 | aligned semantics ([REG-008](10-regression-log.md)) |
 | Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) · ⚠️ [REG-007](10-regression-log.md) |
@@ -58,7 +58,11 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **AI:** deterministic analysis (critical path, bottlenecks); Isabella explanations (pending wiring).
 - **Permissions:** project members; respects project isolation.
 - **Connects to:** Tasks, Milestones, Dependencies, Resource Capacity, (future) Execution Status Engine, Risks/Decisions.
-- **Boundaries:** must never be decorative; must not infer "Blocked" from dependencies.
+- **Boundaries:** must never be decorative; must not infer "Blocked" from dependencies. **Saved
+  Layouts (UX-007 / PD-008) are presentation state only** — persisting node coordinates must never
+  change edges, dependencies, status, blockers, capacity, or rollups.
+- **Affected by UX-007 (Saved Layouts):** manual node positions persist per project + graph context
+  + user; auto-layout/reset/clear remain available. [PD-008](30-product-decision-log.md).
 - **Related:** CAP-005 · [ADR-002](adrs/ADR-002-living-graph-primary-surface.md) · [Strategy](12-living-graph-strategy.md).
 
 ## Resource Capacity Intelligence
@@ -92,6 +96,9 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Knowledge sources:** **every module is a knowledge source for Isabella** via curated Product
   Brain packages — Living Graph, Workboard, Project Memory/Scribe, Resource Capacity, Execution
   Status Engine, regressions (REG-008/009/010), ADRs, and Product Decisions.
+- **Affected by UX-007 (Saved Layouts):** Isabella must explain how to save the Living Graph layout
+  and that it is visual only — it changes no project data, dependencies, or edges
+  (package `pi-living-graph-saved-layouts`; [PD-008](30-product-decision-log.md)).
 - **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md) · [Doc 31 — Dr. Isabella](31-dr-isabella-product-intelligence.md).
 
 ## Project Memory & Scribe
@@ -146,6 +153,8 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Status:** Implemented (~70%). **Users:** owner/admin only (server-enforced).
 - **Data:** `docs/product-brain` (build-bundled). **Permissions:** internal; denied to member/viewer/client.
 - **Boundaries:** internal only; never client-facing; read-only (no in-app editing yet).
+- **Affected by UX-007 (Saved Layouts):** the Living Graph Saved Layouts behavior is documented here
+  (PD-008, doc 12, doc 30) so it is the source of truth and Isabella can answer it.
 - **Related:** CAP-042.
 
 ---

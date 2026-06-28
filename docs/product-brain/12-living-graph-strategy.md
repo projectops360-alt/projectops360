@@ -78,6 +78,7 @@ Tasks/Milestones/Dependencies/Critical Path · Risks · (future) Issues/Decision
 | What-if simulation | `living-graph-analysis.ts` (`runSimulation`) | Implemented |
 | Workforce Intelligence layer | `lib/graph/workforce-graph-mapping.ts` | Implemented (restored, REG-005) |
 | Executive insights panel | `components/graph/executive-summary-panel.tsx` | Implemented (restored) |
+| Saved Layouts (manual node positions persist) | `lib/graph/graph-layout-storage.ts`, `living-graph-layout-controls.tsx` | Implemented (UX-007 / PD-008, MVP localStorage) |
 | Milestone status (live from tasks) | `lib/roadmap/progress.ts` | Implemented |
 | Orphan cleanup / recalculate | `lib/roadmap/living-graph-sync.ts`, `living-graph/actions.ts` | Implemented (restored) |
 | Node "Blocked" indicator | `living-graph-node.tsx` | **Ad-hoc / Needs refactor** (conflates Blocked vs Waiting — REG-006) |
@@ -136,6 +137,29 @@ workload detail. *(Requires captured capacity data — `hasResources`.)* **Known
 limitation:** the people-nodes view shows in **Activities/Events** level, not the default
 **Milestones** level — a follow-up should auto-surface it when the overlay is selected.
 
+## 11c. Manual workspace organization — Saved Layouts (UX-007, [PD-008](30-product-decision-log.md))
+The Living Graph supports **manual workspace organization**: users may drag nodes into an
+arrangement that makes sense for their project and **save** it so it survives refresh and future
+visits.
+
+- A **saved layout is a visual preference, not a change to project relationships.** Node positions
+  are **presentation state only** — edges, dependencies, blockers, waiting, execution status,
+  capacity, rollups, and every project fact remain untouched.
+- **Graph data remains deterministic.** The graph is still built deterministically from the engines;
+  a saved layout only **affects coordinates** (x/y) of matching nodes plus the viewport. It never
+  adds, removes, or rewires edges, and never stores computed status values or stale entity data.
+- **Scope:** per **project** + per **graph context** (view level + layout mode) + per **user**
+  (personal, MVP). Switching layout mode or level loads *that* context's saved layout — it does not
+  silently destroy the manual one. **Auto-layout stays available** (reset-to-auto / reset-to-saved /
+  clear-saved).
+- **Resilient to change:** saved positions apply only to nodes that still exist; new nodes are
+  placed by the auto-layout; deleted nodes in the saved layout are ignored; if the graph changed the
+  layout is partially applied with an honest notice — never a crash.
+- **Persistence:** localStorage (project + context scoped) for the MVP, extending the existing graph
+  view-preference convention (`graph-ui-prefs.ts` → `graph-layout-storage.ts`). Durable
+  `project_graph_layouts` Supabase table is the documented upgrade path for shared/team layouts
+  (PM/PMO/Admin). See [PD-008](30-product-decision-log.md).
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration
@@ -165,7 +189,8 @@ Binding decisions recorded in the [Product Decision Log](30-product-decision-log
 **PD-001** Critical Path lives in the Living Graph · **PD-003** Variance requires a baseline ·
 **PD-004** Timeline Playback requires real history · **PD-005** What-if is sandbox-first
 (simulation only) · **PD-006** Risk/SOP disconnected nodes must be explained · **PD-007** Focus
-Mode (the graph is the protagonist).
+Mode (the graph is the protagonist) · **PD-008** Saved Layouts (manual node positions persist;
+presentation state only — UX-007).
 
 ## 14. Related ADRs
 [ADR-002](adrs/ADR-002-living-graph-primary-surface.md) (primary surface) ·

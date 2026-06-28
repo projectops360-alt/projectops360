@@ -56,7 +56,9 @@ Critical Path lives in Living Graph · Workboard cards show avatar/initials + na
 blocked needs explicit impediment, waiting = unsatisfied dependency · completed tasks never block ·
 ProjectOps Scribe = Project Memory capture assistant · Project Memory = permanent evidence store ·
 Variance needs an approved baseline · Timeline needs real multi-day history · What-if is sandbox-first ·
-Focus Mode makes the graph the protagonist · REG-008 false blocked (stale flag on completed task) ·
+Focus Mode makes the graph the protagonist · Living Graph Saved Layouts (UX-007/PD-008) persist
+manual node positions and are visual-only — they change no tasks, dependencies, edges, or status ·
+REG-008 false blocked (stale flag on completed task) ·
 REG-009 Scribe restored · REG-010 one rollup truth · verify false blockers in Mobile App Design →
 Living Graph (0 blocked, waiting separate) · if Product Brain lacks an answer, say so and offer a decision.
 
