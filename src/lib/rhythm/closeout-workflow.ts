@@ -101,8 +101,13 @@ export function readinessCtaRoute(key: string): string | null {
     case "blockers":
       return "/workboard";
     case "milestones":
-    case "open_risks":
       return "/execution-map";
+    // REG-017 — open_risks intentionally has NO route: there is no risk-register
+    // page, and /execution-map never showed risks, so routing there was a dead
+    // end (count said "2 open risks" but the destination showed none). The
+    // Closeout page now discloses the exact open-risk records inline instead.
+    case "open_risks":
+      return null;
     case "open_actions":
       return "/meetings";
     case "follow_ups":

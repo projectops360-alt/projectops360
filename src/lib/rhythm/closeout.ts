@@ -13,6 +13,10 @@ import type { Locale, I18nField, Milestone, RoadmapTask } from "@/types/database
 import { getI18nValue } from "@/types/database";
 import { getComputedMilestoneStatus } from "@/lib/roadmap/progress";
 import { TASK_COMPLETE_STATUSES } from "@/lib/roadmap/status-mappings";
+import {
+  isOpenRiskStatus, riskExclusionReason, reconcileRecordCount,
+  type CloseoutRiskRecord, type CloseoutCriterionDiagnostics,
+} from "@/lib/rhythm/closeout-criteria";
 
 type Supabase = ReturnType<typeof createAdminClient>;
 
@@ -27,7 +31,13 @@ export interface CloseoutMetrics {
     estimated: number; committed: number; actual: number;
     variance: number; variancePct: number | null; currency: string; hasData: boolean; reconciled: boolean;
   };
-  risks: { total: number; open: number; mitigated: number; closed: number; resolvedPct: number };
+  risks: {
+    total: number; open: number; mitigated: number; closed: number; resolvedPct: number;
+    // REG-017 — the count is derived FROM these records, so "open + mitigated"
+    // can always be traced to exactly these rows. `diagnostics` is dev-facing.
+    openRecords: CloseoutRiskRecord[];
+    diagnostics: CloseoutCriterionDiagnostics;
+  };
   rfis: { total: number; open: number; closed: number };
   submittals: { total: number; pending: number; approved: number };
   decisions: number;
@@ -48,6 +58,15 @@ export interface ReadinessCheck {
   level: ReadinessLevel;
   count: number;
   blocking: boolean;
+  // REG-017 — record-backed criteria. When present, the UI can show the EXACT
+  // records behind the count inline, and flag a mismatch if count ≠ records.
+  recordType?: "risk";
+  recordIds?: string[];
+  records?: CloseoutRiskRecord[];
+  /** count === recordIds.length — false means a data-consistency issue to surface. */
+  recordsConsistent?: boolean;
+  /** Dev-only provenance: source fn, included/excluded IDs, reasons. */
+  diagnostics?: CloseoutCriterionDiagnostics;
 }
 
 export interface CloseoutReadiness {
@@ -102,7 +121,9 @@ export async function computeCloseoutMetrics(
     scoped("milestones", "*"),
     scoped("budget_items", "estimated_cost, committed_cost, actual_cost, currency"),
     scoped("material_requirements", "estimated_total_cost"),
-    scoped("risks", "status"),
+    // REG-017 — fetch full risk rows (not just status) so the open-risk count is
+    // backed by exactly these records (id/title/severity/owner), traceable in UI.
+    scoped("risks", "id, title, status, severity, owner_user_id"),
     scoped("rfis", "status"),
     scoped("submittals", "status"),
     scoped("decisions", "status"),
@@ -146,11 +167,42 @@ export async function computeCloseoutMetrics(
   const variance = Math.round((estimated - actual) * 100) / 100;
   const currency = budgetRows.find((b) => b.currency)?.currency ?? "USD";
 
-  // Risks
-  const riskRows = (risks.data ?? []) as unknown as { status: string }[];
-  const rOpen = riskRows.filter((r) => ["open", "identified"].includes(r.status)).length;
+  // Risks — REG-017: the open-risk count is derived FROM the open records below,
+  // so it can never disagree with the rows the Closeout Report can show inline.
+  type RiskRow = { id: string; title: string | null; status: string; severity: string | null; owner_user_id: string | null };
+  const riskRows = (risks.data ?? []) as unknown as RiskRow[];
+  const openRiskRows = riskRows.filter((r) => isOpenRiskStatus(r.status));
   const rMit = riskRows.filter((r) => r.status === "mitigating").length;
+  const rOpen = openRiskRows.length - rMit; // open/identified (active, not yet mitigating)
   const rClosed = riskRows.filter((r) => ["resolved", "closed", "accepted"].includes(r.status)).length;
+
+  // Resolve owner display names for the open risks (single lookup, scoped).
+  const ownerIds = Array.from(new Set(openRiskRows.map((r) => r.owner_user_id).filter((x): x is string => !!x)));
+  const nameById = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ownerIds);
+    for (const p of (profs ?? []) as unknown as { id: string; display_name: string | null }[]) {
+      if (p.display_name) nameById.set(p.id, p.display_name);
+    }
+  }
+  const openRiskRecords: CloseoutRiskRecord[] = openRiskRows.map((r) => ({
+    id: String(r.id),
+    title: r.title ?? "(untitled risk)",
+    status: r.status,
+    severity: r.severity ?? "medium",
+    ownerUserId: r.owner_user_id,
+    ownerName: r.owner_user_id ? (nameById.get(r.owner_user_id) ?? null) : null,
+  }));
+  const riskDiagnostics: CloseoutCriterionDiagnostics = {
+    source: "computeCloseoutMetrics → risks (open = open|identified|mitigating)",
+    includedIds: openRiskRecords.map((r) => r.id),
+    excluded: riskRows
+      .filter((r) => !isOpenRiskStatus(r.status))
+      .map((r) => ({ id: String(r.id), status: r.status, reason: riskExclusionReason(r.status) })),
+    count: openRiskRecords.length,
+    resolveRoute: null, // inline disclosure on the Closeout page (no risk-register route exists)
+    generatedAt: new Date().toISOString(),
+  };
 
   // RFIs / submittals / decisions / follow-ups
   const rfiRows = (rfis.data ?? []) as unknown as { status: string }[];
@@ -175,7 +227,10 @@ export async function computeCloseoutMetrics(
       variance, variancePct: estimated > 0 ? Math.round((variance / estimated) * 100) : null, currency,
       hasData: estimated > 0 || actual > 0, reconciled: (estimated > 0 || actual > 0) && actual > 0,
     },
-    risks: { total: riskRows.length, open: rOpen, mitigated: rMit, closed: rClosed, resolvedPct: pct(rClosed, riskRows.length) },
+    risks: {
+      total: riskRows.length, open: rOpen, mitigated: rMit, closed: rClosed, resolvedPct: pct(rClosed, riskRows.length),
+      openRecords: openRiskRecords, diagnostics: riskDiagnostics,
+    },
     rfis: { total: rfiRows.length, open: rfiRows.length - rfiClosed, closed: rfiClosed },
     submittals: { total: subRows.length, pending: subRows.length - subApproved, approved: subApproved },
     decisions: decRows.length,
@@ -199,6 +254,20 @@ const RD = (
   level: count === 0 ? "pass" : blocking && !warnOnly ? "fail" : "warn",
 });
 
+/** Attach record-backing (REG-017) to the open-risks check so the count is traceable. */
+function attachRiskRecords(check: ReadinessCheck, m: CloseoutMetrics): ReadinessCheck {
+  const records = m.risks.openRecords;
+  const recordIds = records.map((r) => r.id);
+  return {
+    ...check,
+    recordType: "risk",
+    recordIds,
+    records,
+    recordsConsistent: reconcileRecordCount(check.count, recordIds),
+    diagnostics: m.risks.diagnostics,
+  };
+}
+
 export function computeCloseoutReadiness(m: CloseoutMetrics): CloseoutReadiness {
   const s = m.schedule;
   const checks: ReadinessCheck[] = [
@@ -211,8 +280,13 @@ export function computeCloseoutReadiness(m: CloseoutMetrics): CloseoutReadiness 
     // as blocking too would double-count the same underlying work.
     RD("milestones", "Hitos completados", "Milestones complete",
       `${s.pendingMilestones} hito(s) pendiente(s)`, `${s.pendingMilestones} pending milestone(s)`, s.pendingMilestones, false),
-    RD("open_risks", "Riesgos resueltos", "Risks resolved",
-      `${m.risks.open + m.risks.mitigated} riesgo(s) abierto(s)`, `${m.risks.open + m.risks.mitigated} open risk(s)`, m.risks.open + m.risks.mitigated, true),
+    // REG-017 — count derived from openRecords.length so the number the user sees
+    // is exactly the list we can show inline; recordIds/records make it traceable.
+    attachRiskRecords(
+      RD("open_risks", "Riesgos resueltos", "Risks resolved",
+        `${m.risks.openRecords.length} riesgo(s) abierto(s)`, `${m.risks.openRecords.length} open risk(s)`, m.risks.openRecords.length, true),
+      m,
+    ),
     RD("open_rfis", "RFIs respondidos", "RFIs answered",
       `${m.rfis.open} RFI(s) abierto(s)`, `${m.rfis.open} open RFI(s)`, m.rfis.open, true),
     RD("open_actions", "Action items cerrados", "Action items closed",
