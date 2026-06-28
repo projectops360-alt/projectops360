@@ -1572,6 +1572,19 @@
       "tasks": "tareas",
       "currentPhase": "Fase actual"
     },
+    "edgeTooltip": {
+      "title": "Tareas entre hitos",
+      "more": "+{count} tareas más",
+      "status": {
+        "done": "Hecha",
+        "in_progress": "En progreso",
+        "blocked": "Bloqueada",
+        "waiting": "En espera",
+        "deferred": "Diferida",
+        "cancelled": "Cancelada",
+        "pending": "Pendiente"
+      }
+    },
     "pathNarrative": {
       "title": "Ruta encontrada — {steps} pasos · ~{days}d acumulados",
       "blocked": "Bloqueados en la ruta: {labels}",

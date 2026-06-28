@@ -38,7 +38,8 @@ WITH pkg AS (
     (NULL, 'pi-product-brain-gap', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-isabella-project-briefing', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-isabella-briefing-no-invention', 'product_intelligence', 'published', 'en'),
-    (NULL, 'pi-isabella-portfolio-briefing', 'product_intelligence', 'published', 'en')
+    (NULL, 'pi-isabella-portfolio-briefing', 'product_intelligence', 'published', 'en'),
+    (NULL, 'pi-living-graph-edge-tooltip', 'product_intelligence', 'published', 'en')
   ON CONFLICT DO NOTHING
   RETURNING id, slug
 ),
@@ -68,7 +69,8 @@ ver AS (
     ('pi-product-brain-gap', 'verified', '31-dr-isabella-product-intelligence.md → Honesty & gaps'),
     ('pi-isabella-project-briefing', 'verified', '16-isabella-ai-workforce.md → Project Health Briefing; 10-regression-log.md → REG-013'),
     ('pi-isabella-briefing-no-invention', 'verified', '16-isabella-ai-workforce.md → Project Health Briefing; 10-regression-log.md → REG-013'),
-    ('pi-isabella-portfolio-briefing', 'verified', '16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO); 10-regression-log.md → REG-013')
+    ('pi-isabella-portfolio-briefing', 'verified', '16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO); 10-regression-log.md → REG-013'),
+    ('pi-living-graph-edge-tooltip', 'verified', '32-product-ux-contracts.md → UX-008; 12-living-graph-strategy.md → Edges are evidence')
   ) AS t(slug, tier, source_ref) ON t.slug = p.slug
   RETURNING id, package_id
 ),
@@ -209,7 +211,13 @@ Source: 16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO).
 Verify: as a PMO (owner/admin) open Isabella on the Command Center/home → a Portfolio Briefing appears; as a non-PMO outside a project → only the generic prompt.'),
     ('pi-isabella-portfolio-briefing', 'es', '¿Isabella también le da al PMO un briefing del portafolio?', 'Sí. El PM recibe un briefing del proyecto dentro de un proyecto; el PMO recibe la misma ayuda un nivel más arriba. Cuando Isabella se abre FUERA de un proyecto para un owner/admin (PMO), muestra proactivamente un Briefing del Portafolio determinista sobre todos los proyectos: salud general, lo que va bien, lo que requiere atención (trabajo bloqueado de ruta crítica, bloqueos activos, hitos en riesgo, riesgos de alto impacto, vencidos, sin responsable, decisiones pendientes), los proyectos que más requieren atención (priorizados, cada uno con enlace para entrar), las principales acciones recomendadas, y enlaces de verificación (Command Center, Reportes, Proyectos). Usa las mismas reglas canónicas que el Command Center (task-activity + roadmap), así que los números coinciden — no hay llamada de IA al abrir y no inventa nada. Los miembros y viewers no reciben el briefing del portafolio.
 Fuente: 16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO).
-Verifica: como PMO (owner/admin) abre Isabella en el Command Center/home → aparece un Briefing del Portafolio; como no-PMO fuera de un proyecto → solo el prompt genérico.')
+Verifica: como PMO (owner/admin) abre Isabella en el Command Center/home → aparece un Briefing del Portafolio; como no-PMO fuera de un proyecto → solo el prompt genérico.'),
+    ('pi-living-graph-edge-tooltip', 'en', 'What happens when I hover over a Living Graph connection?', 'When you hover over a connection (edge) or its task-count label in the Living Graph, ProjectOps360° shows a read-only tooltip listing the tasks that connection represents and their current statuses — so you can understand what work links two milestones or phases without opening other panels. On touch devices, tap the task-count badge to open it. An edge that says "3 tasks" represents three tasks connecting the source and target milestone; hover it to see the list. The tooltip is read-only: it explains the tasks but does NOT change dependencies, tasks, milestones, blockers, or rollups, and it makes no database or AI call. Statuses use the same deterministic rules as the rest of the product — a completed task with a stale flag is shown as Done, not Blocked, and Waiting is distinct from Blocked (REG-008/010).
+Source: 32-product-ux-contracts.md → UX-008 (Living Graph Edge Task Tooltip).
+Verify: Execution Map → Living Graph (Milestones level) → hover an edge or its "N tasks" badge → the task list with statuses appears.'),
+    ('pi-living-graph-edge-tooltip', 'es', '¿Qué pasa cuando paso el cursor sobre una conexión del Living Graph?', 'Cuando pasas el cursor sobre una conexión (edge) o sobre su etiqueta de cantidad de tareas en el Living Graph, ProjectOps360° muestra un tooltip de solo lectura con las tareas que representa esa conexión y su estado actual — así entiendes qué trabajo une dos hitos o fases sin abrir otros paneles. En dispositivos táctiles, toca la insignia de cantidad para abrirlo. Un edge que dice "3 tareas" representa tres tareas que conectan el hito origen y el destino; pásale el cursor para ver la lista. El tooltip es de solo lectura: explica las tareas pero NO cambia dependencias, tareas, hitos, bloqueos ni rollups, y no hace ninguna consulta a la base de datos ni llamada de IA. Los estados usan las mismas reglas deterministas que el resto del producto — una tarea completada con un flag obsoleto se muestra como Hecha, no Bloqueada, y En espera es distinto de Bloqueada (REG-008/010).
+Fuente: 32-product-ux-contracts.md → UX-008 (Tooltip de Tareas en Edges del Living Graph).
+Verifica: Execution Map → Living Graph (nivel Hitos) → pasa el cursor sobre un edge o su insignia "N tareas" → aparece la lista de tareas con estados.')
   ) AS c(slug, language, title, body) ON c.slug = p.slug
   RETURNING id, version_id, package_id, organization_id, language, body
 )

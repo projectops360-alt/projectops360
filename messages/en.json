@@ -1572,6 +1572,19 @@
       "tasks": "tasks",
       "currentPhase": "Current phase"
     },
+    "edgeTooltip": {
+      "title": "Tasks between milestones",
+      "more": "+{count} more tasks",
+      "status": {
+        "done": "Done",
+        "in_progress": "In Progress",
+        "blocked": "Blocked",
+        "waiting": "Waiting",
+        "deferred": "Deferred",
+        "cancelled": "Cancelled",
+        "pending": "Pending"
+      }
+    },
     "pathNarrative": {
       "title": "Path found — {steps} steps · ~{days}d accumulated",
       "blocked": "Blocked on the path: {labels}",
