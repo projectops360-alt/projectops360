@@ -8,7 +8,7 @@
 // way process explorers annotate transitions.
 // ============================================================================
 
-import { memo } from "react";
+import { memo, useId, useState } from "react";
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -23,6 +23,12 @@ import {
   GRAPH_SEMANTIC_COLORS,
   hexToRgba,
 } from "@/lib/graph/living-graph-styles";
+import {
+  normalizeEdgeTasks,
+  edgeTaskStatusKey,
+  edgeTaskStatusChipClass,
+  limitTasks,
+} from "@/lib/graph/edge-task-tooltip";
 import type { LivingFlowEdge } from "./living-graph-flow-types";
 
 /** Roadmap-style connector between milestone cards with an info callout. */
@@ -34,6 +40,9 @@ function MilestoneChainEdge({
   tasks,
   durationDays,
   dimmed,
+  taskListRaw,
+  sourceTitle,
+  targetTitle,
 }: {
   path: string;
   labelX: number;
@@ -42,9 +51,22 @@ function MilestoneChainEdge({
   tasks: number;
   durationDays: number | null;
   dimmed: boolean;
+  taskListRaw: unknown;
+  sourceTitle: string | null;
+  targetTitle: string | null;
 }) {
   const t = useTranslations("livingGraph");
   const accent = "#34d399";
+  const tipId = useId();
+  // UX-008 — read-only tooltip. Hover the edge path OR the task-count badge;
+  // on touch, tap the badge to toggle. State is local; no data is mutated.
+  const [hoverPath, setHoverPath] = useState(false);
+  const [hoverTip, setHoverTip] = useState(false);
+  const [tapped, setTapped] = useState(false);
+  const tasksData = normalizeEdgeTasks(taskListRaw);
+  const open = !dimmed && tasksData.length > 0 && (hoverPath || hoverTip || tapped);
+  const { shown, moreCount } = limitTasks(tasksData, 7);
+
   return (
     <>
       <BaseEdge
@@ -58,22 +80,80 @@ function MilestoneChainEdge({
           opacity: dimmed ? 0.15 : 0.9,
         }}
       />
+      {/* Invisible wide hit-area so hovering the (thin, dashed) edge path works. */}
+      {!dimmed && tasksData.length > 0 && (
+        <path
+          d={path}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={18}
+          style={{ pointerEvents: "stroke", cursor: "help" }}
+          onMouseEnter={() => setHoverPath(true)}
+          onMouseLeave={() => setHoverPath(false)}
+        />
+      )}
       {!dimmed && tasks > 0 && (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute z-10 rounded-lg border border-border/70 bg-card px-2.5 py-1.5 text-center shadow-lg"
-            style={{
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-              boxShadow: `0 4px 16px ${hexToRgba(accent, 0.12)}`,
-            }}
+            className="absolute z-10"
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
-            <p className="text-[10px] font-bold leading-none" style={{ color: accent }}>
-              {tasks} {t("milestoneCard.tasks")}
-            </p>
-            {durationDays != null && (
-              <p className="mt-0.5 text-[9px] leading-none text-muted-foreground">
-                {durationDays}d
+            {/* Task-count badge — hoverable, tappable (touch), keyboard-focusable */}
+            <button
+              type="button"
+              aria-describedby={open ? tipId : undefined}
+              aria-label={`${tasks} ${t("milestoneCard.tasks")}`}
+              className="pointer-events-auto block rounded-lg border border-border/70 bg-card px-2.5 py-1.5 text-center shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+              style={{ boxShadow: `0 4px 16px ${hexToRgba(accent, 0.12)}` }}
+              onMouseEnter={() => setHoverTip(true)}
+              onMouseLeave={() => setHoverTip(false)}
+              onFocus={() => setHoverTip(true)}
+              onBlur={() => setHoverTip(false)}
+              onClick={() => setTapped((v) => !v)}
+            >
+              <p className="text-[10px] font-bold leading-none" style={{ color: accent }}>
+                {tasks} {t("milestoneCard.tasks")}
               </p>
+              {durationDays != null && (
+                <p className="mt-0.5 text-[9px] leading-none text-muted-foreground">{durationDays}d</p>
+              )}
+            </button>
+
+            {open && (
+              <div
+                id={tipId}
+                role="tooltip"
+                className="pointer-events-auto absolute left-1/2 bottom-full z-20 mb-2 w-[320px] max-w-[80vw] -translate-x-1/2 rounded-xl border border-border bg-card p-3 text-left shadow-xl"
+                onMouseEnter={() => setHoverTip(true)}
+                onMouseLeave={() => setHoverTip(false)}
+              >
+                <p className="text-xs font-semibold text-foreground">{t("edgeTooltip.title")}</p>
+                {(sourceTitle || targetTitle) && (
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {(sourceTitle ?? "—")} → {(targetTitle ?? "—")}
+                  </p>
+                )}
+                <ol className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+                  {shown.map((task, i) => {
+                    const key = edgeTaskStatusKey(task);
+                    return (
+                      <li key={task.id} className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">
+                          {i + 1}. {task.title}
+                        </span>
+                        <span className={`shrink-0 rounded-full border px-1.5 py-px text-[9px] font-medium ${edgeTaskStatusChipClass(key)}`}>
+                          {t(`edgeTooltip.status.${key}`)}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+                {moreCount > 0 && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    {t("edgeTooltip.more", { count: moreCount })}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </EdgeLabelRenderer>
@@ -160,6 +240,17 @@ function LivingGraphEdgeComponent({
             : null
         }
         dimmed={data.emphasis === "dimmed"}
+        taskListRaw={edge.metadata.taskList}
+        sourceTitle={
+          typeof edge.metadata.sourceMilestoneTitle === "string"
+            ? edge.metadata.sourceMilestoneTitle
+            : null
+        }
+        targetTitle={
+          typeof edge.metadata.targetMilestoneTitle === "string"
+            ? edge.metadata.targetMilestoneTitle
+            : null
+        }
       />
     );
   }

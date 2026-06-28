@@ -140,6 +140,17 @@ export const PRODUCT_BRAIN_ITEMS: ProductBrainItem[] = [
     relatedItems: ["REG-012"], tags: ["navigation", "ux"],
   }),
   mk({
+    itemKey: "UX-008", type: "ux_contract", title: "Living Graph Edge Task Tooltip",
+    module: "Living Graph", status: "protected_by_test", severity: "low", testStatus: "protected",
+    sourcePath: "32-product-ux-contracts.md", sourceSection: "UX-008",
+    summary: "Hovering/tapping an edge or its task-count badge shows the tasks it represents and their statuses.",
+    decision: "Edges are evidence, not decoration: an edge labelled '3 tasks' must reveal which tasks and their state. Read-only, deterministic, no invention; stale-done ≠ blocked, waiting ≠ blocked.",
+    protectionRule: "The tooltip must not modify graph data, dependencies, milestones, tasks, blockers or rollups; no DB/AI on hover.",
+    testFiles: ["src/lib/graph/__tests__/edge-task-tooltip.test.ts"],
+    verificationSteps: ["Execution Map → Living Graph (Milestones level) → hover an edge or its 'N tasks' badge → tooltip lists tasks + statuses", "On touch, tap the badge to open"],
+    relatedItems: ["REG-008", "REG-010"], tags: ["living-graph", "ux", "tooltip", "edges"],
+  }),
+  mk({
     itemKey: "UX-007", type: "ux_contract", title: "Living Graph Saved Layouts are presentation-only",
     module: "Living Graph", status: "protected_by_test", severity: "medium", testStatus: "protected",
     sourcePath: "30-product-decision-log.md", sourceSection: "PD-008",

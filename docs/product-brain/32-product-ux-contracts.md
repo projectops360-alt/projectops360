@@ -15,6 +15,7 @@
 | UX-002 | Living Graph Saved Layouts are presentation-only | **APPROVED** (test exists; contract to be formalized in `contracts.ts`) | [UX-007 / PD-008](30-product-decision-log.md) | `src/lib/graph/__tests__/graph-layout-storage.test.ts` |
 | UX-003 | Navigation never hides/orphans a strategic module (BIM visible-or-explained) | **APPROVED** (test exists; contract to be formalized) | [REG-012](10-regression-log.md#reg-012) · UX-006 | `src/components/layout/__tests__/project-tabs-nav.test.ts` |
 | UX-004 | Metric rollups are consistent across surfaces (terminal tasks never blockers) | **APPROVED** (test exists; contract to be formalized) | [REG-010](10-regression-log.md#reg-010) · REG-008 | `src/lib/project-rollups/__tests__/project-rollup-engine.test.ts` · `task-activity.test.ts` |
+| UX-008 | Living Graph edges are explainable (task tooltip) | **APPROVED** | — (usability; reuses REG-008/010 status rules) | `src/lib/graph/__tests__/edge-task-tooltip.test.ts` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
 > listed here so the contract registry is the single index. Promote each to a full `contracts.ts`
@@ -56,3 +57,31 @@ active). **Do not** re-derive the rule inline; import it so there is one source 
 
 **The regression to never reintroduce:** a large avatar/hero stacked above a Project Briefing or an
 active conversation.
+
+---
+
+## UX-008 — Living Graph Edge Task Tooltip
+
+**Status:** APPROVED · **Reuses:** REG-008/REG-010 status rules (`task-activity.ts`).
+
+**Principle:** Living Graph edges are **not decorative** — they are evidence. If an edge says
+"3 tasks", the user must be able to see *which* 3 tasks and *what state* they are in.
+
+**Contract (binding):**
+- Hovering a milestone-connection edge (its path) **or** its task-count badge shows a read-only
+  tooltip listing the tasks the connection represents, each with its current status.
+- On touch, **tapping** the task-count badge toggles the tooltip; tapping outside / re-tapping closes it.
+- The tooltip header shows `source → target` milestone titles and the title "Tasks between milestones".
+- Status is **deterministic** and uses the same canonical rules as the rest of the product: a
+  completed task with a stale `is_blocked` flag is **Done**, never Blocked (REG-008); **Waiting** is
+  distinct from **Blocked**.
+- It **never invents** tasks, owners, dates, priorities or statuses; missing fields are omitted.
+- It is **read-only**: it must not modify graph data, dependencies, milestones, tasks, blockers, or
+  rollups. No DB query and no AI call on hover.
+- Long lists show the first ~7 tasks then "+N more tasks".
+
+**Implementation:** task list attached to milestone-chain edges in
+`src/lib/graph/living-graph-analysis.ts` (`edge.metadata.taskList`); pure helpers in
+`src/lib/graph/edge-task-tooltip.ts`; rendered by `MilestoneChainEdge` in
+`src/components/graph/living-graph-edge.tsx`. Protected by
+`src/lib/graph/__tests__/edge-task-tooltip.test.ts`.

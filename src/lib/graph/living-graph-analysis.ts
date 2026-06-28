@@ -718,13 +718,24 @@ export function aggregateByMilestone(
     const latest = sorted[sorted.length - 1];
     const representative = gate ?? latest;
 
-    // Distinct tasks observed inside this milestone (and how many are done)
+    // Distinct tasks observed inside this milestone (and how many are done).
+    // We also keep a lightweight task list so milestone-chain edges can show a
+    // read-only tooltip (UX-008) of which tasks the connection represents.
     const taskStatus = new Map<string, string | null>();
+    const taskInfo = new Map<string, { id: string; title: string; status: string | null; isBlocked: boolean }>();
     for (const m of members) {
       if (m.sourceEntityType === "roadmap_tasks") {
         taskStatus.set(m.sourceEntityId, m.status);
+        // Last write wins (latest member for this task id).
+        taskInfo.set(m.sourceEntityId, {
+          id: m.sourceEntityId,
+          title: m.label,
+          status: m.status,
+          isBlocked: m.isBlocked,
+        });
       }
     }
+    const taskList = [...taskInfo.values()];
     const tasksTotal = taskStatus.size;
     let tasksDone = 0;
     let tasksStarted = 0;
@@ -768,6 +779,7 @@ export function aggregateByMilestone(
         clusterSize: members.length,
         tasksTotal,
         tasksDone,
+        taskList,
       },
     });
   }
@@ -813,6 +825,11 @@ export function aggregateByMilestone(
         milestone_chain: true,
         tasks: (b.metadata.tasksTotal as number) ?? 0,
         duration_days: durationDays,
+        // UX-008 — read-only tooltip data: the tasks this connection represents
+        // (the target milestone's tasks) + the milestone titles for the header.
+        taskList: Array.isArray(b.metadata.taskList) ? b.metadata.taskList : [],
+        sourceMilestoneTitle: a.milestoneLabel ?? a.label,
+        targetMilestoneTitle: b.milestoneLabel ?? b.label,
       },
     });
   }

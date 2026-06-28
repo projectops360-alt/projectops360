@@ -34,6 +34,14 @@ Visual project intelligence · critical path · risk/rework/bottleneck/traceabil
 milestone status · what-if simulation · executive insights panel · recalculate/orphan cleanup ·
 (intended) evidence drill-down, navigation to records, and Isabella explanations.
 
+## 4a. Edges are evidence, not decoration ([UX-008](32-product-ux-contracts.md))
+Edges (milestone/phase connections) must be **inspectable**. A user should be able to understand
+**why** two milestones are connected and **which tasks** form that relationship. Edge labels (e.g.
+"3 tasks") are explainable: hovering the edge path or the task-count badge shows a read-only tooltip
+listing those tasks and their current statuses (deterministic, using the same status rules as the
+rest of the product — stale-done ≠ blocked, waiting ≠ blocked). The tooltip never mutates graph data,
+dependencies, milestones, tasks, blockers, or rollups. See UX-008.
+
 ## 5. Data Sources
 `process_nodes` / `process_edges` (the graph substrate) enriched from: Tasks · Milestones · WBS ·
 Dependencies · Risks · **Issues** *(missing entity)* · Decisions · Documents · Meetings ·
