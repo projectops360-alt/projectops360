@@ -20,15 +20,12 @@
 | REG-014 / UX-001 | Isabella | Welcome Hero collapses on active content (a briefing counts); full hero never stacks over a briefing/conversation; compact header ≤70px | `src/lib/product-ux-contracts/__tests__/isabella-welcome-hero.test.ts` | **protected** |
 | UX-007 | Living Graph | Saved layouts are **presentation-only** — they never change tasks/dependencies/edges/status | `src/lib/graph/__tests__/graph-layout-storage.test.ts` · `src/lib/graph/__tests__/graph-ui-prefs.test.ts` | **protected** |
 | REG-006 | Execution Status | Blocked vs Waiting-on-Dependency are independent dimensions; waiting is not a problem state | `src/lib/graph/__tests__/living-graph-status.test.ts` (+ `src/lib/execution/status-engine.ts` rules) | **protected** |
-| REG-009 | Project Memory / Scribe | Voice/paste → AI structure → review → save into Project Memory; anti-hallucination (verbatim excerpt, null for missing, human approval) | — | **manual only** (test owed — see below) |
+| REG-009 | Project Memory / Scribe | Voice/paste → AI structure → review → save into Project Memory; anti-hallucination (verbatim excerpt, null for missing, needs_review default, human approval) | `src/lib/scribe/__tests__/scribe-ai.test.ts` | **protected** |
 
 ## Open gaps (tests owed)
 
-- **REG-009 (ProjectOps Scribe):** restoration was file-level + RBAC; the anti-hallucination
-  extraction contract (verbatim `source_excerpt`, `null` for missing owner/date, `needs_review`,
-  no entity creation without approval) should be covered by a unit test on the Scribe AI parser.
-  Until then it is **manual only** and, per rule 13, REG-009 is not eligible to be marked fully
-  closed. Owner: Product.
+- _None._ Every protected regression in the table above has an executable test. New regressions must
+  add their row + test before being marked closed (doc 11, rule 13).
 
 ## Adding a new regression (procedure)
 
