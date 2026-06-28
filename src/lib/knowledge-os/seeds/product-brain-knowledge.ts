@@ -538,6 +538,27 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
         "Verifica: Execution Map → Living Graph (nivel Hitos) → pasa el cursor sobre un edge o su insignia \"N tareas\" → aparece la lista de tareas con estados.",
     },
   },
+  {
+    slug: "pi-closeout-report-process",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "32-product-ux-contracts.md → UX-010; docs/user-manual.md → Project Closeout",
+    authority: "product_decision",
+    en: {
+      title: "How do I generate the Closeout Report?",
+      body:
+        "Open Command Center → Closeout Report. The page guides you through the process: (1) check closeout readiness, (2) resolve pending requirements (each one links to where you fix it — e.g. open tasks → Workboard, decisions → Decisions, budget → Budget), (3) run the Closing Project meeting in Project Memory → Rhythm Center, (4) once that meeting is completed, generate the AI Executive Summary, (5) review the report, (6) Download PDF. The Closing Project meeting runs in the Rhythm Center; the AI narrative is generated only after that meeting is completed — Download PDF exports the report, it does NOT generate the narrative. A Closeout Report is pending when one or more closeout requirements are incomplete (unresolved risks, decisions, follow-ups, open tasks, or missing budget data). Generating the summary requires PM/PMO/member permission (not viewers).\n" +
+        "Source: 32-product-ux-contracts.md → UX-010 (Closeout Report process).\n" +
+        "Verify: open a project → Closeout Report → the guided workflow + a state-appropriate primary button (Create/Open Closing Project Meeting · Generate Executive Summary · Download PDF).",
+    },
+    es: {
+      title: "¿Cómo genero el Reporte de Cierre?",
+      body:
+        "Abre Command Center → Reporte de Cierre. La página te guía por el proceso: (1) revisar la preparación de cierre, (2) resolver los requisitos pendientes (cada uno enlaza a dónde se resuelve — p. ej. tareas abiertas → Workboard, decisiones → Decisiones, presupuesto → Presupuesto), (3) ejecutar la reunión de Cierre del Proyecto en Project Memory → Rhythm Center, (4) una vez completada esa reunión, generar el Resumen Ejecutivo con IA, (5) revisar el reporte, (6) Descargar PDF. La reunión de Cierre del Proyecto se ejecuta en el Rhythm Center; la narrativa con IA se genera solo después de completar esa reunión — Descargar PDF exporta el reporte, NO genera la narrativa. Un Reporte de Cierre está pendiente cuando hay requisitos de cierre incompletos (riesgos, decisiones o seguimientos sin resolver, tareas abiertas, o falta de datos de presupuesto). Generar el resumen requiere permiso de PM/PMO/miembro (no visores).\n" +
+        "Fuente: 32-product-ux-contracts.md → UX-010 (proceso del Reporte de Cierre).\n" +
+        "Verifica: abre un proyecto → Reporte de Cierre → el flujo guiado + un botón principal según el estado (Crear/Abrir reunión de Cierre · Generar Resumen Ejecutivo · Descargar PDF).",
+    },
+  },
 ];
 
 /** Slugs every curated Product Brain package must include (used by tests). */

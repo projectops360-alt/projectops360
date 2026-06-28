@@ -8,14 +8,24 @@
 // ============================================================================
 
 import type { ReactNode } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Download, Sparkles, CalendarClock, DollarSign, ShieldCheck, ListChecks, TrendingUp,
   AlertTriangle, CheckCircle2, XCircle, Trophy, Lightbulb, Wrench, ClipboardList,
-  Flag, Archive,
+  Flag, Archive, Loader2, CalendarPlus, PlayCircle, ChevronRight, Circle,
 } from "lucide-react";
+import { localizedHref } from "@/i18n/href";
+import type { Locale } from "@/types/database";
 import { printWithFilename, docFilename } from "@/lib/print-document";
 import type { CloseoutMetrics, CloseoutReadiness, CloseoutNarrative, MilestoneDuration, ReadinessCheck } from "@/lib/rhythm/closeout";
+import {
+  resolveCloseoutState, primaryCtaFor, activeStepIndex, readinessCtaRoute,
+  CLOSEOUT_STEP_KEYS, type CloseoutState, type CloseoutCta,
+} from "@/lib/rhythm/closeout-workflow";
+import { generateCloseoutNarrativeAction } from "./actions";
 
 interface Props {
   locale: string;
@@ -28,12 +38,20 @@ interface Props {
   narrative: CloseoutNarrative | null;
   executiveSummary: string | null;
   generatedAt: string | null;
+  closingMeetingStatus: "none" | "scheduled" | "completed";
+  closingMeetingId: string | null;
+  canRunCloseout: boolean;
 }
 
 export function CloseoutReportClient({
   locale, projectId, projectName, metrics: m, readiness, milestoneDurations, archive, narrative, executiveSummary, generatedAt,
+  closingMeetingStatus, closingMeetingId, canRunCloseout,
 }: Props) {
   const isEs = locale === "es";
+  const router = useRouter();
+  const base = localizedHref(locale, `/projects/${projectId}`);
+  const [generating, startGenerating] = useTransition();
+  const [genError, setGenError] = useState<string | null>(null);
   const today = new Date().toLocaleDateString(isEs ? "es-ES" : "en-US", { year: "numeric", month: "long", day: "numeric" });
   const money = (n: number) => n.toLocaleString(isEs ? "es-ES" : "en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const cur = m.budget.currency;
@@ -42,23 +60,109 @@ export function CloseoutReportClient({
   const hasNarrative = narrative != null && (
     narrative.keyAccomplishments.length + narrative.wentWell.length + narrative.wentWrong.length +
     narrative.openItems.length + narrative.nextSteps.length > 0
-  );
+  ) || !!executiveSummary;
+
+  // ── UX-010 — guided closeout workflow state ───────────────────────────────
+  const state = resolveCloseoutState({
+    hasAnyData: m.schedule.totalTasks > 0 || m.meetings > 0,
+    readinessReady: readiness.ready,
+    closingMeeting: closingMeetingStatus,
+    hasNarrative,
+  });
+  const cta = primaryCtaFor(state);
+  const activeStep = activeStepIndex(state);
+
+  function handleGenerate() {
+    setGenError(null);
+    startGenerating(async () => {
+      const res = await generateCloseoutNarrativeAction(projectId, locale as Locale);
+      if (res.ok) router.refresh();
+      else setGenError(res.reason);
+    });
+  }
+  const doDownload = () => printWithFilename(docFilename("Closeout", "CLS", projectId));
+
+  const downloadDisabled = !hasNarrative && !readiness.ready;
 
   return (
     <div>
       {/* Toolbar */}
-      <div className="mb-4 flex items-center justify-between print:hidden">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">{isEs ? "Reporte de Cierre" : "Closeout Report"}</h1>
-          <p className="text-xs text-muted-foreground">{isEs ? "Métricas en vivo. El resumen y las lecciones se generan al completar la reunión de Cierre." : "Live metrics. Narrative is generated when the Closing meeting is completed."}</p>
+      <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-foreground">{isEs ? "Reporte de Cierre" : "Closeout Report"}</h1>
+            <CloseoutStateBadge state={state} isEs={isEs} />
+          </div>
+          <p className="text-xs text-muted-foreground">{isEs ? "Métricas en vivo. El resumen ejecutivo se genera al completar la reunión de Cierre del Proyecto." : "Live metrics. The executive summary is generated when the Closing Project meeting is completed."}</p>
         </div>
-        <button type="button" onClick={() => printWithFilename(docFilename("Closeout", "CLS", projectId))} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700">
+        {/* Secondary download stays available but is not the only/primary action */}
+        <button
+          type="button"
+          onClick={doDownload}
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+          title={downloadDisabled ? (isEs ? "El reporte aún no está listo — completa el proceso de cierre" : "Report not ready yet — complete the closeout process") : undefined}
+        >
           <Download className="h-4 w-4" />{isEs ? "Descargar PDF" : "Download PDF"}
         </button>
       </div>
 
+      {/* ── UX-010 — Guided closeout workflow ────────────────────────────────── */}
+      <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/20 dark:bg-brand-500/5 print:hidden">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+              <Sparkles className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+              {isEs ? "Proceso de cierre" : "Closeout process"}
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stateHelp(state, isEs)}</p>
+          </div>
+          <PrimaryCta
+            cta={cta} isEs={isEs} base={base} canRun={canRunCloseout}
+            generating={generating} onGenerate={handleGenerate} onDownload={doDownload}
+          />
+        </div>
+
+        {/* Step rail */}
+        <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {CLOSEOUT_STEP_KEYS.map((key, i) => {
+            const done = i < activeStep;
+            const current = i === activeStep;
+            return (
+              <li key={key} className={`flex items-start gap-2 rounded-lg border p-2 ${current ? "border-brand-400 bg-card" : "border-border/60 bg-card/50"}`}>
+                {done ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                ) : current ? (
+                  <PlayCircle className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                ) : (
+                  <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/50" />
+                )}
+                <div className="min-w-0">
+                  <p className={`text-[11px] font-medium ${current ? "text-foreground" : "text-muted-foreground"}`}>{i + 1}. {STEP_LABEL[key][isEs ? "es" : "en"]}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+
+        {genError && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {genError === "no_meeting"
+              ? (isEs ? "Completa primero una reunión de Cierre del Proyecto en el Rhythm Center." : "Complete a Closing Project meeting in the Rhythm Center first.")
+              : genError === "not_authorized"
+                ? (isEs ? "No tienes permiso para generar el resumen." : "You don't have permission to generate the summary.")
+                : (isEs ? "No se pudo generar el resumen. Inténtalo de nuevo." : "Could not generate the summary. Try again.")}
+          </p>
+        )}
+
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          {isEs
+            ? "La reunión de Cierre del Proyecto se ejecuta en Project Memory → Rhythm Center. El resumen ejecutivo con IA se genera al completarla; “Descargar PDF” exporta el reporte, no genera el resumen."
+            : "The Closing Project meeting runs in Project Memory → Rhythm Center. The AI executive summary is generated when it is completed; \"Download PDF\" exports the report, it does not generate the summary."}
+        </p>
+      </div>
+
       {/* ── Readiness gate (screen only) ─────────────────────────────────────── */}
-      <ReadinessPanel readiness={readiness} isEs={isEs} />
+      <ReadinessPanel readiness={readiness} isEs={isEs} base={base} />
 
       <div id="closeout-report-print" className="space-y-6 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         {/* Header */}
@@ -228,7 +332,7 @@ export function CloseoutReportClient({
 
 // ── Readiness gate panel (screen only) ──────────────────────────────────────
 
-function ReadinessPanel({ readiness, isEs }: { readiness: CloseoutReadiness; isEs: boolean }) {
+function ReadinessPanel({ readiness, isEs, base }: { readiness: CloseoutReadiness; isEs: boolean; base: string }) {
   const { ready, failCount, warnCount, checks, score } = readiness;
   return (
     <div className="mb-4 rounded-xl border border-border bg-card p-4 print:hidden">
@@ -252,18 +356,19 @@ function ReadinessPanel({ readiness, isEs }: { readiness: CloseoutReadiness; isE
         </div>
       </div>
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} />)}
+        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} base={base} />)}
       </div>
     </div>
   );
 }
 
-function CheckRow({ check, isEs }: { check: ReadinessCheck; isEs: boolean }) {
+function CheckRow({ check, isEs, base }: { check: ReadinessCheck; isEs: boolean; base: string }) {
   const icon = check.level === "pass"
     ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
     : check.level === "fail"
       ? <XCircle className="h-4 w-4 shrink-0 text-red-500" />
       : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />;
+  const route = check.level !== "pass" ? readinessCtaRoute(check.key) : null;
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2.5 py-1.5">
       <div className="flex items-center gap-2 min-w-0">
@@ -273,10 +378,98 @@ function CheckRow({ check, isEs }: { check: ReadinessCheck; isEs: boolean }) {
           <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">{isEs ? "opcional" : "optional"}</span>
         )}
       </div>
-      {check.level !== "pass" && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">{isEs ? check.detailEs : check.detailEn}</span>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {check.level !== "pass" && (
+          <span className="text-[11px] text-muted-foreground">{isEs ? check.detailEs : check.detailEn}</span>
+        )}
+        {route && (
+          <Link
+            href={`${base}${route}`}
+            className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+          >
+            {isEs ? "Resolver" : "Resolve"} <ChevronRight className="h-3 w-3" />
+          </Link>
+        )}
+      </div>
     </div>
+  );
+}
+
+// ── UX-010 — workflow helpers ────────────────────────────────────────────────
+
+const STEP_LABEL: Record<string, { en: string; es: string }> = {
+  check_readiness: { en: "Check readiness", es: "Revisar preparación" },
+  resolve_requirements: { en: "Resolve requirements", es: "Resolver requisitos" },
+  closing_meeting: { en: "Closing meeting", es: "Reunión de cierre" },
+  generate_summary: { en: "Generate summary", es: "Generar resumen" },
+  review_report: { en: "Review report", es: "Revisar reporte" },
+  download_pdf: { en: "Download PDF", es: "Descargar PDF" },
+};
+
+function stateHelp(state: CloseoutState, isEs: boolean): string {
+  const map: Record<CloseoutState, { en: string; es: string }> = {
+    not_started: { en: "Start by recording project work, then run the closing process.", es: "Comienza registrando el trabajo del proyecto y luego ejecuta el cierre." },
+    readiness_incomplete: { en: "Resolve the pending requirements below, then run the Closing Project meeting.", es: "Resuelve los requisitos pendientes de abajo y luego ejecuta la reunión de Cierre del Proyecto." },
+    ready_for_closing_meeting: { en: "Requirements met. Run the Closing Project meeting in the Rhythm Center.", es: "Requisitos cumplidos. Ejecuta la reunión de Cierre del Proyecto en el Rhythm Center." },
+    meeting_scheduled: { en: "A Closing Project meeting is scheduled. Open it and complete it to generate the summary.", es: "Hay una reunión de Cierre del Proyecto programada. Ábrela y complétala para generar el resumen." },
+    meeting_completed: { en: "Closing meeting completed. Generate the AI executive summary.", es: "Reunión de cierre completada. Genera el resumen ejecutivo con IA." },
+    report_ready: { en: "The report is ready. Review it and download the PDF.", es: "El reporte está listo. Revísalo y descarga el PDF." },
+    exported: { en: "The report has been exported.", es: "El reporte fue exportado." },
+  };
+  return isEs ? map[state].es : map[state].en;
+}
+
+function CloseoutStateBadge({ state, isEs }: { state: CloseoutState; isEs: boolean }) {
+  const meta: Record<CloseoutState, { en: string; es: string; cls: string }> = {
+    not_started: { en: "Not started", es: "Sin iniciar", cls: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30" },
+    readiness_incomplete: { en: "Needs attention", es: "Requiere atención", cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30" },
+    ready_for_closing_meeting: { en: "Ready for meeting", es: "Listo para reunión", cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30" },
+    meeting_scheduled: { en: "Meeting scheduled", es: "Reunión programada", cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30" },
+    meeting_completed: { en: "Ready to generate", es: "Listo para generar", cls: "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/30" },
+    report_ready: { en: "Ready", es: "Listo", cls: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30" },
+    exported: { en: "Exported", es: "Exportado", cls: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30" },
+  };
+  const m = meta[state];
+  return <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${m.cls}`}>{isEs ? m.es : m.en}</span>;
+}
+
+function PrimaryCta({
+  cta, isEs, base, canRun, generating, onGenerate, onDownload,
+}: {
+  cta: CloseoutCta; isEs: boolean; base: string; canRun: boolean;
+  generating: boolean; onGenerate: () => void; onDownload: () => void;
+}) {
+  const cls = "inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50";
+  if (cta === "create_meeting") {
+    return (
+      <Link href={`${base}/rhythm`} className={cls}>
+        <CalendarPlus className="h-4 w-4" />{isEs ? "Crear reunión de Cierre" : "Create Closing Project Meeting"}
+      </Link>
+    );
+  }
+  if (cta === "open_meeting") {
+    return (
+      <Link href={`${base}/rhythm`} className={cls}>
+        <PlayCircle className="h-4 w-4" />{isEs ? "Abrir reunión de Cierre" : "Open Closing Project Meeting"}
+      </Link>
+    );
+  }
+  if (cta === "generate_summary") {
+    if (!canRun) {
+      return <span className="text-xs text-muted-foreground">{isEs ? "Sin permiso para generar" : "No permission to generate"}</span>;
+    }
+    return (
+      <button type="button" onClick={onGenerate} disabled={generating} className={cls}>
+        {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+        {isEs ? "Generar resumen ejecutivo" : "Generate Executive Summary"}
+      </button>
+    );
+  }
+  // download_pdf
+  return (
+    <button type="button" onClick={onDownload} className={cls}>
+      <Download className="h-4 w-4" />{isEs ? "Descargar PDF" : "Download PDF"}
+    </button>
   );
 }
 

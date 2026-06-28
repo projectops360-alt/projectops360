@@ -28,21 +28,36 @@ export default async function CloseoutPage({
   if (!project) notFound();
 
   const admin = createAdminClient();
-  const [metrics, milestoneDurations, archive, closingRes] = await Promise.all([
+  const [metrics, milestoneDurations, archive, closingCompletedRes, latestClosingRes] = await Promise.all([
     computeCloseoutMetrics(admin, org.organizationId, projectId),
     computeMilestoneDurations(admin, org.organizationId, projectId, locale as Locale),
     computeArchive(admin, org.organizationId, projectId, locale as Locale),
+    // Latest COMPLETED closing meeting — carries the generated narrative.
     supabase.from("meetings")
       .select("ai_summary, updated_at")
       .eq("project_id", projectId).eq("organization_id", org.organizationId)
       .eq("meeting_type", "closing").eq("meeting_status", "completed").is("deleted_at", null)
       .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    // Latest closing meeting of ANY status — drives the workflow CTA (UX-010).
+    supabase.from("meetings")
+      .select("id, meeting_status, updated_at")
+      .eq("project_id", projectId).eq("organization_id", org.organizationId)
+      .eq("meeting_type", "closing").is("deleted_at", null)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const readiness = computeCloseoutReadiness(metrics);
 
-  const closeout = ((closingRes.data?.ai_summary as Record<string, unknown> | null)?.closeout) as
+  const closeout = ((closingCompletedRes.data?.ai_summary as Record<string, unknown> | null)?.closeout) as
     { executiveSummary?: string; generatedAt?: string; narrative?: CloseoutNarrative } | undefined;
+
+  // UX-010 — closing-meeting status for the guided workflow.
+  const latestClosing = latestClosingRes.data as { id: string; meeting_status: string | null } | null;
+  const closingMeetingStatus: "none" | "scheduled" | "completed" = !latestClosing
+    ? "none"
+    : latestClosing.meeting_status === "completed"
+      ? "completed"
+      : "scheduled";
 
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
 
@@ -58,6 +73,9 @@ export default async function CloseoutPage({
       narrative={closeout?.narrative ?? null}
       executiveSummary={closeout?.executiveSummary ?? null}
       generatedAt={closeout?.generatedAt ?? null}
+      closingMeetingStatus={closingMeetingStatus}
+      closingMeetingId={latestClosing?.id ?? null}
+      canRunCloseout={org.role !== "viewer"}
     />
   );
 }

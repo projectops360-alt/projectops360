@@ -39,7 +39,8 @@ WITH pkg AS (
     (NULL, 'pi-isabella-project-briefing', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-isabella-briefing-no-invention', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-isabella-portfolio-briefing', 'product_intelligence', 'published', 'en'),
-    (NULL, 'pi-living-graph-edge-tooltip', 'product_intelligence', 'published', 'en')
+    (NULL, 'pi-living-graph-edge-tooltip', 'product_intelligence', 'published', 'en'),
+    (NULL, 'pi-closeout-report-process', 'product_intelligence', 'published', 'en')
   ON CONFLICT DO NOTHING
   RETURNING id, slug
 ),
@@ -70,7 +71,8 @@ ver AS (
     ('pi-isabella-project-briefing', 'verified', '16-isabella-ai-workforce.md → Project Health Briefing; 10-regression-log.md → REG-013'),
     ('pi-isabella-briefing-no-invention', 'verified', '16-isabella-ai-workforce.md → Project Health Briefing; 10-regression-log.md → REG-013'),
     ('pi-isabella-portfolio-briefing', 'verified', '16-isabella-ai-workforce.md → Portfolio Health Briefing (PMO); 10-regression-log.md → REG-013'),
-    ('pi-living-graph-edge-tooltip', 'verified', '32-product-ux-contracts.md → UX-008; 12-living-graph-strategy.md → Edges are evidence')
+    ('pi-living-graph-edge-tooltip', 'verified', '32-product-ux-contracts.md → UX-008; 12-living-graph-strategy.md → Edges are evidence'),
+    ('pi-closeout-report-process', 'verified', '32-product-ux-contracts.md → UX-010; docs/user-manual.md → Project Closeout')
   ) AS t(slug, tier, source_ref) ON t.slug = p.slug
   RETURNING id, package_id
 ),
@@ -217,7 +219,13 @@ Source: 32-product-ux-contracts.md → UX-008 (Living Graph Edge Task Tooltip).
 Verify: Execution Map → Living Graph (Milestones level) → hover an edge or its "N tasks" badge → the task list with statuses appears.'),
     ('pi-living-graph-edge-tooltip', 'es', '¿Qué pasa cuando paso el cursor sobre una conexión del Living Graph?', 'Cuando pasas el cursor sobre una conexión (edge) o sobre su etiqueta de cantidad de tareas en el Living Graph, ProjectOps360° muestra un tooltip de solo lectura con las tareas que representa esa conexión y su estado actual — así entiendes qué trabajo une dos hitos o fases sin abrir otros paneles. En dispositivos táctiles, toca la insignia de cantidad para abrirlo. Un edge que dice "3 tareas" representa tres tareas que conectan el hito origen y el destino; pásale el cursor para ver la lista. El tooltip es de solo lectura: explica las tareas pero NO cambia dependencias, tareas, hitos, bloqueos ni rollups, y no hace ninguna consulta a la base de datos ni llamada de IA. Los estados usan las mismas reglas deterministas que el resto del producto — una tarea completada con un flag obsoleto se muestra como Hecha, no Bloqueada, y En espera es distinto de Bloqueada (REG-008/010).
 Fuente: 32-product-ux-contracts.md → UX-008 (Tooltip de Tareas en Edges del Living Graph).
-Verifica: Execution Map → Living Graph (nivel Hitos) → pasa el cursor sobre un edge o su insignia "N tareas" → aparece la lista de tareas con estados.')
+Verifica: Execution Map → Living Graph (nivel Hitos) → pasa el cursor sobre un edge o su insignia "N tareas" → aparece la lista de tareas con estados.'),
+    ('pi-closeout-report-process', 'en', 'How do I generate the Closeout Report?', 'Open Command Center → Closeout Report. The page guides you through the process: (1) check closeout readiness, (2) resolve pending requirements (each one links to where you fix it — e.g. open tasks → Workboard, decisions → Decisions, budget → Budget), (3) run the Closing Project meeting in Project Memory → Rhythm Center, (4) once that meeting is completed, generate the AI Executive Summary, (5) review the report, (6) Download PDF. The Closing Project meeting runs in the Rhythm Center; the AI narrative is generated only after that meeting is completed — Download PDF exports the report, it does NOT generate the narrative. A Closeout Report is pending when one or more closeout requirements are incomplete (unresolved risks, decisions, follow-ups, open tasks, or missing budget data). Generating the summary requires PM/PMO/member permission (not viewers).
+Source: 32-product-ux-contracts.md → UX-010 (Closeout Report process).
+Verify: open a project → Closeout Report → the guided workflow + a state-appropriate primary button (Create/Open Closing Project Meeting · Generate Executive Summary · Download PDF).'),
+    ('pi-closeout-report-process', 'es', '¿Cómo genero el Reporte de Cierre?', 'Abre Command Center → Reporte de Cierre. La página te guía por el proceso: (1) revisar la preparación de cierre, (2) resolver los requisitos pendientes (cada uno enlaza a dónde se resuelve — p. ej. tareas abiertas → Workboard, decisiones → Decisiones, presupuesto → Presupuesto), (3) ejecutar la reunión de Cierre del Proyecto en Project Memory → Rhythm Center, (4) una vez completada esa reunión, generar el Resumen Ejecutivo con IA, (5) revisar el reporte, (6) Descargar PDF. La reunión de Cierre del Proyecto se ejecuta en el Rhythm Center; la narrativa con IA se genera solo después de completar esa reunión — Descargar PDF exporta el reporte, NO genera la narrativa. Un Reporte de Cierre está pendiente cuando hay requisitos de cierre incompletos (riesgos, decisiones o seguimientos sin resolver, tareas abiertas, o falta de datos de presupuesto). Generar el resumen requiere permiso de PM/PMO/miembro (no visores).
+Fuente: 32-product-ux-contracts.md → UX-010 (proceso del Reporte de Cierre).
+Verifica: abre un proyecto → Reporte de Cierre → el flujo guiado + un botón principal según el estado (Crear/Abrir reunión de Cierre · Generar Resumen Ejecutivo · Descargar PDF).')
   ) AS c(slug, language, title, body) ON c.slug = p.slug
   RETURNING id, version_id, package_id, organization_id, language, body
 )

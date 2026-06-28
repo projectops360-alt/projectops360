@@ -70,6 +70,9 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
     ["pi-living-graph-edge-tooltip", /read-only tooltip/i],
     ["pi-living-graph-edge-tooltip", /does NOT change dependencies/i],
     ["pi-living-graph-edge-tooltip", /Waiting is distinct from Blocked/i],
+    ["pi-closeout-report-process", /Rhythm Center/i],
+    ["pi-closeout-report-process", /does NOT generate the narrative/i],
+    ["pi-closeout-report-process", /Command Center . Closeout Report/i],
   ];
 
   it.each(facts)("%s states the expected fact", (slug, re) => {
