@@ -24,9 +24,12 @@
   },
   "projectTabs": {
     "commandCenter": "Command Center",
+    "overview": "Overview",
     "charterGovernance": "Charter & Governance",
     "deliveryFramework": "Delivery Framework",
+    "roadmap": "Roadmap",
     "teamRoles": "Team & Roles",
+    "stakeholders": "Stakeholders",
     "executionMap": "Execution Map",
     "workboard": "Workboard",
     "projectMemory": "Project Memory",
@@ -36,7 +39,18 @@
     "drawingIntelligence": "BIM",
     "rhythm": "Rhythm",
     "rythm": "Rythm",
-    "statusReport": "Status"
+    "statusReport": "Status",
+    "notEnabledBadge": "Off",
+    "moduleNotEnabled": "{module} is not enabled for this project",
+    "groups": {
+      "commandCenter": "Command Center",
+      "planning": "Planning",
+      "execution": "Execution",
+      "resources": "Resources",
+      "intelligence": "Intelligence",
+      "technical": "Technical / BIM",
+      "more": "More"
+    }
   },
   "drawingIntelligence": {
     "title": "BIM — Building Information Module",

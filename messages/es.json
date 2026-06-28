@@ -24,9 +24,12 @@
   },
   "projectTabs": {
     "commandCenter": "Centro de Mando",
+    "overview": "Resumen",
     "charterGovernance": "Charter y Gobernanza",
     "deliveryFramework": "Marco de Ejecución",
+    "roadmap": "Roadmap",
     "teamRoles": "Equipo y Roles",
+    "stakeholders": "Stakeholders",
     "executionMap": "Mapa de Ejecución",
     "workboard": "Tablero de Trabajo",
     "projectMemory": "Memoria del Proyecto",
@@ -36,7 +39,18 @@
     "drawingIntelligence": "BIM",
     "rhythm": "Ritmo",
     "rythm": "Rythm",
-    "statusReport": "Estado"
+    "statusReport": "Estado",
+    "notEnabledBadge": "Off",
+    "moduleNotEnabled": "{module} no está habilitado para este proyecto",
+    "groups": {
+      "commandCenter": "Centro de Mando",
+      "planning": "Planificación",
+      "execution": "Ejecución",
+      "resources": "Recursos",
+      "intelligence": "Inteligencia",
+      "technical": "Técnico / BIM",
+      "more": "Más"
+    }
   },
   "drawingIntelligence": {
     "title": "BIM — Módulo de Información de Construcción",
