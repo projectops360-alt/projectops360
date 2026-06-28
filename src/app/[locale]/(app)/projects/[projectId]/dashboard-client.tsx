@@ -28,9 +28,14 @@ import {
   Code,
   Send,
   FileBarChart,
+  Gauge,
+  Sparkles,
 } from "lucide-react";
-import type { TraceableEntityType, Milestone, RoadmapTask, TaskStatus, TaskPriority, MilestoneStatus } from "@/types/database";
+import type { TraceableEntityType, Milestone, RoadmapTask, TaskStatus, TaskPriority, MilestoneStatus, TaskDependency, Locale } from "@/types/database";
 import type { RoadmapProgress, MilestoneProgress } from "@/lib/roadmap/progress";
+import { buildProjectBriefing } from "@/lib/project-briefing/briefing-engine";
+import type { BriefingScope, ProjectBriefing } from "@/lib/project-briefing/types";
+import { overallStatusLine, healthBandLabel, attentionLabel, allStableLine } from "@/lib/project-briefing/briefing-copy";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -131,6 +136,7 @@ export interface DashboardTranslations {
 interface ProjectDashboardProps {
   projectId: string;
   locale: string;
+  projectName: string;
   data: DashboardData;
   translations: DashboardTranslations;
   entityLabels: Record<string, string>;
@@ -138,6 +144,11 @@ interface ProjectDashboardProps {
   milestones: Milestone[];
   tasks: RoadmapTask[];
   roadmapProgress: RoadmapProgress;
+  // REG-015 — inputs for the deterministic Status summary card (shared engine
+  // with Isabella's REG-013 briefing).
+  statusDependencies: { predecessorId: string; successorId: string }[];
+  statusRisks: { open: number; high: number } | null;
+  statusScope: BriefingScope;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -232,15 +243,46 @@ function StatusDot({ status }: { status: string }) {
 export function ProjectDashboard({
   projectId,
   locale,
+  projectName,
   data,
   translations: t,
   entityLabels,
   milestones,
   tasks,
   roadmapProgress,
+  statusDependencies,
+  statusRisks,
+  statusScope,
 }: ProjectDashboardProps) {
   const router = useRouter();
   const base = localizedHref(locale, `/projects/${projectId}`);
+
+  // REG-015 — deterministic project Status briefing, computed from the SAME
+  // engine Isabella uses (REG-013). No parallel metric logic; terminal tasks are
+  // never active blockers, waiting ≠ blocked (task-activity rules inside).
+  const statusBriefing: ProjectBriefing = React.useMemo(
+    () =>
+      buildProjectBriefing({
+        projectId,
+        projectName,
+        scope: statusScope,
+        tasks,
+        milestones,
+        dependencies: statusDependencies.map((d) => ({
+          id: `${d.predecessorId}->${d.successorId}`,
+          organization_id: "",
+          project_id: projectId,
+          predecessor_id: d.predecessorId,
+          successor_id: d.successorId,
+          dependency_type: "finish_to_start",
+          lag_days: 0,
+          created_at: "",
+        })) as TaskDependency[],
+        risks: statusRisks,
+        memory: { recentDecisions: [], unresolvedActions: [], recentNotes: [], available: false },
+      }),
+    [projectId, projectName, statusScope, tasks, milestones, statusDependencies, statusRisks],
+  );
 
   // ── Resolve blocker handler ──────────────────────────────────────────────────
   const [resolvingBlocker, setResolvingBlocker] = React.useState<string | null>(null);
@@ -468,6 +510,112 @@ export function ProjectDashboard({
           sub={`${data.missingLinkEntities.length} ${locale === "es" ? "enlaces faltantes" : "missing links"}`}
           color={traceHealth >= 80 ? "text-green-600 dark:text-green-400" : traceHealth >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}
         />
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          2b. PROJECT STATUS (REG-015) + REPORTS & EXECUTIVE OUTPUTS (UX-009)
+          Status lives in Command Center now (not a buried tab); Closeout Report
+          is promoted near the top instead of below all activity cards.
+          ════════════════════════════════════════════════════════════════════════ */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Project Status — explained, deterministic (shared engine w/ Isabella) */}
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  {locale === "es" ? "Estado del Proyecto" : "Project Status"}
+                </h3>
+                <p className="text-[11px] text-muted-foreground">
+                  {locale === "es"
+                    ? "Salud, riesgos, progreso y áreas que requieren atención."
+                    : "Explained health, risks, progress, and recommended attention areas."}
+                </p>
+              </div>
+            </div>
+            <StatusBandChip band={statusBriefing.healthBand} locale={locale} />
+          </div>
+
+          <p className="text-sm text-foreground">{overallStatusLine(statusBriefing, locale as Locale)}</p>
+
+          {/* Quick numbers */}
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span>{locale === "es" ? "Completado" : "Complete"}: <strong className="text-foreground">{statusBriefing.overview.percentComplete}%</strong></span>
+            <span>Blockers: <strong className={statusBriefing.execution.activeBlockers > 0 ? "text-red-600 dark:text-red-400" : "text-foreground"}>{statusBriefing.execution.activeBlockers}</strong></span>
+            <span>{locale === "es" ? "En espera" : "Waiting"}: <strong className="text-foreground">{statusBriefing.execution.waitingOnDependency}</strong></span>
+            <span>{locale === "es" ? "Vencidas" : "Overdue"}: <strong className={statusBriefing.execution.overdue > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}>{statusBriefing.execution.overdue}</strong></span>
+            <span>{locale === "es" ? "Hitos en riesgo" : "At-risk milestones"}: <strong className={statusBriefing.execution.atRiskMilestones > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}>{statusBriefing.execution.atRiskMilestones}</strong></span>
+          </div>
+
+          {/* Top-3 attention, or stable */}
+          {statusBriefing.attention.length > 0 ? (
+            <ul className="mt-3 space-y-1">
+              {statusBriefing.attention.slice(0, 3).map((a) => (
+                <li key={a.key} className="flex items-center gap-2 text-xs text-foreground">
+                  <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
+                  {attentionLabel(a.key, a.count, locale as Locale)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/5 px-2.5 py-1.5 text-xs text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+              {allStableLine(locale as Locale)}
+            </p>
+          )}
+
+          <div className="mt-3 flex items-center gap-2">
+            <Link
+              href={`${base}/status`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+            >
+              {locale === "es" ? "Ver estado completo" : "View full status"} <ArrowRight className="h-3 w-3" />
+            </Link>
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-brand-500" />
+              {locale === "es" ? "Pregúntale a Isabella sobre este estado" : "Ask Isabella to explain this status"}
+            </span>
+          </div>
+        </div>
+
+        {/* Reports & Executive Outputs — Closeout promoted to the top */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <FileBarChart className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            <h3 className="text-sm font-semibold text-foreground">
+              {locale === "es" ? "Reportes y Salidas Ejecutivas" : "Reports & Executive Outputs"}
+            </h3>
+          </div>
+          <div className="space-y-2">
+            <Link
+              href={`${base}/closeout`}
+              className="group flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/60 p-3 transition-colors hover:bg-brand-100/60 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileBarChart className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{locale === "es" ? "Reporte de Cierre" : "Closeout Report"}</p>
+                  <p className="text-[11px] text-muted-foreground">{locale === "es" ? "Métricas y resumen ejecutivo · PDF" : "Metrics & executive summary · PDF"}</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400" />
+            </Link>
+            <Link
+              href={`${base}/status`}
+              className="group flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileText className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{locale === "es" ? "Reporte de Estado" : "Status Report"}</p>
+                  <p className="text-[11px] text-muted-foreground">{locale === "es" ? "Estado de proyecto explicado" : "Explained project status"}</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400" />
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════════
@@ -810,26 +958,24 @@ export function ProjectDashboard({
             )}
           </div>
 
-          {/* 3g. Project Closeout Report */}
-          <Link
-            href={`${base}/closeout`}
-            className="group flex items-center justify-between rounded-xl border border-brand-200 bg-brand-50/60 p-5 transition-colors hover:bg-brand-100/60 dark:border-brand-500/20 dark:bg-brand-500/5 dark:hover:bg-brand-500/10"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <FileBarChart className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-foreground">
-                  {locale === "es" ? "Reporte de Cierre" : "Closeout Report"}
-                </h3>
-                <p className="text-[11px] text-muted-foreground">
-                  {locale === "es" ? "Métricas y resumen ejecutivo · PDF" : "Metrics & executive summary · PDF"}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400" />
-          </Link>
+          {/* Closeout Report was promoted to "Reports & Executive Outputs" near
+              the top of the dashboard (UX-009). */}
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Status health band chip (REG-015) ────────────────────────────────────────
+function StatusBandChip({ band, locale }: { band: ProjectBriefing["healthBand"]; locale: string }) {
+  const tone: Record<ProjectBriefing["healthBand"], string> = {
+    healthy: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30",
+    watch: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    at_risk: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
+  };
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone[band]}`}>
+      {healthBandLabel(band, locale === "es" ? "es" : "en")}
+    </span>
   );
 }

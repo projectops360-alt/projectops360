@@ -122,6 +122,22 @@ describe("Settings boundary — Settings is not the home for operational modules
   });
 });
 
+describe("REG-015 — Project Status stays discoverable in Command Center", () => {
+  it("Status lives in the Command Center group, not buried in More/Settings", () => {
+    expect(itemKeys("commandCenter")).toContain("statusReport");
+    expect(itemKeys("more")).not.toContain("statusReport");
+  });
+
+  it("Status routes to /status (capability + route preserved, never dead)", () => {
+    const status = TAB_ITEMS.find((t) => t.titleKey === "statusReport");
+    expect(status?.href).toBe("/projects/[projectId]/status");
+  });
+
+  it("the Command Center group is Overview + Status", () => {
+    expect(itemKeys("commandCenter")).toEqual(["overview", "statusReport"]);
+  });
+});
+
 describe("Core routes preserved in the grouped nav", () => {
   const mustExist = [
     "/projects/[projectId]/workboard",
