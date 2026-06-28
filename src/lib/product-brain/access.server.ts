@@ -17,12 +17,12 @@ import "server-only";
 import { emailInAllowlist, resolveAllowlist } from "./access";
 
 /**
- * Built-in fallback allowlist. NOTE: `pmo@xxx-demi.io` is a placeholder for the
- * PMO address from the spec — set the real one via PRODUCT_BRAIN_ALLOWED_EMAILS.
+ * Built-in fallback allowlist. Production also sets PRODUCT_BRAIN_ALLOWED_EMAILS
+ * (which overrides these). `pmo@xxx-demo.io` is the PMO demo/test account.
  */
 export const DEFAULT_PRODUCT_BRAIN_ALLOWED_EMAILS: readonly string[] = [
   "efrain.pradas@gmail.com",
-  "pmo@xxx-demi.io",
+  "pmo@xxx-demo.io",
 ];
 
 /** Resolve the effective allowlist: env (comma-separated) or the defaults. */

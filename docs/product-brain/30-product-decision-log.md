@@ -175,8 +175,8 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Access (TASK 10A — binding security):** the Control Center is internal and sensitive. Access is a
   **strict server-side EMAIL allowlist**, NOT role and NOT UI hiding. The single source of truth is
   `src/lib/product-brain/access.server.ts` (`isProductBrainAllowedEmail`), configured via
-  `PRODUCT_BRAIN_ALLOWED_EMAILS` (fallback defaults: `efrain.pradas@gmail.com`, `pmo@xxx-demi.io` —
-  *placeholder; set the real PMO address in env*). The route (`/product-intelligence`) returns
+  `PRODUCT_BRAIN_ALLOWED_EMAILS` (set in production to `efrain.pradas@gmail.com,pmo@xxx-demo.io`;
+  fallback defaults match). The route (`/product-intelligence`) returns
   `notFound()` for non-allowed users (existence not revealed) and loads no data; the nav item, the
   server actions (Isabella bridge + export), and Isabella's item answers all enforce the same
   allowlist. Isabella refuses internal Product Brain content for non-allowed accounts.

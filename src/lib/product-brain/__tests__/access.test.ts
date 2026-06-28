@@ -10,7 +10,7 @@ import { normalizeEmail, emailInAllowlist, resolveAllowlist } from "../access";
 // ============================================================================
 
 // Mirrors DEFAULT_PRODUCT_BRAIN_ALLOWED_EMAILS in access.server.ts.
-const ALLOW = ["efrain.pradas@gmail.com", "pmo@xxx-demi.io"] as const;
+const ALLOW = ["efrain.pradas@gmail.com", "pmo@xxx-demo.io"] as const;
 
 describe("Product Brain allowlist — who may access", () => {
   it("allows efrain.pradas@gmail.com", () => {
@@ -18,7 +18,7 @@ describe("Product Brain allowlist — who may access", () => {
   });
 
   it("allows the PMO address", () => {
-    expect(emailInAllowlist("pmo@xxx-demi.io", ALLOW)).toBe(true);
+    expect(emailInAllowlist("pmo@xxx-demo.io", ALLOW)).toBe(true);
   });
 
   it("is case-insensitive and trims whitespace", () => {
