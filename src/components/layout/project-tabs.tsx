@@ -116,7 +116,10 @@ export function ProjectTabs({ projectId, projectTitle, enabledModules }: Project
           </span>
         )}
 
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+        {/* No overflow container here: an `overflow-*` ancestor clips the
+            absolutely-positioned group dropdowns. `flex-wrap` keeps the bar
+            from forcing horizontal page scroll on small screens instead. */}
+        <div className="flex flex-wrap items-center gap-1">
           {groups.map((group) => {
             const isOpen = openGroup === group.groupKey;
             const label = tg(group.groupKey);
