@@ -91,6 +91,23 @@ doing? What should I pay attention to? What should I do next?"*
 · Verify in app. Implemented in `components/isabella/project-briefing.tsx`, rendered by
 `isabella-experience.tsx` above the generic prompt when a project context exists.
 
+### Closeout & risk context ([REG-016](10-regression-log.md) / [REG-017](10-regression-log.md#reg-017))
+- The Closeout Report is a first-class **Screen-Intelligence** surface (`lib/knowledge-os/screens.ts`,
+  project sub-route matching), so Isabella knows the user is on Closeout, names its real components
+  (readiness gate, "Risks resolved" row with inline open-risk list), and offers closeout-specific
+  follow-ups ("Which requirements are blocking closeout?", "Show me the open risks blocking closeout").
+- **She must not simply repeat the closeout count.** The record-backed criterion gives her the open
+  count **and** the risk IDs/titles; her explanation is deterministic via
+  `isabellaCloseoutRiskExplanation` (`lib/rhythm/closeout-criteria.ts`):
+  - count > 0 and records present → *"Closeout is not ready because N open risks remain (…titles). You
+    can resolve them from the 'Risks resolved' row, which lists those exact risks."*
+  - **count ≠ records → she flags a DATA INCONSISTENCY**, never asserts the number as fact: *"Closeout
+    shows N open risks, but I cannot find the matching risk records — this looks like a data
+    consistency issue between Closeout and Risk Management."*
+  - no permission to see records → permission-safe answer (count only, no titles).
+- Isabella distinguishes **execution health** (briefing) from **closeout readiness** (the gate) from
+  **risk registry state** (the records) — three separate dimensions, never conflated.
+
 ### Portfolio Health Briefing (PMO)
 Symmetric to the per-project briefing, but **org-wide for the PMO**. When Isabella opens **outside a
 project** for an **owner/admin (PMO)** she proactively summarizes the whole portfolio: overall

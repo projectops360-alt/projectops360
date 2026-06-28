@@ -28,14 +28,14 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 |--------|-----------|-----------------|--------------|--------------|---------------------|
 | Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) · ⚠️ [REG-007](10-regression-log.md) · ✅ [REG-008](10-regression-log.md) fixed · ✅ [Sprint #2](27-sprint-02-living-graph-focus.md) focus/usability · ✅ [Sprint #3](28-sprint-03-overlay-clarity.md) overlay clarity · ✅ [Sprint #4](29-sprint-04-navigation-evidence.md) navigation/evidence · ✅ **UX-007** Saved Layouts ([PD-008](30-product-decision-log.md)) · ↪ feeds [REG-013](10-regression-log.md#reg-013) briefing · ✅ **UX-008** edge task tooltip ([doc 32](32-product-ux-contracts.md)) |
 | Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) — now consumed by the graph | ~30% | 006 | CAP-016 | ✅ [REG-008](10-regression-log.md) wiring (graph) · ↪ semantics in [REG-013](10-regression-log.md#reg-013) briefing · ↪ status labels reused by UX-008 |
-| Reports / Status Report | Pending | ~70% | — | CAP-024 | aligned semantics ([REG-008](10-regression-log.md)) · ↪ verify target in [REG-013](10-regression-log.md#reg-013) · ✅ [REG-015/UX-009](10-regression-log.md#reg-015) Status+Closeout on dashboard · ✅ **UX-010** guided closeout workflow ([doc 32](32-product-ux-contracts.md)) |
+| Reports / Status Report | Pending | ~70% | — | CAP-024 | aligned semantics ([REG-008](10-regression-log.md)) · ↪ verify target in [REG-013](10-regression-log.md#reg-013) · ✅ [REG-015/UX-009](10-regression-log.md#reg-015) Status+Closeout on dashboard · ✅ **UX-010** guided closeout workflow ([doc 32](32-product-ux-contracts.md)) · ✅ [REG-017](10-regression-log.md#reg-017) record-backed closeout risk count |
 | Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) · ⚠️ [REG-007](10-regression-log.md) · ↪ capacity warnings in [REG-013](10-regression-log.md#reg-013) |
 | Labor Capacity (construction view) | Partial (catalog) — *construction-specific; see [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md)* | ~70% | 009 | CAP-010 | 7 |
 | Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 · ↪ shares rollup with [REG-013](10-regression-log.md#reg-013) briefing · ✅ [REG-015](10-regression-log.md#reg-015) Status card on dashboard |
 | Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) · ✅ [Dr. Isabella](31-dr-isabella-product-intelligence.md) Product-Brain grounding · ✅ [REG-013](10-regression-log.md#reg-013) Project Health Briefing · ↪ explains UX-008 edge tooltip | ~82% | 005, 006 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
 | Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) · ↪ recent decisions/follow-ups in [REG-013](10-regression-log.md#reg-013) briefing |
-| Risk Management | Pending | ~50% | — | CAP-017 | 8 |
+| Risk Management | Pending | ~50% | — | CAP-017 | 8 · ✅ [REG-017](10-regression-log.md#reg-017) canonical open-risk status semantics (`isOpenRiskStatus`) shared with Closeout |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
 | Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) |
@@ -125,6 +125,14 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 ## Reports · Dashboards
 - **Purpose:** Saved reports over curated datasets; execution dashboards.
 - **Status:** Reports Implemented (~70%); Dashboards Partial. **Related:** CAP-024/025.
+- **Closeout Report readiness ([REG-017](10-regression-log.md#reg-017), binding):** every closeout
+  readiness count must be **record-backed**. "Risks resolved" counts only **active unresolved risks
+  in the project's closeout scope** (`isOpenRiskStatus`), the count must equal `recordIds.length`,
+  and the criterion must expose the risk IDs/records. Resolve actions must lead to those **exact
+  records** — inline disclosure on the Closeout page (no risk-register route exists), never a generic
+  destination where the risks are not visible. If a count has **no matching records**, the report
+  shows **0 or an explicit data-consistency warning**, never a fake blocker. Dev mode exposes
+  per-criterion diagnostics (source fn, included/excluded IDs + reasons, count, resolveRoute).
 
 ## Task / Milestone / Dependency / Critical Path Management
 - **Purpose:** Core execution objects and CPM scheduling.
@@ -134,6 +142,17 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 ## Risk Management
 - **Purpose:** Project risk register + risk health dimension.
 - **Status:** Partial (~50%). **Related:** CAP-017.
+- **Risk status semantics (canonical, [REG-017](10-regression-log.md#reg-017)):** a risk is **open /
+  unresolved** when `status ∈ {open, identified, mitigating}`; it is **resolved** when
+  `status ∈ {resolved, closed, accepted}`. These live in the pure, client-safe
+  `src/lib/rhythm/closeout-criteria.ts` (`isOpenRiskStatus`) and **must be shared** with any consumer
+  that counts open risks — Closeout, Status, briefing — so semantics never diverge.
+- **Record-backed entry:** any feature that counts open risks (e.g. Closeout's "Risks resolved")
+  must be able to surface the **exact risk records** behind the count (id, title, status, severity,
+  owner) for the **current project scope** — counts without visible source records are not allowed.
+- **Known gap:** there is **no dedicated risk-register page** yet; risks are created via Project
+  Memory / Scribe and read in aggregates. Until a risk list view exists, open-risk blockers are
+  disclosed **inline** on the consuming screen (Closeout) rather than routed to a non-existent page.
 
 ## Issue Management
 - **Status:** **Missing.** Documentation pending review. (Only Risks exist today; Issues are a distinct future entity — ADR-011 proposed.) **Related:** CAP-018.

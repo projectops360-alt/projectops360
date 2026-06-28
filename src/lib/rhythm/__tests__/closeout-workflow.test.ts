@@ -68,10 +68,13 @@ describe("UX-010 — readinessCtaRoute maps to REAL routes only (no dead links)"
   it("maps known checks to per-project routes", () => {
     expect(readinessCtaRoute("open_tasks")).toBe("/workboard");
     expect(readinessCtaRoute("blockers")).toBe("/workboard");
+    expect(readinessCtaRoute("milestones")).toBe("/execution-map");
     expect(readinessCtaRoute("decisions")).toBe("/decisions");
     expect(readinessCtaRoute("budget")).toBe("/budget");
     expect(readinessCtaRoute("follow_ups")).toBe("/communications");
-    expect(readinessCtaRoute("open_risks")).toBe("/execution-map");
+  });
+  it("REG-017 — open_risks has NO route (inline disclosure, /execution-map showed no risks)", () => {
+    expect(readinessCtaRoute("open_risks")).toBeNull();
   });
   it("returns null where there is no dedicated route (detail-only, no dead CTA)", () => {
     expect(readinessCtaRoute("open_rfis")).toBeNull();

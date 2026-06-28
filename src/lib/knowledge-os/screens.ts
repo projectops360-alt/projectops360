@@ -23,6 +23,13 @@ type BiList = { en: string[]; es: string[] };
 export interface ScreenDefinition {
   /** Route prefix this screen matches (locale already stripped). */
   match: string;
+  /**
+   * When set, this screen matches a project sub-route — the segment AFTER the
+   * projectId, e.g. `/projects/{id}/closeout` → "closeout". This is how
+   * per-project screens (which all share the `/projects/{id}` prefix) get a
+   * specific identity instead of collapsing to the generic Projects screen.
+   */
+  projectSubroute?: string;
   module: string;
   screen: string;
   title: Bi;
@@ -130,6 +137,27 @@ export const SCREEN_REGISTRY: ScreenDefinition[] = [
     },
   },
   {
+    // REG-016/REG-017 — Isabella must understand the Closeout Report screen and
+    // its record-backed readiness, especially the "Risks resolved" blocker.
+    match: "/projects",
+    projectSubroute: "closeout",
+    module: "closeout",
+    screen: "closeout_report",
+    title: { en: "Closeout Report", es: "Reporte de Cierre" },
+    workflow: {
+      en: "Verify closeout readiness, resolve blocking requirements (open risks, open tasks, blockers), run the Closing Project meeting, generate the AI executive summary, and export the report.",
+      es: "Verificar la preparación para el cierre, resolver requisitos bloqueantes (riesgos abiertos, tareas abiertas, bloqueos), ejecutar la reunión de Cierre del Proyecto, generar el resumen ejecutivo con IA y exportar el reporte.",
+    },
+    components: {
+      en: ["Closeout process / step rail", "Readiness gate with per-requirement checks", "\"Risks resolved\" row with inline open-risk list (View risks)", "Live metric cards", "Generate Executive Summary / Download PDF actions"],
+      es: ["Proceso de cierre / barra de pasos", "Compuerta de preparación con verificaciones por requisito", "Fila \"Riesgos resueltos\" con lista de riesgos abiertos inline (Ver riesgos)", "Tarjetas de métricas en vivo", "Acciones Generar resumen ejecutivo / Descargar PDF"],
+    },
+    followups: {
+      en: ["Which requirements are blocking closeout?", "Show me the open risks blocking closeout", "Why is the report not ready yet?"],
+      es: ["¿Qué requisitos están bloqueando el cierre?", "Muéstrame los riesgos abiertos que bloquean el cierre", "¿Por qué el reporte aún no está listo?"],
+    },
+  },
+  {
     match: "/import",
     module: "import",
     screen: "project_import",
@@ -190,6 +218,16 @@ export function extractProjectId(pathname: string): string | null {
   return id;
 }
 
+/**
+ * The project sub-route segment (after the projectId), e.g.
+ * `/projects/{id}/closeout` → "closeout", `/projects/{id}` → null.
+ */
+export function projectSubroute(pathname: string): string | null {
+  const path = stripLocale(pathname);
+  const m = /^\/projects\/[^/]+\/([^/]+)/.exec(path);
+  return m?.[1] ?? null;
+}
+
 /** Strip the optional `/{locale}` prefix and trailing slash from a pathname. */
 function stripLocale(pathname: string): string {
   let p = pathname.replace(/^\/(en|es)(?=\/|$)/, "");
@@ -205,21 +243,35 @@ function stripLocale(pathname: string): string {
  */
 export function resolveScreen(pathname: string, locale: Locale): ResolvedScreen | null {
   const path = stripLocale(pathname);
+
+  // A project sub-route screen (e.g. closeout) wins over the generic Projects
+  // entry so Isabella gets the specific screen identity (REG-016/REG-017).
+  const sub = projectSubroute(pathname);
+  if (sub) {
+    const subDef = SCREEN_REGISTRY.find((d) => d.projectSubroute === sub);
+    if (subDef) return localizeScreen(subDef, locale);
+  }
+
   let best: ScreenDefinition | null = null;
   for (const def of SCREEN_REGISTRY) {
+    if (def.projectSubroute) continue; // sub-route entries are matched above only
     if (path === def.match || path.startsWith(`${def.match}/`) || (def.match === "/projects" && path.startsWith("/projects"))) {
       if (!best || def.match.length > best.match.length) best = def;
     }
   }
   if (!best) return null;
+  return localizeScreen(best, locale);
+}
+
+function localizeScreen(def: ScreenDefinition, locale: Locale): ResolvedScreen {
   const k: "en" | "es" = locale === "es" ? "es" : "en";
   return {
-    module: best.module,
-    screen: best.screen,
-    pageTitle: best.title[k],
-    workflow: best.workflow[k],
-    components: best.components[k],
-    followups: best.followups[k],
+    module: def.module,
+    screen: def.screen,
+    pageTitle: def.title[k],
+    workflow: def.workflow[k],
+    components: def.components[k],
+    followups: def.followups[k],
   };
 }
 

@@ -443,6 +443,63 @@ Impact · Severity · Investigation status · Owner · Next action.
   top; the Closeout Report appears in "Reports & Executive Outputs" near the top, not at the bottom;
   the Status tab and `/status` still work.
 
+## REG-017 — Closeout Risk Count Does Not Match Resolve Target
+- **Description:** The Closeout Report showed `Risks resolved — 2 open risk(s)` and blocked closeout,
+  but the **Resolve** action routed the user to a destination where those 2 risks were **not
+  visible**. The blocking count could not be reconciled with any list of actual risk records.
+- **Observed (2026-06-28):** the `open_risks` readiness check reported `m.risks.open +
+  m.risks.mitigated` as an **aggregate count with no record IDs**, and `readinessCtaRoute("open_risks")`
+  pointed at **`/execution-map`** — a Living-Graph screen that **renders no risk view at all**. There
+  is **no dedicated risk-register page** anywhere in the app (risks are only inserted via Scribe and
+  read in aggregates), so the Resolve button was a dead end: the count said "2", the destination
+  showed "0".
+- **Expected:** the Closeout open-risk count must be **record-backed**. If Closeout says "2 open
+  risks", the user must be able to click and see **exactly those 2 risk records** (title, status,
+  severity, owner), and the count must equal the number of records shown. If no matching records
+  exist, Closeout must **not** show a fake count — it must show 0 or an explicit data-consistency
+  warning.
+- **Impact:** Critical — closeout readiness is untrustworthy if a blocking count cannot be traced to
+  the records that justify it. **Severity:** Critical.
+- **Root cause:** **wrong/dead Resolve route + non-record-backed count.** Not a stale cache and not a
+  scoping bug — `computeCloseoutMetrics` already scopes risks by `organization_id`/`project_id`/
+  `deleted_at IS NULL`. The risks were real and active (`status IN ('open','mitigating')`); the
+  failure was that the count was an aggregate (no IDs) and its CTA pointed to a screen that never
+  showed risks.
+- **Status: RESOLVED (2026-06-28).** Fix:
+  - **Record-backed criteria.** `computeCloseoutMetrics` now selects full risk rows
+    (`id, title, status, severity, owner_user_id`), resolves owner display names from `profiles`,
+    and exposes `risks.openRecords`. The `open_risks` readiness check's count is **derived from
+    `openRecords.length`** and carries `recordIds`, `records`, and `recordsConsistent` (= count ===
+    recordIds.length). Canonical open-risk semantics live in the pure, client-safe
+    `src/lib/rhythm/closeout-criteria.ts` (`isOpenRiskStatus`: open|identified|mitigating; never
+    resolved|closed|accepted|deleted|other-project).
+  - **Resolve route fixed.** `readinessCtaRoute("open_risks")` now returns **`null`** (no dead link).
+    The Closeout page **discloses the exact open-risk records inline** ("View risks" expander) with
+    title, status, severity, and owner — so the count is always clickable down to the records. A
+    **data-inconsistency warning** renders if `recordsConsistent` is false ("Closeout expected N open
+    risks, but M matching records were found").
+  - **Dev diagnostics.** Each record-backed criterion carries `diagnostics` (source fn, includedIds,
+    excluded IDs + reasons, count, resolveRoute, generatedAt), shown in a `<details>` block when
+    `NODE_ENV !== "production"`.
+  - **Isabella.** The Closeout Report is now a first-class Screen-Intelligence entry
+    (`screens.ts`, project sub-route matching), and `isabellaCloseoutRiskExplanation` gives her a
+    deterministic, record-backed sentence that **flags a data inconsistency** when count ≠ records
+    instead of repeating the number.
+  - Files: `src/lib/rhythm/{closeout.ts,closeout-criteria.ts,closeout-workflow.ts}`,
+    `app/.../projects/[projectId]/closeout/closeout-client.tsx`, `src/lib/knowledge-os/screens.ts`.
+    Tests: `src/lib/rhythm/__tests__/{closeout-criteria,closeout-readiness,closeout-workflow}.test.ts`,
+    `src/lib/knowledge-os/__tests__/screens-closeout.test.ts`.
+- **Protection rule (binding):** **Any closeout blocking requirement must be traceable to the exact
+  records counted.** A count without visible source records is not allowed — the count must equal
+  `recordIds.length`, the Resolve action must lead to those exact records (inline or routed), and a
+  count with no matching records must surface a data-consistency warning, never a silent fake
+  blocker. Related: [REG-010](#reg-010--cross-module-metric-rollup-inconsistency),
+  [UX-010](#), [No silent regressions rule].
+- **Owner:** Product. **Verify:** open a project with open risks → Closeout → the "Risks resolved"
+  row shows "N open risk(s)" with a **View risks** expander listing exactly N risks (title/status/
+  severity/owner); resolving/closing all of them flips the row to pass; in dev a diagnostics block
+  lists included/excluded risk IDs.
+
 ---
 
 ### Resolved

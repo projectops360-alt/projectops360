@@ -25,6 +25,7 @@ import {
   resolveCloseoutState, primaryCtaFor, activeStepIndex, readinessCtaRoute,
   CLOSEOUT_STEP_KEYS, type CloseoutState, type CloseoutCta,
 } from "@/lib/rhythm/closeout-workflow";
+import type { CloseoutRiskRecord } from "@/lib/rhythm/closeout-criteria";
 import { generateCloseoutNarrativeAction } from "./actions";
 
 interface Props {
@@ -363,35 +364,133 @@ function ReadinessPanel({ readiness, isEs, base }: { readiness: CloseoutReadines
 }
 
 function CheckRow({ check, isEs, base }: { check: ReadinessCheck; isEs: boolean; base: string }) {
+  // REG-017 — record-backed checks (open risks) reveal the EXACT records inline,
+  // so a count like "2 open risk(s)" is always clickable down to the 2 records.
+  const [expanded, setExpanded] = useState(false);
   const icon = check.level === "pass"
     ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
     : check.level === "fail"
       ? <XCircle className="h-4 w-4 shrink-0 text-red-500" />
       : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />;
   const route = check.level !== "pass" ? readinessCtaRoute(check.key) : null;
+  const records = check.records ?? [];
+  // A record-backed, still-failing check resolves INLINE (no dead route).
+  const hasInlineRecords = check.recordType === "risk" && check.level !== "pass";
+  const inconsistent = check.recordsConsistent === false;
+  const isDev = process.env.NODE_ENV !== "production";
+
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-2.5 py-1.5">
-      <div className="flex items-center gap-2 min-w-0">
-        {icon}
-        <span className="truncate text-xs font-medium text-foreground">{isEs ? check.labelEs : check.labelEn}</span>
-        {!check.blocking && check.level !== "pass" && (
-          <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">{isEs ? "opcional" : "optional"}</span>
-        )}
+    <div className="rounded-lg border border-border/60">
+      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+        <div className="flex items-center gap-2 min-w-0">
+          {icon}
+          <span className="truncate text-xs font-medium text-foreground">{isEs ? check.labelEs : check.labelEn}</span>
+          {!check.blocking && check.level !== "pass" && (
+            <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground">{isEs ? "opcional" : "optional"}</span>
+          )}
+          {inconsistent && (
+            <span className="shrink-0 rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              {isEs ? "inconsistencia" : "data issue"}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {check.level !== "pass" && (
+            <span className="text-[11px] text-muted-foreground">{isEs ? check.detailEs : check.detailEn}</span>
+          )}
+          {hasInlineRecords ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+            >
+              {isEs ? "Ver riesgos" : "View risks"}
+              <ChevronRight className={`h-3 w-3 transition-transform ${expanded ? "rotate-90" : ""}`} />
+            </button>
+          ) : route ? (
+            <Link
+              href={`${base}${route}`}
+              className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+            >
+              {isEs ? "Resolver" : "Resolve"} <ChevronRight className="h-3 w-3" />
+            </Link>
+          ) : null}
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {check.level !== "pass" && (
-          <span className="text-[11px] text-muted-foreground">{isEs ? check.detailEs : check.detailEn}</span>
-        )}
-        {route && (
-          <Link
-            href={`${base}${route}`}
-            className="inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
-          >
-            {isEs ? "Resolver" : "Resolve"} <ChevronRight className="h-3 w-3" />
-          </Link>
-        )}
-      </div>
+
+      {hasInlineRecords && expanded && (
+        <div className="space-y-1.5 border-t border-border/60 px-2.5 py-2">
+          {inconsistent ? (
+            <p className="flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {isEs
+                ? `El cierre esperaba ${check.count} riesgo(s) abierto(s), pero se encontraron ${records.length} registro(s) coincidente(s). Esto indica una inconsistencia de datos entre Cierre y la gestión de riesgos.`
+                : `Closeout expected ${check.count} open risk(s), but ${records.length} matching risk record(s) were found. This indicates a data consistency issue between Closeout and Risk Management.`}
+            </p>
+          ) : records.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">{isEs ? "No hay riesgos abiertos." : "No open risks."}</p>
+          ) : (
+            <ul className="space-y-1">
+              {records.map((r) => <RiskLine key={r.id} risk={r} isEs={isEs} />)}
+            </ul>
+          )}
+          {isDev && check.diagnostics && <DevDiagnostics diagnostics={check.diagnostics} />}
+        </div>
+      )}
     </div>
+  );
+}
+
+function RiskLine({ risk, isEs }: { risk: CloseoutRiskRecord; isEs: boolean }) {
+  return (
+    <li className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+        <span className="truncate text-[11px] font-medium text-foreground">{risk.title}</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">· {risk.ownerName ?? (isEs ? "sin responsable" : "unassigned")}</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <SeverityBadge severity={risk.severity} />
+        <RiskStatusBadge status={risk.status} isEs={isEs} />
+      </div>
+    </li>
+  );
+}
+
+function SeverityBadge({ severity }: { severity: string }) {
+  const cls: Record<string, string> = {
+    critical: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+    medium: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  };
+  return <span className={`rounded px-1 py-0.5 text-[9px] font-medium uppercase ${cls[severity] ?? cls.medium}`}>{severity}</span>;
+}
+
+function RiskStatusBadge({ status, isEs }: { status: string; isEs: boolean }) {
+  const label: Record<string, { en: string; es: string }> = {
+    open: { en: "Open", es: "Abierto" },
+    identified: { en: "Identified", es: "Identificado" },
+    mitigating: { en: "Mitigating", es: "Mitigando" },
+  };
+  const l = label[status] ?? { en: status, es: status };
+  return <span className="rounded bg-blue-100 px-1 py-0.5 text-[9px] font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">{isEs ? l.es : l.en}</span>;
+}
+
+function DevDiagnostics({ diagnostics }: { diagnostics: NonNullable<ReadinessCheck["diagnostics"]> }) {
+  return (
+    <details className="mt-1 rounded-md border border-dashed border-border/70 bg-background/60 px-2 py-1 text-[10px] text-muted-foreground">
+      <summary className="cursor-pointer select-none font-mono">dev · closeout criterion diagnostics</summary>
+      <dl className="mt-1 space-y-0.5 font-mono">
+        <div><span className="text-foreground">source:</span> {diagnostics.source}</div>
+        <div><span className="text-foreground">count:</span> {diagnostics.count}</div>
+        <div><span className="text-foreground">includedIds:</span> [{diagnostics.includedIds.join(", ")}]</div>
+        <div><span className="text-foreground">excluded:</span> [{diagnostics.excluded.map((e) => `${e.id}:${e.reason}`).join(", ")}]</div>
+        <div><span className="text-foreground">resolveRoute:</span> {diagnostics.resolveRoute ?? "inline"}</div>
+        <div><span className="text-foreground">generatedAt:</span> {diagnostics.generatedAt}</div>
+      </dl>
+    </details>
   );
 }
 
