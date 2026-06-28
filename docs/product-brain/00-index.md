@@ -64,6 +64,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [30-product-decision-log.md](30-product-decision-log.md) | **Product Decision Log** — binding decisions (PD-001…PD-009, incl. PD-009 BIM Navigation Placement) |
 | [31-dr-isabella-product-intelligence.md](31-dr-isabella-product-intelligence.md) | **Dr. Isabella** — Product Intelligence Expert: Product-Brain grounding, knowledge hierarchy, authority order, sources & verification |
 | [32-product-ux-contracts.md](32-product-ux-contracts.md) | **Product UX Contracts** — approved, test-protected UX behaviors (UX-001 Isabella Welcome Hero Lifecycle) |
+| [regression-test-map.md](regression-test-map.md) | **Regression → Test Map** — each protected REG-###/UX contract ↔ the test that fails if it returns (executable governance) |
 
 ### Sub-repositories
 

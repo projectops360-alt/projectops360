@@ -26,6 +26,27 @@ defect.
 12. **No new implementation may contradict an accepted ADR.** To change a decision, supersede
     the ADR explicitly.
 
+## Executable regression protection (binding — added 2026-06-28)
+
+Documentation is necessary but **not sufficient**. A Product Brain rule becomes durable only when
+breaking it breaks an automated check. These rules turn the prose above into enforced gates:
+
+13. **No REG-### may be marked closed unless an executable regression test exists that fails if the
+    regression returns.** "Resolved" in the regression log requires a test file + a row in
+    [`regression-test-map.md`](regression-test-map.md). No green test → not closed.
+14. **Approved Product UX Contracts must be backed by code-level tests or validation checks.** The
+    rule lives in `src/lib/product-ux-contracts/contracts.ts` and is consumed by the component (one
+    source of truth) and protected by `src/lib/product-ux-contracts/__tests__/**`. See
+    [doc 32](32-product-ux-contracts.md).
+15. **Before modifying a protected area, check (in order):** the module doc → the regression log →
+    the Product UX Contracts → the related test file(s). Protected areas and their required reading
+    are listed in `CLAUDE.md` and [`regression-test-map.md`](regression-test-map.md).
+16. **CI is the wall.** `.github/workflows/ci.yml` runs typecheck + the full test suite + build on
+    every PR and push to `master`. With branch protection, **no green CI → no merge**. Do not weaken,
+    skip, or `continue-on-error` the regression suite to make a PR pass.
+
+> Mantra: **No green test, no closed regression. No CI, no merge. No Product UX Contract, no UI overwrite.**
+
 ## Operating procedure (per task)
 
 1. **Read:** Brain index → relevant registry rows → related ADRs → regression log.
