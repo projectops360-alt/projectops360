@@ -17,6 +17,7 @@
 | UX-004 | Metric rollups are consistent across surfaces (terminal tasks never blockers) | **APPROVED** (test exists; contract to be formalized) | [REG-010](10-regression-log.md#reg-010) · REG-008 | `src/lib/project-rollups/__tests__/project-rollup-engine.test.ts` · `task-activity.test.ts` |
 | UX-008 | Living Graph edges are explainable (task tooltip) | **APPROVED** | — (usability; reuses REG-008/010 status rules) | `src/lib/graph/__tests__/edge-task-tooltip.test.ts` |
 | UX-009 | Closeout Report has dashboard prominence | **APPROVED** | [REG-015](10-regression-log.md#reg-015) | `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status placement) |
+| UX-010 | Closeout Report process is guided & discoverable | **APPROVED** | — (usability) | `src/lib/rhythm/__tests__/closeout-workflow.test.ts` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
 > listed here so the contract registry is the single index. Promote each to a full `contracts.ts`
@@ -86,3 +87,35 @@ active conversation.
 `src/lib/graph/edge-task-tooltip.ts`; rendered by `MilestoneChainEdge` in
 `src/components/graph/living-graph-edge.tsx`. Protected by
 `src/lib/graph/__tests__/edge-task-tooltip.test.ts`.
+
+---
+
+## UX-010 — Closeout Report process is guided & discoverable
+
+**Status:** APPROVED.
+
+**Principle:** A report page must not only say what is missing — it must **guide** the PM through the
+process. The Closeout Report answers: *what is missing · where do I fix it · where do I run the
+closing meeting · when can I generate the narrative · when can I download the final report*.
+
+**Contract (binding):**
+- The Closeout Report page shows a **guided workflow** (6 steps): check readiness → resolve
+  requirements → Closing Project meeting → generate AI executive summary → review → download PDF.
+- It shows a **single primary CTA appropriate to the current state**: *Create Closing Project
+  Meeting* (no meeting) · *Open Closing Project Meeting* (scheduled) · *Generate Executive Summary*
+  (meeting completed, no narrative) · *Download PDF* (report ready). Download PDF is **secondary**
+  while the report is not ready and is never the only prominent action.
+- **Pending readiness requirements are actionable**: each failing check links to the real route that
+  resolves it (open tasks/blockers → Workboard, risks/milestones → Execution Map, decisions →
+  Decisions, follow-ups → Communications, budget → Budget). No fabricated routes.
+- The **Closing Project meeting runs in Project Memory → Rhythm Center** (`/rhythm`); the page routes
+  the user there. The **AI narrative is generated only when the closing meeting is completed**;
+  Download PDF exports, it does not generate.
+- **States:** not_started · readiness_incomplete · ready_for_closing_meeting · meeting_scheduled ·
+  meeting_completed · report_ready · exported, shown as a badge.
+- **RBAC:** generating the narrative requires PMO/PM/member (not viewer).
+
+**Implementation:** state machine in `src/lib/rhythm/closeout-workflow.ts` (pure); on-demand
+generation `src/app/.../closeout/actions.ts` (`generateCloseoutNarrativeAction`, allowlisted by
+role); UI in `closeout-client.tsx`; closing-meeting status loaded in `closeout/page.tsx`. Protected
+by `src/lib/rhythm/__tests__/closeout-workflow.test.ts`.
