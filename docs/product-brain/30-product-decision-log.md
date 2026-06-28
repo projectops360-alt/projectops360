@@ -132,6 +132,34 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
   [REG-012](10-regression-log.md#reg-012--bim-module-missing-from-navigation); implements
   [UX-006](25-ux-design-debt.md). CAP-035.
 
+## PD-010 — Landing Hero Uses Animated Living Graph
+- **Decision:** The public landing hero (`/landing`) must use a **real animated HTML/CSS/SVG/React
+  Living Graph preview** — never a static screenshot/image. **Reason:** ProjectOps360° should present
+  itself as a **living Project Intelligence Platform**, not a generic task board; the hero is the first
+  proof of that. The whole landing was also re-skinned from the prior dark theme to a **premium
+  corporate light** system (off-white #F7F8F4 surfaces, corporate green #007A4D, generous whitespace,
+  subtle premium motion) approved via the `projectops360_animated_hero_mock.html` reference.
+- **Scope (binding):** this is a **marketing/landing** change only. It must **not** modify app-internal
+  logic — project metrics, rollups, Project Memory, Rythm, the real in-app Living Graph, BIM, internal
+  routes, or permissions.
+- **Protection rules (binding):**
+  - Do **not** replace the hero animation with a static image.
+  - Do **not** hide **BIM / Drawing Intelligence** from the public feature set (it stays in the
+    Capabilities section *and* appears in the hero graph's sidebar).
+  - Do **not** remove existing landing sections, CTAs, the EN/ES language switch, privacy links,
+    sign-in, or request-access flows.
+  - **AI messaging must say AI _supports_ the Project Manager — it does not replace the PM.** The
+    Decision Intelligence section keeps the "AI does not replace your expertise … the project manager
+    remains in control" message (now a text-left + Isabella advisor-panel layout).
+  - Content is preserved per the product owner's instruction ("change the design, not the content"):
+    existing i18n copy is kept; only **design** changed plus **new design-element labels** for the
+    hero graph (`heroGraph.*`) and the Isabella panel (`ai.panel*`).
+  - Honor `prefers-reduced-motion` (calm static graph), keep it responsive with **no horizontal
+    overflow**, and avoid heavy animation libraries (CSS + SVG + a single rAF loop).
+- **Implementation:** `src/components/landing/animated-hero-graph.tsx` (new), wired into `hero.tsx`;
+  light design tokens + graph keyframes in `landing.css`; every landing section restyled to the light
+  system; `execution-map.tsx` (old dark hero mock) removed. **Status: Shipped** — `/landing`.
+
 ---
 
 ## Affected modules

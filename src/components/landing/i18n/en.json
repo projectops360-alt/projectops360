@@ -18,6 +18,57 @@
     "ctaPrimary": "Request early access",
     "ctaSecondary": "See how it works"
   },
+  "heroGraph": {
+    "window": "app.projectops360.com · Living Graph",
+    "title": "Living Graph",
+    "subtitle": "See how everything connects. Detect impact. Anticipate drift.",
+    "live": "Real time",
+    "share": "Share",
+    "saveView": "Save view",
+    "pending": "Pending",
+    "toolbar": {
+      "project": "NorthPeak Implementation",
+      "view": "View: Execution",
+      "filters": "Filters"
+    },
+    "sidebar": {
+      "workboard": "Workboard",
+      "livingGraph": "Living Graph",
+      "projects": "Projects",
+      "schedule": "Schedule",
+      "risks": "Risks",
+      "decisions": "Decisions",
+      "memory": "Project Memory",
+      "bim": "Drawings & BIM",
+      "reports": "Reports",
+      "analytics": "Analytics",
+      "settings": "Settings"
+    },
+    "user": {
+      "name": "Efraín Prada",
+      "role": "PMO Director"
+    },
+    "nodes": {
+      "start": "Project Start",
+      "req": "Requirements",
+      "design": "Solution Design",
+      "config": "Configuration",
+      "integrations": "Integrations",
+      "training": "Training",
+      "deploy": "Deployment",
+      "golive": "Go Live"
+    },
+    "chip": {
+      "milestone": "MILESTONE",
+      "phase": "PHASE"
+    },
+    "legend": {
+      "completed": "Completed",
+      "inProgress": "In progress",
+      "atRisk": "At risk",
+      "pending": "Pending"
+    }
+  },
   "executionMap": {
     "title": "Execution Map",
     "live": "Live",
@@ -176,7 +227,11 @@
     "chips": ["Define scope", "Structure work", "Detect risk", "Summarize communication", "Preserve project memory", "Next best action"],
     "noReplace": "But AI does not replace your expertise.",
     "sharper": "It gives you better visibility, faster analysis, and stronger decision support — so your judgment becomes sharper, not less important.",
-    "closing": "ProjectOps 360° helps you lead projects with intelligence, control, and confidence."
+    "closing": "ProjectOps 360° helps you lead projects with intelligence, control, and confidence.",
+    "panelTitle": "Isabella",
+    "panelRole": "AI Project Advisor",
+    "panelLive": "Active",
+    "panelControl": "You stay in control. AI assists, you decide."
   },
   "about": {
     "eyebrow": "Who we are",

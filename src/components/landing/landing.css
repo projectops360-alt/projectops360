@@ -1,40 +1,43 @@
 /* ==========================================================================
-   ProjectOps 360° — marketing landing (scoped). "Dark Command Center" redesign.
-   Design tokens, fonts and animations from the handoff. Everything is scoped
-   under .lp-root so it never leaks into the app's theme.
+   ProjectOps 360° — marketing landing (scoped). "Premium Corporate Light" redesign.
+   Design tokens, fonts and animations are scoped under .lp-root so they never
+   leak into the app's theme. Visual direction approved via the animated Living
+   Graph hero mock (PD-010): white/off-white surfaces, soft corporate green
+   accents, generous whitespace, subtle premium motion — not a dark theme.
    ========================================================================== */
 
 .lp-root {
-  /* darks */
-  --lp-forest: #07120d;
-  --lp-method-dark: #0a1611;
-  --lp-panel-a: #0e1512;
-  --lp-panel-b: #0a0f0c;
-  --lp-ring-inner: #101a15;
+  /* surfaces */
+  --lp-bg: #f7f8f4;
+  --lp-bg-soft: #f8faf7;
+  --lp-surface: #ffffff;
+  --lp-surface-2: #f0fbf5;
+  /* ink / text */
+  --lp-ink: #07130f;
+  --lp-muted: #5f6b66;
+  --lp-muted-2: #7b877f;
   /* greens */
-  --lp-green-deep: #0c3a2a;
+  --lp-green: #007a4d;
+  --lp-green-strong: #008756;
+  --lp-green-dark: #064e3b;
   --lp-green-deeper: #06231a;
-  --lp-emerald: #1fb587;
-  --lp-mint: #3ce5a4;
-  /* amber */
-  --lp-amber: #e2a33c;
-  /* light section */
-  --lp-light-bg: #f6f8f6;
-  --lp-card-border: #e7ece8;
-  --lp-icon-tile: #eaf6f0;
-  --lp-ink: #10271e;
-  --lp-muted-light: #5c6b62;
-  --lp-muted-light2: #7b877f;
-  /* dark muted */
-  --lp-muted-dark: #a9bab1;
-  --lp-muted-dark2: #b8c7bf;
-  --lp-muted-dark3: #6f8278;
-  --lp-muted-dark4: #7e9389;
-  --lp-muted-dark5: #5e7269;
+  --lp-green-soft: #e7f5ee;
+  /* lines / accents */
+  --lp-line: #e2e8e1;
+  --lp-line-soft: #edf0ec;
+  --lp-blue: #2f80ed;
+  --lp-blue-soft: #edf6ff;
+  --lp-risk: #e95454;
+  --lp-risk-soft: #fff1f1;
+  /* shadows */
+  --lp-shadow: 0 24px 70px rgba(6, 78, 59, 0.12);
+  --lp-shadow-soft: 0 10px 34px rgba(7, 19, 15, 0.08);
 
   font-family: var(--font-hanken), system-ui, sans-serif;
-  background: var(--lp-forest);
-  color: #fff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0, 122, 77, 0.06), transparent 40%),
+    linear-gradient(180deg, #f7f8f4 0%, #eef1eb 100%);
+  color: var(--lp-ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
@@ -45,11 +48,11 @@
 }
 
 .lp-root ::selection {
-  background: var(--lp-mint);
-  color: var(--lp-green-deeper);
+  background: var(--lp-green-soft);
+  color: var(--lp-green-dark);
 }
 
-/* ── Animations ─────────────────────────────────────────────────────────── */
+/* ── Page-level animations ──────────────────────────────────────────────── */
 @keyframes lp-floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 @keyframes lp-glowPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 @keyframes lp-gridDrift { 0% { background-position: 0 0; } 100% { background-position: 48px 48px; } }
@@ -59,21 +62,20 @@
 
 /* flowing dashed line (methodology pipeline connector) */
 .lp-flowline {
-  background-image: repeating-linear-gradient(90deg, rgba(60, 229, 164, 0.55) 0 8px, transparent 8px 16px);
+  background-image: repeating-linear-gradient(90deg, rgba(0, 122, 77, 0.55) 0 8px, transparent 8px 16px);
   animation: lp-flow 0.7s linear infinite;
 }
 
-/* Celonis-style flow connector between Execution Map nodes */
+/* Celonis-style flow connector between cards */
 .lp-connector {
   position: relative;
   align-self: center;
   flex: 0 0 30px;
   height: 2px;
-  background-image: linear-gradient(90deg, rgba(60, 229, 164, 0.9) 0 7px, transparent 7px 16px);
+  background-image: linear-gradient(90deg, rgba(0, 122, 77, 0.85) 0 7px, transparent 7px 16px);
   background-size: 16px 2px;
   background-repeat: repeat-x;
   animation: lp-flow 0.7s linear infinite;
-  box-shadow: 0 0 8px rgba(60, 229, 164, 0.45);
 }
 .lp-connector::after {
   content: "";
@@ -81,7 +83,7 @@
   right: -1px;
   top: 50%;
   transform: translateY(-50%);
-  border-left: 7px solid rgba(60, 229, 164, 0.95);
+  border-left: 7px solid rgba(0, 122, 77, 0.9);
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
 }
@@ -92,37 +94,95 @@
 .lp-anim-blink { animation: lp-blink 1.6s infinite; }
 .lp-anim-dot { animation: lp-glowPulse 2s infinite; }
 
-/* faint grid overlay used in hero + CTA card */
+/* faint corporate-green grid overlay (hero + CTA card) */
 .lp-grid-overlay {
   background-image:
-    linear-gradient(rgba(60, 229, 164, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(60, 229, 164, 0.045) 1px, transparent 1px);
+    linear-gradient(rgba(0, 122, 77, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 122, 77, 0.05) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 .lp-grid-overlay-cta {
   background-image:
-    linear-gradient(rgba(60, 229, 164, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(60, 229, 164, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 42px 42px;
 }
 
-/* Stage-lit logo: the app wordmark filled with a top-down gradient (bright at
-   top → dark/black at bottom) via CSS mask, so it reads as dark letters hit by
-   a spotlight from above. Pair with a soft glow element above it. */
+/* Stage-lit logo: the app wordmark filled with a dark corporate-green gradient
+   via CSS mask so it reads as premium dark-green letters on a light surface. */
 .lp-logo-stage {
-  background: linear-gradient(180deg, #ffffff 0%, #d7fbee 30%, #79dcbb 66%, #44bd94 100%);
+  background: linear-gradient(180deg, #0b6a45 0%, #007a4d 45%, #064e3b 100%);
   -webkit-mask: url("/logo-full.png") center / contain no-repeat;
   mask: url("/logo-full.png") center / contain no-repeat;
-  filter: drop-shadow(0 2px 14px rgba(60, 229, 164, 0.3));
+  filter: drop-shadow(0 2px 10px rgba(0, 122, 77, 0.18));
 }
 
-/* clipped gradient text (hero accent lines) */
+/* clipped gradient text (hero/section accent) */
 .lp-grad-text {
-  background: linear-gradient(100deg, #3ce5a4, #1fb587 72%);
+  background: linear-gradient(100deg, #007a4d, #0aa564 78%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+
+/* ── Animated Living Graph (hero mock) ──────────────────────────────────── */
+@keyframes lp-dashMove { to { stroke-dashoffset: -28; } }
+@keyframes lp-livePulse {
+  0%, 100% { transform: scale(1); opacity: 0.75; box-shadow: 0 0 0 0 rgba(0, 122, 77, 0.25); }
+  50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 0 8px rgba(0, 122, 77, 0); }
+}
+@keyframes lp-riskPulseNode {
+  0%, 100% { box-shadow: 0 14px 28px rgba(7, 19, 15, 0.07), 0 0 0 0 rgba(233, 84, 84, 0.2); }
+  50% { box-shadow: 0 18px 36px rgba(233, 84, 84, 0.12), 0 0 0 8px rgba(233, 84, 84, 0); }
+}
+@keyframes lp-alertFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.06); }
+}
+@keyframes lp-miniMove {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(4px, -2px, 0); }
+}
+
+.lp-edge {
+  fill: none;
+  stroke: #b4c7bf;
+  stroke-width: 2;
+  stroke-dasharray: 7 7;
+  stroke-linecap: round;
+  opacity: 0.9;
+  animation: lp-dashMove 2.8s linear infinite;
+}
+.lp-edge.green { stroke: #4bbd8f; }
+.lp-edge.blue { stroke: #86baf4; }
+.lp-edge.risk { stroke: rgba(233, 84, 84, 0.6); }
+
+.lp-particle { fill: var(--lp-green); opacity: 0.8; }
+.lp-particle.risk { fill: var(--lp-risk); }
+
+.lp-node {
+  position: absolute;
+  z-index: 2;
+  width: 142px;
+  min-height: 66px;
+  border-radius: 14px;
+  border: 1px solid #dce8e2;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 28px rgba(7, 19, 15, 0.07);
+  padding: 12px;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.lp-node:hover { box-shadow: 0 22px 42px rgba(6, 78, 59, 0.16); border-color: #a8d9c3; }
+.lp-node.risk {
+  border-color: rgba(233, 84, 84, 0.44);
+  background: rgba(255, 250, 250, 0.97);
+  animation: lp-riskPulseNode 2.4s ease-in-out infinite;
+}
+.lp-live-dot { animation: lp-livePulse 1.5s ease-in-out infinite; }
+.lp-risk-alert { animation: lp-alertFloat 1.8s ease-in-out infinite; }
+.lp-mini-node { animation: lp-miniMove 5s ease-in-out infinite alternate; }
 
 /* ── Scroll reveal ──────────────────────────────────────────────────────── */
 .lp-reveal {
@@ -136,7 +196,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot, .lp-connector, .lp-flowline { animation: none !important; }
+  .lp-anim-float, .lp-anim-glow, .lp-anim-grid, .lp-anim-blink, .lp-anim-dot,
+  .lp-connector, .lp-flowline, .lp-edge, .lp-live-dot, .lp-risk-alert,
+  .lp-mini-node, .lp-node.risk {
+    animation: none !important;
+  }
   .lp-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .lp-root { scroll-behavior: auto; }
 }
