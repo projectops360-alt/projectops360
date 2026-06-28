@@ -638,6 +638,7 @@ export default async function ProjectDetailPage({
         statusDependencies={statusDependencies}
         statusRisks={statusRisks}
         statusScope={statusScope}
+        userRole={org.role}
       />
     </div>
   );

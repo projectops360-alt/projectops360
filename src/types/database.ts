@@ -916,7 +916,8 @@ export type AuditAction =
   | "prompt_sent_to_ai"
   | "task_blocked"
   | "task_completed"
-  | "task_unblocked";
+  | "task_unblocked"
+  | "export";
 
 export interface AuditLog {
   id: string;

@@ -134,6 +134,27 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
   shows **0 or an explicit data-consistency warning**, never a fake blocker. Dev mode exposes
   per-criterion diagnostics (source fn, included/excluded IDs + reasons, count, resolveRoute).
 
+## Project Export & Blueprint Generator
+- **Purpose:** Export a project two ways — **Full Project Archive** (the project as executed:
+  evidence, traceability, reports, memory, closeout) and **Starter Blueprint** (a clean reusable
+  template: structure kept, execution history reset). See [PD-011](30-product-decision-log.md#pd-011).
+- **Status:** Implemented (MVP — ZIP package). **Entry point:** Command Center / Dashboard →
+  "Reports & Executive Outputs" → **Export Project**. **Related:** CAP-024 (Reports).
+- **Boundaries (must-not, binding):** export is **read-only** — it never mutates the source project
+  (no status change, no reset of original tasks/memory/layout, no closeout completion). RBAC is
+  enforced **server-side** in the route handler (Full Archive → owner/admin; Blueprint → also member/
+  PM; never viewers); sensitive sets (Project Memory, transcripts, audit) require owner/admin even if
+  requested. Starter Blueprint **never** carries raw memory, transcripts, actual costs/dates, owner
+  identities or audit history by default. Every package carries `export-manifest.json`; every export
+  is **audit logged** (`export` action). Code: `src/lib/project-export/*`,
+  `app/.../projects/[projectId]/export/route.ts`, `export-project-modal.tsx`.
+- **Affected/related modules (PD-011 surfaces them as export sources):** Command Center (entry),
+  Project Memory (gated, lessons-only in blueprint), Closeout Report (archive includes it),
+  Workboard/Tasks, Living Graph (structure → blueprint phases/tasks/deps), Resource Capacity &
+  Team/Roles (role templates, identity-stripped), Rythm/Meetings (transcripts gated), BIM/Documents
+  (manifest only, no bytes), Reports, Isabella (explains the two modes), Product Brain Control Center
+  (PD-011 traceable).
+
 ## Task / Milestone / Dependency / Critical Path Management
 - **Purpose:** Core execution objects and CPM scheduling.
 - **Status:** Implemented (Tasks/Milestones/Dependencies ~85-90%; Critical Path ~80%).
