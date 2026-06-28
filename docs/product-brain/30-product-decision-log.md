@@ -191,6 +191,39 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-011 — Project Export & Blueprint Generator
+- **Decision:** ProjectOps360° must support exporting a project in **two modes**:
+  1. **Full Project Archive** — a complete historical package of the project **as executed**
+     (project data, charter/governance, roadmap, milestones, tasks, dependencies, risks, decisions,
+     action items, communications, meetings, Project Memory, documents manifest, traceability,
+     Closeout Report, lessons learned, audit trail). Preserves actual statuses, dates, evidence and
+     traceability.
+  2. **Starter Blueprint** — a **clean reusable template** derived from the project structure but
+     reset for future use (phases, task templates, dependency patterns, role templates, risk
+     templates, document checklist, optional lessons-learned summary).
+- **Reason:** PMOs need to **preserve** completed projects as evidence/audit while also **reusing**
+  successful structures to accelerate similar future projects and simulations. "A completed project
+  should become reusable organizational knowledge."
+- **Protection rules (binding):**
+  - Full Archive must **preserve** evidence and traceability.
+  - Starter Blueprint must **remove or reset** sensitive execution history: no completed statuses, no
+    actual costs/dates, no private transcripts, no raw Project Memory, no audit history, owners →
+    role placeholders — unless explicitly selected (and transcripts never enter a blueprint).
+  - Export must **respect RBAC** (Full Archive → owner/admin/PMO; Blueprint → also PM/member; never
+    viewers) **server-side**, not via hidden buttons.
+  - Export must **never mutate** the original project (read-only gather; pure transforms).
+  - Every package includes an **export-manifest.json**; every export is **audit logged** (`export`
+    action, no document contents).
+  - **Isabella** must understand the difference between Full Archive and Starter Blueprint.
+- **Implementation:** pure core `src/lib/project-export/{types,rbac,manifest,transform,csv,zip}.ts`;
+  server `{gather,full-archive,blueprint,service}.ts`; download route
+  `app/[locale]/(app)/projects/[projectId]/export/route.ts`; UI `export-project-modal.tsx` in the
+  dashboard "Reports & Executive Outputs" card; migration `20260628000000_audit_action_export.sql`.
+  Tests: `src/lib/project-export/__tests__/project-export.test.ts`. **Status: Shipped (MVP — ZIP
+  package; future "Create project from blueprint" import is designed-for, not yet built).**
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery

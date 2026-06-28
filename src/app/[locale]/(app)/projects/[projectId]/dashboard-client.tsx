@@ -36,6 +36,8 @@ import type { RoadmapProgress, MilestoneProgress } from "@/lib/roadmap/progress"
 import { buildProjectBriefing } from "@/lib/project-briefing/briefing-engine";
 import type { BriefingScope, ProjectBriefing } from "@/lib/project-briefing/types";
 import { overallStatusLine, healthBandLabel, attentionLabel, allStableLine } from "@/lib/project-briefing/briefing-copy";
+import type { OrgRole } from "@/lib/project-export/rbac";
+import { ExportProjectButton } from "./export-project-modal";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -149,6 +151,8 @@ interface ProjectDashboardProps {
   statusDependencies: { predecessorId: string; successorId: string }[];
   statusRisks: { open: number; high: number } | null;
   statusScope: BriefingScope;
+  /** Org role — gates the Export Project entry (CAP — Project Export). */
+  userRole: OrgRole;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -253,6 +257,7 @@ export function ProjectDashboard({
   statusDependencies,
   statusRisks,
   statusScope,
+  userRole,
 }: ProjectDashboardProps) {
   const router = useRouter();
   const base = localizedHref(locale, `/projects/${projectId}`);
@@ -614,6 +619,8 @@ export function ProjectDashboard({
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400" />
             </Link>
+            {/* CAP — Project Export: Full Archive (as executed) or Starter Blueprint (template). */}
+            <ExportProjectButton locale={locale} projectId={projectId} role={userRole} />
           </div>
         </div>
       </div>

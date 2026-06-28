@@ -559,6 +559,50 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
         "Verifica: abre un proyecto → Reporte de Cierre → el flujo guiado + un botón principal según el estado (Crear/Abrir reunión de Cierre · Generar Resumen Ejecutivo · Descargar PDF).",
     },
   },
+
+  // ── Project Export & Blueprint (CAP — Project Export) ──────────────────────
+  {
+    slug: "pi-project-export-modes",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "PD-011 — Project Export & Blueprint Generator; 22-modules.md → Project Export",
+    authority: "product_decision",
+    en: {
+      title: "What is the difference between Full Project Archive and Starter Blueprint?",
+      body:
+        "ProjectOps360° can export a project in two modes from Command Center → Export Project. Full Project Archive preserves the project AS EXECUTED — evidence, decisions, Project Memory, reports, risks, tasks, milestones, traceability and the Closeout Report — for audits, closeout and documentation. Starter Blueprint resets the project into a clean reusable template: it keeps the structure (phases, tasks, dependencies, roles, risk templates, document checklist) but resets statuses to planned, blanks actual dates, converts owners to role placeholders, and removes raw Project Memory, transcripts, actual costs and audit history. Export is READ-ONLY — it never changes your tasks, risks, memory, reports or project status. Every export package includes an export-manifest.json and is recorded in the audit log.\n" +
+        "Source: PD-011 — Project Export & Blueprint Generator.\n" +
+        "Verify: open a project → Command Center → Reports & Executive Outputs → Export Project.",
+    },
+    es: {
+      title: "¿Cuál es la diferencia entre Archivo Completo y Plantilla (Blueprint)?",
+      body:
+        "ProjectOps360° puede exportar un proyecto en dos modos desde Command Center → Exportar Proyecto. El Archivo Completo preserva el proyecto TAL COMO SE EJECUTÓ — evidencia, decisiones, Memoria del Proyecto, reportes, riesgos, tareas, hitos, trazabilidad y el Reporte de Cierre — para auditorías, cierre y documentación. La Plantilla (Starter Blueprint) reinicia el proyecto en una plantilla limpia y reutilizable: mantiene la estructura (fases, tareas, dependencias, roles, plantillas de riesgo, checklist de documentos) pero reinicia estados a planificado, borra fechas reales, convierte responsables en marcadores de rol y elimina la Memoria del Proyecto en bruto, transcripciones, costos reales e historial de auditoría. La exportación es de SOLO LECTURA — no cambia tus tareas, riesgos, memoria, reportes ni el estado del proyecto. Cada paquete incluye un export-manifest.json y queda registrado en la auditoría.\n" +
+        "Fuente: PD-011 — Project Export & Blueprint Generator.\n" +
+        "Verifica: abre un proyecto → Command Center → Reportes y Salidas Ejecutivas → Exportar Proyecto.",
+    },
+  },
+  {
+    slug: "pi-project-export-blueprint-reuse",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "PD-011 — Project Export & Blueprint Generator (privacy + reuse)",
+    authority: "product_decision",
+    en: {
+      title: "Does Starter Blueprint include Project Memory, and can I start a similar project from it?",
+      body:
+        "Not by default. A Starter Blueprint may include an optional lessons-learned summary, but raw Project Memory historical evidence and transcripts are removed unless explicitly selected — and even then, blueprints never carry private transcripts. Use Starter Blueprint to start a similar project faster: it preserves the phase/milestone structure, task templates, dependency patterns, roles and risk templates while resetting execution data (statuses → planned, dates blank, owners → role placeholders). The blueprint.json is import-ready for a future \"Create project from blueprint\", a simulation sandbox, or comparing two similar projects. Full Archive is restricted to PMO/Admin/Owner; Starter Blueprint is also available to the PM. Viewers cannot export.\n" +
+        "Source: PD-011 — Project Export & Blueprint Generator.\n" +
+        "Verify: Command Center → Export Project → Starter Blueprint → review the included/excluded list before exporting.",
+    },
+    es: {
+      title: "¿La Plantilla incluye la Memoria del Proyecto y puedo iniciar un proyecto similar con ella?",
+      body:
+        "No por defecto. Una Plantilla puede incluir un resumen opcional de lecciones aprendidas, pero la evidencia histórica de la Memoria del Proyecto y las transcripciones se eliminan salvo que se seleccionen explícitamente — y aun así, las plantillas nunca llevan transcripciones privadas. Usa la Plantilla para iniciar un proyecto similar más rápido: conserva la estructura de fases/hitos, plantillas de tareas, patrones de dependencias, roles y plantillas de riesgo, mientras reinicia los datos de ejecución (estados → planificado, fechas en blanco, responsables → marcadores de rol). El blueprint.json está listo para un futuro \"Crear proyecto desde plantilla\", un entorno de simulación, o comparar dos proyectos similares. El Archivo Completo está restringido a PMO/Admin/Owner; la Plantilla también está disponible para el PM. Los visores no pueden exportar.\n" +
+        "Fuente: PD-011 — Project Export & Blueprint Generator.\n" +
+        "Verifica: Command Center → Exportar Proyecto → Plantilla → revisa la lista de incluido/excluido antes de exportar.",
+    },
+  },
 ];
 
 /** Slugs every curated Product Brain package must include (used by tests). */
