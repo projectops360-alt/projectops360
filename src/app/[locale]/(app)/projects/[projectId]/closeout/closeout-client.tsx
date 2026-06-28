@@ -26,7 +26,7 @@ import {
   CLOSEOUT_STEP_KEYS, type CloseoutState, type CloseoutCta,
 } from "@/lib/rhythm/closeout-workflow";
 import type { CloseoutRiskRecord } from "@/lib/rhythm/closeout-criteria";
-import { generateCloseoutNarrativeAction, resolveRiskAction } from "./actions";
+import { generateCloseoutNarrativeAction, resolveRiskAction, markCloseoutExportedAction } from "./actions";
 
 interface Props {
   locale: string;
@@ -42,11 +42,12 @@ interface Props {
   closingMeetingStatus: "none" | "scheduled" | "completed";
   closingMeetingId: string | null;
   canRunCloseout: boolean;
+  exported?: boolean;
 }
 
 export function CloseoutReportClient({
   locale, projectId, projectName, metrics: m, readiness, milestoneDurations, archive, narrative, executiveSummary, generatedAt,
-  closingMeetingStatus, closingMeetingId, canRunCloseout,
+  closingMeetingStatus, closingMeetingId, canRunCloseout, exported: exportedInitial = false,
 }: Props) {
   const isEs = locale === "es";
   const router = useRouter();
@@ -64,11 +65,16 @@ export function CloseoutReportClient({
   ) || !!executiveSummary;
 
   // ── UX-010 — guided closeout workflow state ───────────────────────────────
+  // `exported` is seeded from the server (persisted on the closing meeting) and
+  // flipped optimistically when the user downloads, so the step rail can advance
+  // past "Review report" to a completed state instead of stalling on step 5.
+  const [exported, setExported] = useState(exportedInitial);
   const state = resolveCloseoutState({
     hasAnyData: m.schedule.totalTasks > 0 || m.meetings > 0,
     readinessReady: readiness.ready,
     closingMeeting: closingMeetingStatus,
     hasNarrative,
+    exported,
   });
   const cta = primaryCtaFor(state);
   const activeStep = activeStepIndex(state);
@@ -81,7 +87,17 @@ export function CloseoutReportClient({
       else setGenError(res.reason);
     });
   }
-  const doDownload = () => printWithFilename(docFilename("Closeout", "CLS", projectId));
+  const doDownload = () => {
+    printWithFilename(docFilename("Closeout", "CLS", projectId));
+    // Mark the workflow complete (step 5 → done) once the report exists; persist
+    // so it survives a refresh. Only meaningful when there is a report to export.
+    if (hasNarrative && !exported) {
+      setExported(true);
+      void markCloseoutExportedAction(projectId, locale as Locale).then((res) => {
+        if (res.ok) router.refresh();
+      });
+    }
+  };
 
   const downloadDisabled = !hasNarrative && !readiness.ready;
 

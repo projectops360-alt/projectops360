@@ -32,10 +32,13 @@ export interface CloseoutStateInput {
   closingMeeting: CloseoutMeetingStatus;
   /** An AI executive summary / narrative already exists on the closing meeting. */
   hasNarrative: boolean;
+  /** The report has been exported (PDF downloaded) at least once. */
+  exported?: boolean;
 }
 
-/** Resolve the single closeout workflow state (precedence: narrative → meeting → readiness). */
+/** Resolve the single closeout workflow state (precedence: exported → narrative → meeting → readiness). */
 export function resolveCloseoutState(i: CloseoutStateInput): CloseoutState {
+  if (i.exported && i.hasNarrative) return "exported";
   if (i.hasNarrative) return "report_ready";
   if (i.closingMeeting === "completed") return "meeting_completed";
   if (i.closingMeeting === "scheduled") return "meeting_scheduled";
@@ -84,7 +87,7 @@ export function activeStepIndex(state: CloseoutState): number {
     case "report_ready":
       return 4; // review
     case "exported":
-      return 5; // download
+      return 6; // all six steps complete (past the last index → every step checked)
     default:
       return 0;
   }
