@@ -32,6 +32,12 @@ describe("UX-010 — resolveCloseoutState", () => {
   it("narrative present → report_ready (even if a meeting is also completed)", () => {
     expect(resolveCloseoutState(input({ closingMeeting: "completed", hasNarrative: true }))).toBe("report_ready");
   });
+  it("exported + narrative → exported (workflow complete, not stalled on review)", () => {
+    expect(resolveCloseoutState(input({ hasNarrative: true, exported: true }))).toBe("exported");
+  });
+  it("exported flag is ignored until a report exists", () => {
+    expect(resolveCloseoutState(input({ hasNarrative: false, exported: true }))).not.toBe("exported");
+  });
 });
 
 describe("UX-010 — primaryCtaFor (state-appropriate primary action)", () => {
@@ -61,6 +67,11 @@ describe("UX-010 — activeStepIndex advances with state", () => {
       activeStepIndex("report_ready"),
     ];
     expect(order).toEqual([1, 2, 3, 4]);
+  });
+  it("exported marks every step complete (index past the last step → all checked)", () => {
+    // 6 steps (0..5); returning 6 means none is 'current', all are 'done'.
+    expect(activeStepIndex("exported")).toBe(6);
+    expect(activeStepIndex("exported")).toBeGreaterThan(activeStepIndex("report_ready"));
   });
 });
 

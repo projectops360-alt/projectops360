@@ -63,6 +63,49 @@ export async function generateCloseoutNarrativeAction(
   return { ok: true };
 }
 
+export type MarkExportedResult = { ok: true } | { ok: false; reason: "not_authorized" | "no_report" | "failed" };
+
+/**
+ * Mark the closeout report as exported (PDF downloaded) so the guided workflow
+ * (UX-010) can advance past "Review report" to a completed state — otherwise the
+ * step rail stalls on step 5 forever (there was no transition into "exported").
+ * Stores `exportedAt` alongside the generated narrative on the closing meeting.
+ */
+export async function markCloseoutExportedAction(
+  projectId: string,
+  locale: Locale,
+): Promise<MarkExportedResult> {
+  const org = await getOrgContext();
+  if (org.role === "viewer") return { ok: false, reason: "not_authorized" };
+
+  const admin = createAdminClient();
+  const { data: meeting } = await admin
+    .from("meetings")
+    .select("id, ai_summary")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .eq("meeting_type", "closing")
+    .eq("meeting_status", "completed")
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!meeting) return { ok: false, reason: "no_report" };
+
+  const summary = (meeting.ai_summary as Record<string, unknown>) ?? {};
+  const closeout = (summary.closeout as Record<string, unknown> | undefined) ?? undefined;
+  if (!closeout) return { ok: false, reason: "no_report" }; // nothing generated to export
+
+  const { error } = await admin
+    .from("meetings")
+    .update({ ai_summary: { ...summary, closeout: { ...closeout, exportedAt: new Date().toISOString() } } })
+    .eq("id", meeting.id as string);
+  if (error) return { ok: false, reason: "failed" };
+
+  revalidatePath(`/${locale}/projects/${projectId}/closeout`);
+  return { ok: true };
+}
+
 export type ResolveRiskResult =
   | { ok: true }
   | { ok: false; reason: "not_authorized" | "not_found" | "failed" };

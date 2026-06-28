@@ -49,7 +49,7 @@ export default async function CloseoutPage({
   const readiness = computeCloseoutReadiness(metrics);
 
   const closeout = ((closingCompletedRes.data?.ai_summary as Record<string, unknown> | null)?.closeout) as
-    { executiveSummary?: string; generatedAt?: string; narrative?: CloseoutNarrative } | undefined;
+    { executiveSummary?: string; generatedAt?: string; narrative?: CloseoutNarrative; exportedAt?: string } | undefined;
 
   // UX-010 — closing-meeting status for the guided workflow.
   const latestClosing = latestClosingRes.data as { id: string; meeting_status: string | null } | null;
@@ -73,6 +73,7 @@ export default async function CloseoutPage({
       narrative={closeout?.narrative ?? null}
       executiveSummary={closeout?.executiveSummary ?? null}
       generatedAt={closeout?.generatedAt ?? null}
+      exported={Boolean(closeout?.exportedAt)}
       closingMeetingStatus={closingMeetingStatus}
       closingMeetingId={latestClosing?.id ?? null}
       canRunCloseout={org.role !== "viewer"}
