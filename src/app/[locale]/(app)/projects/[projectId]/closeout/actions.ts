@@ -62,3 +62,45 @@ export async function generateCloseoutNarrativeAction(
   revalidatePath(`/${locale}/projects/${projectId}/closeout`);
   return { ok: true };
 }
+
+export type ResolveRiskResult =
+  | { ok: true }
+  | { ok: false; reason: "not_authorized" | "not_found" | "failed" };
+
+/**
+ * REG-017 — resolve an open risk directly from the Closeout Report so the
+ * "Risks resolved" blocker is actionable where it is surfaced (there is no
+ * separate risk-register page to route to). Scope-checked: the risk must belong
+ * to this org+project and still be open. PMO/PM/member only — viewers cannot.
+ */
+export async function resolveRiskAction(
+  projectId: string,
+  riskId: string,
+  locale: Locale,
+): Promise<ResolveRiskResult> {
+  const org = await getOrgContext();
+  if (org.role === "viewer") return { ok: false, reason: "not_authorized" };
+
+  const admin = createAdminClient();
+  // Verify the risk is in scope and currently open before mutating it.
+  const { data: risk } = await admin
+    .from("risks")
+    .select("id, status")
+    .eq("id", riskId)
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!risk) return { ok: false, reason: "not_found" };
+
+  const { error } = await admin
+    .from("risks")
+    .update({ status: "resolved" })
+    .eq("id", riskId)
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId);
+  if (error) return { ok: false, reason: "failed" };
+
+  revalidatePath(`/${locale}/projects/${projectId}/closeout`);
+  return { ok: true };
+}

@@ -475,9 +475,11 @@ Impact · Severity · Investigation status · Owner · Next action.
     resolved|closed|accepted|deleted|other-project).
   - **Resolve route fixed.** `readinessCtaRoute("open_risks")` now returns **`null`** (no dead link).
     The Closeout page **discloses the exact open-risk records inline** ("View risks" expander) with
-    title, status, severity, and owner — so the count is always clickable down to the records. A
-    **data-inconsistency warning** renders if `recordsConsistent` is false ("Closeout expected N open
-    risks, but M matching records were found").
+    title, status, severity, and owner — so the count is always clickable down to the records. Each
+    risk is **actionable inline**: a per-risk **Resolve** button (`resolveRiskAction`, scope-checked,
+    non-viewer only) sets `status = resolved` and refreshes, since there is no separate risk-register
+    page to open. A **data-inconsistency warning** renders if `recordsConsistent` is false ("Closeout
+    expected N open risks, but M matching records were found").
   - **Dev diagnostics.** Each record-backed criterion carries `diagnostics` (source fn, includedIds,
     excluded IDs + reasons, count, resolveRoute, generatedAt), shown in a `<details>` block when
     `NODE_ENV !== "production"`.
