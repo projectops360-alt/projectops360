@@ -26,19 +26,19 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 
 | Module | Doc status | Impl confidence | Related ADRs | Related CAPs | Next audit priority |
 |--------|-----------|-----------------|--------------|--------------|---------------------|
-| Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) · ⚠️ [REG-007](10-regression-log.md) · ✅ [REG-008](10-regression-log.md) fixed · ✅ [Sprint #2](27-sprint-02-living-graph-focus.md) focus/usability · ✅ [Sprint #3](28-sprint-03-overlay-clarity.md) overlay clarity · ✅ [Sprint #4](29-sprint-04-navigation-evidence.md) navigation/evidence · ✅ **UX-007** Saved Layouts ([PD-008](30-product-decision-log.md)) |
-| Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) — now consumed by the graph | ~30% | 006 | CAP-016 | ✅ [REG-008](10-regression-log.md) wiring (graph) |
-| Reports / Status Report | Pending | ~70% | — | CAP-024 | aligned semantics ([REG-008](10-regression-log.md)) |
-| Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) · ⚠️ [REG-007](10-regression-log.md) |
+| Living Graph | **Documented** ([doc 12](12-living-graph-strategy.md)) | ~75% | 002, 005, 006 | CAP-005 | ✅ done (pass 1) · ⚠️ [REG-007](10-regression-log.md) · ✅ [REG-008](10-regression-log.md) fixed · ✅ [Sprint #2](27-sprint-02-living-graph-focus.md) focus/usability · ✅ [Sprint #3](28-sprint-03-overlay-clarity.md) overlay clarity · ✅ [Sprint #4](29-sprint-04-navigation-evidence.md) navigation/evidence · ✅ **UX-007** Saved Layouts ([PD-008](30-product-decision-log.md)) · ↪ feeds [REG-013](10-regression-log.md#reg-013) briefing |
+| Execution Status Engine | Partial ([doc 18](18-execution-status-engine.md)) — now consumed by the graph | ~30% | 006 | CAP-016 | ✅ [REG-008](10-regression-log.md) wiring (graph) · ↪ semantics in [REG-013](10-regression-log.md#reg-013) briefing |
+| Reports / Status Report | Pending | ~70% | — | CAP-024 | aligned semantics ([REG-008](10-regression-log.md)) · ↪ verify target in [REG-013](10-regression-log.md#reg-013) |
+| Resource Capacity Intelligence | **Documented** ([doc 13](13-resource-capacity-intelligence.md)) | ~45% | 003, **009** | CAP-009 | ✅ done (pass) · ⚠️ [REG-007](10-regression-log.md) · ↪ capacity warnings in [REG-013](10-regression-log.md#reg-013) |
 | Labor Capacity (construction view) | Partial (catalog) — *construction-specific; see [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md)* | ~70% | 009 | CAP-010 | 7 |
-| Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 |
-| Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) · ✅ [Dr. Isabella](31-dr-isabella-product-intelligence.md) Product-Brain grounding | ~80% | 005 | CAP-002/004 | 4 |
+| Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 · ↪ shares rollup with [REG-013](10-regression-log.md#reg-013) briefing |
+| Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) · ✅ [Dr. Isabella](31-dr-isabella-product-intelligence.md) Product-Brain grounding · ✅ [REG-013](10-regression-log.md#reg-013) Project Health Briefing | ~82% | 005, 006 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
-| Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) |
+| Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) · ↪ recent decisions/follow-ups in [REG-013](10-regression-log.md#reg-013) briefing |
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
-| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards |
+| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) |
 | Task / Milestone / WBS / Dependency / Critical Path | Pending | ~85% | 006 | CAP-019/020/021/022/023 | 11 · ✅ [Sprint #1](26-sprint-01-operational-clarity.md) Critical Path source of truth |
 | Reports · Dashboards | Pending | ~70% / Partial | — | CAP-024/025 | 12 |
 | Project Charter & Governance | Pending | ~80% | — | CAP-034 | 13 |
@@ -99,6 +99,12 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Affected by UX-007 (Saved Layouts):** Isabella must explain how to save the Living Graph layout
   and that it is visual only — it changes no project data, dependencies, or edges
   (package `pi-living-graph-saved-layouts`; [PD-008](30-product-decision-log.md)).
+- **Project Health Briefing ([REG-013](10-regression-log.md#reg-013)):** inside a project Isabella
+  proactively shows a **deterministic** briefing on open (health, blockers vs waiting, overdue,
+  capacity warnings, risks, recommended actions, verify links) built from the canonical rollup +
+  roadmap engines — **no AI on load, nothing invented**. Refresh re-runs it; Dismiss is
+  session-only; RBAC scopes what each role sees. Code: `lib/project-briefing/*` +
+  `components/isabella/project-briefing.tsx`. See [Doc 16 → Project Health Briefing](16-isabella-ai-workforce.md).
 - **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md) · [Doc 31 — Dr. Isabella](31-dr-isabella-product-intelligence.md).
 
 ## Project Memory & Scribe

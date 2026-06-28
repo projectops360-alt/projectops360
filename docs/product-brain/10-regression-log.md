@@ -311,6 +311,53 @@ Impact · Severity · Investigation status · Owner · Next action.
   shows **BIM disabled** with the "not enabled" tooltip. Visit `/projects/:id/drawing-intelligence`
   directly → renders without a server error.
 
+## REG-013 — Isabella Project Health Briefing not triggering on load
+- **Description:** Isabella previously provided a proactive **project health/status briefing** when
+  opened inside a project. She regressed to a passive generic guide state and no longer
+  automatically analyzes the project.
+- **Observed:** Opening Isabella inside a project showed only the generic prompt *"What are you
+  trying to accomplish today?"* — no project-aware briefing.
+- **Expected:** When opened inside a project context, Isabella generates a **grounded Project Health
+  Briefing** using deterministic project data and clearly identifies what is healthy, what needs
+  attention, and what the user should do next.
+- **Impact:** High — Isabella loses operational value if she waits for the user to ask basic
+  project-health questions she should proactively surface. **Severity:** High.
+- **Root cause (audited 2026-06-28):** two compounding factors —
+  1. **No project context reached Isabella.** The app layout mounts `LivingGuideWidget` with a base
+     context of `{ module: "", role, userId, organizationId }` — **no `projectId`** — and
+     `enrichContextWithScreen` never derived it from the route. So even a briefing capability could
+     not know which project she was in.
+  2. **No briefing surface existed.** `isabella-experience.tsx` only rendered a passive greeting +
+     generic prompt; the persona carried "briefing readiness" tone guidance but nothing fetched or
+     rendered real project data. (The deterministic `project-rollup-engine.ts` from REG-010 existed
+     and was tested, but was **not wired into any runtime surface**.)
+- **Status: RESOLVED (2026-06-28).** Deterministic fix (not an AI prompt patch):
+  - **Project context:** `extractProjectId` + `enrichContextWithScreen` (`lib/knowledge-os/screens.ts`)
+    now derive `projectId` from `/projects/{id}/…` so Isabella detects project context.
+  - **Briefing engine:** new `lib/project-briefing/{types,briefing-engine,briefing-copy,service}.ts`.
+    The engine is **pure and deterministic**, reusing `project-rollup-engine.ts` (REG-010),
+    `roadmap/progress.ts`, and `task-activity.ts` blocker rules — so the briefing **agrees** with the
+    Living Graph header, Executive Insights, and Resource Capacity. **No AI call on open.**
+  - **Surface:** `components/isabella/project-briefing.tsx`, rendered by `isabella-experience.tsx`
+    above the generic prompt when a project context exists. Includes **Refresh** (re-run) and
+    session-scoped **Dismiss**, plus **Verify in app** deep links.
+  - **Honesty:** Blocked vs Waiting separated; terminal tasks never count as active blockers;
+    missing data → explicit `dataGaps`; "looks stable" when nothing is flagged. Nothing invented.
+  - **RBAC:** org role → briefing scope (owner/admin = full · member = execution-only · viewer =
+    external-safe); sensitive capacity/personnel and governance detail withheld below `full`.
+  - Tests: `lib/project-briefing/__tests__/briefing-engine.test.ts`; Product Brain QA seeds added.
+- **Protection rule (binding):** future Isabella UI, mode, Product Brain, or layout changes **must
+  not remove** the project-aware automatic briefing behavior. When opened inside a project, Isabella
+  must proactively surface a grounded briefing (health, blockers vs waiting, capacity warnings,
+  risks, recommended actions) and never invent findings. Related:
+  [REG-006](#reg-006--confusing-blocked-vs-waiting-on-dependency),
+  [REG-008](#reg-008--living-graph-shows-a-resolvedfalse-blocked-state),
+  [REG-010](#reg-010--cross-module-metric-rollup-inconsistency), [No silent regressions rule].
+- **Owner:** Product. **Verify:** open any project → Isabella → a **Project Briefing** appears on
+  load (overall status, what looks good, needs attention, recommended actions, verify links);
+  Refresh re-runs it; Dismiss hides it for the session; open Isabella **outside** a project → only
+  the generic guide prompt.
+
 ---
 
 ### Resolved

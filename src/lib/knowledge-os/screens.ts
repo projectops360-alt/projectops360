@@ -176,6 +176,20 @@ export interface ResolvedScreen {
   followups: string[];
 }
 
+/**
+ * Extract the projectId from a route when the user is inside a project, e.g.
+ * `/projects/{id}/workboard` or `/es/projects/{id}`. Returns null otherwise.
+ * This is what lets Isabella detect she is inside a project context (REG-013)
+ * so she can open with a proactive Project Health Briefing.
+ */
+export function extractProjectId(pathname: string): string | null {
+  const path = stripLocale(pathname);
+  const m = /^\/projects\/([^/]+)(?:\/|$)/.exec(path);
+  const id = m?.[1];
+  if (!id || id === "new") return null;
+  return id;
+}
+
 /** Strip the optional `/{locale}` prefix and trailing slash from a pathname. */
 function stripLocale(pathname: string): string {
   let p = pathname.replace(/^\/(en|es)(?=\/|$)/, "");
@@ -215,10 +229,15 @@ export function resolveScreen(pathname: string, locale: Locale): ResolvedScreen 
  * presentation-side awareness (title, workflow, components) when available.
  */
 export function enrichContextWithScreen(base: GuideContext, resolved: ResolvedScreen | null, pathname: string): GuideContext {
-  if (!resolved) return { ...base, pathname };
+  // Always derive the project context from the route so Isabella knows when she
+  // is inside a project (REG-013) — the server-provided base context does not
+  // carry the projectId.
+  const projectId = base.projectId || extractProjectId(pathname) || undefined;
+  if (!resolved) return { ...base, pathname, projectId };
   return {
     ...base,
     pathname,
+    projectId,
     module: base.module || resolved.module,
     screen: base.screen || resolved.screen,
     pageTitle: resolved.pageTitle,
