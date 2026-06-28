@@ -73,6 +73,34 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Status: Shipped** — Sprint #2 ([doc 27](27-sprint-02-living-graph-focus.md)); in-page Focus Mode
   toggle, Insights/Legend collapsed by default. ADR-002.
 
+## PD-008 — Living Graph Saved Layouts (UX-007)
+- **Decision:** Users may manually reposition nodes in the Living Graph and **save** that
+  arrangement so it persists across refresh and future visits. A saved layout is a **visual
+  workspace preference** — node coordinates and viewport only. **Reason:** time spent arranging the
+  graph for a project should not be lost on reload.
+- **Rules (binding):**
+  - Saved layout stores **node positions + viewport only** — never edges, dependencies, blockers,
+    execution status, capacity metrics, rollups, or any business logic. Graph data stays the
+    deterministic source of truth; the saved layout only changes the x/y of matching nodes.
+  - Scope is **per project + per graph context** (view level + layout mode) and **per user**
+    (personal). Changing layout mode (Executive Flow / Process Mining) or view level loads **that
+    context's** saved layout — it must not silently destroy the manual one.
+  - **Auto-layout stays available**: the user can reset to auto layout, reset to the saved layout,
+    or clear the saved layout. New nodes added after a save are placed by the auto-layout; deleted
+    nodes in the saved layout are ignored. If the graph changed, the layout is **partially applied**
+    with an honest notice — it never crashes on stale node IDs.
+  - Unsaved manual changes are surfaced **subtly** (a highlighted Save button + dot), never with
+    nagging alerts after every drag.
+  - **MVP persistence is localStorage** (project + context scoped, implicitly personal), extending
+    the existing graph view-preference convention. A durable `project_graph_layouts` Supabase table
+    (id, project_id, user_id, layout_key, level, layout_mode, node_positions jsonb, viewport jsonb,
+    is_default, timestamps) is the documented upgrade path for **shared/team layouts**, which would
+    require **PM/PMO/Admin** permission. Personal layouts never affect other users.
+  - **Isabella must be able to explain** how saved layouts work and what they do (and do not) change.
+- **Status: Shipped (MVP)** — UX-007; `src/lib/graph/graph-layout-storage.ts`,
+  `src/components/graph/living-graph-layout-controls.tsx`, wired in `living-graph-view.tsx`.
+  CAP-005, ADR-002. Shared/team layout = Decided (not yet built).
+
 ---
 
 ## Affected modules

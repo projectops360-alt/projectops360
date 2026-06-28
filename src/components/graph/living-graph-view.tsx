@@ -108,6 +108,18 @@ import {
 } from "@/lib/graph/overlay-metadata";
 import { localizedHref } from "@/i18n/href";
 import { useGraphUiPref, countActiveGraphFilters } from "@/lib/graph/graph-ui-prefs";
+import {
+  LAYOUT_SCHEMA_VERSION,
+  buildLayoutKey,
+  loadSavedLayout,
+  saveLayout,
+  clearSavedLayout,
+  applySavedPositions,
+  isPartialApply,
+  type SavedGraphLayout,
+  type SavedNodePosition,
+} from "@/lib/graph/graph-layout-storage";
+import { LivingGraphLayoutControls } from "./living-graph-layout-controls";
 import { LivingGraphSimulationPanel } from "./living-graph-simulation-panel";
 import {
   LivingGraphEditDialogs,
@@ -240,7 +252,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
-  const { fitView, setCenter, getIntersectingNodes } = useReactFlow();
+  const { fitView, setCenter, getIntersectingNodes, getViewport, setViewport } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const [recalculating, setRecalculating] = useState(false);
   // Floating "Insights" panel (executive KPIs + summary) over the canvas.
@@ -280,6 +292,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const [manualPositions, setManualPositions] = useState<Map<string, { x: number; y: number }>>(
     () => new Map(),
   );
+  // UX-007 — Saved Layouts: persisted manual arrangement per project + context.
+  // Presentation state only (coordinates + viewport); never graph relationships.
+  const [savedLayout, setSavedLayout] = useState<SavedGraphLayout | null>(null);
+  const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
+  const [savingLayout, setSavingLayout] = useState(false);
+  const [layoutNotice, setLayoutNotice] = useState<
+    "saved" | "error" | "reset" | "auto" | "cleared" | null
+  >(null);
+  // Latest visible node IDs, read by context-scoped layout load without making
+  // the load re-run on every filter change (it must only react to context).
+  const filteredIdsRef = useRef<string[]>([]);
   // Node currently hovered while dragging another node (drop-to-connect)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   // Entity being edited via the roadmap dialogs (in-graph editing)
@@ -535,6 +558,113 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return merged;
   }, [layoutPositions, manualPositions]);
 
+  // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
+  // The context a saved arrangement is scoped to (level + layout mode). Switching
+  // context loads ITS saved layout instead of destroying the manual one.
+  const layoutKey = useMemo(() => buildLayoutKey(viewLevel, layoutMode), [viewLevel, layoutMode]);
+  // Keep the live node IDs fresh for the context loader without re-running the
+  // context-load on every filter change (refs must not be set during render).
+  // Declared before the load effect so the IDs commit first on a context switch.
+  useEffect(() => {
+    filteredIdsRef.current = filtered.nodes.map((n) => n.id);
+  });
+
+  // Load the saved layout for a context: apply saved coordinates to nodes that
+  // still exist (new nodes fall through to the auto-layout), or clear to auto.
+  const loadContextLayout = useCallback(
+    (projectId: string, key: string) => {
+      const loaded = loadSavedLayout(projectId, key);
+      setSavedLayout(loaded);
+      setManualPositions(applySavedPositions(loaded, filteredIdsRef.current).positions);
+      setHasUnsavedLayout(false);
+    },
+    [],
+  );
+
+  // Restore on load + whenever the layout context changes (TASK 6). This must run
+  // post-commit (not in an event handler) because changing level recomputes the
+  // node set, and it must hydrate from localStorage only on the client (SSR-safe,
+  // same rationale as useGraphUiPref). Deliberately NOT keyed on filters, so a
+  // saved arrangement and unsaved drags survive filtering — only a context switch
+  // reloads. The setState here is the intended effect, not a cascading render.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadContextLayout(projectId, layoutKey);
+  }, [projectId, layoutKey, loadContextLayout]);
+
+  // Subtle "partially applied" signal when the graph changed since the save
+  // (TASK 7): some saved nodes are gone, or some visible nodes are new.
+  const layoutPartiallyApplied = useMemo(() => {
+    if (!savedLayout) return false;
+    return isPartialApply(applySavedPositions(savedLayout, filtered.nodes.map((n) => n.id)));
+  }, [savedLayout, filtered.nodes]);
+
+  // Auto-dismiss the transient save/reset/clear notice.
+  useEffect(() => {
+    if (!layoutNotice) return;
+    const id = setTimeout(() => setLayoutNotice(null), 2600);
+    return () => clearTimeout(id);
+  }, [layoutNotice]);
+
+  const handleSaveLayout = useCallback(() => {
+    setSavingLayout(true);
+    // Capture the current rendered position of every visible node (not just the
+    // dragged ones) so the whole arrangement is restored verbatim on reload.
+    const nodes: Record<string, SavedNodePosition> = {};
+    for (const id of filteredIdsRef.current) {
+      const p = positions.get(id);
+      if (p) nodes[id] = { x: Math.round(p.x), y: Math.round(p.y) };
+    }
+    const payload: SavedGraphLayout = {
+      version: LAYOUT_SCHEMA_VERSION,
+      projectId,
+      layoutKey,
+      level: viewLevel,
+      layoutMode,
+      nodes,
+      viewport: getViewport(),
+      savedAt: new Date().toISOString(),
+    };
+    const ok = saveLayout(payload);
+    setSavingLayout(false);
+    if (ok) {
+      setSavedLayout(payload);
+      setManualPositions(new Map(Object.entries(nodes)));
+      setHasUnsavedLayout(false);
+      setLayoutNotice("saved");
+    } else {
+      setLayoutNotice("error");
+    }
+  }, [positions, projectId, layoutKey, viewLevel, layoutMode, getViewport]);
+
+  const handleResetToSaved = useCallback(() => {
+    const loaded = loadSavedLayout(projectId, layoutKey);
+    if (!loaded) return;
+    setSavedLayout(loaded);
+    setManualPositions(applySavedPositions(loaded, filteredIdsRef.current).positions);
+    setHasUnsavedLayout(false);
+    if (loaded.viewport) void setViewport(loaded.viewport, { duration: 300 });
+    else void fitView({ padding: 0.15, duration: 300 });
+    setLayoutNotice("reset");
+  }, [projectId, layoutKey, setViewport, fitView]);
+
+  const handleResetToAuto = useCallback(() => {
+    setManualPositions(new Map());
+    // Diverges from the saved layout (if any) until re-saved.
+    setHasUnsavedLayout(savedLayout != null);
+    void fitView({ padding: 0.15, duration: 300 });
+    setLayoutNotice("auto");
+  }, [savedLayout, fitView]);
+
+  const handleClearSavedLayout = useCallback(() => {
+    clearSavedLayout(projectId, layoutKey);
+    setSavedLayout(null);
+    setManualPositions(new Map());
+    setHasUnsavedLayout(false);
+    void fitView({ padding: 0.15, duration: 300 });
+    setLayoutNotice("cleared");
+  }, [projectId, layoutKey, fitView]);
+
   // ── Search ──
   const searchHits = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -690,7 +820,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (milestonePicks.length === 0) return;
     setMilestoneFocus(new Set(milestonePicks));
     setMilestonePicks([]);
-    setManualPositions(new Map());
+    // Manual positions are reloaded for the new context by the layout-key effect.
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     setViewLevel("activities");
@@ -909,16 +1039,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // Free repositioning: drag position changes become manual layout overrides
   const onNodesChange = useCallback((changes: NodeChange<LivingFlowNode>[]) => {
+    let moved = false;
     setManualPositions((prev) => {
       let next: Map<string, { x: number; y: number }> | null = null;
       for (const change of changes) {
         if (change.type === "position" && change.position) {
           if (!next) next = new Map(prev);
           next.set(change.id, change.position);
+          moved = true;
         }
       }
       return next ?? prev;
     });
+    // UX-007 — surface an unsaved-layout indicator after a manual move.
+    if (moved) setHasUnsavedLayout(true);
   }, []);
 
   // Drop-to-connect (milestone level): highlight the card under the drag
@@ -1093,13 +1227,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Re-fit after layout or filter structure changes
+  // Re-fit after layout or filter structure changes. UX-007: when a saved layout
+  // for this context carries a viewport and the user is not in a focus/drill
+  // subset, restore that viewport instead of fitting (TASK 6).
   useEffect(() => {
     const id = setTimeout(() => {
-      void fitView({ padding: 0.15, duration: 300 });
-    }, 60);
+      const saved = loadSavedLayout(projectId, layoutKey);
+      if (saved?.viewport && !focusIds && !milestoneFocus) {
+        void setViewport(saved.viewport, { duration: 300 });
+      } else {
+        void fitView({ padding: 0.15, duration: 300 });
+      }
+    }, 80);
     return () => clearTimeout(id);
-  }, [layoutMode, viewLevel, focusIds, milestoneFocus, fitView]);
+  }, [layoutMode, viewLevel, focusIds, milestoneFocus, fitView, setViewport, projectId, layoutKey]);
 
   const showPanel = selectedNode != null || selectedEdge != null;
 
@@ -1151,8 +1292,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         onOverlayChange={handleOverlayChange}
         layoutMode={layoutMode}
         onLayoutModeChange={(mode) => {
+          // Each layout mode keeps its OWN saved arrangement (UX-007): the
+          // layout-key effect loads it (or falls back to the auto layout).
           setLayoutMode(mode);
-          setManualPositions(new Map()); // recomputed layout discards manual drags
         }}
         onSearchChange={setSearchQuery}
         searchHitCount={searchHits.size}
@@ -1195,7 +1337,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         onViewLevelChange={(level) => {
           setViewLevel(level);
           setMilestonePicks([]);
-          setManualPositions(new Map());
+          // The layout-key effect loads this level's saved arrangement (or auto).
           setSelectedNodeId(null);
           setSelectedEdgeId(null);
         }}
@@ -1247,7 +1389,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             onChange={(e) => {
               if (e.target.value) {
                 setMilestoneFocus(new Set([e.target.value]));
-                setManualPositions(new Map());
+                // Same context — re-apply its saved arrangement to the focused
+                // subset (new nodes auto-place); never destroy a saved layout.
+                loadContextLayout(projectId, layoutKey);
               }
             }}
             className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
@@ -1370,6 +1514,54 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         }}
       >
         <LivingGraphLegend />
+
+        {/* UX-007 — Saved Layouts: compact floating controls (works in normal,
+            fullscreen and Focus Mode). Save node positions + reset/clear. */}
+        <LivingGraphLayoutControls
+          locale={locale}
+          hasUnsaved={hasUnsavedLayout}
+          hasSaved={savedLayout != null}
+          saving={savingLayout}
+          onSave={handleSaveLayout}
+          onResetSaved={handleResetToSaved}
+          onResetAuto={handleResetToAuto}
+          onClear={handleClearSavedLayout}
+        />
+
+        {/* Transient confirmation (acts as the "Layout saved" toast). */}
+        {layoutNotice && (
+          <div
+            role="status"
+            className={
+              "absolute left-1/2 top-14 z-30 -translate-x-1/2 rounded-md border px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur " +
+              (layoutNotice === "error"
+                ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
+                : "border-brand-500/40 bg-brand-500/10 text-brand-700 dark:text-brand-300")
+            }
+          >
+            {layoutNotice === "saved" && (locale === "es" ? "Diseño guardado" : "Layout saved")}
+            {layoutNotice === "error" &&
+              (locale === "es" ? "No se pudo guardar el diseño" : "Couldn’t save layout")}
+            {layoutNotice === "reset" &&
+              (locale === "es" ? "Diseño guardado restaurado" : "Saved layout restored")}
+            {layoutNotice === "auto" &&
+              (locale === "es" ? "Diseño automático aplicado" : "Auto layout applied")}
+            {layoutNotice === "cleared" &&
+              (locale === "es" ? "Diseño guardado borrado" : "Saved layout cleared")}
+          </div>
+        )}
+
+        {/* TASK 7 — graph changed since the save: positions partially applied. */}
+        {layoutPartiallyApplied && !layoutNotice && (
+          <div
+            role="status"
+            className="absolute left-1/2 top-14 z-20 -translate-x-1/2 max-w-[min(92%,30rem)] rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-center text-[11px] text-amber-700 dark:text-amber-400"
+          >
+            {locale === "es"
+              ? "El diseño guardado se aplicó parcialmente porque el grafo cambió."
+              : "Saved layout was partially applied because the graph changed."}
+          </div>
+        )}
 
         {/* Sprint #3 — overlay clarity: what am I looking at, why are nodes here,
             what to do next + empty/incomplete state, for the advanced overlays. */}

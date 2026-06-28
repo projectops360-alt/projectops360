@@ -102,6 +102,28 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
     },
   },
 
+  {
+    slug: "pi-living-graph-saved-layouts",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "Product Decision PD-008 (UX-007); 12-living-graph-strategy.md → Manual workspace organization",
+    authority: "product_decision",
+    en: {
+      title: "How do I save the Living Graph layout?",
+      body:
+        "In ProjectOps360°, you can manually arrange nodes in the Living Graph and click Save Layout. The saved layout is visual only — it does NOT change tasks, dependencies, blockers, edges, execution status, capacity, or project data; it stores node positions and the viewport. It is saved for the current project and graph context (view level + layout mode) and is personal to you. Switching layout mode or level loads that context's saved layout rather than destroying your arrangement. You can reset to auto-layout, reset to your saved layout, or clear it at any time. When the graph changes, existing nodes with saved positions are restored and new nodes are placed automatically (a notice tells you the layout was partially applied); deleted nodes are ignored. Saving never changes graph edges or relationships — node position is presentation state only.\n" +
+        "Source: Product Decision PD-008 (UX-007) / 12-living-graph-strategy.md → Manual workspace organization.\n" +
+        "Verify: Execution Map → Living Graph → drag nodes → Save Layout (top-center); refresh and the arrangement returns. Use the layout menu to reset to auto-layout or clear.",
+    },
+    es: {
+      title: "¿Cómo guardo el diseño del Living Graph?",
+      body:
+        "En ProjectOps360°, puedes acomodar manualmente los nodos del Living Graph y hacer clic en Guardar diseño. El diseño guardado es solo visual — NO cambia tareas, dependencias, bloqueos, aristas, estado de ejecución, capacidad ni datos del proyecto; almacena las posiciones de los nodos y el viewport. Se guarda para el proyecto y el contexto de grafo actual (nivel de vista + modo de diseño) y es personal tuyo. Cambiar de modo de diseño o de nivel carga el diseño guardado de ese contexto en lugar de destruir tu disposición. Puedes restaurar el diseño automático, restaurar tu diseño guardado o borrarlo cuando quieras. Cuando el grafo cambia, los nodos existentes con posición guardada se restauran y los nodos nuevos se colocan automáticamente (un aviso indica que el diseño se aplicó parcialmente); los nodos eliminados se ignoran. Guardar nunca cambia las aristas ni las relaciones del grafo — la posición del nodo es solo estado de presentación.\n" +
+        "Fuente: Decisión de Producto PD-008 (UX-007) / 12-living-graph-strategy.md → Manual workspace organization.\n" +
+        "Verifica: Execution Map → Living Graph → arrastra nodos → Guardar diseño (arriba al centro); recarga y la disposición vuelve. Usa el menú de diseño para restaurar el automático o borrar.",
+    },
+  },
+
   // ── Execution truth: blocked vs waiting, completed never blocks ─────────────
   {
     slug: "pi-blocked-vs-waiting",
