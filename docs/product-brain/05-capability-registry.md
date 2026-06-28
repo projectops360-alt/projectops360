@@ -48,7 +48,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-034 | Project Charter & Governance | P6 | Implemented | 80% | `lib/charter` |
 | CAP-035 | BIM / Drawing Intelligence | P2 | Partial | 55% | `lib/drawing-intelligence` |
 | CAP-036 | Documents | P5 | Implemented | 75% | `/documents` |
-| CAP-037 | Meetings (Rhythm + Rythm) | P5 | Implemented | 70% | `lib/rhythm`, `lib/rythm` |
+| CAP-037 | Meetings (Rhythm Center — canonical; Rythm consolidated via REG-011) | P5 | Implemented | 70% | `lib/rhythm` (`lib/rythm` dormant) |
 | CAP-038 | AI Recommendations | P1 | Partial | 45% | `lib/roadmap/recommendation`, `lib/delivery/ai` |
 | CAP-039 | Adaptive Delivery Framework | P6 | Implemented | 70% | `lib/delivery` |
 | CAP-040 | Project Import Intelligence | P5 | Implemented | 75% | `lib/import-intelligence` |

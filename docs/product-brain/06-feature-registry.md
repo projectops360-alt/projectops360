@@ -94,7 +94,8 @@ presence only; "None" ≠ broken, it means unverified by automated tests.
   Implemented. Source: `lib/delivery`.
 - **Import Intelligence (CAP-040):** wizard, parsers, heuristic+AI extraction, rollback —
   Implemented. Source: `lib/import-intelligence`.
-- **Meetings (CAP-037):** Rhythm Center (calendar) + Rythm (transcription/intelligence) —
-  Implemented; **naming duplication risk** (`rhythm` vs `rythm`). See debt doc.
+- **Meetings (CAP-037):** Rhythm Center (calendar + meetings) is the **canonical** module; the
+  former Rythm (transcription/intelligence) surface was **consolidated** into it — `/rythm`
+  redirects to `/rhythm` and the duplicate nav item was removed (REG-011, resolves DEBT-004).
 
 > Add a `specs/` file when a feature is being designed or significantly changed.

@@ -19,8 +19,8 @@ Audited from the repo on 2026-06-27 (`git ls-files`, route tree, prod table list
 | `/resource-capacity` | **Resource Capacity Intelligence** | `lib/capacity` |
 | `/drawing-intelligence` | Drawing/BIM intelligence | `lib/drawing-intelligence` |
 | `/memory` | Project Memory + Scribe | `lib/memory` |
-| `/rhythm` | Rhythm Center (calendar + meetings) | `lib/rhythm` |
-| `/rythm` (+ `/[meetingId]`) | Rythm Meeting Intelligence | `lib/rythm` |
+| `/rhythm` | Rhythm Center (calendar + meetings) — **canonical meeting module** | `lib/rhythm` |
+| `/rythm` (+ `/[meetingId]`) | **Redirect → `/rhythm`** (REG-011 alias; was Rythm Meeting Intelligence) | `lib/rythm` (dormant) |
 | `/meetings` (+ `/[meetingId]`) | Meetings | `lib/rhythm` |
 | `/status` | Status Report | `lib/execution/status-report` |
 | `/closeout` | Project Closeout Report | `lib/rhythm/closeout` |
