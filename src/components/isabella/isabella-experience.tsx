@@ -39,6 +39,7 @@ import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/li
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
 import { ProjectBriefing } from "./project-briefing";
+import { PortfolioBriefing } from "./portfolio-briefing";
 import { HologramPlaceholder } from "./hologram/hologram-placeholder";
 import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
@@ -107,6 +108,19 @@ export function IsabellaExperience({
       setBriefingHidden(false);
     }
   }, [projectId]);
+
+  // PMO portfolio briefing — shown outside a project for owner/admin (PMO).
+  const isPmo = context.role === "owner" || context.role === "admin";
+  const showPortfolio = !projectId && isPmo;
+  const [portfolioHidden, setPortfolioHidden] = useState(false);
+  useEffect(() => {
+    if (!showPortfolio) return;
+    try {
+      setPortfolioHidden(window.sessionStorage.getItem("isabella.portfolioBriefing.dismissed") === "1");
+    } catch {
+      setPortfolioHidden(false);
+    }
+  }, [showPortfolio]);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -428,6 +442,10 @@ export function IsabellaExperience({
               projectId={projectId}
               onDismissed={() => setBriefingHidden(true)}
             />
+          )}
+          {/* PMO Portfolio Briefing (outside a project, owner/admin only) */}
+          {showPortfolio && !portfolioHidden && (
+            <PortfolioBriefing locale={locale} onDismissed={() => setPortfolioHidden(true)} />
           )}
           {turns.length === 0 && (
             <div className="space-y-3">

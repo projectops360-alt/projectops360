@@ -15,6 +15,8 @@ import { indexPendingKnowledge } from "@/lib/knowledge-os/indexer";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
 import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
+import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
+import type { PortfolioBriefingResult } from "@/lib/portfolio-briefing/types";
 import type { Locale } from "@/types/database";
 
 /** Ask the Living Guide. Returns a fully-attributed answer. */
@@ -43,6 +45,17 @@ export async function getProjectBriefingAction(
   locale: Locale,
 ): Promise<ProjectBriefingResult> {
   return getProjectBriefing(projectId, locale);
+}
+
+/**
+ * Generate Isabella's deterministic Portfolio Health Briefing for the PMO
+ * (owner/admin only — enforced from the trusted session inside the service).
+ * Shown when Isabella opens outside a project context.
+ */
+export async function getPortfolioBriefingAction(
+  locale: Locale,
+): Promise<PortfolioBriefingResult> {
+  return getPortfolioBriefing(locale);
 }
 
 /** Record 👍/👎 feedback against a previously generated answer. */

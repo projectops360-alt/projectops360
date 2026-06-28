@@ -353,10 +353,18 @@ Impact · Severity · Investigation status · Owner · Next action.
   [REG-006](#reg-006--confusing-blocked-vs-waiting-on-dependency),
   [REG-008](#reg-008--living-graph-shows-a-resolvedfalse-blocked-state),
   [REG-010](#reg-010--cross-module-metric-rollup-inconsistency), [No silent regressions rule].
+- **Follow-up (2026-06-28) — PMO Portfolio Briefing:** extended the same proactive behavior to the
+  PMO. When Isabella opens **outside a project** for an **owner/admin**, she shows a deterministic
+  **Portfolio Briefing** (org-wide health, blocked critical work, at-risk milestones, high risks,
+  overdue, unassigned, pending decisions, ranked projects-needing-attention with drill-in links).
+  Same engines/guarantees (no AI on open, no hallucination, Refresh + session Dismiss). Members and
+  viewers keep the generic prompt. Code: `lib/portfolio-briefing/*` +
+  `components/isabella/portfolio-briefing.tsx`. The PM gets project help; the PMO gets it one level up.
 - **Owner:** Product. **Verify:** open any project → Isabella → a **Project Briefing** appears on
   load (overall status, what looks good, needs attention, recommended actions, verify links);
-  Refresh re-runs it; Dismiss hides it for the session; open Isabella **outside** a project → only
-  the generic guide prompt.
+  Refresh re-runs it; Dismiss hides it for the session. Open Isabella on the **Command Center /
+  home** as a PMO → a **Portfolio Briefing** appears. Open Isabella outside a project as a
+  non-PMO → only the generic guide prompt.
 
 ---
 
