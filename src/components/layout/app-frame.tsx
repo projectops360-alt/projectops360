@@ -14,11 +14,14 @@ export function AppFrame({
   header,
   children,
   role,
+  canViewProductBrain = false,
 }: {
   header: React.ReactNode;
   children: React.ReactNode;
   /** Org role of the current user — drives role-gated sidebar items. */
   role?: string;
+  /** Server-computed allowlist flag for the Product Brain Control Center. */
+  canViewProductBrain?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -45,7 +48,7 @@ export function AppFrame({
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} />
       <div className={cn("transition-[padding] duration-200", collapsed ? "pl-16" : "pl-64")}>
         {header}
         <main className="p-6">{children}</main>

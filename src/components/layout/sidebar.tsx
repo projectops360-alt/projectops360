@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sidebarNav, bottomNav, internalNav, type NavItem } from "@/config/navigation";
-import { canViewProductIntelligence } from "@/lib/product-brain/access";
 import { Logo } from "@/components/shared/logo";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
@@ -64,7 +63,8 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle, role }: { collapsed?: boolean; onToggle?: () => void; role?: string }) {
+export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain = false }: { collapsed?: boolean; onToggle?: () => void; role?: string; canViewProductBrain?: boolean }) {
+  void role;
   const pathname = usePathname();
   const tNav = useTranslations("nav");
   const projectId = extractProjectId(pathname);
@@ -72,8 +72,10 @@ export function Sidebar({ collapsed = false, onToggle, role }: { collapsed?: boo
   // Separate global and project-scoped items
   const globalItems = sidebarNav.filter((item) => !item.projectScoped);
   const projectItems = sidebarNav.filter((item) => item.projectScoped);
-  // Internal, role-gated items (server route also enforces access).
-  const internalItems = canViewProductIntelligence(role) ? internalNav : [];
+  // Internal items — gated by the server-computed STRICT EMAIL ALLOWLIST
+  // (TASK 10A). Hiding here is UX only; the route + actions enforce access
+  // server-side. The allowlist itself never reaches the client.
+  const internalItems = canViewProductBrain ? internalNav : [];
 
   // Resolve project-scoped hrefs with the current projectId
   function resolveHref(item: NavItem): string {
