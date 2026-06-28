@@ -35,6 +35,11 @@ import { resolveExpert } from "@/lib/knowledge-os/experts";
 import { detectLanguage } from "@/lib/knowledge-os/language";
 import { resolveScreen, enrichContextWithScreen } from "@/lib/knowledge-os/screens";
 import { buildActionLinks, type ResolvedLink } from "@/lib/knowledge-os/action-links";
+import {
+  resolveIsabellaLayoutState,
+  isCompactHeaderRequired,
+  type IsabellaLayoutSignals,
+} from "@/lib/product-ux-contracts/contracts";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
@@ -256,10 +261,41 @@ export function IsabellaExperience({
   };
   const iconBtn = "rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground";
   const presenceSize = wf.frame.mode === "executive" ? 200 : 150;
-  // State A (idle): large hologram. State B (active): compact header so the
-  // answer is immediately visible. State C: user expanded the avatar manually.
-  const hasConversation = turns.length > 0;
-  const compactPresence = hasConversation && !avatarExpanded;
+  // ── REG-014 / UX-001 — Isabella Welcome Hero lifecycle (PROTECTED) ────────
+  // The full Welcome Hero belongs to the EMPTY_WELCOME state ONLY. ANY active
+  // content is ACTIVE_CONTENT and MUST collapse the hero into the compact header
+  // so the content wins — the large avatar is a welcome affordance, not chrome.
+  //
+  // ACTIVE_CONTENT is true when ANY of these hold:
+  //   • a Project or Portfolio Briefing is showing (counts as assistant content),
+  //   • the conversation has at least one turn (user or assistant),
+  //   • a request is in flight (pending),
+  //   • the user has typed the first character.
+  // Returning to EMPTY_WELCOME happens only when all of the above are empty
+  // (briefing dismissed AND no turns AND not pending AND input empty) — i.e. a
+  // genuine reset/new-conversation/empty-history state.
+  //
+  // Do NOT reintroduce a `turns.length > 0`-only check here: a Project Briefing
+  // with no turns would then wrongly show the large hero stacked on top of the
+  // briefing. That stacked layout is exactly REG-014. See UX-001 and the test
+  // src/lib/product-ux-contracts/__tests__/isabella-welcome-hero.test.ts.
+  const briefingActive =
+    (!!projectId && !briefingHidden) || (showPortfolio && !portfolioHidden);
+  // The layout rule lives in the Product UX Contract (UX-001) so it is the single
+  // source of truth and a future refactor cannot drift from the approved behavior.
+  const layoutSignals: IsabellaLayoutSignals = {
+    turnCount: turns.length,
+    briefingActive,
+    pending,
+    inputLength: input.trim().length,
+    avatarManuallyExpanded: avatarExpanded,
+  };
+  const isEmptyWelcome = resolveIsabellaLayoutState(layoutSignals) === "EMPTY_WELCOME";
+  const hasActiveContent = !isEmptyWelcome;
+  // State A (EMPTY_WELCOME): large hologram. State B (ACTIVE_CONTENT): compact
+  // header. State C: the user manually re-expanded the avatar (UX-004) — an
+  // explicit, user-initiated action, never an automatic regression.
+  const compactPresence = isCompactHeaderRequired(layoutSignals);
 
   // ── Minimized pill ─────────────────────────────────────────────────────────
   if (wf.frame.minimized) {
@@ -358,15 +394,32 @@ export function IsabellaExperience({
           })}
         </div>
 
-        {/* ── Presence (UX-004) ─────────────────────────────────────────── */}
-        {compactPresence ? (
-          // State B — active conversation: compact one-line header so the answer
-          // is immediately visible. Small avatar · name · mode · status.
-          <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+        {/* ── Presence — Welcome Hero lifecycle (REG-014 / UX-001) ───────────
+            Two mutually-exclusive presentations share one animated region:
+            • Compact header (State B): shown whenever there is active content.
+            • Full Welcome Hero (State A / manual State C): always mounted but
+              CSS-collapsed (max-height/opacity → 0, ~300ms) while content is
+              active, so the briefing/conversation is readable immediately and
+              the large avatar never stacks on top of content. On first load
+              WITH a briefing it mounts already-collapsed (no flash of hero). */}
+        {compactPresence && (
+          <div
+            data-testid="isabella-compact-header"
+            className={`${styles.compactHeader} flex items-center justify-between gap-2 border-b border-border px-3 py-1.5`}
+          >
             <div className="flex min-w-0 items-center gap-2">
-              <HologramPlaceholder state={presence} size={30} accent={expert.presentation.accent} />
+              <HologramPlaceholder state={presence} size={28} accent={expert.presentation.accent} />
               <span className="truncate text-xs font-semibold text-foreground">{expert.displayName}</span>
-              <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">· {modeLabel[wf.frame.mode]}</span>
+              <span
+                className="hidden shrink-0 items-center gap-0.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-1.5 text-[9px] font-medium text-brand-600 dark:text-brand-400 sm:inline-flex"
+                title={tt(
+                  "Isabella answers from the Product Brain, project data, and Project Memory.",
+                  "Isabella responde desde el Product Brain, los datos del proyecto y la Memoria del Proyecto.",
+                )}
+              >
+                <BadgeCheck className="h-2.5 w-2.5" aria-hidden />
+                {tt("Grounded in Product Intelligence", "Fundamentada en Inteligencia de Producto")}
+              </span>
               <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-brand-600 dark:text-brand-400">
                 <span className={styles.statusDot} />
                 {statusLabel[presence]}
@@ -381,12 +434,20 @@ export function IsabellaExperience({
               <ChevronDown className="h-4 w-4" />
             </button>
           </div>
-        ) : (
-          // State A (idle) / State C (manually expanded): the full hologram.
+        )}
+
+        {/* Full Welcome Hero — always mounted, collapses when active content. */}
+        <div
+          data-testid="isabella-welcome-hero"
+          data-collapsed={compactPresence ? "true" : "false"}
+          aria-hidden={compactPresence}
+          className={`${styles.heroWrap} ${compactPresence ? styles.heroWrapCollapsed : ""}`}
+        >
           <div className={`${styles.presence} relative border-b border-border`}>
-            {hasConversation && (
+            {hasActiveContent && (
               <button
                 onClick={() => setAvatarExpanded(false)}
+                tabIndex={compactPresence ? -1 : 0}
                 className={`absolute right-1.5 top-1.5 z-10 ${iconBtn}`}
                 title={tt("Collapse", "Contraer")}
                 aria-label={tt("Collapse Isabella avatar", "Contraer el avatar de Isabella")}
@@ -430,7 +491,7 @@ export function IsabellaExperience({
               )}
             </div>
           </div>
-        )}
+        </div>
 
         {/* ── Conversation ──────────────────────────────────────────────── */}
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
@@ -447,7 +508,9 @@ export function IsabellaExperience({
           {showPortfolio && !portfolioHidden && (
             <PortfolioBriefing locale={locale} onDismissed={() => setPortfolioHidden(true)} />
           )}
-          {turns.length === 0 && (
+          {/* Empty-welcome greeting — only in EMPTY_WELCOME. With an active
+              briefing or conversation it is hidden so content wins (REG-014). */}
+          {isEmptyWelcome && (
             <div className="space-y-3">
               <div className="rounded-2xl border border-border bg-background p-4">
                 <p className="text-base font-semibold text-foreground">{expert.greeting[isEs ? "es" : "en"]}</p>

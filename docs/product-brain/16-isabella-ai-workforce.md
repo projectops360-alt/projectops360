@@ -35,6 +35,28 @@ area gets priority height), **C — Expanded** (user can re-show the hologram wi
 response). **Binding rule:** decorative avatar/header elements must never obscure or compete with
 generated answer content. Resolved 2026-06-27.
 
+## Isabella Layout Lifecycle (UX-001 · REG-014 — binding)
+Isabella has **two major layout states**, governed by the Product UX Contract **UX-001**
+([doc 32](32-product-ux-contracts.md)) — the rule lives in
+`src/lib/product-ux-contracts/contracts.ts` and is consumed by the panel, so it has one source of
+truth and is protected by tests.
+
+1. **Empty Welcome State** — the full Welcome Hero (large avatar + name + "Product Intelligence
+   Expert" + "Grounded in Product Intelligence" badge + presence). Allowed **only** when there is no
+   active content: no turns, no briefing, not pending, empty input.
+2. **Active Content State** — a **compact header (≤70px)** with the conversation/briefing immediately
+   beneath. Triggered by ANY active content: a **Project Briefing** (which counts as active
+   assistant content), a conversation turn, a pending request, or the first typed character.
+
+The active conversation starts when the user interacts **OR when Isabella generates a briefing
+automatically.** The large avatar is a **welcome affordance, not permanent chrome** — the compact
+header is required the moment Isabella is useful, and the content must be readable immediately. The
+hero is always mounted but **CSS-collapses smoothly (~300ms, honors `prefers-reduced-motion`)**; on
+first load with a briefing it mounts already-collapsed so the hero never flashes or stacks above
+content. The full hero returns only on New Conversation / Reset / empty history, or by an explicit
+user re-expand (UX-004). **The regression to never reintroduce (REG-014):** a large avatar stacked on
+top of a Project Briefing or active conversation.
+
 ## Project Health Briefing (REG-013)
 Inside a project, **Isabella does not wait passively.** When she is opened in a project context she
 proactively shows a **Project Health Briefing** answering, from evidence only: *"How is my project
