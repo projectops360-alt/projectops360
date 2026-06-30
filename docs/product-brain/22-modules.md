@@ -233,6 +233,13 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
   (BIM, Living Graph, Resource Capacity, Project Memory). Grouping organizes by **user intent**, not by
   removal. Operational modules must not be demoted into Settings. One visible home per capability
   (REG-011). **Related:** [PD-009](30-product-decision-log.md), [UX-006](25-ux-design-debt.md).
+- **Language consistency ([UX-012](32-product-ux-contracts.md#ux-012), binding, app-wide):** nav and
+  all user-facing UI must be fully in the selected language — **no Spanglish**. Nav labels, Workboard,
+  Team & Roles, Charter/Governance, Command Center, Living Graph, Project Memory, Isabella, Resource
+  Capacity, Reports and Landing all draw from `messages/{en,es}.json`, which stay in **key-parity**
+  (enforced by `src/i18n/__tests__/message-parity.test.ts`). Canonical terms live in
+  `src/lib/i18n/glossary.ts`; product names/acronyms may stay canonical. New UI text must add both EN
+  and ES keys — never hardcode single-language strings.
 
 ## Drawing Intelligence / BIM
 - **Status:** Partial (~55%). Documentation pending deeper review. **Affected by

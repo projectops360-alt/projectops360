@@ -32,6 +32,7 @@ stop it — executable checks do. See `docs/product-brain/11-ai-development-rule
 | **Project Memory / Scribe / Rythm** | **REG-009** (Scribe restoration) + REG-011 (Rythm consolidated into Rhythm Center, one visible home) |
 | **Resource Capacity** | `13-resource-capacity-intelligence.md` + ADR-003/009; REG-004/007 |
 | **Task editor / Workboard task form** | **UX-014** (`32-product-ux-contracts.md`) + **PD-013** — never expose internal AI prompt metadata (`prompt_body`/`prompt_context`/`ai_tool_target`) as a user-facing field; preserve stored values on save (preserve-on-absent); user-facing AI help goes through Isabella; `src/lib/product-ux-contracts/contracts.ts` |
+| **User-facing UI text / i18n (any language)** | **UX-012** No Spanglish (`32-product-ux-contracts.md`). Before adding user-facing UI text, use the i18n system and add **both EN and ES** keys (`messages/{en,es}.json` stay key-parity). Use the canonical glossary `src/lib/i18n/glossary.ts`; never hardcode single-language strings in protected modules; never auto-translate user-generated content. |
 
 ## Definition of Done (every change)
 
