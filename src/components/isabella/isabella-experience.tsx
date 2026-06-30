@@ -41,6 +41,7 @@ import {
   type IsabellaLayoutSignals,
 } from "@/lib/product-ux-contracts/contracts";
 import { askLivingGuideAction, submitGuideFeedbackAction } from "@/components/living-guide/actions";
+import type { IsabellaAskDetail } from "@/lib/isabella/ask-isabella";
 import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
 import { ProjectBriefing } from "./project-briefing";
@@ -79,10 +80,13 @@ interface Turn {
 export function IsabellaExperience({
   locale,
   baseContext,
+  initialAsk,
   onClose,
 }: {
   locale: Locale;
   baseContext: GuideContext;
+  /** UX-014 — open with a seeded question + entity context (e.g. "Ask Isabella about this task"). */
+  initialAsk?: IsabellaAskDetail | null;
   onClose: () => void;
 }) {
   const isEs = locale === "es";
@@ -93,10 +97,12 @@ export function IsabellaExperience({
 
   const expert = resolveExpert({ module: baseContext.module });
   const screen = useMemo(() => resolveScreen(pathname || "", locale), [pathname, locale]);
-  const context = useMemo(
-    () => enrichContextWithScreen(baseContext, screen, pathname || ""),
-    [baseContext, screen, pathname],
-  );
+  const context = useMemo(() => {
+    const enriched = enrichContextWithScreen(baseContext, screen, pathname || "");
+    // UX-014 — when opened about a specific entity, carry it so the server can
+    // attach the right (record-backed) context/provenance to the answer.
+    return initialAsk?.entity ? { ...enriched, currentEntity: initialAsk.entity } : enriched;
+  }, [baseContext, screen, pathname, initialAsk]);
   const expertTitle = expert.title[isEs ? "es" : "en"];
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expertTitle };
   const actionLinks = useMemo(() => buildActionLinks(locale, context), [locale, context]);
@@ -231,6 +237,21 @@ export function IsabellaExperience({
       }
     });
   }
+
+  // UX-014 — when opened via "Ask Isabella about this task" (or similar), seed
+  // the conversation once with the provided question. The created turn becomes
+  // active content, so the Welcome Hero collapses per UX-001/REG-014.
+  const askedInitialRef = useRef(false);
+  useEffect(() => {
+    if (askedInitialRef.current) return;
+    const q = initialAsk?.query?.trim();
+    if (q) {
+      askedInitialRef.current = true;
+      ask("question", q);
+    }
+    // ask is stable for this purpose; we intentionally run only for the seeded query.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAsk]);
 
   // Guided action: she navigates AND stays present (mounted app-wide), then
   // offers to continue on the new screen.

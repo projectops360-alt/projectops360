@@ -14,12 +14,13 @@
 // premium default presentation was added.
 // ============================================================================
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { GuideContext } from "@/lib/knowledge-os/types";
 import { resolveExpert } from "@/lib/knowledge-os/experts";
 import { IsabellaExperience } from "@/components/isabella";
+import { ISABELLA_ASK_EVENT, type IsabellaAskDetail } from "@/lib/isabella/ask-isabella";
 import { LivingGuidePanel } from "./living-guide-panel";
 import { LivingGuideAvatar } from "./living-guide-avatar";
 
@@ -34,8 +35,27 @@ export function LivingGuideWidget({
   immersive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [initialAsk, setInitialAsk] = useState<IsabellaAskDetail | null>(null);
   const isEs = locale === "es";
   const expert = resolveExpert({ module: context.module });
+
+  // UX-014 — "Ask Isabella about this task" (and other in-app AI actions) open
+  // Isabella here via a window event, the single mechanism for opening her with
+  // a seeded question + entity context. Never a dead deep-link.
+  useEffect(() => {
+    function onAsk(e: Event) {
+      const detail = (e as CustomEvent<IsabellaAskDetail>).detail ?? {};
+      setInitialAsk(detail);
+      setOpen(true);
+    }
+    window.addEventListener(ISABELLA_ASK_EVENT, onAsk);
+    return () => window.removeEventListener(ISABELLA_ASK_EVENT, onAsk);
+  }, []);
+
+  function handleClose() {
+    setInitialAsk(null);
+    setOpen(false);
+  }
 
   return (
     <>
@@ -53,7 +73,7 @@ export function LivingGuideWidget({
 
       {/* Immersive experience (default) */}
       {open && immersive && (
-        <IsabellaExperience locale={locale} baseContext={context} onClose={() => setOpen(false)} />
+        <IsabellaExperience locale={locale} baseContext={context} initialAsk={initialAsk} onClose={handleClose} />
       )}
 
       {/* Classic slide-over (back-compat fallback) */}
@@ -61,11 +81,11 @@ export function LivingGuideWidget({
         <>
           <div
             className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px] md:hidden"
-            onClick={() => setOpen(false)}
+            onClick={handleClose}
             aria-hidden
           />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col border-l border-border shadow-2xl">
-            <LivingGuidePanel locale={locale} context={context} onClose={() => setOpen(false)} />
+            <LivingGuidePanel locale={locale} context={context} onClose={handleClose} />
           </div>
         </>
       )}

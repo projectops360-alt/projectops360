@@ -14,6 +14,7 @@ import Link from "next/link";
 import { FileSearch, Mic, FileText, Users2, ExternalLink, BookOpen, Sparkles, AlertTriangle } from "lucide-react";
 import type { EntityProvenance } from "@/lib/provenance/types";
 import type { Locale } from "@/types/database";
+import { askIsabella } from "@/lib/isabella/ask-isabella";
 import { getEntityProvenanceAction } from "./actions";
 
 interface Props {
@@ -84,15 +85,14 @@ export function SourceEvidence({ entityType, entityId, projectId, locale, entity
     };
   }, [entityType, entityId, projectId, locale]);
 
-  const base = locale === "es" ? "/es" : "";
   const isUnknown = !state.prov || !state.prov.found || state.prov.sourceType === "unknown";
 
-  // "Ask Isabella" deep link — opens the assistant pre-seeded with the question.
-  const askHref = `${base}/projects/${projectId}?isabella=1&q=${encodeURIComponent(
+  // "Ask Isabella" — opens the assistant (single event mechanism, UX-014) seeded
+  // with the provenance question and this entity's context. Never a dead link.
+  const askQuery =
     locale === "es"
       ? `¿De dónde vino este ${entityType === "decision" ? "decisión" : entityType === "risk" ? "riesgo" : "tarea"}${entityTitle ? `: "${entityTitle}"` : ""}?`
-      : `Where did this ${entityType === "decision" ? "decision" : entityType === "risk" ? "risk" : "task"}${entityTitle ? ` "${entityTitle}"` : ""} come from?`,
-  )}`;
+      : `Where did this ${entityType === "decision" ? "decision" : entityType === "risk" ? "risk" : "task"}${entityTitle ? ` "${entityTitle}"` : ""} come from?`;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -168,12 +168,15 @@ export function SourceEvidence({ entityType, entityId, projectId, locale, entity
                 )}
               </Link>
             )}
-            <Link
-              href={askHref}
+            <button
+              type="button"
+              onClick={() =>
+                askIsabella({ query: askQuery, entity: { type: entityType, id: entityId, title: entityTitle } })
+              }
               className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
             >
               <Sparkles className="h-3.5 w-3.5" /> {t.askIsabella}
-            </Link>
+            </button>
           </div>
         </div>
       )}

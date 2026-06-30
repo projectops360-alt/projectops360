@@ -264,6 +264,32 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-013 — AI Prompt Field Is Internal Metadata (not user-facing)
+- **Decision:** The **"AI Prompt / Prompt de IA"** field (`prompt_body`, plus `prompt_context` and
+  `ai_tool_target`) must **not** be visible in the normal task editor. It is internal AI-implementation
+  metadata, not a user-facing AI interaction.
+- **Reason:** users expect a prompt field to **produce an AI response**. An external reviewer tested
+  ProjectOps360°, saw "Prompt de IA" in the task edit modal, and reasonably interpreted it as an
+  interactive AI input. A static field that only stores internal implementation instructions is
+  misleading and makes the product feel unfinished/technically exposed.
+- **Approved behavior (binding):**
+  - Hide/remove the field from the normal task edit UI (all roles).
+  - **Preserve existing stored values** — a normal save must not null them (preserve-on-absent). No
+    destructive migration; a cleanup migration, if ever wanted, is a documented follow-up.
+  - If the metadata is still needed, move it to internal/developer/admin-only, **permission-protected**
+    (never frontend-only hiding). Preferred MVP: remove from normal UI, keep backend-only.
+  - User-facing AI help is an **explicit action through Isabella** ("Ask Isabella about this task"),
+    not a static field. Isabella is the interface for asking questions about a task.
+- **Implementation (shipped):** field removed from `task-form-dialog.tsx` (section relabeled
+  "Implementation & Testing Notes"); "Ask Isabella about this task" opens Isabella via the app-wide
+  `isabella:ask` event bridge (`src/lib/isabella/ask-isabella.ts`); data preserved server-side in
+  `roadmap/actions.ts`. Protected by **[UX-014](32-product-ux-contracts.md#ux-014)** + test. The same
+  event bridge also fixed the provenance "Ask Isabella about this source" action (previously a dead
+  deep-link). **Status: Shipped.** Affects Workboard · Task Editor · Isabella · AI Governance · UX
+  Contracts · Product Brain Control Center.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery

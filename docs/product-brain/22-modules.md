@@ -11,7 +11,8 @@ permissions apply, what it connects to, and what it must NOT do.*
 > Binding product decisions affecting these modules are in the
 > [Product Decision Log](30-product-decision-log.md) (PD-001 Critical Path · PD-002 Workboard
 > ownership · PD-003 Variance baseline · PD-004 Timeline history · PD-005 What-if sandbox · PD-006
-> Risk/SOP disconnected nodes · PD-007 Focus Mode · **PD-012 Evidence Provenance**).
+> Risk/SOP disconnected nodes · PD-007 Focus Mode · **PD-012 Evidence Provenance** · **PD-013 AI
+> Prompt field is internal metadata**).
 
 Per-module template: **Purpose · Status · Users · Data · AI · Permissions · Connects to ·
 Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
@@ -39,7 +40,7 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 · ✅ [REG-017](10-regression-log.md#reg-017) canonical open-risk status semantics (`isOpenRiskStatus`) shared with Closeout |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
-| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) |
+| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) · ✅ **[UX-014](32-product-ux-contracts.md#ux-014)/[PD-013](30-product-decision-log.md#pd-013)** — internal AI prompt field removed from task editor; "Ask Isabella about this task" instead |
 | Task / Milestone / WBS / Dependency / Critical Path | Pending | ~85% | 006 | CAP-019/020/021/022/023 | 11 · ✅ [Sprint #1](26-sprint-01-operational-clarity.md) Critical Path source of truth |
 | Reports · Dashboards | Pending | ~70% / Partial | — | CAP-024/025 | 12 |
 | Project Charter & Governance | Pending | ~80% | — | CAP-034 | 13 |
@@ -113,6 +114,11 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
   grounded by KP `pi-evidence-provenance`. She **cites the source**, includes the excerpt when
   allowed, links to Project Memory, and says **"I don't have a linked source"** (a traceability gap)
   when none exists — she never infers a source. `currentEntity` context lets her trace "this" item.
+- **Ask Isabella action bridge ([UX-014](32-product-ux-contracts.md#ux-014)):** in-app AI actions
+  ("Ask Isabella about this task", "Ask Isabella about this source") open Isabella through ONE app-wide
+  `isabella:ask` event (`src/lib/isabella/ask-isabella.ts`), seeded with a question + entity context —
+  never a dead deep-link. This is the **user-facing replacement** for the removed internal task
+  "AI Prompt" field ([PD-013](30-product-decision-log.md#pd-013)).
 - **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md) · [Doc 31 — Dr. Isabella](31-dr-isabella-product-intelligence.md).
 
 ## Project Memory & Scribe
