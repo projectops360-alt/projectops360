@@ -11,7 +11,7 @@ permissions apply, what it connects to, and what it must NOT do.*
 > Binding product decisions affecting these modules are in the
 > [Product Decision Log](30-product-decision-log.md) (PD-001 Critical Path · PD-002 Workboard
 > ownership · PD-003 Variance baseline · PD-004 Timeline history · PD-005 What-if sandbox · PD-006
-> Risk/SOP disconnected nodes · PD-007 Focus Mode).
+> Risk/SOP disconnected nodes · PD-007 Focus Mode · **PD-012 Evidence Provenance**).
 
 Per-module template: **Purpose · Status · Users · Data · AI · Permissions · Connects to ·
 Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
@@ -34,7 +34,8 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Executive Command Center | Partial ([doc 14](14-executive-command-center.md)) | ~40% | 002, 006 | CAP-015 | 3 · ↪ shares rollup with [REG-013](10-regression-log.md#reg-013) briefing · ✅ [REG-015](10-regression-log.md#reg-015) Status card on dashboard |
 | Isabella / AI Workforce | Partial ([doc 16](16-isabella-ai-workforce.md)) · ✅ [Dr. Isabella](31-dr-isabella-product-intelligence.md) Product-Brain grounding · ✅ [REG-013](10-regression-log.md#reg-013) Project Health Briefing · ↪ explains UX-008 edge tooltip | ~82% | 005, 006 | CAP-002/004 | 4 |
 | Knowledge OS | Partial ([doc 15](15-knowledge-os.md)) | ~80% | 004 | CAP-001 | 5 |
-| Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) · ↪ recent decisions/follow-ups in [REG-013](10-regression-log.md#reg-013) briefing |
+| Project Memory & ProjectOps Scribe | Partial ([doc 17](17-project-memory.md)) | ~80% | — | CAP-006/007/008 | 6 · ✅ [REG-009](10-regression-log.md) restored (voice→actions/decisions) · ↪ recent decisions/follow-ups in [REG-013](10-regression-log.md#reg-013) briefing · ✅ **PD-012** Evidence Provenance (note → derived items; source chain preserved) |
+| Evidence Provenance & Traceability | **Catalog** (this doc) · [PD-012](30-product-decision-log.md#pd-012) | ~70% (Phase 1) | — | CAP-043 | ✅ **PD-012** shipped (engine + Isabella + evidence UI); Phase 2 = task/risk detail UI, Living Graph badges, report counts, backfill |
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 · ✅ [REG-017](10-regression-log.md#reg-017) canonical open-risk status semantics (`isOpenRiskStatus`) shared with Closeout |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
@@ -105,13 +106,42 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
   roadmap engines — **no AI on load, nothing invented**. Refresh re-runs it; Dismiss is
   session-only; RBAC scopes what each role sees. Code: `lib/project-briefing/*` +
   `components/isabella/project-briefing.tsx`. See [Doc 16 → Project Health Briefing](16-isabella-ai-workforce.md).
+- **Provenance intelligence ([PD-012](30-product-decision-log.md#pd-012)):** Isabella answers "where
+  did this task/decision/risk come from?", "how many tasks came from voice notes?", "which decisions
+  came from meetings?" using a **deterministic, record-backed** PROVENANCE FACTS block stamped into
+  her context server-side (`askLivingGuideAction` → `lib/provenance` → `formatProvenanceForPrompt`),
+  grounded by KP `pi-evidence-provenance`. She **cites the source**, includes the excerpt when
+  allowed, links to Project Memory, and says **"I don't have a linked source"** (a traceability gap)
+  when none exists — she never infers a source. `currentEntity` context lets her trace "this" item.
 - **Related:** CAP-002/004 · [ADR-005](adrs/ADR-005-isabella-primary-ai-interface.md) · [Doc 16](16-isabella-ai-workforce.md) · [Doc 31 — Dr. Isabella](31-dr-isabella-product-intelligence.md).
 
 ## Project Memory & Scribe
 - **Purpose:** Per-project institutional memory; fast capture → structured items.
 - **Status:** Implemented (~80%). **Data:** `project_memory_items`, `project_scribe_items` (vectorized).
 - **Boundaries:** per-project; distinct from Knowledge OS and Product Intelligence.
+- **Provenance ([PD-012](30-product-decision-log.md#pd-012), binding):** every Scribe extraction is the
+  **forward** provenance record (`project_scribe_items`: `source_excerpt`, approval status,
+  `created_entity_*`); generated work items carry the **reverse** link
+  (`project_backlog_items.source_memory_item_id`/`source_scribe_item_id`). The note detail panel shows
+  **"What this note produced"** (derived tasks/decisions/risks + memory-only extractions). AI must
+  never create an entity without preserving this chain.
 - **Related:** CAP-006/007/008 · [Doc 17](17-project-memory.md).
+
+## Evidence Provenance & Traceability
+- **Purpose:** Track the **origin of every AI-derived project entity** so PMs/PMOs can answer "why
+  does this work exist?". Provenance is a **read-only projection** over the canonical source-chain
+  records — it never forks the truth into a parallel table. See [PD-012](30-product-decision-log.md#pd-012).
+- **Status:** Implemented (Phase 1). **Data (read):** `project_scribe_items`, `traceability_links`,
+  `project_backlog_items` reverse FKs, `decisions.source_type`/`source_record_id`, `project_memory_items`.
+- **AI:** Isabella answers provenance via **deterministic injection** (record-backed PROVENANCE FACTS
+  stamped into context; she cites the source, includes the excerpt when present, and says the source
+  is **unknown / a traceability gap** when no record exists — never inferred). Engine:
+  `getProjectProvenanceSummary` / `getEntityProvenance`.
+- **Permissions:** org + project scoped (server-side); **source excerpts are redacted for external
+  viewers**. **Boundaries (must-not):** never infer a source from text similarity; never hide a
+  missing source (show the gap); never overwrite existing provenance.
+- **Related:** CAP-043 · `src/lib/provenance/*` · `src/components/provenance/*` · KP
+  `pi-evidence-provenance`.
 
 ## Execution Status Engine
 - **Purpose:** Single deterministic engine for Execution/Dependency/Health/Risk (independent dimensions).

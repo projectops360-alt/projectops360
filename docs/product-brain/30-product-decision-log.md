@@ -224,6 +224,46 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-012 — Evidence Provenance Is Required for AI-Derived Work
+- **Decision:** Any **task, decision, risk, issue, follow-up, milestone, or action item created from
+  AI extraction** must retain its **source provenance**. Source provenance includes: source type,
+  source item ID, source excerpt, transcript/note/document reference, extraction method, approval
+  status, approved by, approved at, created entity ID, and a traceability link.
+- **Reason:** ProjectOps360° must not only create work — it must remember **why** the work exists.
+  PMs and PMOs have to answer "Why does this task exist?", "Who decided this?", "Where did this risk
+  come from?", "What note, meeting, or document produced this action?". *No source, no confidence.*
+- **Protection rules (binding):**
+  - AI must **not** create project entities without preserving source evidence.
+  - Isabella must **not** answer provenance questions unless source records exist. If provenance is
+    missing she must say the source is **unknown** and **flag a traceability gap** — never inferred
+    from text similarity.
+  - Traceability must be **record-backed**, created at the time of approval/entity creation.
+  - "Created manually" is a **known origin**, distinct from a gap; it must not be reported as missing.
+  - Source excerpts are sensitive (raw notes/transcripts): **external viewers never receive them**;
+    server-side authorization enforces this (not UI hiding).
+- **Model (one source of truth, not a fork):** provenance is a **read-only projection** over the
+  canonical records that already store the source chain — `project_scribe_items` (forward:
+  extraction → `created_entity_*`, with `source_excerpt` + approval status), the reverse FKs on
+  `project_backlog_items` (`source_memory_item_id` / `source_scribe_item_id`), `traceability_links`
+  (memory/meeting → decision/risk), and `decisions.source_type`/`source_record_id` (meeting-derived).
+  No parallel `entity_provenance` table is created (CLAUDE.md rule #5 — consolidate, don't fork).
+- **Implementation (Phase 1 — shipped):** deterministic engine
+  `src/lib/provenance/{types,engine,service}.ts` — `getProjectProvenanceSummary(projectId)` (counts
+  by source: Scribe voice/note, meetings; traceability gaps) + `getEntityProvenance(type,id)`.
+  Isabella answers provenance via **deterministic injection**: server stamps a record-backed
+  PROVENANCE FACTS block into her context (`askLivingGuideAction` → `formatProvenanceForPrompt`),
+  grounded by Knowledge Package `pi-evidence-provenance` (migration
+  `20260830000000_provenance_knowledge.sql`); `currentEntity` context lets her trace "this" item.
+  UI: `SourceEvidence` section on the **Decision detail**, "What this note produced" on the
+  **Project Memory** note panel. Tests: `src/lib/provenance/__tests__/engine.test.ts`.
+- **Phase 2 (Decided, not yet built):** `SourceEvidence` on task (backlog refinement) + risk detail;
+  provenance badges on Living Graph nodes; provenance counts in the Closeout/executive report;
+  a backfill script for historical items lacking links; persisting meeting-derived non-decision
+  entities. **Status: Shipped (Phase 1).** Affects Project Memory · ProjectOps Scribe · Rythm/
+  Meetings · Workboard/Tasks · Decisions · Risks · Isabella · Living Graph · Traceability · Reports.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery

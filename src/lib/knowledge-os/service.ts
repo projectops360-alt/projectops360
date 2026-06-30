@@ -89,6 +89,10 @@ function serializeContext(input: AskGuideInput): string {
     c.role && `Current user role: ${c.role}`,
     c.action && `Current action: ${c.action}`,
     c.permissions?.length && `Capabilities: ${c.permissions.join(", ")}`,
+    c.currentEntity && `Selected item: ${c.currentEntity.type} ${c.currentEntity.id}${c.currentEntity.title ? ` ("${c.currentEntity.title}")` : ""}`,
+    // PD-012: deterministic, server-stamped provenance facts. Authoritative —
+    // the model must use these numbers/sources verbatim and never invent a source.
+    c.provenanceFacts && `\n${c.provenanceFacts}`,
   ].filter(Boolean);
   return parts.join("\n") || "No additional context provided.";
 }

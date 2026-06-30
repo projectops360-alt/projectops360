@@ -15,6 +15,7 @@ import {
   SourceTypeBadge, ImportanceDot, ClassificationBadges, ENTITY_TYPE_META, LINK_TYPE_META,
 } from "./memory-badges";
 import type { MemoryItemView, LinkableEntities, LinkableEntityType } from "./types";
+import { MemoryDerivedItems } from "@/components/provenance/memory-derived-items";
 import type { Locale } from "@/types/database";
 
 interface MemoryDetailPanelProps {
@@ -262,6 +263,9 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
               </ul>
             )}
           </section>
+
+          {/* What this note produced (PD-012 provenance — derived items) */}
+          <MemoryDerivedItems memoryItemId={item.id} projectId={projectId} locale={locale} />
 
           {/* Metadata / source info */}
           <section className="rounded-lg border border-border bg-muted/20 p-3 text-xs">

@@ -52,6 +52,14 @@ export interface GuideContext {
   tab?: string;              // active tab/section when applicable
   workflow?: string;         // the primary workflow on this screen
   components?: string[];     // visible UI components (buttons/cards/tables/…)
+  // ── Current item context (PD-012) — what entity is open/selected, so Isabella
+  // can answer "where did THIS task/decision come from?". Client-supplied as a
+  // lookup key only; the server re-validates ownership before resolving anything.
+  currentEntity?: { type: string; id: string; title?: string };
+  // ── Provenance facts (PD-012) — DETERMINISTIC, server-stamped only. Never set
+  // by the client. Holds record-backed source/traceability facts the model must
+  // use verbatim (and never invent). Populated in askLivingGuideAction.
+  provenanceFacts?: string;
 }
 
 /** One retrieved chunk with provenance, after hybrid fusion. */

@@ -11,6 +11,7 @@ import { DecisionStatusBadge } from "@/components/decisions/decision-status-badg
 import { ImpactBadge } from "@/components/decisions/impact-badge";
 import { EditDecisionDialog } from "@/components/decisions/edit-decision-dialog";
 import { LinkedRecords, type ResolvedLink } from "@/components/links/linked-records";
+import { SourceEvidence } from "@/components/provenance/source-evidence";
 import { archiveDecisionAction } from "../actions";
 
 interface StakeholderOption {
@@ -231,6 +232,15 @@ export function DecisionDetailClient({
           </div>
         )}
       </div>
+
+      {/* Source / Evidence (PD-012 provenance) */}
+      <SourceEvidence
+        entityType="decision"
+        entityId={decision.id}
+        projectId={projectId}
+        locale={locale}
+        entityTitle={title}
+      />
 
       {/* Description */}
       <div className="rounded-xl border border-border bg-card p-5">

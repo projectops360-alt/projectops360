@@ -17,7 +17,15 @@ import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
 import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
 import type { PortfolioBriefingResult } from "@/lib/portfolio-briefing/types";
+import { getProjectProvenanceSummary, getEntityProvenance } from "@/lib/provenance/service";
+import { formatProvenanceForPrompt } from "@/lib/provenance/engine";
 import type { Locale } from "@/types/database";
+
+// Lightweight (NON-authorization) hint that the user is asking about source /
+// provenance / traceability — used only to decide whether to spend a few count
+// queries enriching the prompt. Bilingual.
+const PROVENANCE_HINT =
+  /\b(source|sources|origin|provenance|trace|traceab|derived|came from|come from|created from|where did|voice note|dictat|scribe|rythm|evidence)\b|de d[oó]nde|procede|origen|fuente|trazab|deriva|nota de voz|dictad|evidencia/i;
 
 /** Ask the Living Guide. Returns a fully-attributed answer. */
 export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideAnswer> {
@@ -30,8 +38,37 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       userId: org.userId,
       organizationId: org.organizationId,
       role: org.role,
+      // Never trust a client-supplied provenanceFacts — only the server sets it.
+      provenanceFacts: undefined,
     },
   };
+
+  // ── Provenance intelligence (PD-012) ────────────────────────────────────────
+  // When inside a project and the question (or a selected item) is about where
+  // work came from, stamp DETERMINISTIC, record-backed facts into the context so
+  // Isabella answers with real numbers/sources and never invents provenance.
+  const projectId = input.context.projectId;
+  const entity = input.context.currentEntity;
+  const wantsProvenance = entity != null || PROVENANCE_HINT.test(input.query ?? "");
+  if (projectId && wantsProvenance) {
+    try {
+      const lang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+      const [summaryRes, entityRes] = await Promise.all([
+        getProjectProvenanceSummary(projectId),
+        entity?.id && entity?.type
+          ? getEntityProvenance(entity.type, entity.id, projectId, lang as Locale)
+          : Promise.resolve(null),
+      ]);
+      const summary = summaryRes.ok ? summaryRes.summary : null;
+      const entityProv = entityRes && entityRes.ok ? entityRes.provenance : null;
+      if (summary || entityProv) {
+        safeInput.context.provenanceFacts = formatProvenanceForPrompt(summary, entityProv, lang);
+      }
+    } catch {
+      // Never break the answer flow over provenance enrichment.
+    }
+  }
+
   return askKnowledgeOs(org, safeInput);
 }
 
