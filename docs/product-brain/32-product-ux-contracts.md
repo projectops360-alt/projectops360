@@ -18,6 +18,7 @@
 | UX-008 | Living Graph edges are explainable (task tooltip) | **APPROVED** | — (usability; reuses REG-008/010 status rules) | `src/lib/graph/__tests__/edge-task-tooltip.test.ts` |
 | UX-009 | Closeout Report has dashboard prominence | **APPROVED** | [REG-015](10-regression-log.md#reg-015) | `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status placement) |
 | UX-010 | Closeout Report process is guided & discoverable | **APPROVED** | — (usability) | `src/lib/rhythm/__tests__/closeout-workflow.test.ts` |
+| UX-012 | Language Consistency / No Spanglish | **APPROVED** | — (usability/quality) | `contracts.ts` · `src/lib/i18n/glossary.ts` · `src/i18n/__tests__/message-parity.test.ts` · `glossary-consistency.test.ts` |
 | UX-014 | Internal AI prompt metadata must not be user-facing (task editor) | **APPROVED** | [PD-013](30-product-decision-log.md#pd-013) | `contracts.ts` · `src/components/roadmap/__tests__/task-editor-ai-prompt-visibility.test.ts` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
@@ -160,3 +161,52 @@ the app-wide `isabella:ask` event (`src/lib/isabella/ask-isabella.ts`) consumed 
 
 **The regression to never reintroduce:** a "Prompt de IA / AI Prompt" (or any developer prompt) field
 visible in the normal task editor.
+
+---
+
+## UX-012 — Language Consistency / No Spanglish
+
+**Status:** APPROVED.
+
+**Principle:** ProjectOps360° must feel professional in every supported language. When a language is
+selected, **all** user-facing UI text is in that language — no Spanish/English mixing. An external
+reviewer saw Spanish navigation mixed with English workflow labels; mixed-language UI makes the
+product feel unfinished.
+
+**Contract (binding):**
+- Spanish mode shows Spanish UI; English mode shows English UI, across labels, buttons, helper text,
+  menus, tabs, empty states, tooltips, alerts, and form fields.
+- The **EN and ES message dictionaries** (`messages/en.json`, `messages/es.json`) must stay in
+  **key-parity** — a key present in one locale must exist in the other — so the UI never silently
+  falls back to the other language (the #1 Spanglish cause).
+- Reviewer-flagged **protected labels** (nav groups, Workboard, task status, Project Memory, Execution
+  Map…) must match the **canonical glossary** in the selected language.
+- **User-generated content** (task titles, notes, names…) is **never** auto-translated.
+- **Approved product names** (ProjectOps360°, Isabella, Rythm, Living Graph, Product Brain, ProjectOps
+  Scribe, Knowledge OS, Workboard, Roadmap, Sprint, Stakeholders) and **technical acronyms** (PMO, BIM,
+  RACI, KPI, PDF, API, RFI, WBS, CPM, SOP) may remain canonical/identical across locales.
+- New user-facing strings must use the i18n dictionary (**both** EN and ES) — no hardcoded
+  single-language UI text in protected modules. Future UI changes must use the existing i18n system.
+
+**Canonical glossary (selected terms):** Command Center → Centro de Mando · Planning → Planificación ·
+Execution → Ejecución · Resources → Recursos · Intelligence → Inteligencia · Technical / BIM →
+Técnico / BIM · Workboard → Tablero de Trabajo · Execution Map → Mapa de Ejecución · Project Memory →
+Memoria del Proyecto · Closeout Report → Reporte de Cierre · Team & Roles → Equipo y Roles · Owner →
+Responsable · Planned Start → Inicio planificado · Planned Finish → Fin planificado · Blocked →
+Bloqueado · Waiting → En espera · In Progress → En progreso · Completed → Completado · **Stakeholders**
+kept verbatim (canonical PM-Spanish choice).
+
+**Implementation:** canonical terms + allowed-untranslated names in `src/lib/i18n/glossary.ts`
+(`CANONICAL_GLOSSARY`, `PROTECTED_MESSAGE_LABELS`, `CANONICAL_PRODUCT_NAMES`, `ALLOWED_ACRONYMS`,
+`isCanonicalUntranslatable`); contract in `src/lib/product-ux-contracts/contracts.ts`
+(`UX_012_LANGUAGE_CONSISTENCY`). Protected by `src/i18n/__tests__/message-parity.test.ts` (EN/ES
+key-parity) and `src/i18n/__tests__/glossary-consistency.test.ts` (protected labels match the glossary
+in the right language). The audit found the dictionaries already in full parity (1717 keys each); the
+fixed Spanglish instance was `livingGraph.backToExecutionMap` (ES "Execution Map" → "Mapa de Ejecución").
+
+**Ongoing (documented):** the dictionaries are the system of record and are well-translated; remaining
+Spanglish lives in pockets of components that hardcode single-language strings. New work must route
+through i18n; the key-parity test is the standing enforcement that keeps EN/ES aligned going forward.
+
+**The regression to never reintroduce:** a protected nav/Workboard/status label appearing in the wrong
+language, or an EN message key added without its ES counterpart (or vice-versa).

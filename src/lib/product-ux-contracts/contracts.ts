@@ -145,7 +145,30 @@ export const UX_014_TASK_EDITOR_AI_PROMPT: ProductUxContract = {
   ],
 };
 
+// ── UX-012 — Language Consistency / No Spanglish ────────────────────────────
+
+/**
+ * No Spanglish: when a language is selected, user-facing UI must be entirely in
+ * that language. The canonical terminology + the allowed-untranslated names live
+ * in `src/lib/i18n/glossary.ts`; the message dictionaries (`messages/{en,es}.json`)
+ * are kept in key-parity and consistency by tests under `src/i18n/__tests__/`.
+ */
+export const UX_012_LANGUAGE_CONSISTENCY: ProductUxContract = {
+  id: "UX-012",
+  title: "Language Consistency / No Spanglish",
+  status: "APPROVED",
+  rules: [
+    "Spanish mode must show Spanish UI; English mode must show English UI.",
+    "EN and ES message dictionaries must stay in key-parity (a key in one locale must exist in the other) so the UI never falls back to the other language.",
+    "Reviewer-flagged protected labels (nav, Workboard, status, Project Memory…) must match the canonical glossary in the selected language.",
+    "User-generated content is never auto-translated.",
+    "Approved product names (ProjectOps360°, Isabella, Rythm, Living Graph, Product Brain, ProjectOps Scribe…) and technical acronyms (PMO, BIM, RACI, KPI, PDF, API) may remain canonical/identical across locales.",
+    "New user-facing strings must use the i18n dictionary (both EN and ES) — no hardcoded single-language UI text in protected modules.",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
+  UX_012_LANGUAGE_CONSISTENCY,
   UX_014_TASK_EDITOR_AI_PROMPT,
 ];
