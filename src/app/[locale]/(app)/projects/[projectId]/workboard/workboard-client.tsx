@@ -8,7 +8,7 @@ import {
   FileText, Send, Code, ShieldCheck, AlertCircle,
   GripVertical, Filter, ChevronLeft, ChevronRight,
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
-  CornerDownRight, User,
+  CornerDownRight, User, Rows3, Rows4,
 } from "lucide-react";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { resolveTaskOwner, type AssigneeInfo } from "@/lib/roadmap/task-owner";
@@ -126,6 +126,7 @@ interface PredecessorInfo {
 
 interface BoardColumnProps {
   status: TaskStatus;
+  compact: boolean;
   isLastInGroup: boolean;
   columnTasks: RoadmapTask[];
   milestoneMap: Map<string, string>;
@@ -156,6 +157,7 @@ interface BoardColumnProps {
 
 function BoardColumn({
   status,
+  compact,
   isLastInGroup,
   columnTasks,
   milestoneMap,
@@ -214,7 +216,7 @@ function BoardColumn({
       ) : (
         <>
           {/* ── Column header with collapse button ── */}
-          <div className={`flex items-center gap-1.5 px-3 py-2.5 border-b ${color.border}`}>
+          <div className={`flex items-center gap-1.5 border-b ${compact ? "px-2 py-1.5" : "px-3 py-2.5"} ${color.border}`}>
             {STATUS_ICON[status]}
             <span className={`text-xs font-semibold ${color.header} truncate`}>
               {t.columns[status]}
@@ -239,7 +241,7 @@ function BoardColumn({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex-1 min-h-[120px] p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
+                className={`flex-1 min-h-[120px] transition-colors ${compact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"} ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
               >
                 {columnTasks.map((task, index) => (
                   <Draggable key={task.id} draggableId={`task-${task.id}`} index={index} isDragDisabled={anyResizing}>
@@ -249,13 +251,13 @@ function BoardColumn({
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
                         onClick={() => { if (!snapshot.isDragging) onTaskClick(task); }}
-                        className={`rounded-lg border border-border bg-card p-2.5 shadow-sm transition-shadow cursor-pointer ${snapshot.isDragging ? "shadow-lg ring-2 ring-brand-500/30" : "hover:shadow-md hover:border-brand-500/30"}`}
+                        className={`rounded-lg border border-border bg-card shadow-sm transition-shadow cursor-pointer ${compact ? "p-1.5" : "p-2.5"} ${snapshot.isDragging ? "shadow-lg ring-2 ring-brand-500/30" : "hover:shadow-md hover:border-brand-500/30"}`}
                       >
                         <div className="flex items-start gap-1.5">
                           <GripVertical className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium text-foreground truncate">{task.title}</p>
-                            {task.description && <p className="text-[10px] text-muted-foreground/60 mt-0.5 line-clamp-1">{task.description}</p>}
+                            {!compact && task.description && <p className="text-[10px] text-muted-foreground/60 mt-0.5 line-clamp-1">{task.description}</p>}
                             {(predecessorsByTask.get(task.id) ?? []).map((pred) => (
                               <p
                                 key={pred.id}
@@ -372,6 +374,7 @@ export function WorkboardClient({
   translations: t,
 }: WorkboardClientProps) {
   const router = useRouter();
+  const isEs = locale === "es";
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<RoadmapTask[]>(initialTasks);
   const [isDragging, setIsDragging] = useState(false);
@@ -416,8 +419,11 @@ export function WorkboardClient({
     resetColumnWidth,
     isColumnCollapsed,
     toggleColumnCollapse,
+    density,
+    toggleDensity,
     allStatuses,
   } = useWorkboardPreferences(projectId);
+  const isCompact = density === "compact";
 
   // ── Column Visibility Popover ──────────────────────────────────────────────
   const [visOpen, setVisOpen] = useState(false);
@@ -715,6 +721,18 @@ export function WorkboardClient({
           </div>
         )}
 
+        {/* Density toggle (UX-013) — Compact fits more columns without zoom */}
+        <button
+          type="button"
+          onClick={toggleDensity}
+          aria-pressed={isCompact}
+          className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${isCompact ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+          title={isCompact ? (isEs ? "Vista cómoda" : "Comfortable view") : (isEs ? "Vista compacta (más columnas visibles)" : "Compact view (more columns visible)")}
+        >
+          {isCompact ? <Rows3 className="h-3 w-3" /> : <Rows4 className="h-3 w-3" />}
+          <span>{isCompact ? (isEs ? "Compacto" : "Compact") : (isEs ? "Cómodo" : "Comfortable")}</span>
+        </button>
+
         {/* Column Visibility Toggle */}
         <div className="relative" ref={visRef}>
           <button type="button" onClick={() => setVisOpen(!visOpen)}
@@ -773,7 +791,7 @@ export function WorkboardClient({
             <ChevronRight className="h-5 w-5" />
           </button>
 
-          <div ref={scrollRef} className="workboard-scroll flex gap-4 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-x-auto pb-4 scroll-smooth`} style={{ scrollbarWidth: "thin" }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
               const visibleStatuses = group.statuses.filter((s) => isColumnVisible(s));
@@ -792,11 +810,12 @@ export function WorkboardClient({
 
                   {/* Columns */}
                   {!collapsed && visibleStatuses.length > 0 && (
-                    <div className="flex gap-3">
+                    <div className={`flex ${isCompact ? "gap-2" : "gap-3"}`}>
                       {visibleStatuses.map((status, statusIndex) => (
                         <BoardColumn
                           key={status}
                           status={status}
+                          compact={isCompact}
                           isLastInGroup={statusIndex === visibleStatuses.length - 1}
                           columnTasks={tasksByStatus[status]}
                           milestoneMap={milestoneMap}

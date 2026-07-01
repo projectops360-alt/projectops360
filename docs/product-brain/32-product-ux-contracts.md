@@ -19,6 +19,7 @@
 | UX-009 | Closeout Report has dashboard prominence | **APPROVED** | [REG-015](10-regression-log.md#reg-015) | `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status placement) |
 | UX-010 | Closeout Report process is guided & discoverable | **APPROVED** | — (usability) | `src/lib/rhythm/__tests__/closeout-workflow.test.ts` |
 | UX-012 | Language Consistency / No Spanglish | **APPROVED** | — (usability/quality) | `contracts.ts` · `src/lib/i18n/glossary.ts` · `src/i18n/__tests__/message-parity.test.ts` · `glossary-consistency.test.ts` |
+| UX-013 | Workboard operable without browser zoom | **APPROVED** | — (usability) | `contracts.ts` · `src/lib/workboard/density.ts` · `src/lib/workboard/__tests__/density.test.ts` |
 | UX-014 | Internal AI prompt metadata must not be user-facing (task editor) | **APPROVED** | [PD-013](30-product-decision-log.md#pd-013) | `contracts.ts` · `src/components/roadmap/__tests__/task-editor-ai-prompt-visibility.test.ts` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
@@ -210,3 +211,40 @@ through i18n; the key-parity test is the standing enforcement that keeps EN/ES a
 
 **The regression to never reintroduce:** a protected nav/Workboard/status label appearing in the wrong
 language, or an EN message key added without its ES counterpart (or vice-versa).
+
+---
+
+## UX-013 — Workboard Must Be Operable Without Browser Zoom
+
+**Status:** APPROVED.
+
+**Principle:** the Workboard is an operational daily-use workspace. A PM must never have to reduce
+browser zoom to see and move tasks across the full workflow. An external reviewer had to zoom out to
+use the board (default column width 280px × 9 columns far exceeds a laptop viewport).
+
+**Contract (binding):**
+- The user must be able to move tasks **without changing browser zoom**.
+- Columns live in a **horizontal scroll container** with clear affordances: a visible (thin)
+  scrollbar, **left/right edge fades**, **scroll arrow buttons**, and Ctrl/Cmd+Arrow keyboard scroll.
+- Dragging a card near a board edge **auto-scrolls** the board to reach off-screen columns (built into
+  `@hello-pangea/dnd` for the board's scroll container).
+- A **Compact density** option reduces column width (280 → 212px) plus card/column padding and gaps so
+  more workflow columns fit; the choice **persists locally** (per-project, in the existing Workboard
+  preferences). Comfortable is the default.
+- Workflow columns must not collapse into unusable widths; cards stay readable in compact mode (only
+  the description preview — available in the detail view — is dropped).
+- Drag-and-drop **status updates**, **filters**, and the **task editor** keep working — this is a
+  layout/interaction fix only; **no business-logic, status semantics, counts, or schema change**.
+- The **Isabella launcher** (bottom-right) must not cover Workboard drop zones, the scroll arrows, or
+  the horizontal scrollbar.
+
+**Implementation:** pure density rules in `src/lib/workboard/density.ts`
+(`resolveColumnWidth`, `nextDensity`, `defaultColumnWidth`, `isValidDensity`,
+`COMPACT_COLUMN_WIDTH`/`COMFORTABLE_COLUMN_WIDTH`) — one source of truth, consumed by
+`src/hooks/use-workboard-preferences.ts` (persists `density`) and the density toggle + compact
+spacing in `workboard-client.tsx`. Existing scroll container/fades/arrows/keyboard scroll and column
+collapse/resize/visibility were already present. Protected by
+`src/lib/workboard/__tests__/density.test.ts`.
+
+**The regression to never reintroduce:** a Workboard where the full workflow can only be reached by
+zooming the browser out, or a compact mode that no longer narrows columns.
