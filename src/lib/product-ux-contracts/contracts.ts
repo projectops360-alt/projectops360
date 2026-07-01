@@ -183,6 +183,7 @@ export const UX_013_WORKBOARD_RESPONSIVE: ProductUxContract = {
   rules: [
     "The user must be able to move tasks without manually changing browser zoom.",
     "Columns live in a horizontal scroll container with clear affordances (visible scrollbar, edge fades, and scroll arrows).",
+    "The board is height-bounded to the viewport so the HORIZONTAL scrollbar stays at the foot of the screen (reachable without scrolling past a long column); each column scrolls its OWN tasks vertically. Two scrolls: board = horizontal, column body = vertical.",
     "Dragging a card near a board edge auto-scrolls the board to reach off-screen columns.",
     "A Compact density option reduces column width + card/column padding so more workflow columns fit; the choice persists locally.",
     "Workflow columns must not collapse into unusable widths, and cards stay readable in compact mode.",

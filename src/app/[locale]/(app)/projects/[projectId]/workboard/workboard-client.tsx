@@ -190,7 +190,7 @@ function BoardColumn({
 
   return (
     <div
-      className={`rounded-xl border ${color.border} ${color.bg} flex flex-col relative transition-[width] duration-150`}
+      className={`rounded-xl border ${color.border} ${color.bg} flex flex-col relative transition-[width] duration-150 h-full min-h-0`}
       style={{
         width: collapsed ? COLLAPSED_COLUMN_WIDTH : currentWidth,
         flexShrink: 0,
@@ -241,7 +241,7 @@ function BoardColumn({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex-1 min-h-[120px] transition-colors ${compact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"} ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
+                className={`flex-1 min-h-0 overflow-y-auto transition-colors ${compact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"} ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
               >
                 {columnTasks.map((task, index) => (
                   <Draggable key={task.id} draggableId={`task-${task.id}`} index={index} isDragDisabled={anyResizing}>
@@ -383,6 +383,10 @@ export function WorkboardClient({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  // UX-013 — bound the board height to the remaining viewport so the horizontal
+  // scrollbar stays reachable at the foot of the screen and each column scrolls
+  // its own tasks. Measured at runtime (chrome height varies with filter wrapping).
+  const [boardMaxH, setBoardMaxH] = useState<number | null>(null);
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     taskId: string;
     taskTitle: string;
@@ -546,6 +550,24 @@ export function WorkboardClient({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [scrollBoard]);
+
+  // ── Board height fit (UX-013) — keep the horizontal scrollbar at the foot of
+  // the viewport by capping the board to the space below its top edge. Recomputes
+  // on resize and when the banner above it toggles (which shifts the board down).
+  useEffect(() => {
+    function computeBoardHeight() {
+      const el = scrollRef.current;
+      if (!el || typeof window === "undefined") return;
+      const top = el.getBoundingClientRect().top;
+      // Leave room for the scrollbar + a little breathing space; never shorter
+      // than a usable board.
+      const available = Math.max(320, Math.round(window.innerHeight - top - 24));
+      setBoardMaxH(available);
+    }
+    computeBoardHeight();
+    window.addEventListener("resize", computeBoardHeight);
+    return () => window.removeEventListener("resize", computeBoardHeight);
+  }, [dependencyWarning]);
 
   // ── Drag and Drop ─────────────────────────────────────────────────────────────
 
@@ -791,7 +813,13 @@ export function WorkboardClient({
             <ChevronRight className="h-5 w-5" />
           </button>
 
-          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-x-auto pb-4 scroll-smooth`} style={{ scrollbarWidth: "thin" }}>
+          {/* UX-013 — the board is height-bounded to the viewport so the HORIZONTAL
+              scrollbar stays at the foot of the screen (reachable without scrolling
+              past a long column), while each column scrolls its own tasks VERTICALLY.
+              Two scrolls: board = horizontal, column body = vertical. The height is
+              measured at runtime so it fits the real remaining viewport regardless of
+              the header/toolbar height (which varies with filters wrapping). */}
+          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-x-auto overflow-y-hidden pb-3 scroll-smooth`} style={{ scrollbarWidth: "thin", maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
               const visibleStatuses = group.statuses.filter((s) => isColumnVisible(s));
@@ -800,7 +828,7 @@ export function WorkboardClient({
               if (visibleStatuses.length === 0 && !collapsed) return null;
 
               return (
-                <div key={group.label} className="flex-shrink-0">
+                <div key={group.label} className="flex-shrink-0 flex flex-col min-h-0">
                   {/* Group header */}
                   <div className="flex items-center gap-2 mb-2 cursor-pointer select-none group/header" onClick={() => toggleGroup(group.label)}>
                     <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
@@ -810,7 +838,7 @@ export function WorkboardClient({
 
                   {/* Columns */}
                   {!collapsed && visibleStatuses.length > 0 && (
-                    <div className={`flex ${isCompact ? "gap-2" : "gap-3"}`}>
+                    <div className={`flex flex-1 min-h-0 ${isCompact ? "gap-2" : "gap-3"}`}>
                       {visibleStatuses.map((status, statusIndex) => (
                         <BoardColumn
                           key={status}
