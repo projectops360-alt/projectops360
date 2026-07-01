@@ -172,20 +172,26 @@ body {
   background: var(--muted-foreground);
 }
 
-/* Workboard horizontal scrollbar — always visible */
+/* Workboard horizontal scrollbar — always visible + prominent (UX-013).
+   A subtle 8px bar was easy to miss on large screens; make it unmistakable. */
+.workboard-scroll {
+  scrollbar-width: auto;                                  /* Firefox: normal (not thin) */
+  scrollbar-color: var(--brand-500) var(--muted);         /* Firefox: brand thumb on muted track */
+}
 .workboard-scroll::-webkit-scrollbar {
-  height: 8px;
+  height: 14px;
 }
 .workboard-scroll::-webkit-scrollbar-track {
   background: var(--muted);
-  border-radius: 4px;
+  border-radius: 8px;
 }
 .workboard-scroll::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 4px;
+  background: var(--brand-500);
+  border-radius: 8px;
+  border: 3px solid var(--muted);                         /* inset so the thumb reads as a pill */
 }
 .workboard-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--brand-500);
+  background: var(--brand-600);
 }
 /* ── Print isolation for the Project Status Report ─────────────────────────── */
 /* When printing, hide everything except the report card so the browser's
