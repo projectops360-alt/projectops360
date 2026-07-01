@@ -179,7 +179,8 @@ body {
   scrollbar-color: var(--brand-500) var(--muted);         /* Firefox: brand thumb on muted track */
 }
 .workboard-scroll::-webkit-scrollbar {
-  height: 14px;
+  height: 14px;   /* horizontal bar (bottom) — move across columns */
+  width: 14px;    /* vertical bar (right) — go down through tall columns */
 }
 .workboard-scroll::-webkit-scrollbar-track {
   background: var(--muted);

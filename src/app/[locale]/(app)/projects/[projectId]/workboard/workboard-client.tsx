@@ -190,7 +190,7 @@ function BoardColumn({
 
   return (
     <div
-      className={`rounded-xl border ${color.border} ${color.bg} flex flex-col relative transition-[width] duration-150 h-full min-h-0`}
+      className={`rounded-xl border ${color.border} ${color.bg} flex flex-col relative transition-[width] duration-150`}
       style={{
         width: collapsed ? COLLAPSED_COLUMN_WIDTH : currentWidth,
         flexShrink: 0,
@@ -241,7 +241,7 @@ function BoardColumn({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex-1 min-h-0 overflow-y-auto transition-colors ${compact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"} ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
+                className={`flex-1 min-h-[120px] transition-colors ${compact ? "p-1.5 space-y-1.5" : "p-2 space-y-2"} ${snapshot.isDraggingOver ? "bg-brand-50/50 dark:bg-brand-900/10" : ""}`}
               >
                 {columnTasks.map((task, index) => (
                   <Draggable key={task.id} draggableId={`task-${task.id}`} index={index} isDragDisabled={anyResizing}>
@@ -813,13 +813,13 @@ export function WorkboardClient({
             <ChevronRight className="h-5 w-5" />
           </button>
 
-          {/* UX-013 — the board is height-bounded to the viewport so the HORIZONTAL
-              scrollbar stays at the foot of the screen (reachable without scrolling
-              past a long column), while each column scrolls its own tasks VERTICALLY.
-              Two scrolls: board = horizontal, column body = vertical. The height is
-              measured at runtime so it fits the real remaining viewport regardless of
-              the header/toolbar height (which varies with filters wrapping). */}
-          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-x-auto overflow-y-hidden pb-3 scroll-smooth`} style={{ scrollbarWidth: "thin", maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
+          {/* UX-013 — the board is ONE 2D scroll area, height-bounded to the
+              viewport. It scrolls BOTH ways on the same container: the vertical
+              scrollbar (right) goes down through tall columns, the horizontal
+              scrollbar (bottom) moves across columns. Both bars stay pinned to the
+              board's edges (in view), never at the bottom of a long column. The
+              height is measured at runtime so it fits the real remaining viewport. */}
+          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
               const visibleStatuses = group.statuses.filter((s) => isColumnVisible(s));
@@ -828,7 +828,7 @@ export function WorkboardClient({
               if (visibleStatuses.length === 0 && !collapsed) return null;
 
               return (
-                <div key={group.label} className="flex-shrink-0 flex flex-col min-h-0">
+                <div key={group.label} className="flex-shrink-0">
                   {/* Group header */}
                   <div className="flex items-center gap-2 mb-2 cursor-pointer select-none group/header" onClick={() => toggleGroup(group.label)}>
                     <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
@@ -838,7 +838,7 @@ export function WorkboardClient({
 
                   {/* Columns */}
                   {!collapsed && visibleStatuses.length > 0 && (
-                    <div className={`flex flex-1 min-h-0 ${isCompact ? "gap-2" : "gap-3"}`}>
+                    <div className={`flex ${isCompact ? "gap-2" : "gap-3"}`}>
                       {visibleStatuses.map((status, statusIndex) => (
                         <BoardColumn
                           key={status}
