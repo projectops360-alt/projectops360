@@ -2,19 +2,33 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { TaskStatus } from "@/types/database";
+import {
+  isValidDensity,
+  nextDensity,
+  resolveColumnWidth,
+  COMPACT_COLUMN_WIDTH as PURE_COMPACT_WIDTH,
+  COMFORTABLE_COLUMN_WIDTH as PURE_COMFORTABLE_WIDTH,
+  type WorkboardDensity,
+} from "@/lib/workboard/density";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+/** UX-013 — board density. Compact fits more workflow columns without zoom. */
+export type { WorkboardDensity };
 
 export interface WorkboardPreferences {
   hiddenColumns: TaskStatus[];
   collapsedGroups: string[];      // "backlog" | "active" | "complete"
   columnWidths: Partial<Record<TaskStatus, number>>; // custom width in px
   collapsedColumns: TaskStatus[]; // individually collapsed columns
+  density: WorkboardDensity;      // UX-013 — comfortable (default) | compact
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-export const DEFAULT_COLUMN_WIDTH = 280;
+export const DEFAULT_COLUMN_WIDTH = PURE_COMFORTABLE_WIDTH;
+/** UX-013 — narrower default in compact mode so more columns are visible. */
+export const COMPACT_COLUMN_WIDTH = PURE_COMPACT_WIDTH;
 export const MIN_COLUMN_WIDTH = 200;
 export const MAX_COLUMN_WIDTH = 600;
 export const COLLAPSED_COLUMN_WIDTH = 40;
@@ -31,6 +45,7 @@ const defaultPreferences: WorkboardPreferences = {
   collapsedGroups: [],
   columnWidths: {},
   collapsedColumns: [],
+  density: "comfortable",
 };
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -95,6 +110,10 @@ function loadPreferences(projectId: string): WorkboardPreferences {
       // Ensure collapsedColumns exists
       if (!Array.isArray(parsed.collapsedColumns)) {
         parsed.collapsedColumns = [];
+      }
+      // Back-compat: density added in UX-013; default older prefs to comfortable.
+      if (!isValidDensity(parsed.density)) {
+        parsed.density = "comfortable";
       }
       return parsed;
     }
@@ -196,9 +215,11 @@ export function useWorkboardPreferences(projectId: string) {
 
   const getColumnWidth = useCallback(
     (status: TaskStatus): number => {
-      return preferences.columnWidths[status] ?? DEFAULT_COLUMN_WIDTH;
+      // A user-set width always wins; otherwise the density-aware default makes
+      // compact mode fit more columns without zoom (UX-013).
+      return resolveColumnWidth(preferences.density, preferences.columnWidths[status] ?? null);
     },
-    [preferences.columnWidths]
+    [preferences.columnWidths, preferences.density]
   );
 
   const setColumnWidth = useCallback(
@@ -248,6 +269,27 @@ export function useWorkboardPreferences(projectId: string) {
     [projectId, immediateSave]
   );
 
+  // ── Density (UX-013) ──────────────────────────────────────────────────────
+
+  const setDensity = useCallback(
+    (density: WorkboardDensity) => {
+      setPreferences((prev) => {
+        const next = { ...prev, density };
+        immediateSave(next);
+        return next;
+      });
+    },
+    [immediateSave]
+  );
+
+  const toggleDensity = useCallback(() => {
+    setPreferences((prev) => {
+      const next = { ...prev, density: nextDensity(prev.density) };
+      immediateSave(next);
+      return next;
+    });
+  }, [immediateSave]);
+
   // ── Reset ──────────────────────────────────────────────────────────────────
 
   const resetPreferences = useCallback(() => {
@@ -268,6 +310,9 @@ export function useWorkboardPreferences(projectId: string) {
     resetColumnWidth,
     isColumnCollapsed,
     toggleColumnCollapse,
+    density: preferences.density,
+    setDensity,
+    toggleDensity,
     resetPreferences,
     allStatuses: ALL_STATUSES,
     groupLabels: GROUP_LABELS,
