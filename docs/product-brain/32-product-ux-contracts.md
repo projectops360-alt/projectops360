@@ -18,6 +18,7 @@
 | UX-008 | Living Graph edges are explainable (task tooltip) | **APPROVED** | — (usability; reuses REG-008/010 status rules) | `src/lib/graph/__tests__/edge-task-tooltip.test.ts` |
 | UX-009 | Closeout Report has dashboard prominence | **APPROVED** | [REG-015](10-regression-log.md#reg-015) | `src/components/layout/__tests__/project-tabs-nav.test.ts` (Status placement) |
 | UX-010 | Closeout Report process is guided & discoverable | **APPROVED** | — (usability) | `src/lib/rhythm/__tests__/closeout-workflow.test.ts` |
+| UX-014 | Internal AI prompt metadata must not be user-facing (task editor) | **APPROVED** | [PD-013](30-product-decision-log.md#pd-013) | `contracts.ts` · `src/components/roadmap/__tests__/task-editor-ai-prompt-visibility.test.ts` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
 > listed here so the contract registry is the single index. Promote each to a full `contracts.ts`
@@ -119,3 +120,43 @@ closing meeting · when can I generate the narrative · when can I download the 
 generation `src/app/.../closeout/actions.ts` (`generateCloseoutNarrativeAction`, allowlisted by
 role); UI in `closeout-client.tsx`; closing-meeting status loaded in `closeout/page.tsx`. Protected
 by `src/lib/rhythm/__tests__/closeout-workflow.test.ts`.
+
+---
+
+## UX-014 — Internal AI Prompt Metadata Must Not Be User-Facing
+
+**Status:** APPROVED · **Guards:** [PD-013](30-product-decision-log.md#pd-013).
+
+**Principle:** if a field looks like an AI chat prompt, users will expect an AI answer. The task's
+`prompt_body` / `prompt_context` / `ai_tool_target` are **internal AI-implementation metadata** (the
+prompt used during AI-assisted development and the target tool), not a user-facing AI interaction.
+An external reviewer reasonably read the **"Prompt de IA"** field in the task editor as an interactive
+AI input — that confusion makes the product feel unfinished/technically exposed. User-facing AI help
+belongs to **Isabella**.
+
+**Contract (binding):**
+- The normal task editor **must not** render `prompt_body`, `prompt_context`, or `ai_tool_target` as
+  editable fields — for **any** role (PMO, PM, member, collaborator, viewer, external reviewer).
+- User-facing AI help is an **explicit action routed through Isabella** ("Ask Isabella about this
+  task"), never a static internal prompt field.
+- Internal AI metadata, if ever surfaced in UI, must be **permission-protected**, never exposed by
+  frontend-only logic.
+- A normal task save **must preserve** any existing stored prompt metadata (preserve-on-absent) — it
+  must never null it out. No destructive migration; cleanup is a documented follow-up if ever needed.
+- Forbidden user-facing labels: **AI Prompt, Prompt de IA, Developer Prompt, Implementation Prompt,
+  System Prompt, Hidden AI Instructions.** Allowed notes labels remain: Implementation Notes, Testing
+  Notes, Acceptance Criteria, Tracking & Notes.
+- Future task-editor redesigns must preserve this rule.
+
+**Implementation:** rule + constants in `src/lib/product-ux-contracts/contracts.ts`
+(`TASK_EDITOR_INTERNAL_AI_FIELDS`, `isInternalAiTaskField`, `isForbiddenTaskEditorLabel`,
+`UX_014_TASK_EDITOR_AI_PROMPT`). The field was removed from
+`src/components/roadmap/task-form-dialog.tsx` (section relabeled "Implementation & Testing Notes",
+keeping `implementation_notes` + `test_notes`); the "Ask Isabella about this task" action dispatches
+the app-wide `isabella:ask` event (`src/lib/isabella/ask-isabella.ts`) consumed by
+`living-guide-widget.tsx` → `isabella-experience.tsx`. Data preservation enforced in
+`roadmap/actions.ts` (`updateTaskAction` preserve-on-absent for the three columns). Protected by
+`src/components/roadmap/__tests__/task-editor-ai-prompt-visibility.test.ts`.
+
+**The regression to never reintroduce:** a "Prompt de IA / AI Prompt" (or any developer prompt) field
+visible in the normal task editor.

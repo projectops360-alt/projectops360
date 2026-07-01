@@ -10,6 +10,7 @@ import {
   createPersonResourceAction,
 } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
+import { askIsabella } from "@/lib/isabella/ask-isabella";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -248,6 +249,10 @@ export function TaskFormDialog({
   translations: t,
 }: TaskFormDialogProps) {
   const isEdit = mode === "edit";
+  const isEs = locale === "es";
+  // UX-014 — the section formerly labeled "AI Prompt / Prompt de IA" is now the
+  // user-facing notes section; its label comes from here (bilingual fallback).
+  const notesSectionLabel = isEs ? "Notas de implementación y pruebas" : "Implementation & Testing Notes";
   const planningLabels = PLANNING_LABELS[locale] ?? PLANNING_LABELS.en;
   const tp = {
     sectionPlanning: t.fields.sectionPlanning ?? planningLabels.sectionPlanning,
@@ -394,9 +399,9 @@ export function TaskFormDialog({
     const estimateHours = formData.get("estimate_hours") as string;
     const acceptanceCriteria = (formData.get("acceptance_criteria") as string)?.trim();
     const dependencyNotes = (formData.get("dependency_notes") as string)?.trim();
-    const promptBody = (formData.get("prompt_body") as string)?.trim();
-    const promptContext = (formData.get("prompt_context") as string)?.trim();
-    const aiToolTarget = (formData.get("ai_tool_target") as string)?.trim();
+    // UX-014 — prompt_body / prompt_context / ai_tool_target are no longer in the
+    // form. We intentionally do NOT read or send them, so the server preserves any
+    // existing stored values (preserve-on-absent) instead of wiping them.
     const implementationNotes = (formData.get("implementation_notes") as string)?.trim();
     const testNotes = (formData.get("test_notes") as string)?.trim();
     const executionNotes = (formData.get("execution_notes") as string)?.trim();
@@ -432,9 +437,6 @@ export function TaskFormDialog({
         start_date: startDate,
         end_date: endDate,
         progress,
-        prompt_body: promptBody,
-        prompt_context: promptContext,
-        ai_tool_target: aiToolTarget,
         implementation_notes: implementationNotes,
         test_notes: testNotes,
         execution_notes: executionNotes,
@@ -464,9 +466,6 @@ export function TaskFormDialog({
         start_date: startDate,
         end_date: endDate,
         progress,
-        prompt_body: promptBody,
-        prompt_context: promptContext,
-        ai_tool_target: aiToolTarget,
         implementation_notes: implementationNotes,
         test_notes: testNotes,
         execution_notes: executionNotes,
@@ -497,11 +496,13 @@ export function TaskFormDialog({
   // Auto-expand sections in edit mode when they have data
   const hasDetailsData = isEdit && !!(task?.sprint_name || task?.estimate_hours || task?.acceptance_criteria || task?.dependency_notes);
   const hasTrackingData = isEdit && !!(task?.execution_notes || task?.blocker_reason || task?.start_date || task?.end_date || (task?.progress && task.progress > 0));
-  const hasPromptData = isEdit && !!((task as RoadmapTask | undefined)?.prompt_body || (task as RoadmapTask | undefined)?.implementation_notes || (task as RoadmapTask | undefined)?.test_notes);
+  // UX-014 — the notes section auto-expands only on real notes data; internal
+  // prompt metadata (preserved, hidden) no longer drives this.
+  const hasNotesData = isEdit && !!((task as RoadmapTask | undefined)?.implementation_notes || (task as RoadmapTask | undefined)?.test_notes);
 
   const [showDetails, setShowDetails] = useState(hasDetailsData);
   const [showTracking, setShowTracking] = useState(hasTrackingData);
-  const [showPrompt, setShowPrompt] = useState(hasPromptData);
+  const [showNotes, setShowNotes] = useState(hasNotesData);
   const [showPlanning, setShowPlanning] = useState(true);
 
   // Count filled fields per section for badges
@@ -1122,68 +1123,39 @@ export function TaskFormDialog({
               </div>
             </FormSection>
 
-            {/* ── Collapsible: AI Prompt ── */}
+            {/* ── Ask Isabella about this task (UX-014) ──
+                User-facing AI help is an explicit Isabella action — NOT a static
+                internal "AI Prompt" field. Opens Isabella seeded with this task's
+                context so she can analyze it and answer in the assistant panel. */}
+            {isEdit && task && (
+              <button
+                type="button"
+                onClick={() => {
+                  askIsabella({
+                    query: isEs
+                      ? `Analiza esta tarea y dime en qué debería enfocarme: "${task.title}"`
+                      : `Analyze this task and tell me what to focus on: "${task.title}"`,
+                    entity: { type: "task", id: task.id, title: task.title },
+                  });
+                  onClose();
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700 transition hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300"
+              >
+                <Sparkles className="h-4 w-4" />
+                {isEs ? "Preguntar a Isabella sobre esta tarea" : "Ask Isabella about this task"}
+              </button>
+            )}
+
+            {/* ── Collapsible: Implementation & Testing Notes ──
+                The internal AI-implementation fields (prompt_body / prompt_context /
+                ai_tool_target) are intentionally NOT rendered here (UX-014). Their
+                stored values are preserved server-side (preserve-on-absent). */}
             <FormSection
-              icon={<Sparkles className="h-4 w-4 text-purple-500" />}
-              label={t.fields.promptSection}
-              open={showPrompt}
-              onToggle={() => setShowPrompt(!showPrompt)}
+              icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+              label={notesSectionLabel}
+              open={showNotes}
+              onToggle={() => setShowNotes(!showNotes)}
             >
-              {/* Prompt body */}
-              <div className="space-y-1.5">
-                <label htmlFor="task-prompt-body" className="block text-xs font-medium text-muted-foreground">
-                  {t.fields.promptBody}
-                </label>
-                <textarea
-                  id="task-prompt-body"
-                  name="prompt_body"
-                  rows={4}
-                  maxLength={10000}
-                  defaultValue={isEdit ? (task as RoadmapTask | undefined)?.prompt_body ?? "" : ""}
-                  className={`${textareaClass} font-mono`}
-                  placeholder={t.fields.promptBodyPlaceholder}
-                  disabled={isPending}
-                />
-              </div>
-
-              {/* Prompt context + AI tool (side by side) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label htmlFor="task-prompt-context" className="block text-xs font-medium text-muted-foreground">
-                    {t.fields.promptContext}
-                  </label>
-                  <input
-                    id="task-prompt-context"
-                    name="prompt_context"
-                    type="text"
-                    maxLength={2000}
-                    defaultValue={isEdit ? (task as RoadmapTask | undefined)?.prompt_context ?? "" : ""}
-                    className={inputClass}
-                    placeholder={t.fields.promptContextPlaceholder}
-                    disabled={isPending}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="task-ai-tool" className="block text-xs font-medium text-muted-foreground">
-                    {t.fields.aiToolTarget}
-                  </label>
-                  <select
-                    id="task-ai-tool"
-                    name="ai_tool_target"
-                    defaultValue={isEdit ? (task as RoadmapTask | undefined)?.ai_tool_target ?? "" : ""}
-                    className={inputClass}
-                    disabled={isPending}
-                  >
-                    <option value="">—</option>
-                    <option value="claude">Claude</option>
-                    <option value="codex">Codex</option>
-                    <option value="cursor">Cursor</option>
-                    <option value="copilot">GitHub Copilot</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-
               {/* Implementation + Test notes (side by side) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

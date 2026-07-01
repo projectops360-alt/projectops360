@@ -90,9 +90,12 @@ const updateTaskSchema = z.object({
   dependency_notes: z.string().max(2000, "dependencyTooLong").transform((s) => s.trim()).optional().default(""),
   acceptance_criteria: z.string().max(2000, "acceptanceTooLong").transform((s) => s.trim()).optional().default(""),
   order_index: z.coerce.number().int().min(0).optional(),
-  prompt_body: z.string().max(10000, "promptTooLong").transform((s) => s.trim()).optional().default(""),
-  prompt_context: z.string().max(2000, "promptContextTooLong").transform((s) => s.trim()).optional().default(""),
-  ai_tool_target: z.string().max(100, "aiToolTooLong").transform((s) => s.trim()).optional().default(""),
+  // UX-014 — internal AI metadata. NO `.default("")`: when the form omits these
+  // (it now always does), they stay `undefined` so the update PRESERVES the
+  // stored value instead of wiping it (preserve-on-absent below).
+  prompt_body: z.string().max(10000, "promptTooLong").transform((s) => s.trim()).optional(),
+  prompt_context: z.string().max(2000, "promptContextTooLong").transform((s) => s.trim()).optional(),
+  ai_tool_target: z.string().max(100, "aiToolTooLong").transform((s) => s.trim()).optional(),
   implementation_notes: z.string().max(5000, "implementationNotesTooLong").transform((s) => s.trim()).optional().default(""),
   test_notes: z.string().max(5000, "testNotesTooLong").transform((s) => s.trim()).optional().default(""),
   execution_notes: z.string().max(5000, "executionNotesTooLong").transform((s) => s.trim()).optional().default(""),
@@ -810,9 +813,6 @@ export async function updateTaskAction(input: {
     actual_hours: data.actual_hours ?? null,
     dependency_notes: data.dependency_notes || null,
     acceptance_criteria: data.acceptance_criteria || null,
-    prompt_body: data.prompt_body || null,
-    prompt_context: data.prompt_context || null,
-    ai_tool_target: data.ai_tool_target || null,
     implementation_notes: data.implementation_notes || null,
     test_notes: data.test_notes || null,
     execution_notes: data.execution_notes || null,
@@ -821,6 +821,12 @@ export async function updateTaskAction(input: {
     end_date: data.end_date || null,
     progress: data.progress,
   };
+  // UX-014 — internal AI metadata is preserve-on-absent: only written when the
+  // caller explicitly provided it. The normal task editor no longer sends these,
+  // so an edit/save must never null out an existing prompt (data preservation).
+  if (data.prompt_body !== undefined) updateData.prompt_body = data.prompt_body || null;
+  if (data.prompt_context !== undefined) updateData.prompt_context = data.prompt_context || null;
+  if (data.ai_tool_target !== undefined) updateData.ai_tool_target = data.ai_tool_target || null;
   if (data.order_index !== undefined) updateData.order_index = data.order_index;
   if (data.assigned_to !== undefined || data.assigned_resource_id !== undefined || data.project_team_member_id !== undefined) {
     const own = await resolveTeamAssignment(supabase, data.project_team_member_id, data.assigned_to, data.assigned_resource_id);

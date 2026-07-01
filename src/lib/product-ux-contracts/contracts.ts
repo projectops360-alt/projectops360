@@ -89,4 +89,63 @@ export const UX_001_ISABELLA_WELCOME_HERO: ProductUxContract = {
   ],
 };
 
-export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [UX_001_ISABELLA_WELCOME_HERO];
+// ── UX-014 — Internal AI Prompt Metadata Must Not Be User-Facing ────────────
+
+/**
+ * Internal/developer AI-implementation metadata fields on a task. These store
+ * the prompt text used during AI-assisted implementation and the target AI tool
+ * — NOT a user-facing AI interaction. They MUST NOT appear as editable fields in
+ * the normal task editor (an external reviewer reasonably read "Prompt de IA" as
+ * an interactive AI input). User-facing AI help is routed through Isabella.
+ *
+ * This is the single source of truth for the rule; the task form and its
+ * regression test both import from here so the field cannot quietly return.
+ */
+export const TASK_EDITOR_INTERNAL_AI_FIELDS = [
+  "prompt_body",
+  "prompt_context",
+  "ai_tool_target",
+] as const;
+
+export type TaskEditorInternalAiField = (typeof TASK_EDITOR_INTERNAL_AI_FIELDS)[number];
+
+/** True when a task field name is internal AI metadata that must not be user-facing. */
+export function isInternalAiTaskField(name: string): boolean {
+  return (TASK_EDITOR_INTERNAL_AI_FIELDS as readonly string[]).includes(name);
+}
+
+/** Labels that must NEVER appear in the normal task editor (case-insensitive). */
+export const TASK_EDITOR_FORBIDDEN_LABELS = [
+  "ai prompt",
+  "prompt de ia",
+  "developer prompt",
+  "implementation prompt",
+  "system prompt",
+  "hidden ai instructions",
+] as const;
+
+/** True when a user-facing task-editor label is a forbidden internal/AI label. */
+export function isForbiddenTaskEditorLabel(label: string): boolean {
+  const l = label.trim().toLowerCase();
+  return (TASK_EDITOR_FORBIDDEN_LABELS as readonly string[]).some((bad) => l === bad || l.includes(bad));
+}
+
+export const UX_014_TASK_EDITOR_AI_PROMPT: ProductUxContract = {
+  id: "UX-014",
+  title: "Internal AI Prompt Metadata Must Not Be User-Facing",
+  status: "APPROVED",
+  rules: [
+    "Static AI prompt fields (prompt_body, prompt_context, ai_tool_target) must not appear in the normal task editor.",
+    "User-facing AI actions must be explicit actions routed through Isabella (e.g. 'Ask Isabella about this task').",
+    "Internal AI metadata must be hidden or permission-protected — never exposed by frontend-only logic.",
+    "Existing stored prompt metadata must not be destroyed by a normal task save (preserve-on-absent).",
+    "Forbidden user-facing labels: AI Prompt, Prompt de IA, Developer Prompt, Implementation Prompt, System Prompt, Hidden AI Instructions.",
+    "Allowed notes labels remain: Implementation Notes, Testing Notes, Acceptance Criteria, Tracking & Notes.",
+    "Future task editor redesigns must preserve this rule.",
+  ],
+};
+
+export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
+  UX_001_ISABELLA_WELCOME_HERO,
+  UX_014_TASK_EDITOR_AI_PROMPT,
+];
