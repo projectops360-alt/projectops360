@@ -40,7 +40,7 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 | Risk Management | Pending | ~50% | — | CAP-017 | 8 · ✅ [REG-017](10-regression-log.md#reg-017) canonical open-risk status semantics (`isOpenRiskStatus`) shared with Closeout |
 | Issue Management | Pending | 0% (Missing) | 011 (proposed) | CAP-018 | 9 |
 | Decision Management | Pending | Implemented | — | — | 10 |
-| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) · ✅ **[UX-014](32-product-ux-contracts.md#ux-014)/[PD-013](30-product-decision-log.md#pd-013)** — internal AI prompt field removed from task editor; "Ask Isabella about this task" instead |
+| Workboard (Task ownership) | Catalog | ~85% | — | CAP-020 | ✅ [Sprint #1](26-sprint-01-operational-clarity.md) — assignee on cards · ↪ primary verify target in [REG-013](10-regression-log.md#reg-013) · ✅ **[UX-014](32-product-ux-contracts.md#ux-014)/[PD-013](30-product-decision-log.md#pd-013)** — internal AI prompt field removed from task editor; "Ask Isabella about this task" instead · ✅ **[UX-013](32-product-ux-contracts.md#ux-013)** — responsive board: Compact density + horizontal scroll/auto-scroll, operable without browser zoom |
 | Task / Milestone / WBS / Dependency / Critical Path | Pending | ~85% | 006 | CAP-019/020/021/022/023 | 11 · ✅ [Sprint #1](26-sprint-01-operational-clarity.md) Critical Path source of truth |
 | Reports · Dashboards | Pending | ~70% / Partial | — | CAP-024/025 | 12 |
 | Project Charter & Governance | Pending | ~80% | — | CAP-034 | 13 |

@@ -167,8 +167,33 @@ export const UX_012_LANGUAGE_CONSISTENCY: ProductUxContract = {
   ],
 };
 
+// ── UX-013 — Workboard Must Be Operable Without Browser Zoom ────────────────
+
+/**
+ * The Workboard is a daily operational surface. A PM must be able to see, scroll
+ * and drag across the full workflow WITHOUT reducing browser zoom. Density +
+ * width rules live in `src/lib/workboard/density.ts` (pure, tested); the board
+ * (`workboard-client.tsx`) provides horizontal scroll, fade + arrow affordances,
+ * and drag auto-scroll (built into @hello-pangea/dnd for the scroll container).
+ */
+export const UX_013_WORKBOARD_RESPONSIVE: ProductUxContract = {
+  id: "UX-013",
+  title: "Workboard Must Be Operable Without Browser Zoom",
+  status: "APPROVED",
+  rules: [
+    "The user must be able to move tasks without manually changing browser zoom.",
+    "Columns live in a horizontal scroll container with clear affordances (visible scrollbar, edge fades, and scroll arrows).",
+    "Dragging a card near a board edge auto-scrolls the board to reach off-screen columns.",
+    "A Compact density option reduces column width + card/column padding so more workflow columns fit; the choice persists locally.",
+    "Workflow columns must not collapse into unusable widths, and cards stay readable in compact mode.",
+    "Drag-and-drop task status updates, filters, and the task editor must keep working (layout/interaction fix only — no business-logic change).",
+    "The Isabella launcher must not cover Workboard drop zones, scroll arrows, or the horizontal scrollbar.",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
   UX_012_LANGUAGE_CONSISTENCY,
+  UX_013_WORKBOARD_RESPONSIVE,
   UX_014_TASK_EDITOR_AI_PROMPT,
 ];
