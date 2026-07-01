@@ -819,7 +819,7 @@ export function WorkboardClient({
               scrollbar (bottom) moves across columns. Both bars stay pinned to the
               board's edges (in view), never at the bottom of a long column. The
               height is measured at runtime so it fits the real remaining viewport. */}
-          <div ref={scrollRef} className={`workboard-scroll flex ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
+          <div ref={scrollRef} className={`workboard-scroll flex items-start max-h-[calc(100vh-22rem)] ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
               const visibleStatuses = group.statuses.filter((s) => isColumnVisible(s));
