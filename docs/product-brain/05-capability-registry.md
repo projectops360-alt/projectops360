@@ -55,6 +55,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-041 | Billing & Entitlements | P6 | Partial | 50% | `lib/billing` |
 | CAP-042 | Product Intelligence Center | P5 | Implemented | 70% | `lib/product-brain`, `/product-intelligence` |
 | CAP-043 | Evidence Provenance & Traceability | P5 | Implemented (Phase 1) | 70% | `lib/provenance`, `components/provenance` |
+| CAP-044 | Unified People, Roles & Stakeholder Directory | P6 | Partial (Phase 1 — read model) | 40% | `lib/people` (projection over `project_team_members` + sources) |
 
 `*` CAP-003 is "complete" only in the sense that it was fully superseded by Knowledge OS.
 

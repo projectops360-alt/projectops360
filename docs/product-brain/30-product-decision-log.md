@@ -290,6 +290,45 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-014 — Unified People, Roles & Stakeholder Directory
+- **Decision:** ProjectOps360° uses **one unified people directory** as the source of truth for project
+  participants, team members, stakeholders, roles, responsibilities, authority, RACI/approval roles,
+  and capacity. People are **not module-specific data** — the same person may appear in governance,
+  delivery, capacity, task ownership, stakeholder communication, and approvals. **One person. Many
+  roles. One connected system.**
+- **Reason:** external review found participants, stakeholders, roles and project assignment felt
+  disconnected — AI-generated roles weren't clearly tied to real people, and users had to retype
+  people across modules.
+- **Model (one source of truth, not a fork):** the directory is a **read-only projection** over the
+  records that already exist — internal users (`profiles` + `organization_members`), external people
+  (`external_contacts`), and `stakeholders` — de-duplicated by **email** (strong signal; ambiguous
+  rows kept distinct, never guessed). The canonical **project person assignment** model is the
+  existing `project_team_members` (it already links `user_id` / `external_contact_id` /
+  `organization_team_id` and carries `member_type`, `project_role`, `governance_role`,
+  `responsibility`, `authority_level`, RACI + a full permission set). No new parallel people table.
+- **Protection rules (binding):**
+  - Do **not** create separate disconnected people lists per module.
+  - Role-assignment screens must **reuse** directory people/contact records where possible (select an
+    existing person; don't retype).
+  - AI-generated roles must be **assignable to real people**.
+  - Resource Capacity, Workboard ownership, and Charter/Governance roles must connect to the **same**
+    people identity.
+  - A role may exist without a person — show **"Unassigned / Sin asignar"** (intentional, not an error).
+  - RBAC preserved: authority/permission changes are server-guarded; no UI escalation.
+- **Implementation (Phase 1 — shipped):** pure engine `src/lib/people/{types,directory}.ts`
+  (`mergeDirectory` dedup-by-email, `classifyContactType`, `unassignedLabel`) + service
+  `src/lib/people/service.ts` (`getPeopleDirectory(projectId?)`); wired into the **Charter → Roles**
+  person selector so governance roles can be assigned from the full directory (not only project team).
+  Tests: `src/lib/people/__tests__/directory.test.ts`. Isabella KP `pi-unified-people-directory`.
+- **Phase 2+ (Decided, not built):** dedicated **Resources → People & Roles** page; write-through of
+  Charter/Team assignments into `project_team_members` from the directory selector; consolidate the
+  legacy `stakeholders` table into `external_contacts`; Resource Capacity + Workboard reading the same
+  `person` identity end-to-end; a safe `scripts/backfill-people-directory.mjs` (dry-run, dedup report).
+  **Status: Shipped (Phase 1 — read model + directory service + Charter selector).** Affects Team &
+  Roles · Stakeholders · Charter/Governance · Resource Capacity · Workboard · RBAC · Isabella.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery

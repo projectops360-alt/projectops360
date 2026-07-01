@@ -6,6 +6,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { createCharterForProject, getCharterByProject } from "@/lib/charter/service";
+import { getPeopleDirectory } from "@/lib/people/service";
 import { CharterClient } from "./charter-client";
 
 export const dynamic = "force-dynamic";
@@ -56,11 +57,25 @@ export default async function CharterPage({
       .eq("project_id", projectId).eq("organization_id", org.organizationId).neq("status", "removed"),
   ]);
 
-  // People + roles from the Project Team & Roles Center, to suggest in the
-  // charter governance sections (roles / approvals / sign-off).
+  // People to suggest in the charter governance sections (roles / approvals /
+  // sign-off). CAP-044 / PD-014 — sourced from the UNIFIED People Directory
+  // (internal users + external contacts + stakeholders), not only the project
+  // team, so a governance role can be assigned to any existing person instead of
+  // retyping. Project members keep their known project/governance role.
   const teamMembers = ((teamRes.data ?? []) as Record<string, unknown>[])
     .map((r) => ({ name: (r.display_name as string) || "", role: (r.project_role as string) || "", govRole: (r.governance_role as string) || "" }))
     .filter((m) => m.name || m.role);
+
+  const directory = await getPeopleDirectory(projectId);
+  if (directory.ok) {
+    const seen = new Set(teamMembers.map((m) => m.name.trim().toLowerCase()).filter(Boolean));
+    for (const person of directory.people) {
+      const key = person.displayName.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      teamMembers.push({ name: person.displayName, role: person.type.replace(/_/g, " "), govRole: "" });
+    }
+  }
 
   return (
     <CharterClient

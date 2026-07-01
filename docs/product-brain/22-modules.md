@@ -222,6 +222,13 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 - **Purpose:** Members, roles, RACI; access control.
 - **Status:** Team Implemented (~70%); RBAC **Partial / regression-risk** on `master`.
 - **Boundaries:** authorization must be server-side. **Related:** CAP-028/029 · DEBT-002.
+- **Unified People Directory ([PD-014](30-product-decision-log.md#pd-014) / CAP-044, binding):** people
+  are **not module-specific data**. A read-only directory (`src/lib/people/*`) unifies internal users,
+  external contacts and stakeholders (dedup by email) so Team & Roles, **Charter/Governance roles**,
+  Stakeholders, Resource Capacity and Workboard ownership can **select an existing person** instead of
+  retyping. The canonical project assignment model is `project_team_members`. "Unassigned / Sin
+  asignar" is intentional, not an error. Phase 1 wires the Charter role selector; Phase 2 adds a
+  Resources → People & Roles page + write-through + stakeholder consolidation + backfill.
 
 ## Navigation / Shell (Project Workspace)
 - **Purpose:** The project-level navigation (`ProjectTabs`, one sticky bar serving desktop + mobile)
