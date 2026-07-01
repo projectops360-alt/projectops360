@@ -226,6 +226,9 @@ use the board (default column width 280px × 9 columns far exceeds a laptop view
 - The user must be able to move tasks **without changing browser zoom**.
 - Columns live in a **horizontal scroll container** with clear affordances: a visible (thin)
   scrollbar, **left/right edge fades**, **scroll arrow buttons**, and Ctrl/Cmd+Arrow keyboard scroll.
+- The board is **height-bounded to the viewport** (measured at runtime) so the **horizontal scrollbar
+  stays at the foot of the screen** — reachable without scrolling to the bottom of a long column — and
+  **each column scrolls its own tasks vertically**. Two scrolls: board = horizontal, column = vertical.
 - Dragging a card near a board edge **auto-scrolls** the board to reach off-screen columns (built into
   `@hello-pangea/dnd` for the board's scroll container).
 - A **Compact density** option reduces column width (280 → 212px) plus card/column padding and gaps so
