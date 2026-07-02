@@ -37,6 +37,8 @@
 
 | PEG-BACKFILL | Event Log Foundation (Phase 2) | Historical Backfill reconstructs events from owners only when supported by data; every backfilled event is marked `SYNTHETIC_BACKFILL_EVENT` + `provenance.backfilled` with reduced confidence when inferred (explicit=0.9, inferred=0.6); risky transitions (TaskStarted/BlockerRaised) are never invented; backfilled events pass registry validation; dedup key is stable across runs (idempotent) and distinct from live events (backfill marker); ingestion rejects backfill events without provenance/confidence. Reads owners only — never touches process_nodes/process_edges/dual-write. | `src/lib/events/__tests__/backfill.test.ts` | **protected** |
 
+| PEG-BACKFILL-ADMIN | Event Log Foundation · Admin | Backfill Runner is RBAC-gated (org owner/admin or platform-admin allowlist; member/viewer denied → 404); the console is the only approved execution path (no manual SQL); dry-run writes nothing and is required before execute; execute records an immutable BackfillCompleted audit event (actor + reason + executionId); quality report derives explicit/inferred % + avg/min/max confidence; replay-readiness score is deterministic; org-memory aggregates + ranks; Organizational DNA is structure-only (not implemented). | `src/lib/events/__tests__/backfill-admin.test.ts` | **protected** |
+
 ## Open gaps (tests owed)
 
 - _None._ Every protected regression in the table above has an executable test. New regressions must
