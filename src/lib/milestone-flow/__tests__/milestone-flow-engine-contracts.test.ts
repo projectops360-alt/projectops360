@@ -236,8 +236,9 @@ describe("MPF engine — input validation + typed errors", () => {
   });
 
   it("not-yet-implemented algorithmic methods throw MpfUnsupportedOperationError (never fake output)", () => {
-    // buildTransitionModel/buildFlowSegments are implemented in Task 3; the
-    // metrics + health classifiers remain deferred and must never fabricate.
+    // buildTransitionModel/buildFlowSegments (Task 3) and calculateFlowMetrics
+    // (Task 4) are implemented; the final HEALTH classifier remains deferred and
+    // must never fabricate a health conclusion.
     const engine = createMilestoneProcessFlowEngine();
     const transition = {
       transitionId: "tr1",
@@ -250,9 +251,10 @@ describe("MPF engine — input validation + typed errors", () => {
       segments: [],
       evidenceEventIds: [],
     };
-    expect(() => engine.calculateFlowMetrics(transition)).toThrow(MpfUnsupportedOperationError);
+    const metrics = engine.calculateFlowMetrics(transition); // now implemented
+    expect(() => engine.classifyTransitionHealth(transition, metrics)).toThrow(MpfUnsupportedOperationError);
     try {
-      engine.calculateFlowMetrics(transition);
+      engine.classifyTransitionHealth(transition, metrics);
     } catch (err) {
       expect(isMpfError(err)).toBe(true);
       if (isMpfError(err)) expect(err.code).toBe("UNSUPPORTED_ENGINE_OPERATION");

@@ -63,6 +63,12 @@ export interface RunTallies {
   unknownSegmentCount?: number;
   openTransitionCount?: number;
   completedTransitionCount?: number;
+  /** Metrics-stage counts (Task 4) — optional; default 0. */
+  metricsCalculatedCount?: number;
+  metricsUnknownCount?: number;
+  openSegmentDurationCount?: number;
+  invalidDurationCount?: number;
+  totalKnownSegmentTimeMs?: number;
   warnings?: MilestoneFlowEngineWarning[];
   errors?: MilestoneFlowEngineError[];
 }
@@ -99,6 +105,11 @@ export function closeRunSummary(
     unknownSegmentCount: tallies.unknownSegmentCount ?? 0,
     openTransitionCount: tallies.openTransitionCount ?? 0,
     completedTransitionCount: tallies.completedTransitionCount ?? 0,
+    metricsCalculatedCount: tallies.metricsCalculatedCount ?? 0,
+    metricsUnknownCount: tallies.metricsUnknownCount ?? 0,
+    openSegmentDurationCount: tallies.openSegmentDurationCount ?? 0,
+    invalidDurationCount: tallies.invalidDurationCount ?? 0,
+    totalKnownSegmentTimeMs: tallies.totalKnownSegmentTimeMs ?? 0,
     warningCount: warnings.length,
     errorCount: errors.length,
     startedAt: ctx.startedAt,

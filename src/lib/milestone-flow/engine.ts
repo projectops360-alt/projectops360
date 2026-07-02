@@ -39,6 +39,7 @@ import { openRunContext, closeRunSummary } from "./observability";
 import { aggregateConfidence } from "./evidence";
 import { buildMilestoneTransitions } from "./transition-builder";
 import { buildFlowSegmentsForTransition } from "./flow-segment-builder";
+import { calculateMilestoneFlowMetrics, calculateMilestoneTransitionMetrics } from "./metrics-calculator";
 import type {
   MilestoneProcessFlowEngine,
   MilestoneFlowInputContract,
@@ -135,6 +136,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
     const dataQualityFlags: MilestoneFlowProjection["dataQualityFlags"] =
       input.events.length === 0 ? ["insufficient_event_density"] : [];
 
+    // Task 4: metrics over the built transitions. No analysisAsOf is passed here,
+    // so OPEN durations stay null (unknown) and the projection is replay-stable
+    // (never reads the wall clock). Callers wanting elapsed metrics pass an
+    // explicit analysisAsOf to calculateMilestoneFlowMetrics.
+    const metrics = calculateMilestoneFlowMetrics({
+      scope: input.scope,
+      milestones: input.milestones,
+      transitions: build.transitions,
+    });
+
     const summary = closeRunSummary(
       ctx,
       {
@@ -149,7 +160,12 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
         unknownSegmentCount: build.stats.unknownSegmentCount,
         openTransitionCount: build.stats.openTransitionCount,
         completedTransitionCount: build.stats.completedTransitionCount,
-        warnings: build.warnings,
+        metricsCalculatedCount: metrics.stats.metricsCalculatedCount,
+        metricsUnknownCount: metrics.stats.metricsUnknownCount,
+        openSegmentDurationCount: metrics.stats.openSegmentDurationCount,
+        invalidDurationCount: metrics.stats.invalidDurationCount,
+        totalKnownSegmentTimeMs: metrics.stats.totalKnownSegmentTimeMs,
+        warnings: [...build.warnings, ...metrics.warnings],
       },
       this.now,
     );
@@ -161,8 +177,8 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       configVersion: MPF_CONFIG_VERSION,
       generatedAt: ctx.startedAt,
       transitions: build.transitions,
-      // Metrics + health are deferred to later Phase 3 tasks (kept empty / unknown).
-      metricsByTransition: {},
+      metricsByTransition: metrics.metricsByTransition,
+      // Final health is deferred to a later Phase 3 task (kept empty / unknown).
       healthByTransition: {},
       bottlenecks: [],
       constraintPropagations: [],
@@ -191,11 +207,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
     });
   }
 
-  // ── Algorithmic methods — not implemented yet (never faked) ─────────────────
+  // ── Metrics (Task 4) ────────────────────────────────────────────────────────
 
-  calculateFlowMetrics(_transition: MilestoneTransition): MilestoneFlowMetrics {
-    throw new MpfUnsupportedOperationError("calculateFlowMetrics");
+  calculateFlowMetrics(transition: MilestoneTransition): MilestoneFlowMetrics {
+    // Delegates to the calculator. No milestone refs here (single-transition
+    // contract) → planned/forecast durations are null; actual + segment metrics
+    // come from the transition itself. No analysisAsOf → open durations unknown.
+    return calculateMilestoneTransitionMetrics(transition);
   }
+
+  // ── Algorithmic methods — not implemented yet (never faked) ─────────────────
 
   classifyTransitionHealth(
     _transition: MilestoneTransition,
