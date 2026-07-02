@@ -78,6 +78,12 @@ export interface MilestoneFlowEventRef {
   lifecycleClass: string;
   confidence: number | null;
   isCompensatingEvent: boolean;
+  /**
+   * The canonical milestone this event pertains to, when the source row exposes
+   * it (e.g. `payload.milestone_id` or a milestone subject). Optional and
+   * additive — used by the Transition Builder for explicit event assignment.
+   */
+  milestoneId?: string | null;
 }
 
 /** Read-only canonical milestone data (owned by the Milestone domain). */
@@ -378,6 +384,11 @@ export interface MilestoneFlowEngineRunSummary {
   segmentCount: number;
   bottleneckCount: number;
   healthAssessmentCount: number;
+  /** Builder-stage counts (Task 3) — default 0 when the builder did not run. */
+  unassignedEventCount: number;
+  unknownSegmentCount: number;
+  openTransitionCount: number;
+  completedTransitionCount: number;
   warningCount: number;
   errorCount: number;
   startedAt: string; // ISO
