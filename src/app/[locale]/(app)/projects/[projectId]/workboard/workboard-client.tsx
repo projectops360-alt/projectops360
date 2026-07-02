@@ -477,6 +477,16 @@ export function WorkboardClient({
   const hasUnsprinted = useMemo(() => tasks.some((t) => !t.sprint_name), [tasks]);
   const hasNoMilestone = useMemo(() => tasks.some((t) => !t.milestone_id), [tasks]);
 
+  // The dimension actually in effect. The Sprint/Milestone toggle only appears
+  // when BOTH exist; when a project has milestones but no sprints (or vice-versa)
+  // we auto-select the dimension that has options so the milestone filter is
+  // always reachable (previously it was hidden behind a toggle that never showed).
+  const effectiveDimension = useMemo<"sprint" | "milestone">(() => {
+    if (sprintOptions.length === 0 && milestoneOptions.length > 0) return "milestone";
+    if (milestoneOptions.length === 0 && sprintOptions.length > 0) return "sprint";
+    return filterDimension;
+  }, [sprintOptions.length, milestoneOptions.length, filterDimension]);
+
   function setDimension(dim: "sprint" | "milestone") {
     setFilterDimension(dim);
     setFilterValue(null);
@@ -488,12 +498,12 @@ export function WorkboardClient({
   const isTaskVisible = useCallback(
     (task: RoadmapTask): boolean => {
       if (filterValue === null) return true;
-      if (filterDimension === "sprint") {
+      if (effectiveDimension === "sprint") {
         return filterValue === NONE_VALUE ? !task.sprint_name : task.sprint_name === filterValue;
       }
       return filterValue === NONE_VALUE ? !task.milestone_id : task.milestone_id === filterValue;
     },
-    [filterDimension, filterValue],
+    [effectiveDimension, filterValue],
   );
 
   const filteredTasks = useMemo(() => tasks.filter(isTaskVisible), [tasks, isTaskVisible]);
@@ -622,15 +632,17 @@ export function WorkboardClient({
     if (fromStatus === toStatus) {
       if (source.index === destination.index) return;
       const res = applyBoardDrag({ tasks, draggableId, source, destination, isVisible: isTaskVisible });
-      if (!res || res.orderUpdates.length === 0) return;
+      if (!res) return;
       const prev = tasks;
-      setTasks(res.tasks);
-      reorderTasksAction({
-        projectId,
-        updates: res.orderUpdates.map((u) => ({ taskId: u.id, orderIndex: u.order_index })),
-      })
-        .then((r) => { if (r?.error) setTasks(prev); })
-        .catch(() => setTasks(prev));
+      setTasks(res.tasks); // apply the visual reorder immediately
+      if (res.orderUpdates.length > 0) {
+        reorderTasksAction({
+          projectId,
+          updates: res.orderUpdates.map((u) => ({ taskId: u.id, orderIndex: u.order_index })),
+        })
+          .then((r) => { if (r?.error) setTasks(prev); })
+          .catch(() => setTasks(prev));
+      }
       return;
     }
 
@@ -739,32 +751,37 @@ export function WorkboardClient({
           <div className="flex items-center gap-1.5 flex-wrap">
             <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
 
-            {/* Dimension switch (only when both dimensions exist) */}
-            {sprintOptions.length > 0 && milestoneOptions.length > 0 && (
+            {/* Dimension switch when both dimensions exist; otherwise a static
+                label so the single available dimension (e.g. Milestone) is clear. */}
+            {sprintOptions.length > 0 && milestoneOptions.length > 0 ? (
               <div className="mr-1 inline-flex overflow-hidden rounded-full border border-border">
                 <button
                   type="button"
                   onClick={() => setDimension("sprint")}
-                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterDimension === "sprint" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${effectiveDimension === "sprint" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
                 >
                   {t.bySprint}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDimension("milestone")}
-                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterDimension === "milestone" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                  className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${effectiveDimension === "milestone" ? "bg-foreground text-background" : "bg-background text-muted-foreground hover:text-foreground"}`}
                 >
                   {t.byMilestone}
                 </button>
               </div>
+            ) : (
+              <span className="mr-1 text-[11px] font-semibold text-muted-foreground">
+                {effectiveDimension === "milestone" ? t.byMilestone : t.bySprint}
+              </span>
             )}
 
             <button type="button" onClick={() => setFilterValue(null)}
               className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === null ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
-              {filterDimension === "sprint" ? t.allSprints : t.allMilestones}
+              {effectiveDimension === "sprint" ? t.allSprints : t.allMilestones}
             </button>
 
-            {filterDimension === "sprint"
+            {effectiveDimension === "sprint"
               ? sprintOptions.map((name) => (
                   <button key={name} type="button" onClick={() => setFilterValue(filterValue === name ? null : name)}
                     className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === name ? "bg-brand-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
@@ -779,13 +796,13 @@ export function WorkboardClient({
                   </button>
                 ))}
 
-            {filterDimension === "sprint" && hasUnsprinted && (
+            {effectiveDimension === "sprint" && hasUnsprinted && (
               <button type="button" onClick={() => setFilterValue(filterValue === NONE_VALUE ? null : NONE_VALUE)}
                 className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium italic transition-colors ${filterValue === NONE_VALUE ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
                 {t.noSprint}
               </button>
             )}
-            {filterDimension === "milestone" && hasNoMilestone && (
+            {effectiveDimension === "milestone" && hasNoMilestone && (
               <button type="button" onClick={() => setFilterValue(filterValue === NONE_VALUE ? null : NONE_VALUE)}
                 className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium italic transition-colors ${filterValue === NONE_VALUE ? "bg-gray-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
                 {t.noMilestone}
