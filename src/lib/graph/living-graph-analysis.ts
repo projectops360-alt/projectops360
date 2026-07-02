@@ -21,6 +21,7 @@ import type {
 } from "@/types/living-graph";
 import type { ExecutionStatus } from "@/lib/execution/status-engine";
 import { resolveNodeExecutionStatus } from "./living-graph-status";
+import type { MilestoneTaskCensus } from "@/lib/roadmap/milestone-task-census";
 
 // ── Adjacency ──────────────────────────────────────────────────────────────────
 
@@ -690,12 +691,20 @@ const DONE_STATUSES = new Set(["done", "completed", "tested"]);
  * Each chain edge carries the target milestone's task count and duration so
  * the UI can render an info callout between cards.
  *
- * Per-milestone node metadata: clusterSize (process events), tasksTotal and
- * tasksDone (distinct tasks observed in the graph).
+ * Per-milestone node metadata: clusterSize (process events), tasksTotal,
+ * tasksDone and taskList.
+ *
+ * CAP-001 / REG-018: task counts + taskList come from the CANONICAL task census
+ * (`censusByMilestone`, derived from `roadmap_tasks`) when provided, so the
+ * milestone cards + UX-008 edge tooltip agree with the Workboard. Without a
+ * census (e.g. demo data with no real tasks) it falls back to counting the task
+ * nodes present in the graph — which undercounts `not_started` tasks and is the
+ * exact inconsistency CAP-001 fixes for real projects.
  */
 export function aggregateByMilestone(
   nodes: LivingGraphNode[],
   edges: LivingGraphEdge[],
+  censusByMilestone?: Map<string, MilestoneTaskCensus>,
 ): { nodes: LivingGraphNode[]; edges: LivingGraphEdge[] } {
   void edges; // real edges are deliberately not rendered at this level
   const groups = new Map<string, LivingGraphNode[]>();
@@ -718,36 +727,52 @@ export function aggregateByMilestone(
     const latest = sorted[sorted.length - 1];
     const representative = gate ?? latest;
 
-    // Distinct tasks observed inside this milestone (and how many are done).
-    // We also keep a lightweight task list so milestone-chain edges can show a
-    // read-only tooltip (UX-008) of which tasks the connection represents.
-    const taskStatus = new Map<string, string | null>();
-    const taskInfo = new Map<string, { id: string; title: string; status: string | null; isBlocked: boolean }>();
-    for (const m of members) {
-      if (m.sourceEntityType === "roadmap_tasks") {
-        taskStatus.set(m.sourceEntityId, m.status);
-        // Last write wins (latest member for this task id).
-        taskInfo.set(m.sourceEntityId, {
-          id: m.sourceEntityId,
-          title: m.label,
-          status: m.status,
-          isBlocked: m.isBlocked,
-        });
-      }
-    }
-    const taskList = [...taskInfo.values()];
-    const tasksTotal = taskStatus.size;
-    let tasksDone = 0;
-    let tasksStarted = 0;
-    for (const status of taskStatus.values()) {
-      const s = status?.toLowerCase() ?? "";
-      if (s && DONE_STATUSES.has(s)) tasksDone++;
-      else if (s && s !== "not_started" && s !== "deferred") tasksStarted++;
-    }
+    // Task census + list (used by the card counter and the UX-008 edge tooltip).
+    // CAP-001 / REG-018: prefer the CANONICAL census (from roadmap_tasks) so the
+    // count/list match the Workboard. Fall back to the task nodes present in the
+    // graph only when no census is supplied (e.g. synthetic demo data).
+    const milestoneId = key.slice("milestone:".length);
+    const census = censusByMilestone?.get(milestoneId);
 
-    // Living document: derive progress + status from the tasks in real time,
-    // instead of the stored progress_percent/status which can be stale (0 / planned).
-    const anyBlocked = members.some((m) => m.isBlocked);
+    let taskList: { id: string; title: string; status: string | null; isBlocked: boolean }[];
+    let tasksTotal: number;
+    let tasksDone: number;
+    let tasksStarted: number;
+    let anyBlocked: boolean;
+
+    if (census) {
+      taskList = census.taskList;
+      tasksTotal = census.tasksTotal;
+      tasksDone = census.tasksDone;
+      tasksStarted = census.tasksStarted;
+      anyBlocked = census.anyBlocked;
+    } else {
+      // Fallback: distinct task nodes observed in the graph (undercounts
+      // not_started tasks — the very inconsistency CAP-001 fixes for real data).
+      const taskStatus = new Map<string, string | null>();
+      const taskInfo = new Map<string, { id: string; title: string; status: string | null; isBlocked: boolean }>();
+      for (const m of members) {
+        if (m.sourceEntityType === "roadmap_tasks") {
+          taskStatus.set(m.sourceEntityId, m.status);
+          taskInfo.set(m.sourceEntityId, {
+            id: m.sourceEntityId,
+            title: m.label,
+            status: m.status,
+            isBlocked: m.isBlocked,
+          });
+        }
+      }
+      taskList = [...taskInfo.values()];
+      tasksTotal = taskStatus.size;
+      tasksDone = 0;
+      tasksStarted = 0;
+      for (const status of taskStatus.values()) {
+        const s = status?.toLowerCase() ?? "";
+        if (s && DONE_STATUSES.has(s)) tasksDone++;
+        else if (s && s !== "not_started" && s !== "deferred") tasksStarted++;
+      }
+      anyBlocked = members.some((m) => m.isBlocked);
+    }
     const computedProgress =
       tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : (representative.progress ?? 0);
     const computedStatus =

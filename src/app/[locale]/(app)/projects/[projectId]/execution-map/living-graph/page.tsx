@@ -303,19 +303,18 @@ export default async function LivingGraphPage({
   const rawNodes = (nodesResult.data ?? []) as ProcessNode[];
   const rawEdges = (edgesResult.data ?? []) as ProcessEdge[];
 
-  // Enrichment: roadmap tasks + milestones referenced by the graph
-  const taskIds = [
-    ...new Set(
-      rawNodes
-        .filter((n) => n.source_entity_type === "roadmap_tasks")
-        .map((n) => n.source_entity_id),
-    ),
-  ];
-  // Full task rows: enrichment + in-graph editing (TaskFormDialog needs them all)
-  const tasksResult =
-    taskIds.length > 0
-      ? await supabase.from("roadmap_tasks").select("*").in("id", taskIds)
-      : { data: [] as RoadmapTask[], error: null };
+  // Full task rows for the WHOLE project — the canonical owner (roadmap_tasks).
+  // CAP-001 / REG-018: the milestone task census must include tasks that never
+  // materialized a process_node (e.g. still `not_started`), so the Living Graph
+  // counts + UX-008 tooltip agree with the Workboard. Also powers enrichment and
+  // in-graph editing (TaskFormDialog needs the full rows).
+  const tasksResult = await supabase
+    .from("roadmap_tasks")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("order_index", { ascending: true });
 
   const fullTasks = (tasksResult.data ?? []) as RoadmapTask[];
   const fullMilestones = (milestonesResult.data ?? []) as Milestone[];

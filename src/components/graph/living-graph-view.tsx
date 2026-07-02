@@ -62,6 +62,7 @@ import {
   type OverlayEmphasis,
 } from "@/lib/graph/living-graph-analysis";
 import { buildDemoGraphData } from "@/lib/graph/living-graph-demo-data";
+import { computeMilestoneTaskCensus } from "@/lib/roadmap/milestone-task-census";
 import {
   computeLayout,
   milestoneFlowLayout,
@@ -395,10 +396,16 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return map;
   }, [resourceCapacity, tasks]);
 
+  // ── Canonical milestone task census (CAP-001 / REG-018) ──
+  // Milestone card counts + the UX-008 edge tooltip derive their task set from
+  // the canonical owner (roadmap_tasks), NOT from process_nodes — so they match
+  // the Workboard ("different views, same truth").
+  const milestoneCensus = useMemo(() => computeMilestoneTaskCensus(tasks), [tasks]);
+
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
-      return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges);
+      return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges, milestoneCensus);
     }
     const graph =
       viewLevel === "activities"
@@ -407,7 +414,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus]);
 
   // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
   //    with capacity status so at-risk work lights up. No resource nodes are

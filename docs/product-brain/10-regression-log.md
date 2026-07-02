@@ -504,5 +504,47 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-018 — Living Graph milestone task count/tooltip disagrees with the Workboard
+- **Description:** For the **same milestone**, the Living Graph milestone card counter
+  (`tasksDone/tasksTotal`) and the UX-008 edge tooltip showed **different task information** than the
+  Workboard. A milestone with `not_started` tasks read fewer tasks in the graph than on the board.
+- **Observed (CAP-001):** the Workboard reads the canonical owner
+  (`roadmap_tasks`, `workboard/page.tsx`), but the Living Graph derived its milestone task census from
+  **`process_nodes`** via `aggregateByMilestone` — and `backfill_living_graph` **skips
+  `status = 'not_started'`** tasks (emit only fires on transition), so those tasks have no node and
+  were silently dropped from the count/list. The graph's own Executive Insights already used the owner
+  (`tasks` prop), so the graph was even **inconsistent with itself**.
+- **Expected:** **Different views, same truth.** Any projection of "a milestone's tasks" (Workboard,
+  Living Graph card + tooltip, dashboards) must derive its task set/counts from the **same canonical
+  resolver over `roadmap_tasks`** — never from a derived substrate. `process_nodes` is a graph of
+  relationships, not a census of entities.
+- **Impact:** Critical — a projection presenting different business facts violates the Single Canonical
+  Source of Truth principle; PMs cannot trust the graph counts. **Severity:** High.
+- **Root cause:** **projection reading from another projection.** The milestone census was computed
+  from `process_nodes` (a filtered event materialization) instead of the owner `roadmap_tasks`.
+- **Status: RESOLVED (2026-07-01).** Fix:
+  - **Canonical resolver.** New pure `src/lib/roadmap/milestone-task-census.ts`
+    (`computeMilestoneTaskCensus`) groups `roadmap_tasks` by milestone using the canonical
+    task-activity rules (REG-008/010: terminal ≠ blocked). It is the single producer of milestone
+    task counts/lists for projections.
+  - **Living Graph consumes the owner.** `execution-map/.../living-graph/page.tsx` now fetches **all**
+    project tasks (not only those referenced by nodes); `aggregateByMilestone` takes an optional
+    `censusByMilestone` and uses it for `tasksTotal/tasksDone/taskList` (and therefore the UX-008 edge
+    tooltip). `process_nodes` still supplies relationships/edges, never the census. A fallback to
+    node-counting remains only for synthetic demo data (no real tasks).
+  - Files: `src/lib/roadmap/milestone-task-census.ts`, `src/lib/graph/living-graph-analysis.ts`,
+    `src/components/graph/living-graph-view.tsx`,
+    `app/.../execution-map/living-graph/page.tsx`.
+    Test: `src/lib/graph/__tests__/milestone-task-census.test.ts`.
+- **Protection rule (binding):** **Different views, same truth.** Every projection of an entity
+  consumes that entity's canonical owner through a shared resolver; the Living Graph never counts tasks
+  from `process_nodes`. A projection presenting different business facts for the same entity is a
+  regression. Related: [REG-010](#reg-010--cross-module-metric-rollup-inconsistency),
+  [UX-008](32-product-ux-contracts.md), [No silent regressions rule].
+- **Owner:** Product/Engineering. **Verify:** open a project with `not_started` tasks in a milestone →
+  the Living Graph card counter and edge tooltip show the **same** task count as the Workboard.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*
