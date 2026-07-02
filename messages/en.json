@@ -1573,7 +1573,7 @@
       "currentPhase": "Current phase"
     },
     "edgeTooltip": {
-      "title": "Tasks between milestones",
+      "title": "Tasks in this phase",
       "more": "+{count} more tasks",
       "status": {
         "done": "Done",

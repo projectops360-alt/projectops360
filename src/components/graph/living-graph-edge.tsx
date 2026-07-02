@@ -130,7 +130,7 @@ function MilestoneChainEdge({
                 <p className="text-xs font-semibold text-foreground">{t("edgeTooltip.title")}</p>
                 {(sourceTitle || targetTitle) && (
                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {(sourceTitle ?? "—")} → {(targetTitle ?? "—")}
+                    {sourceTitle ?? targetTitle}
                   </p>
                 )}
                 <ol className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">

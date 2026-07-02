@@ -826,11 +826,11 @@ export function aggregateByMilestone(
     const a = ordered[i];
     const b = ordered[i + 1];
     const durationDays =
-      b.startDate && b.endDate
+      a.startDate && a.endDate
         ? Math.max(
             0,
             Math.round(
-              (new Date(b.endDate).getTime() - new Date(b.startDate).getTime()) /
+              (new Date(a.endDate).getTime() - new Date(a.startDate).getTime()) /
                 86_400_000,
             ),
           )
@@ -848,11 +848,13 @@ export function aggregateByMilestone(
       metadata: {
         synthetic: true,
         milestone_chain: true,
-        tasks: (b.metadata.tasksTotal as number) ?? 0,
+        // UX-008 (CAP-001 follow-up): the edge leaving a phase shows THAT phase's
+        // OWN tasks — the work to finish to advance — not the next phase's. This
+        // makes the current/first phase's tasks visible (they were previously
+        // hidden because the edge showed the target). Source-scoped, canonical.
+        tasks: (a.metadata.tasksTotal as number) ?? 0,
         duration_days: durationDays,
-        // UX-008 — read-only tooltip data: the tasks this connection represents
-        // (the target milestone's tasks) + the milestone titles for the header.
-        taskList: Array.isArray(b.metadata.taskList) ? b.metadata.taskList : [],
+        taskList: Array.isArray(a.metadata.taskList) ? a.metadata.taskList : [],
         sourceMilestoneTitle: a.milestoneLabel ?? a.label,
         targetMilestoneTitle: b.milestoneLabel ?? b.label,
       },

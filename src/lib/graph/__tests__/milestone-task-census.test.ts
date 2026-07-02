@@ -118,7 +118,7 @@ describe("aggregateByMilestone milestone card == owner (REG-018 / CAP-001)", () 
     expect(card.metadata.tasksTotal).toBe(2);
   });
 
-  it("edge tooltip (UX-008) inherits the canonical taskList of the target milestone", () => {
+  it("edge tooltip (UX-008) shows the SOURCE phase's own tasks, so the first phase is visible", () => {
     const M2 = "22222222-2222-2222-2222-222222222222";
     const owner2 = [
       ...owner,
@@ -132,9 +132,10 @@ describe("aggregateByMilestone milestone card == owner (REG-018 / CAP-001)", () 
     const census = computeMilestoneTaskCensus(owner2);
     const { edges } = aggregateByMilestone(nodes2, [], census);
     const chain = edges.find((e) => e.metadata.milestone_chain === true)!;
-    // The chain edge carries the TARGET milestone's canonical task list (UX-008).
+    // CAP-001 follow-up: the edge leaving M carries M's OWN (source) tasks — so
+    // the current/first phase's tasks show, not the next phase's (which hid them).
     const tooltipIds = (chain.metadata.taskList as { id: string }[]).map((t) => t.id).sort();
-    expect(tooltipIds).toEqual(["d", "e"]);
-    expect(chain.metadata.tasks).toBe(2);
+    expect(tooltipIds).toEqual(["a", "b", "c"]);
+    expect(chain.metadata.tasks).toBe(3);
   });
 });
