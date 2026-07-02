@@ -15,6 +15,10 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 
 ---
 
+> 📜 **[Product Constitution](00-product-constitution.md)** — the consolidated authoritative reference
+> for architecture & product direction (Phase 0 + Phase 1 decisions). Read it before designing the
+> Event Log Foundation (Phase 2). Labels every capability as IMPLEMENTED / APPROVED-DESIGN / FUTURE.
+
 ## ⚠️ Read this first (for any human or AI agent)
 
 1. **The Product Brain overrides conversation memory and prompts.** If a chat says one
