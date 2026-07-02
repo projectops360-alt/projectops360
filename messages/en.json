@@ -770,7 +770,8 @@
         "commercial_construction": "Commercial Construction",
         "infrastructure": "Infrastructure",
         "industrial": "Industrial",
-        "general": "General"
+        "general": "General",
+        "ai_native_execution": "AI-Native Project Execution"
       },
       "importFromFile": "Or import an existing project file…"
     },

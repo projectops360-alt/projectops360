@@ -183,6 +183,7 @@ export function EditProjectDialog({
               <option value="commercial_construction">{t("types.commercial_construction")}</option>
               <option value="infrastructure">{t("types.infrastructure")}</option>
               <option value="industrial">{t("types.industrial")}</option>
+              <option value="ai_native_execution">{t("types.ai_native_execution")}</option>
             </select>
           </div>
 

@@ -34,6 +34,7 @@ const createProjectSchema = z.object({
       "infrastructure",
       "industrial",
       "general",
+      "ai_native_execution",
     ])
     .default("general"),
   useTemplate: z.boolean().default(false),
@@ -203,6 +204,7 @@ const updateProjectSchema = z.object({
       "infrastructure",
       "industrial",
       "general",
+      "ai_native_execution",
     ])
     .optional(),
   startDate: z.string().optional(),

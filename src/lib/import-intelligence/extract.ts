@@ -67,6 +67,7 @@ const PROJECT_TYPE_KEYWORDS: Record<Exclude<ProjectType, "general">, string[]> =
   commercial_construction: ["commercial", "tenant", "core and shell", "comercial", "edificio", "oficinas"],
   infrastructure: ["highway", "bridge", "road", "pipeline", "utility", "infraestructura", "carretera", "puente", "vialidad"],
   industrial: ["plant", "industrial", "refinery", "factory", "planta", "refinería", "refineria", "fábrica", "fabrica"],
+  ai_native_execution: ["ai", "ai-native", "llm", "agent", "prompt", "copilot", "automation", "ia", "inteligencia artificial", "agente", "automatización", "automatizacion"],
 };
 
 // ── Header matching ─────────────────────────────────────────────────────────

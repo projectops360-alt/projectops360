@@ -17,7 +17,11 @@ export type ProjectType =
   | "commercial_construction"
   | "infrastructure"
   | "industrial"
-  | "general";
+  | "general"
+  // Future platform: projects designed for AI-assisted execution. At this stage
+  // this only IDENTIFIES the project (selectable + stored); no AI-specific
+  // workflows or provider integrations. Backward compatible.
+  | "ai_native_execution";
 
 /** Modules that can be enabled/softened per project type. The underlying
  *  architecture always exists; project type only configures visibility. */

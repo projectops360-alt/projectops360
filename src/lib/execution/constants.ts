@@ -26,6 +26,7 @@ export const PROJECT_TYPES: ProjectType[] = [
   "infrastructure",
   "industrial",
   "general",
+  "ai_native_execution",
 ];
 
 export const PROJECT_TYPE_LABELS: Record<ProjectType, I18nField> = {
@@ -36,6 +37,7 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, I18nField> = {
   infrastructure: { en: "Infrastructure", es: "Infraestructura" },
   industrial: { en: "Industrial", es: "Industrial" },
   general: { en: "General", es: "General" },
+  ai_native_execution: { en: "AI-Native Project Execution", es: "AI-Native Project Execution" },
 };
 
 /** Terminology hint: what "materials" means per project type. */
@@ -47,6 +49,7 @@ export const MATERIALS_TERMINOLOGY: Record<ProjectType, I18nField> = {
   infrastructure: { en: "Materials", es: "Materiales" },
   industrial: { en: "Materials", es: "Materiales" },
   general: { en: "Materials & Resources", es: "Materiales y Recursos" },
+  ai_native_execution: { en: "Materials & Resources", es: "Materiales y Recursos" },
 };
 
 // ── Universal status mapping ────────────────────────────────────────────────
