@@ -1573,7 +1573,7 @@
       "currentPhase": "Fase actual"
     },
     "edgeTooltip": {
-      "title": "Tareas entre hitos",
+      "title": "Tareas de esta fase",
       "more": "+{count} tareas más",
       "status": {
         "done": "Hecha",

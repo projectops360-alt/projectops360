@@ -177,6 +177,12 @@ resolver `lib/roadmap/milestone-task-census.ts` (`computeMilestoneTaskCensus`) �
 (CAP-001). `process_nodes` supplies **relationships/edges**, not the task census. Any projection of a
 milestone's tasks must consume the same resolver, so every view agrees by construction.
 
+**Edge tooltip scope (UX-008, CAP-001 follow-up):** the milestone-chain edge leaving a phase shows
+**that phase's OWN tasks** (the source/current phase — the work to finish to advance), not the next
+phase's. Showing the destination's tasks hid the current (and first) phase's tasks entirely — a user
+on "Phase 0 (current)" could not see Phase 0's tasks. Source-scoped keeps every phase's own tasks
+visible and matches the user's mental model ("the N tasks to reach the next phase").
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration
