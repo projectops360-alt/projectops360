@@ -591,7 +591,7 @@ export function TaskFormDialog({
                 id="task-description"
                 name="description"
                 rows={2}
-                maxLength={2000}
+                maxLength={20000}
                 defaultValue={isEdit ? task?.description ?? "" : ""}
                 className={textareaClass}
                 placeholder={t.fields.descriptionPlaceholder}
@@ -663,7 +663,7 @@ export function TaskFormDialog({
                   id="task-blocker-reason"
                   name="blocker_reason"
                   rows={2}
-                  maxLength={2000}
+                  maxLength={20000}
                   defaultValue={isEdit ? task?.blocker_reason ?? "" : ""}
                   className={`${textareaClass} border-red-200 dark:border-red-800/50`}
                   placeholder={t.fields.blockerReasonPlaceholder}
@@ -1038,7 +1038,7 @@ export function TaskFormDialog({
                   id="task-acceptance"
                   name="acceptance_criteria"
                   rows={2}
-                  maxLength={2000}
+                  maxLength={20000}
                   defaultValue={isEdit ? task?.acceptance_criteria ?? "" : ""}
                   className={textareaClass}
                   placeholder={t.fields.acceptanceCriteriaPlaceholder}
@@ -1055,7 +1055,7 @@ export function TaskFormDialog({
                   id="task-dependencies"
                   name="dependency_notes"
                   rows={2}
-                  maxLength={2000}
+                  maxLength={20000}
                   defaultValue={isEdit ? task?.dependency_notes ?? "" : ""}
                   className={textareaClass}
                   placeholder={t.fields.dependencyNotesPlaceholder}
@@ -1137,7 +1137,7 @@ export function TaskFormDialog({
                   id="task-execution-notes"
                   name="execution_notes"
                   rows={2}
-                  maxLength={5000}
+                  maxLength={100000}
                   defaultValue={isEdit ? task?.execution_notes ?? "" : ""}
                   className={textareaClass}
                   placeholder={t.fields.executionNotesPlaceholder}
@@ -1189,7 +1189,7 @@ export function TaskFormDialog({
                     id="task-implementation-notes"
                     name="implementation_notes"
                     rows={2}
-                    maxLength={5000}
+                    maxLength={100000}
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.implementation_notes ?? "" : ""}
                     className={textareaClass}
                     placeholder={t.fields.implementationNotesPlaceholder}
@@ -1204,7 +1204,7 @@ export function TaskFormDialog({
                     id="task-test-notes"
                     name="test_notes"
                     rows={2}
-                    maxLength={5000}
+                    maxLength={100000}
                     defaultValue={isEdit ? (task as RoadmapTask | undefined)?.test_notes ?? "" : ""}
                     className={textareaClass}
                     placeholder={t.fields.testNotesPlaceholder}
@@ -1235,10 +1235,10 @@ export function TaskFormDialog({
                   <textarea
                     id="task-prompt-body"
                     name="prompt_body"
-                    rows={4}
-                    maxLength={10000}
+                    rows={10}
+                    maxLength={500000}
                     defaultValue={isEdit ? task?.prompt_body ?? "" : ""}
-                    className={textareaClass}
+                    className={`${inputClass} resize-y`}
                     placeholder={isEs ? "El prompt exacto usado para ejecutar la tarea…" : "The exact prompt used to execute the task…"}
                     disabled={isPending}
                   />
@@ -1250,8 +1250,8 @@ export function TaskFormDialog({
                   <textarea
                     id="task-prompt-context"
                     name="prompt_context"
-                    rows={2}
-                    maxLength={2000}
+                    rows={3}
+                    maxLength={100000}
                     defaultValue={isEdit ? task?.prompt_context ?? "" : ""}
                     className={textareaClass}
                     placeholder={isEs ? "Contexto o instrucciones adicionales…" : "Additional context or instructions…"}

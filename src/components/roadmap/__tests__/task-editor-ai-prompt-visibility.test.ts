@@ -78,7 +78,7 @@ describe("UX-014 — existing prompt data is preserved on save (preserve-on-abse
     // A `.default("")` on the update schema would turn an absent field into "",
     // which would then wipe the stored value — exactly what we must avoid.
     expect(actionSrc).toContain(
-      'prompt_body: z.string().max(10000, "promptTooLong").transform((s) => s.trim()).optional(),',
+      'prompt_body: z.string().max(500000, "promptTooLong").transform((s) => s.trim()).optional(),',
     );
     expect(actionSrc).toContain(
       'ai_tool_target: z.string().max(100, "aiToolTooLong").transform((s) => s.trim()).optional(),',
