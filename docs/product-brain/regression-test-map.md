@@ -33,6 +33,8 @@
 | REG-018 / CAP-001 | Living Graph / Metrics · Workboard | Milestone task count + UX-008 edge tooltip derive from the canonical owner (`roadmap_tasks`) via a shared resolver, never from `process_nodes`; the graph card counter matches the Workboard incl. `not_started` tasks ("different views, same truth") | `src/lib/graph/__tests__/milestone-task-census.test.ts` | **protected** |
 | PD-014 / CAP-044 | Unified People Directory | People from internal users + external contacts + stakeholders unify into one identity, de-duplicated by email; internal user wins identity on collision; no email → kept distinct (no fuzzy guessing); contact types classified; "Unassigned/Sin asignar" is intentional | `src/lib/people/__tests__/directory.test.ts` | **protected** (Phase 1 read model) |
 
+| PEG-INGEST | Event Log Foundation (Phase 2) | Event Ingestion Service is the only write path: only registered past-tense events; required payload; payload never duplicates envelope; HIGH/CRITICAL require evidence; AI events require provenance+confidence; EPHEMERAL_EXCLUDED (UI telemetry) rejected; compensating events reference a prior event; stable dedup key (idempotent); deterministic projection-invalidation tags. DB enforces append-only immutability (trigger blocks UPDATE/DELETE), monotonic per-project sequence, unique dedup, service-role-only writes (RLS). Additive — does not touch process_nodes/process_edges/emit-event. | `src/lib/events/__tests__/ingestion.test.ts` | **protected** (DB immutability/sequence/dedup by migration `20260830000000`) |
+
 ## Open gaps (tests owed)
 
 - _None._ Every protected regression in the table above has an executable test. New regressions must

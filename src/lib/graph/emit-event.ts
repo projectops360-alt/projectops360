@@ -401,6 +401,11 @@ export async function autoLinkProcessNode(
  * Fire-and-forget: failures are logged but never block the caller.
  */
 export function emitAndAutoLink(input: EmitNodeInput): void {
+  // Phase 2 — dual-write to the Project Event Graph (best-effort, never blocks;
+  // existing process_nodes/process_edges behavior is untouched).
+  import("@/lib/events/dual-write")
+    .then(({ dualWriteProcessNodeEvent }) => dualWriteProcessNodeEvent(input))
+    .catch((err) => console.error("[events] dual-write import failed:", err));
   // Fire-and-forget: start the async work but don't await it
   emitProcessNode(input)
     .then((nodeId) => {
