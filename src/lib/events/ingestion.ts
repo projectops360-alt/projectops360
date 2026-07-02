@@ -21,7 +21,13 @@ import {
   VALID_IMPORTANCE,
   type ActorType,
   type EventImportance,
+  type EventLifecycleClass,
 } from "./registry";
+
+const VALID_LIFECYCLE_CLASSES: ReadonlySet<string> = new Set([
+  "BUSINESS_EVENT", "SYSTEM_EVENT", "AI_EVENT",
+  "DERIVED_EVENT", "EXTERNAL_EVENT", "SYNTHETIC_BACKFILL_EVENT",
+]);
 
 // ── Input ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +57,8 @@ export interface EmitEventInput {
   permissionScope?: Record<string, unknown>;
   /** Authorized importance override — recorded in provenance.importanceOverride. */
   importanceOverride?: EventImportance;
+  /** Lifecycle-class override (e.g. SYNTHETIC_BACKFILL_EVENT for the Backfill Service). */
+  lifecycleClassOverride?: EventLifecycleClass;
   isCompensatingEvent?: boolean;
   compensatesEventId?: string | null;
   eventSchemaVersion?: number;
@@ -122,6 +130,8 @@ export function computeDedupKey(input: EmitEventInput): string | null {
     input.sourceEntityId ?? "",
     input.occurredAt ?? "",
     input.correlationId ?? "",
+    // Backfill marker keeps synthetic history distinct from live-captured events.
+    input.lifecycleClassOverride === "SYNTHETIC_BACKFILL_EVENT" ? "backfill" : "",
     payloadHash,
   ];
   return createHash("sha256").update(parts.join("|")).digest("hex");
@@ -170,6 +180,17 @@ export function validateProjectEvent(input: EmitEventInput): { ok: boolean; erro
     errors.push("event_schema_version must be a positive integer");
   }
   if (input.confidence != null && (input.confidence < 0 || input.confidence > 1)) errors.push("confidence must be within [0,1]");
+
+  if (input.lifecycleClassOverride != null && !VALID_LIFECYCLE_CLASSES.has(input.lifecycleClassOverride)) {
+    errors.push("event_lifecycle_class override is invalid");
+  }
+  // Synthetic backfill events must be marked (provenance.backfilled) and carry reduced confidence.
+  if (input.lifecycleClassOverride === "SYNTHETIC_BACKFILL_EVENT") {
+    if (input.confidence == null) errors.push("backfill event requires confidence");
+    if ((input.provenance as { backfilled?: unknown } | undefined)?.backfilled !== true) {
+      errors.push("backfill event requires provenance.backfilled = true");
+    }
+  }
 
   if (def) {
     const importance = resolveImportance(input);
@@ -276,7 +297,7 @@ export function normalizeProjectEvent(input: EmitEventInput): NormalizedRow {
     event_type: input.eventType,
     event_schema_version: input.eventSchemaVersion ?? 1,
     event_importance: importance,
-    event_lifecycle_class: def.lifecycleClass,
+    event_lifecycle_class: input.lifecycleClassOverride ?? def.lifecycleClass,
     subject_type: def.subjectType,
     subject_id: subjectId,
     actor_type: input.actorType,

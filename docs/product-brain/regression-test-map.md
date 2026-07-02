@@ -35,6 +35,8 @@
 
 | PEG-INGEST | Event Log Foundation (Phase 2) | Event Ingestion Service is the only write path: only registered past-tense events; required payload; payload never duplicates envelope; HIGH/CRITICAL require evidence; AI events require provenance+confidence; EPHEMERAL_EXCLUDED (UI telemetry) rejected; compensating events reference a prior event; stable dedup key (idempotent); deterministic projection-invalidation tags. DB enforces append-only immutability (trigger blocks UPDATE/DELETE), monotonic per-project sequence, unique dedup, service-role-only writes (RLS). Additive — does not touch process_nodes/process_edges/emit-event. | `src/lib/events/__tests__/ingestion.test.ts` | **protected** (DB immutability/sequence/dedup by migration `20260830000000`) |
 
+| PEG-BACKFILL | Event Log Foundation (Phase 2) | Historical Backfill reconstructs events from owners only when supported by data; every backfilled event is marked `SYNTHETIC_BACKFILL_EVENT` + `provenance.backfilled` with reduced confidence when inferred (explicit=0.9, inferred=0.6); risky transitions (TaskStarted/BlockerRaised) are never invented; backfilled events pass registry validation; dedup key is stable across runs (idempotent) and distinct from live events (backfill marker); ingestion rejects backfill events without provenance/confidence. Reads owners only — never touches process_nodes/process_edges/dual-write. | `src/lib/events/__tests__/backfill.test.ts` | **protected** |
+
 ## Open gaps (tests owed)
 
 - _None._ Every protected regression in the table above has an executable test. New regressions must

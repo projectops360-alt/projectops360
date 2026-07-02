@@ -119,6 +119,7 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
   // ── Document / Drawing ──
   DocumentUploaded: { category: "document", subjectType: "document", importance: "LOW", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: [] },
   DocumentApproved: { category: "document", subjectType: "document", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [] },
+  DrawingUploaded: { category: "drawing", subjectType: "drawing", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [] },
   DrawingRevised: { category: "drawing", subjectType: "drawing", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["rev"] },
 
   // ── Budget / Cost ──
