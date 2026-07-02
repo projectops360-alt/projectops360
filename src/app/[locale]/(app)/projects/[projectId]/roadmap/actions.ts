@@ -1084,6 +1084,78 @@ export async function updateTaskStatusAction(input: {
   return {};
 }
 
+// ── Reorder Tasks (Workboard drag reorder — order_index only) ──────────────────
+// Persists same-column drag reordering / cross-column drop position. This changes
+// ONLY order_index — never status — so it never emits a (misleading) task status
+// event. Scoped by org + project like every other task write. Audited as a plain
+// "update" clearly tagged field=order_index (an order change, not a status change).
+
+const reorderTasksSchema = z.object({
+  projectId: z.string().uuid("invalid_project_id"),
+  updates: z
+    .array(
+      z.object({
+        taskId: z.string().uuid("invalid_task_id"),
+        orderIndex: z.coerce.number().int().min(0),
+      }),
+    )
+    .min(1, "no_updates")
+    .max(500, "too_many_updates"),
+});
+
+export async function reorderTasksAction(input: {
+  projectId: string;
+  updates: { taskId: string; orderIndex: number }[];
+}): Promise<{ error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+
+  const parsed = reorderTasksSchema.safeParse(input);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0];
+    return { error: firstError?.message || "validation_error" };
+  }
+
+  const data = parsed.data;
+  const supabase = createAdminClient();
+
+  // Apply each order_index write, strictly scoped to this org + project so a
+  // caller can never touch another project's or organization's tasks.
+  const results = await Promise.all(
+    data.updates.map((u) =>
+      supabase
+        .from("roadmap_tasks")
+        .update({ order_index: u.orderIndex })
+        .eq("id", u.taskId)
+        .eq("organization_id", org.organizationId)
+        .eq("project_id", data.projectId)
+        .is("deleted_at", null),
+    ),
+  );
+
+  if (results.some((r) => r.error)) {
+    console.error("Failed to reorder roadmap tasks:", results.find((r) => r.error)?.error);
+    return { error: "unexpected" };
+  }
+
+  await logAudit({
+    org,
+    projectId: data.projectId,
+    action: "update",
+    entityType: "roadmap_tasks",
+    entityId: data.updates[0].taskId,
+    metadata: { field: "order_index", count: data.updates.length },
+  });
+
+  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+
+  return {};
+}
+
 // ── Record Prompt Sent ──────────────────────────────────────────────────────────
 // Called when the user copies a prompt. Optionally transitions status to sent_to_ai.
 

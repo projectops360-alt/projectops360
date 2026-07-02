@@ -10,7 +10,8 @@ import {
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
   CornerDownRight, User, Rows3, Rows4,
 } from "lucide-react";
-import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
+import { updateTaskStatusAction, reorderTasksAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
+import { applyBoardDrag } from "@/lib/workboard/reorder";
 import { resolveTaskOwner, type AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
 import { TaskFormDialog, type TaskFormTranslations } from "@/components/roadmap/task-form-dialog";
@@ -392,6 +393,10 @@ export function WorkboardClient({
     taskTitle: string;
     fromStatus: TaskStatus;
     toStatus: TaskStatus;
+    /** Destination-column order_index writes to persist after the move is confirmed. */
+    orderUpdates: { id: string; order_index: number }[];
+    /** Snapshot to restore if the move is cancelled or fails. */
+    prevTasks: RoadmapTask[];
   } | null>(null);
 
   // ── Deep-link: open a specific task from ?task=<id> ────────────────────────
@@ -477,15 +482,21 @@ export function WorkboardClient({
     setFilterValue(null);
   }
 
-  const filteredTasks = useMemo(() => {
-    if (filterValue === null) return tasks;
-    if (filterDimension === "sprint") {
-      if (filterValue === NONE_VALUE) return tasks.filter((t) => !t.sprint_name);
-      return tasks.filter((t) => t.sprint_name === filterValue);
-    }
-    if (filterValue === NONE_VALUE) return tasks.filter((t) => !t.milestone_id);
-    return tasks.filter((t) => t.milestone_id === filterValue);
-  }, [tasks, filterDimension, filterValue]);
+  // Single source of truth for "is this task visible under the active filter?".
+  // Used both to derive the filtered board AND to keep drag reordering safe:
+  // reorder operates only on visible tasks and preserves hidden tasks' order.
+  const isTaskVisible = useCallback(
+    (task: RoadmapTask): boolean => {
+      if (filterValue === null) return true;
+      if (filterDimension === "sprint") {
+        return filterValue === NONE_VALUE ? !task.sprint_name : task.sprint_name === filterValue;
+      }
+      return filterValue === NONE_VALUE ? !task.milestone_id : task.milestone_id === filterValue;
+    },
+    [filterDimension, filterValue],
+  );
+
+  const filteredTasks = useMemo(() => tasks.filter(isTaskVisible), [tasks, isTaskVisible]);
 
   // Group filtered tasks by status
   const tasksByStatus: Record<TaskStatus, RoadmapTask[]> = {
@@ -597,13 +608,34 @@ export function WorkboardClient({
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setIsDragging(false);
-    if (!result.destination) return;
-    const taskId = result.draggableId.replace("task-", "");
-    const newStatus = result.destination.droppableId as TaskStatus;
-    if (!isColumnVisible(newStatus) || isColumnCollapsed(newStatus)) return;
+    const { source, destination, draggableId } = result;
+    // Drop outside any droppable → no-op (@hello-pangea/dnd reverts the UI).
+    if (!destination) return;
+    const taskId = draggableId.replace("task-", "");
+    const fromStatus = source.droppableId as TaskStatus;
+    const toStatus = destination.droppableId as TaskStatus;
+    if (!isColumnVisible(toStatus) || isColumnCollapsed(toStatus)) return;
     const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.status === newStatus) return;
-    const blocker = findBlockingPredecessor(taskId, newStatus);
+    if (!task) return;
+
+    // ── Same-column reorder (no status change, no dialog) ────────────────────
+    if (fromStatus === toStatus) {
+      if (source.index === destination.index) return;
+      const res = applyBoardDrag({ tasks, draggableId, source, destination, isVisible: isTaskVisible });
+      if (!res || res.orderUpdates.length === 0) return;
+      const prev = tasks;
+      setTasks(res.tasks);
+      reorderTasksAction({
+        projectId,
+        updates: res.orderUpdates.map((u) => ({ taskId: u.id, orderIndex: u.order_index })),
+      })
+        .then((r) => { if (r?.error) setTasks(prev); })
+        .catch(() => setTasks(prev));
+      return;
+    }
+
+    // ── Cross-column move (status change) ────────────────────────────────────
+    const blocker = findBlockingPredecessor(taskId, toStatus);
     if (blocker) {
       setDependencyWarning(
         t.errors.dependency_not_met
@@ -612,9 +644,20 @@ export function WorkboardClient({
       );
       return;
     }
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
-    setPendingStatusChange({ taskId, taskTitle: task.title, fromStatus: task.status, toStatus: newStatus });
-  }, [tasks, isColumnVisible, isColumnCollapsed, findBlockingPredecessor, t.errors.dependency_not_met]);
+    const res = applyBoardDrag({ tasks, draggableId, source, destination, isVisible: isTaskVisible });
+    if (!res) return;
+    const prev = tasks;
+    // Optimistic: apply status + drop placement in one step.
+    setTasks(res.tasks);
+    setPendingStatusChange({
+      taskId,
+      taskTitle: task.title,
+      fromStatus: task.status,
+      toStatus,
+      orderUpdates: res.orderUpdates,
+      prevTasks: prev,
+    });
+  }, [tasks, isColumnVisible, isColumnCollapsed, findBlockingPredecessor, isTaskVisible, projectId, t.errors.dependency_not_met]);
 
   const handleStatusConfirm = useCallback(async (note?: string) => {
     if (!pendingStatusChange) return;
@@ -622,7 +665,8 @@ export function WorkboardClient({
       taskId: pendingStatusChange.taskId, status: pendingStatusChange.toStatus, projectId, note,
     });
     if (res.error) {
-      setTasks((prev) => prev.map((t) => t.id === pendingStatusChange.taskId ? { ...t, status: pendingStatusChange.fromStatus } : t));
+      // Restore the full pre-drag board (status + placement).
+      setTasks(pendingStatusChange.prevTasks);
       if (res.error === "dependency_not_met") {
         setDependencyWarning(
           t.errors.dependency_not_met
@@ -630,6 +674,12 @@ export function WorkboardClient({
             .replace("{predecessor}", res.predecessorTitle ?? "—"),
         );
       }
+    } else if (pendingStatusChange.orderUpdates.length > 0) {
+      // Persist the destination-column drop position (order_index only).
+      await reorderTasksAction({
+        projectId,
+        updates: pendingStatusChange.orderUpdates.map((u) => ({ taskId: u.id, orderIndex: u.order_index })),
+      });
     }
     setPendingStatusChange(null);
     router.refresh();
@@ -637,7 +687,8 @@ export function WorkboardClient({
 
   const handleStatusCancel = useCallback(() => {
     if (!pendingStatusChange) return;
-    setTasks((prev) => prev.map((t) => t.id === pendingStatusChange.taskId ? { ...t, status: pendingStatusChange.fromStatus } : t));
+    // Restore the full pre-drag board (status + placement).
+    setTasks(pendingStatusChange.prevTasks);
     setPendingStatusChange(null);
   }, [pendingStatusChange]);
 
@@ -819,7 +870,10 @@ export function WorkboardClient({
               scrollbar (bottom) moves across columns. Both bars stay pinned to the
               board's edges (in view), never at the bottom of a long column. The
               height is measured at runtime so it fits the real remaining viewport. */}
-          <div ref={scrollRef} className={`workboard-scroll flex items-start max-h-[calc(100vh-22rem)] ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
+          {/* items-stretch equalizes column heights across ALL groups so a
+              short/empty target column still offers a full-height drop zone
+              (fixes cross-column drops into columns shorter than the source). */}
+          <div ref={scrollRef} className={`workboard-scroll flex items-stretch max-h-[calc(100vh-22rem)] ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
               const visibleStatuses = group.statuses.filter((s) => isColumnVisible(s));
@@ -828,7 +882,7 @@ export function WorkboardClient({
               if (visibleStatuses.length === 0 && !collapsed) return null;
 
               return (
-                <div key={group.label} className="flex-shrink-0">
+                <div key={group.label} className="flex-shrink-0 flex flex-col">
                   {/* Group header */}
                   <div className="flex items-center gap-2 mb-2 cursor-pointer select-none group/header" onClick={() => toggleGroup(group.label)}>
                     <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200 ${collapsed ? "-rotate-90" : ""}`} />
@@ -836,9 +890,10 @@ export function WorkboardClient({
                     <span className="text-[10px] text-muted-foreground/60 font-medium">{groupTaskCount}</span>
                   </div>
 
-                  {/* Columns */}
+                  {/* Columns — flex-1 + items-stretch so each column fills the
+                      group height, giving short/empty columns a full drop zone. */}
                   {!collapsed && visibleStatuses.length > 0 && (
-                    <div className={`flex ${isCompact ? "gap-2" : "gap-3"}`}>
+                    <div className={`flex flex-1 items-stretch ${isCompact ? "gap-2" : "gap-3"}`}>
                       {visibleStatuses.map((status, statusIndex) => (
                         <BoardColumn
                           key={status}
