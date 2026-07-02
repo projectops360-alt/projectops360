@@ -182,16 +182,24 @@ export interface BackfillReport {
   eventsFailed: number;
   byType: Record<string, number>;
   confidenceDistribution: { high: number; medium: number; low: number };
+  /** Running confidence stats for quality/replay reports. */
+  confidenceStats: { count: number; sum: number; min: number; max: number };
+  explicitEvents: number;
+  inferredEvents: number;
   unsupportedSources: string[];
   warnings: string[];
   errorSummary: string[];
 }
 
-function bucketConfidence(dist: BackfillReport["confidenceDistribution"], c: number | null | undefined) {
+const EXPLICIT_THRESHOLD = 0.85;
+
+function recordConfidence(report: BackfillReport, c: number | null | undefined) {
   const v = c ?? 0;
-  if (v >= 0.85) dist.high++;
-  else if (v >= 0.6) dist.medium++;
-  else dist.low++;
+  if (v >= EXPLICIT_THRESHOLD) { report.confidenceDistribution.high++; report.explicitEvents++; }
+  else if (v >= 0.6) { report.confidenceDistribution.medium++; report.inferredEvents++; }
+  else { report.confidenceDistribution.low++; report.inferredEvents++; }
+  const s = report.confidenceStats;
+  s.count++; s.sum += v; s.min = Math.min(s.min, v); s.max = Math.max(s.max, v);
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -203,10 +211,20 @@ type Scanner = { module: string; run: () => Promise<EmitEventInput[]> };
  * backfill marker), evidence/confidence-aware. Reads owners only; never touches
  * process_nodes/process_edges or the dual-write path.
  */
+export interface BackfillRunOptions {
+  dryRun?: boolean;
+  /** Audit: the admin who triggered the run (null = system/script). */
+  actorUserId?: string | null;
+  /** Audit: why the run was executed. */
+  reason?: string | null;
+  /** Audit: correlates all projects of one console execution. */
+  executionId?: string | null;
+}
+
 export async function backfillProject(
   projectId: string,
   organizationId: string,
-  options: { dryRun?: boolean } = {},
+  options: BackfillRunOptions = {},
 ): Promise<BackfillReport> {
   const batchId = randomUUID();
   const startedAt = new Date().toISOString();
@@ -217,6 +235,7 @@ export async function backfillProject(
     status: options.dryRun ? "dry_run" : "completed",
     sourceModulesProcessed: [], eventsCreated: 0, eventsSkipped: 0, eventsFailed: 0,
     byType: {}, confidenceDistribution: { high: 0, medium: 0, low: 0 },
+    confidenceStats: { count: 0, sum: 0, min: 1, max: 0 }, explicitEvents: 0, inferredEvents: 0,
     unsupportedSources: [], warnings: [], errorSummary: [],
   };
 
@@ -276,7 +295,7 @@ export async function backfillProject(
     a.eventType.localeCompare(b.eventType));
 
   if (options.dryRun) {
-    for (const e of events) { report.byType[e.eventType] = (report.byType[e.eventType] ?? 0) + 1; bucketConfidence(report.confidenceDistribution, e.confidence); }
+    for (const e of events) { report.byType[e.eventType] = (report.byType[e.eventType] ?? 0) + 1; recordConfidence(report, e.confidence); }
     report.completedAt = new Date().toISOString();
     return report;
   }
@@ -287,18 +306,24 @@ export async function backfillProject(
     if (!v.ok) { report.eventsFailed++; report.errorSummary.push(`${e.eventType}: ${v.errors.join("; ")}`); continue; }
     const res = await emitProjectEvent(e);
     if (res.ok && res.deduped) report.eventsSkipped++;
-    else if (res.ok) { report.eventsCreated++; report.byType[e.eventType] = (report.byType[e.eventType] ?? 0) + 1; bucketConfidence(report.confidenceDistribution, e.confidence); }
+    else if (res.ok) { report.eventsCreated++; report.byType[e.eventType] = (report.byType[e.eventType] ?? 0) + 1; recordConfidence(report, e.confidence); }
     else { report.eventsFailed++; report.errorSummary.push(`${e.eventType}: ${res.error}`); }
   }
 
   report.completedAt = new Date().toISOString();
 
-  // Audit trail: record the batch as a real system event (not backfilled).
+  // Audit trail: record the batch as a real (immutable) system event with who/why.
   emitProjectEventSafe({
     organizationId, projectId, eventType: "BackfillCompleted", subjectId: projectId,
-    actorType: "system", sourceModule: "system",
-    payload: { backfill_batch_id: batchId, created: report.eventsCreated, skipped: report.eventsSkipped, failed: report.eventsFailed, modules: report.sourceModulesProcessed },
-    provenance: { backfill_batch_id: batchId },
+    actorType: options.actorUserId ? "human" : "system", actorId: options.actorUserId ?? null,
+    sourceModule: "system",
+    payload: {
+      backfill_batch_id: batchId, execution_id: options.executionId ?? null,
+      reason: options.reason ?? null,
+      created: report.eventsCreated, skipped: report.eventsSkipped, failed: report.eventsFailed,
+      modules: report.sourceModulesProcessed,
+    },
+    provenance: { backfill_batch_id: batchId, execution_id: options.executionId ?? null },
   });
 
   return report;
