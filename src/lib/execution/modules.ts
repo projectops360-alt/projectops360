@@ -49,6 +49,10 @@ export const DEFAULT_MODULES: Record<ProjectType, ProjectModule[]> = {
   infrastructure: [...CORE_MODULES, ...CONSTRUCTION_MODULES],
   industrial: [...CORE_MODULES, ...CONSTRUCTION_MODULES],
   general: [...CORE_MODULES, "materials", "procurement"],
+  // AI-Native Project Execution™ — domain-neutral defaults for now (same as
+  // general). ai_recommendations is already a CORE module, so no AI-specific
+  // module is added here; this type only identifies AI-assisted projects.
+  ai_native_execution: [...CORE_MODULES, "materials", "procurement"],
 };
 
 /** Resolve the enabled modules for a project: explicit list wins,
