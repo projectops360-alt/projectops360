@@ -235,11 +235,24 @@ describe("MPF engine — input validation + typed errors", () => {
     ).toThrow(MpfMissingProjectScopeError);
   });
 
-  it("algorithmic methods throw MpfUnsupportedOperationError (never fake output)", () => {
+  it("not-yet-implemented algorithmic methods throw MpfUnsupportedOperationError (never fake output)", () => {
+    // buildTransitionModel/buildFlowSegments are implemented in Task 3; the
+    // metrics + health classifiers remain deferred and must never fabricate.
     const engine = createMilestoneProcessFlowEngine();
-    expect(() => engine.buildTransitionModel(input())).toThrow(MpfUnsupportedOperationError);
+    const transition = {
+      transitionId: "tr1",
+      scope: { organizationId: ORG, projectId: PROJ },
+      sourceMilestoneId: null,
+      targetMilestoneId: "m1",
+      startedAt: null,
+      completedAt: null,
+      state: { status: "unknown" as const, currentSegmentType: null, isBlocked: false, lastEventAt: null },
+      segments: [],
+      evidenceEventIds: [],
+    };
+    expect(() => engine.calculateFlowMetrics(transition)).toThrow(MpfUnsupportedOperationError);
     try {
-      engine.buildTransitionModel(input());
+      engine.calculateFlowMetrics(transition);
     } catch (err) {
       expect(isMpfError(err)).toBe(true);
       if (isMpfError(err)) expect(err.code).toBe("UNSUPPORTED_ENGINE_OPERATION");

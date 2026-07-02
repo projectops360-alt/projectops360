@@ -37,6 +37,8 @@ import {
 } from "./security";
 import { openRunContext, closeRunSummary } from "./observability";
 import { aggregateConfidence } from "./evidence";
+import { buildMilestoneTransitions } from "./transition-builder";
+import { buildFlowSegmentsForTransition } from "./flow-segment-builder";
 import type {
   MilestoneProcessFlowEngine,
   MilestoneFlowInputContract,
@@ -121,29 +123,33 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       now: this.now,
     });
 
-    // Task 1: no transition algorithm yet — an authorized, valid input yields a
-    // safe EMPTY projection. This is honest "nothing derived", not fake output.
-    const includedEventCount = input.events.length;
+    // Task 3: build transition corridors + flow segments (structure only — no
+    // metrics, no final health). Empty input still yields a safe empty projection.
+    const build = buildMilestoneTransitions({
+      scope: input.scope,
+      milestones: input.milestones,
+      events: input.events,
+      config: input.config,
+    });
+
+    const dataQualityFlags: MilestoneFlowProjection["dataQualityFlags"] =
+      input.events.length === 0 ? ["insufficient_event_density"] : [];
+
     const summary = closeRunSummary(
       ctx,
       {
         inputEventCount: input.events.length,
-        includedEventCount,
+        includedEventCount: input.events.length,
         excludedEventCount: 0,
-        transitionCount: 0,
-        segmentCount: 0,
+        transitionCount: build.stats.transitionCount,
+        segmentCount: build.stats.segmentCount,
         bottleneckCount: 0,
-        healthAssessmentCount: 0,
-        warnings:
-          input.events.length > 0
-            ? [
-                {
-                  code: "ALGORITHM_NOT_IMPLEMENTED",
-                  message:
-                    "Transition derivation is not implemented in Phase 3 Task 1; events were accepted read-only but not interpreted.",
-                },
-              ]
-            : [],
+        healthAssessmentCount: 0, // final health is a later task — kept unknown
+        unassignedEventCount: build.stats.unassignedEventCount,
+        unknownSegmentCount: build.stats.unknownSegmentCount,
+        openTransitionCount: build.stats.openTransitionCount,
+        completedTransitionCount: build.stats.completedTransitionCount,
+        warnings: build.warnings,
       },
       this.now,
     );
@@ -154,27 +160,38 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       engineVersion: MPF_ENGINE_VERSION,
       configVersion: MPF_CONFIG_VERSION,
       generatedAt: ctx.startedAt,
-      transitions: [],
+      transitions: build.transitions,
+      // Metrics + health are deferred to later Phase 3 tasks (kept empty / unknown).
       metricsByTransition: {},
       healthByTransition: {},
       bottlenecks: [],
       constraintPropagations: [],
-      dataQualityFlags: input.events.length === 0 ? ["insufficient_event_density"] : [],
+      dataQualityFlags,
       observability: summary,
     };
 
     return { projection, transitionSummaries: [], observability: summary };
   }
 
-  // ── Algorithmic methods — not implemented in Task 1 (never faked) ───────────
+  // ── Transition + segment building (Task 3) ──────────────────────────────────
 
-  buildTransitionModel(_input: MilestoneFlowInputContract): MilestoneTransition[] {
-    throw new MpfUnsupportedOperationError("buildTransitionModel");
+  buildTransitionModel(input: MilestoneFlowInputContract): MilestoneTransition[] {
+    validateInputContract(input);
+    return buildMilestoneTransitions({
+      scope: input.scope,
+      milestones: input.milestones,
+      events: input.events,
+      config: input.config,
+    }).transitions;
   }
 
-  buildFlowSegments(_transition: MilestoneTransition, _events: MilestoneFlowEventRef[]): MilestoneFlowSegment[] {
-    throw new MpfUnsupportedOperationError("buildFlowSegments");
+  buildFlowSegments(transition: MilestoneTransition, events: MilestoneFlowEventRef[]): MilestoneFlowSegment[] {
+    return buildFlowSegmentsForTransition(transition.transitionId, events, {
+      closesAt: transition.completedAt,
+    });
   }
+
+  // ── Algorithmic methods — not implemented yet (never faked) ─────────────────
 
   calculateFlowMetrics(_transition: MilestoneTransition): MilestoneFlowMetrics {
     throw new MpfUnsupportedOperationError("calculateFlowMetrics");

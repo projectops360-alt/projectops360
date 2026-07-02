@@ -58,6 +58,11 @@ export interface RunTallies {
   segmentCount: number;
   bottleneckCount: number;
   healthAssessmentCount: number;
+  /** Builder-stage counts (Task 3) — optional; default 0. */
+  unassignedEventCount?: number;
+  unknownSegmentCount?: number;
+  openTransitionCount?: number;
+  completedTransitionCount?: number;
   warnings?: MilestoneFlowEngineWarning[];
   errors?: MilestoneFlowEngineError[];
 }
@@ -90,6 +95,10 @@ export function closeRunSummary(
     segmentCount: tallies.segmentCount,
     bottleneckCount: tallies.bottleneckCount,
     healthAssessmentCount: tallies.healthAssessmentCount,
+    unassignedEventCount: tallies.unassignedEventCount ?? 0,
+    unknownSegmentCount: tallies.unknownSegmentCount ?? 0,
+    openTransitionCount: tallies.openTransitionCount ?? 0,
+    completedTransitionCount: tallies.completedTransitionCount ?? 0,
     warningCount: warnings.length,
     errorCount: errors.length,
     startedAt: ctx.startedAt,

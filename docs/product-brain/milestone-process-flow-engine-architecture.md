@@ -71,3 +71,19 @@ inferences. Coverage is enforced by `validateMilestoneFlowEventSemanticsMap()`
 [milestone-process-flow-event-semantics.md](./milestone-process-flow-event-semantics.md).
 The Transition & Flow Segment Builder (Task 3) consumes it and must not re-derive
 event meanings.
+
+## Milestone Transition & Flow Segment Builder (Task 3 — added)
+
+`transition-builder-types.ts`, `flow-segment-builder.ts`, and
+`transition-builder.ts` build the first executable MPF **structure**: milestone
+transition corridors (deterministic consecutive pairs from ordered milestones),
+explicit event→corridor assignment (with unassigned reporting), and ordered flow
+segments derived from Task 2 semantics — with evidence refs, provenance-preserving
+confidence, and a **preliminary structural state** (`pending/active/completed/
+regressed/unknown`, not final health). The engine's `buildTransitionModel` /
+`buildFlowSegments` now delegate here, and `buildMilestoneFlowProjection` populates
+`transitions` + observability counts. Metrics and final health stay deferred.
+Additive-only type extensions: `MilestoneFlowEventRef.milestoneId?` and four builder
+counts on the run summary. Test id **PEG-MPF-TRANSITION-SEGMENT-BUILDER**. Full
+detail: [milestone-process-flow-transition-builder.md](./milestone-process-flow-transition-builder.md).
+The **Metrics Calculator** (next task) consumes segment `startedAt`/`endedAt`/`type`.
