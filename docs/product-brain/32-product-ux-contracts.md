@@ -127,7 +127,13 @@ by `src/lib/rhythm/__tests__/closeout-workflow.test.ts`.
 
 ## UX-014 — Internal AI Prompt Metadata Must Not Be User-Facing
 
-**Status:** APPROVED · **Guards:** [PD-013](30-product-decision-log.md#pd-013).
+**Status:** APPROVED (amended 2026-07-01) · **Guards:** [PD-013](30-product-decision-log.md#pd-013).
+
+**Scoped exception (PD-013 amended):** for AI-oriented project types (`software_development`,
+`ai_native_execution`) the fields ARE exposed as an explicit **"AI Execution"** section (AI execution
+trail: prompt used, prompt context, AI tool/model). For every other project type they stay hidden and
+values are preserved on save. The forbidden generic labels are still never used; the section uses clear
+labels. The guard test asserts the fields are **gated** by project type (not simply absent).
 
 **Principle:** if a field looks like an AI chat prompt, users will expect an AI answer. The task's
 `prompt_body` / `prompt_context` / `ai_tool_target` are **internal AI-implementation metadata** (the

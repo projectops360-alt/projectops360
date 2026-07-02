@@ -304,6 +304,8 @@ export async function getTaskFormOptionsAction(input: {
   tasks?: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials?: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies?: { predecessor_id: string; successor_id: string; dependency_type: string }[];
+  /** Project type — drives the scoped "AI Execution" section (UX-014 exception). */
+  projectType?: string;
 }> {
   let org;
   try {
@@ -367,6 +369,15 @@ export async function getTaskFormOptionsAction(input: {
     .filter((m) => m.assignable && m.name)
     .map(({ id, name, role }) => ({ id, name, role }));
 
+  // Project type gates the scoped "AI Execution" section (UX-014 exception for
+  // software_development / ai_native_execution). Cheap single-column read.
+  const { data: projectRow } = await supabase
+    .from("projects")
+    .select("project_type")
+    .eq("id", input.projectId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+
   return {
     people: (peopleRes.data ?? []).map((p) => ({
       id: p.id,
@@ -377,6 +388,7 @@ export async function getTaskFormOptionsAction(input: {
     tasks: tasksRes.data ?? [],
     materials: materialsRes.data ?? [],
     dependencies: depsRes.data ?? [],
+    projectType: (projectRow as { project_type?: string } | null)?.project_type ?? "general",
   };
 }
 

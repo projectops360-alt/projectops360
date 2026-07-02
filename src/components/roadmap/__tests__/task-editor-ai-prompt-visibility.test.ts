@@ -3,10 +3,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // ============================================================================
-// UX-014 / PD-013 — the task editor must NOT expose internal AI prompt metadata.
-// These are source-level guards: they fail if the "Prompt de IA / AI Prompt"
-// field (or its inputs) reappears in the normal task editor, or if the data
-// preservation (preserve-on-absent) is removed from the update action.
+// UX-014 / PD-013 (amended) — the task editor exposes internal AI prompt
+// metadata ONLY through a scoped "AI Execution" section, shown for AI-oriented
+// project types (software_development / ai_native_execution). For every other
+// project type the fields stay hidden and stored values are preserved on save.
+// These are source-level guards: they fail if the fields become ungated again,
+// if the generic "Prompt de IA / AI Prompt" labels reappear, or if the
+// preserve-on-absent write is removed from the update action.
 // ============================================================================
 
 const root = process.cwd();
@@ -19,24 +22,30 @@ const actionSrc = readFileSync(
   "utf8",
 );
 
-describe("UX-014 — task editor does not render internal AI prompt fields", () => {
-  it("renders no prompt_body / prompt_context / ai_tool_target inputs", () => {
-    expect(formSrc).not.toContain('name="prompt_body"');
-    expect(formSrc).not.toContain('name="prompt_context"');
-    expect(formSrc).not.toContain('name="ai_tool_target"');
+describe("UX-014 (amended) — AI Execution fields are gated to AI project types", () => {
+  it("only renders the prompt fields inside the scoped AI-project-type gate", () => {
+    // The fields exist (the scoped exception) …
+    expect(formSrc).toContain('name="prompt_body"');
+    expect(formSrc).toContain('name="prompt_context"');
+    expect(formSrc).toContain('name="ai_tool_target"');
+    // … but only behind the project-type flag.
+    expect(formSrc).toContain("AI_EXECUTION_PROJECT_TYPES");
+    expect(formSrc).toContain("ai_native_execution");
+    expect(formSrc).toContain("software_development");
+    expect(formSrc).toContain("const showAiExecution =");
+    expect(formSrc).toContain("{showAiExecution && (");
   });
 
-  it("renders none of the AI-prompt labels", () => {
+  it("does not reuse the generic AI-prompt label keys", () => {
     expect(formSrc).not.toContain("t.fields.promptSection");
     expect(formSrc).not.toContain("t.fields.promptBody");
     expect(formSrc).not.toContain("t.fields.promptContext");
     expect(formSrc).not.toContain("t.fields.aiToolTarget");
   });
 
-  it("does not send prompt metadata from the form to the task actions", () => {
-    expect(formSrc).not.toContain("prompt_body: promptBody");
-    expect(formSrc).not.toContain("prompt_context: promptContext");
-    expect(formSrc).not.toContain("ai_tool_target: aiToolTarget");
+  it("collects the prompt fields conditionally (preserve-on-absent for other types)", () => {
+    expect(formSrc).toContain("const aiExec = showAiExecution");
+    expect(formSrc).toContain("...(aiExec ?? {})");
   });
 });
 

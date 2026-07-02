@@ -268,6 +268,15 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Decision:** The **"AI Prompt / Prompt de IA"** field (`prompt_body`, plus `prompt_context` and
   `ai_tool_target`) must **not** be visible in the normal task editor. It is internal AI-implementation
   metadata, not a user-facing AI interaction.
+- **Amendment (2026-07-01) — scoped exception:** for **AI-oriented project types**
+  (`software_development`, `ai_native_execution`) these fields **are** exposed as an explicit
+  **"AI Execution"** section in the task editor (the AI execution trail: prompt used, prompt context,
+  AI tool/model). Rationale: for AI-native/software projects this is a legitimate, expected feature —
+  the original concern was a *generic* prompt field on *every* task, not an opt-in AI-execution record
+  for AI projects. For all other project types the fields stay hidden and values are preserved on save
+  (preserve-on-absent). The forbidden generic labels are still never used; the section uses clear
+  labels ("AI Execution", "Prompt used", "AI tool / model"). Guard updated:
+  `task-editor-ai-prompt-visibility.test.ts` now asserts the fields are **gated** by project type.
 - **Reason:** users expect a prompt field to **produce an AI response**. An external reviewer tested
   ProjectOps360°, saw "Prompt de IA" in the task edit modal, and reasonably interpreted it as an
   interactive AI input. A static field that only stores internal implementation instructions is
