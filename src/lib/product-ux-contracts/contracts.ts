@@ -135,13 +135,14 @@ export const UX_014_TASK_EDITOR_AI_PROMPT: ProductUxContract = {
   title: "Internal AI Prompt Metadata Must Not Be User-Facing",
   status: "APPROVED",
   rules: [
-    "Static AI prompt fields (prompt_body, prompt_context, ai_tool_target) must not appear in the normal task editor.",
+    "By default, static AI prompt fields (prompt_body, prompt_context, ai_tool_target) must not appear in the normal task editor.",
+    "SCOPED EXCEPTION (PD-013 amended): for AI-oriented project types (software_development, ai_native_execution) these fields ARE exposed as an explicit 'AI Execution' section — the AI execution trail is a legitimate feature for those projects. For every other project type they remain hidden.",
     "User-facing AI actions must be explicit actions routed through Isabella (e.g. 'Ask Isabella about this task').",
-    "Internal AI metadata must be hidden or permission-protected — never exposed by frontend-only logic.",
-    "Existing stored prompt metadata must not be destroyed by a normal task save (preserve-on-absent).",
-    "Forbidden user-facing labels: AI Prompt, Prompt de IA, Developer Prompt, Implementation Prompt, System Prompt, Hidden AI Instructions.",
+    "Internal AI metadata must be hidden or permission-protected — never exposed by frontend-only logic for non-AI project types.",
+    "Existing stored prompt metadata must not be destroyed by a normal task save (preserve-on-absent) — including when the scoped section is hidden.",
+    "Forbidden user-facing labels remain: AI Prompt, Prompt de IA, Developer Prompt, Implementation Prompt, System Prompt, Hidden AI Instructions. The scoped section uses clear labels ('AI Execution', 'Prompt used', 'AI tool / model'), never these.",
     "Allowed notes labels remain: Implementation Notes, Testing Notes, Acceptance Criteria, Tracking & Notes.",
-    "Future task editor redesigns must preserve this rule.",
+    "Future task editor redesigns must preserve this rule (default-hidden; scoped-visible for AI project types).",
   ],
 };
 

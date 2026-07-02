@@ -172,9 +172,15 @@ interface TaskFormOptions {
   tasks: { id: string; title: string; milestone_id: string | null; start_date: string | null; end_date: string | null; order_index: number }[];
   materials: { id: string; name: string; status: string; required_by_task_id: string | null }[];
   dependencies: { predecessor_id: string; successor_id: string; dependency_type: string }[];
+  projectType: string;
 }
 
 const ADD_PERSON_VALUE = "__add_person__";
+
+// UX-014 scoped exception (PD-013 amended): the AI Execution section (prompt
+// used, prompt context, AI tool/model) is shown ONLY for AI-oriented project
+// types. For every other type it stays hidden and values are preserved on save.
+const AI_EXECUTION_PROJECT_TYPES = new Set(["software_development", "ai_native_execution"]);
 
 interface TaskFormDialogProps {
   mode: TaskFormMode;
@@ -288,6 +294,10 @@ export function TaskFormDialog({
   const [selectedPredecessors, setSelectedPredecessors] = useState<Set<string>>(new Set());
   const [materialDraft, setMaterialDraft] = useState("");
 
+  // UX-014 scoped exception (PD-013 amended): the AI Execution section is shown
+  // and collected ONLY for AI-oriented project types (software / ai-native).
+  const showAiExecution = AI_EXECUTION_PROJECT_TYPES.has(options?.projectType ?? "");
+
   // Assignee: 'team:<id>' | 'user:<id>' | 'resource:<id>' | '' — controlled so
   // the quick-add flow can select the freshly created resource. Project team
   // members take precedence (the real Team & Roles link).
@@ -316,6 +326,7 @@ export function TaskFormDialog({
         tasks: res.tasks ?? [],
         materials: res.materials ?? [],
         dependencies: res.dependencies ?? [],
+        projectType: res.projectType ?? "general",
       });
       // Seed the predecessor selection from existing dependencies (edit mode).
       // Done here in the async callback rather than a separate effect.
@@ -399,9 +410,16 @@ export function TaskFormDialog({
     const estimateHours = formData.get("estimate_hours") as string;
     const acceptanceCriteria = (formData.get("acceptance_criteria") as string)?.trim();
     const dependencyNotes = (formData.get("dependency_notes") as string)?.trim();
-    // UX-014 — prompt_body / prompt_context / ai_tool_target are no longer in the
-    // form. We intentionally do NOT read or send them, so the server preserves any
-    // existing stored values (preserve-on-absent) instead of wiping them.
+    // UX-014 scoped exception (PD-013 amended): send the AI Execution fields ONLY
+    // for AI-oriented project types. For every other type we do NOT read/send them,
+    // so the server preserves existing stored values (preserve-on-absent).
+    const aiExec = showAiExecution
+      ? {
+          prompt_body: (formData.get("prompt_body") as string)?.trim() ?? "",
+          prompt_context: (formData.get("prompt_context") as string)?.trim() ?? "",
+          ai_tool_target: (formData.get("ai_tool_target") as string)?.trim() ?? "",
+        }
+      : null;
     const implementationNotes = (formData.get("implementation_notes") as string)?.trim();
     const testNotes = (formData.get("test_notes") as string)?.trim();
     const executionNotes = (formData.get("execution_notes") as string)?.trim();
@@ -447,6 +465,7 @@ export function TaskFormDialog({
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
+        ...(aiExec ?? {}),
         projectId,
       });
       if (result.error) {
@@ -476,6 +495,7 @@ export function TaskFormDialog({
         predecessor_ids: predecessorIds,
         material_ids: materialIds,
         new_materials: newMaterials,
+        ...(aiExec ?? {}),
         order_index: 0,
         projectId,
       });
@@ -499,10 +519,13 @@ export function TaskFormDialog({
   // UX-014 — the notes section auto-expands only on real notes data; internal
   // prompt metadata (preserved, hidden) no longer drives this.
   const hasNotesData = isEdit && !!((task as RoadmapTask | undefined)?.implementation_notes || (task as RoadmapTask | undefined)?.test_notes);
+  // UX-014 scoped exception: auto-open the AI Execution section when it has data.
+  const hasAiExecData = isEdit && !!(task?.prompt_body || task?.prompt_context || task?.ai_tool_target);
 
   const [showDetails, setShowDetails] = useState(hasDetailsData);
   const [showTracking, setShowTracking] = useState(hasTrackingData);
   const [showNotes, setShowNotes] = useState(hasNotesData);
+  const [showAiExec, setShowAiExec] = useState(hasAiExecData);
   const [showPlanning, setShowPlanning] = useState(true);
 
   // Count filled fields per section for badges
@@ -1190,6 +1213,68 @@ export function TaskFormDialog({
                 </div>
               </div>
             </FormSection>
+
+            {/* ── Collapsible: AI Execution (UX-014 scoped exception / PD-013 amended) ──
+                Shown ONLY for AI-oriented project types (software_development /
+                ai_native_execution). Captures the AI execution trail: the prompt
+                used, its context and the AI tool/model. For every other project
+                type this section is hidden and stored values are preserved on save
+                (preserve-on-absent). It is a scoped feature, not a generic field
+                exposed on every task. */}
+            {showAiExecution && (
+              <FormSection
+                icon={<Sparkles className="h-4 w-4 text-violet-500" />}
+                label={isEs ? "Ejecución con IA" : "AI Execution"}
+                open={showAiExec}
+                onToggle={() => setShowAiExec(!showAiExec)}
+              >
+                <div className="space-y-1.5">
+                  <label htmlFor="task-prompt-body" className="block text-xs font-medium text-muted-foreground">
+                    {isEs ? "Prompt utilizado" : "Prompt used"}
+                  </label>
+                  <textarea
+                    id="task-prompt-body"
+                    name="prompt_body"
+                    rows={4}
+                    maxLength={10000}
+                    defaultValue={isEdit ? task?.prompt_body ?? "" : ""}
+                    className={textareaClass}
+                    placeholder={isEs ? "El prompt exacto usado para ejecutar la tarea…" : "The exact prompt used to execute the task…"}
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="task-prompt-context" className="block text-xs font-medium text-muted-foreground">
+                    {isEs ? "Contexto del prompt" : "Prompt context"}
+                  </label>
+                  <textarea
+                    id="task-prompt-context"
+                    name="prompt_context"
+                    rows={2}
+                    maxLength={2000}
+                    defaultValue={isEdit ? task?.prompt_context ?? "" : ""}
+                    className={textareaClass}
+                    placeholder={isEs ? "Contexto o instrucciones adicionales…" : "Additional context or instructions…"}
+                    disabled={isPending}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="task-ai-tool" className="block text-xs font-medium text-muted-foreground">
+                    {isEs ? "Herramienta / modelo de IA" : "AI tool / model"}
+                  </label>
+                  <input
+                    id="task-ai-tool"
+                    name="ai_tool_target"
+                    type="text"
+                    maxLength={100}
+                    defaultValue={isEdit ? task?.ai_tool_target ?? "" : ""}
+                    className={inputClass}
+                    placeholder={isEs ? "ej. Claude Opus, Cursor, GPT…" : "e.g. Claude Opus, Cursor, GPT…"}
+                    disabled={isPending}
+                  />
+                </div>
+              </FormSection>
+            )}
           </div>
 
           {/* Actions — fixed footer */}
