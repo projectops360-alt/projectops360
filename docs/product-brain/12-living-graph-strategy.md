@@ -168,6 +168,15 @@ visits.
   `project_graph_layouts` Supabase table is the documented upgrade path for shared/team layouts
   (PM/PMO/Admin). See [PD-008](30-product-decision-log.md).
 
+## 11d. Canonical task census — different views, same truth ([REG-018](10-regression-log.md) / CAP-001)
+The Living Graph is a **projection**, never an owner. Milestone task counts (`tasksDone/tasksTotal`)
+and the UX-008 edge tooltip **MUST** derive from the canonical owner (`roadmap_tasks`) via the shared
+resolver `lib/roadmap/milestone-task-census.ts` (`computeMilestoneTaskCensus`) — **never** from
+`process_nodes`. `process_nodes` only materializes tasks that transitioned (backfill skips
+`not_started`), so counting them silently drops tasks and made the graph disagree with the Workboard
+(CAP-001). `process_nodes` supplies **relationships/edges**, not the task census. Any projection of a
+milestone's tasks must consume the same resolver, so every view agrees by construction.
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration
