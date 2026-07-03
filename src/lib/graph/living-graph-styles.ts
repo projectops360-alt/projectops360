@@ -28,6 +28,7 @@ import {
   FileBadge,
   Route,
   UploadCloud,
+  ListTree,
 } from "lucide-react";
 import type {
   ProcessNodeType,
@@ -67,6 +68,8 @@ export const NODE_TYPE_STYLES: Record<ProcessNodeType, NodeTypeStyle> = {
   permit_event: { icon: FileBadge, accent: "#7c3aed", soft: "rgba(124,58,237,0.14)" },
   critical_path_event: { icon: Route, accent: "#f43f5e", soft: "rgba(244,63,94,0.14)" },
   import_event: { icon: UploadCloud, accent: "#2563eb", soft: "rgba(37,99,235,0.14)" },
+  // Task Execution Map — synthetic subtask node (client-side hierarchy layer)
+  subtask_item: { icon: ListTree, accent: "#7c3aed", soft: "rgba(124,58,237,0.14)" },
 };
 
 // ── Edge styles ────────────────────────────────────────────────────────────────
@@ -114,6 +117,9 @@ export const EDGE_TYPE_STYLES: Record<ProcessEdgeType, EdgeTypeStyle> = {
   supplied_by: { stroke: "#94a3b8", strokeWidth: 1.4, dashArray: "2 4", animated: false, curved: false },
   contains: { stroke: "#64748b", strokeWidth: 1.4, animated: false, curved: false },
   imported_from: { stroke: "#2563eb", strokeWidth: 1.4, dashArray: "3 4", animated: false, curved: false },
+  // Task Execution Map — parent→subtask HIERARCHY edge: solid violet, clearly
+  // distinct from dependency-like edges (gray solid) and dashed signal edges.
+  subtask_of: { stroke: "#7c3aed", strokeWidth: 2.2, animated: false, curved: true },
 };
 
 // ── Shared semantic colors ─────────────────────────────────────────────────────

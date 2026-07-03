@@ -12,7 +12,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
-import { Lock, Link2, ShieldAlert, FileQuestion, CheckCircle2, HardHat } from "lucide-react";
+import { Lock, Link2, ShieldAlert, FileQuestion, CheckCircle2, HardHat, ChevronRight, ChevronDown, ListTree } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NODE_TYPE_STYLES,
@@ -35,6 +35,16 @@ function LivingGraphNodeComponent({
   const { node, metrics, emphasis, playback } = data;
   const style = NODE_TYPE_STYLES[node.nodeType];
   const Icon = style.icon;
+
+  // ── Subtask visibility affordance (NotebookLM-style progressive expansion) ──
+  const subtaskTotal =
+    typeof node.metadata.subtask_total === "number" ? node.metadata.subtask_total : 0;
+  const subtaskCompleted =
+    typeof node.metadata.subtask_completed === "number" ? node.metadata.subtask_completed : 0;
+  const subtaskBlocked =
+    typeof node.metadata.subtask_blocked === "number" ? node.metadata.subtask_blocked : 0;
+  const subtaskExpanded = node.metadata.subtask_expanded === true;
+  const hasSubtasks = subtaskTotal > 0 && typeof data.onToggleSubtasks === "function";
 
   const isDimmed =
     (emphasis === "dimmed" && playback === "none") || playback === "future";
@@ -119,6 +129,39 @@ function LivingGraphNodeComponent({
             {data.clusterSize}
           </span>
         </div>
+
+        {/* Subtask indicator — visible affordance for tasks WITH subtasks.
+            Clicking toggles progressive expansion (root-first; nothing is
+            dumped by default). Presentation-only; never mutates task data. */}
+        {hasSubtasks && (
+          <button
+            type="button"
+            className="mt-1 flex w-full items-center gap-1 rounded border border-violet-500/40 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-medium text-violet-700 transition-colors hover:bg-violet-500/20 dark:text-violet-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onToggleSubtasks?.(node.sourceEntityId);
+            }}
+            aria-expanded={subtaskExpanded}
+            aria-label={t("subtasks.toggle", { count: subtaskTotal })}
+            title={t("subtasks.toggle", { count: subtaskTotal })}
+            data-testid="graph-subtask-indicator"
+          >
+            {subtaskExpanded ? (
+              <ChevronDown className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            ) : (
+              <ChevronRight className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            )}
+            <ListTree className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            <span className="tabular-nums">
+              {subtaskCompleted}/{subtaskTotal}
+            </span>
+            {subtaskBlocked > 0 && (
+              <span className="ml-auto tabular-nums text-red-600 dark:text-red-400" title={t("subtasks.blocked")}>
+                ⛔ {subtaskBlocked}
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Row 2: status / duration / indicators */}
         <div className="mt-1 flex items-center gap-1.5 text-[9px] text-muted-foreground">

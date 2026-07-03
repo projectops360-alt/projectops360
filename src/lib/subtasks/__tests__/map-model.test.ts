@@ -69,6 +69,44 @@ function build(subtasks: Subtask[], extra: Partial<Parameters<typeof buildExecut
   return buildExecutionMapModel({ parent: PARENT, subtasks, asOf: ASOF, ...extra });
 }
 
+describe("Subtask Map — NotebookLM root-first behavior", () => {
+  it("rootExpanded=false shows ONLY the parent/root node (nothing dumped)", () => {
+    const model = build([subtask(), subtask(), subtask({ status: "blocked", blocked_reason: "x" })], {
+      rootExpanded: false,
+    });
+    expect(model.nodes.filter((n) => n.kind === "parent")).toHaveLength(1);
+    expect(model.nodes.filter((n) => n.kind === "subtask")).toHaveLength(0);
+    expect(model.nodes.filter((n) => n.kind === "blocker")).toHaveLength(0);
+    expect(model.edges).toHaveLength(0);
+    // The root carries the affordance: has children + collapsed state + count.
+    const root = model.nodes.find((n) => n.kind === "parent")!;
+    expect(root.data.hasChildren).toBe(true);
+    expect(root.data.rootExpanded).toBe(false);
+    expect(root.data.activeCount).toBe(3);
+    // All subtasks reported hidden (honest).
+    expect(model.hiddenSubtaskIds).toHaveLength(3);
+  });
+
+  it("rootExpanded=true reveals the subtask branches (progressive expansion)", () => {
+    const rows = [subtask(), subtask()];
+    const collapsed = build(rows, { rootExpanded: false });
+    const expanded = build(rows, { rootExpanded: true });
+    expect(collapsed.nodes.filter((n) => n.kind === "subtask")).toHaveLength(0);
+    expect(expanded.nodes.filter((n) => n.kind === "subtask")).toHaveLength(2);
+    expect(expanded.nodes.find((n) => n.kind === "parent")!.data.rootExpanded).toBe(true);
+  });
+
+  it("a root with no subtasks reports hasChildren=false", () => {
+    const model = build([], { rootExpanded: false });
+    expect(model.nodes.find((n) => n.kind === "parent")!.data.hasChildren).toBe(false);
+  });
+
+  it("defaults to expanded (back-compat) when rootExpanded is omitted", () => {
+    const model = build([subtask(), subtask()]);
+    expect(model.nodes.filter((n) => n.kind === "subtask")).toHaveLength(2);
+  });
+});
+
 describe("map structure", () => {
   it("renders the parent task as the central node with calculated progress + counters", () => {
     const model = build([

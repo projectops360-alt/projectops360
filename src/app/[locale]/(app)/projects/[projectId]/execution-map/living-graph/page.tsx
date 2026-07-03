@@ -319,6 +319,41 @@ export default async function LivingGraphPage({
   const fullTasks = (tasksResult.data ?? []) as RoadmapTask[];
   const fullMilestones = (milestonesResult.data ?? []) as Milestone[];
 
+  // ── Subtask visibility layer (Task Execution Map) ───────────────────────────
+  // Fetch project subtasks for the NotebookLM-style progressive expansion.
+  // RBAC is already enforced above (org-scoped project ownership check + RLS on
+  // task_subtasks). The table may not exist before its migration — treat errors
+  // as no subtasks (the graph simply shows no expansion affordances). Never
+  // written; presentation-only. Deleted rows filtered out client-side too.
+  const subtasksResult = await supabase
+    .from("task_subtasks")
+    .select("id, task_id, title, status, priority, progress, owner_id, due_date, is_critical, blocked_reason, sort_order, created_at, deleted_at")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true });
+  const subtasks = (subtasksResult.data ?? []) as {
+    id: string; task_id: string; title: string; status: string; priority: string;
+    progress: number; owner_id: string | null; due_date: string | null;
+    is_critical: boolean; blocked_reason: string | null; sort_order: number;
+    created_at: string; deleted_at: string | null;
+  }[];
+
+  // Resolve subtask owner display names (read-only team context for the
+  // inspector). Uses the admin client only to read names — access is already
+  // gated by the project-ownership check above (same pattern as the Workboard).
+  const subtaskOwnerIds = [...new Set(subtasks.map((s) => s.owner_id).filter((x): x is string => !!x))];
+  const subtaskOwnerNames: Record<string, string> = {};
+  if (subtaskOwnerIds.length > 0) {
+    const { data: ownerProfiles } = await createAdminClient()
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", subtaskOwnerIds);
+    for (const p of (ownerProfiles ?? []) as { id: string; display_name: string | null }[]) {
+      if (p.display_name) subtaskOwnerNames[p.id] = p.display_name;
+    }
+  }
+
   const taskMap = new Map<string, TaskEnrichment>(
     fullTasks.map((task) => [task.id, task]),
   );
@@ -481,6 +516,8 @@ export default async function LivingGraphPage({
         varianceResult={varianceResult}
         varianceCauses={varianceCauses}
         resourceCapacity={resourceCapacity}
+        subtasks={subtasks}
+        subtaskOwnerNames={subtaskOwnerNames}
       />
     </div>
   );

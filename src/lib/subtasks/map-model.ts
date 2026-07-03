@@ -164,6 +164,10 @@ export interface BuildExecutionMapArgs {
   /** Group keys the user expanded (when auto-grouped). */
   expandedGroups?: readonly string[];
   sprintOf?: (s: Subtask) => string | null;
+  /** NotebookLM root-first: when false the map shows ONLY the parent/root node
+   *  (with its subtask-count affordance) and no child branches. Defaults true
+   *  for back-compat. The Subtask Map opens with this false. */
+  rootExpanded?: boolean;
   asOf: Date;
 }
 
@@ -178,6 +182,7 @@ export function buildExecutionMapModel(args: BuildExecutionMapArgs): ExecutionMa
     layout = "radial",
     autoGroupThreshold = 24,
     expandedGroups = [],
+    rootExpanded = true,
     asOf,
   } = args;
 
@@ -212,8 +217,17 @@ export function buildExecutionMapModel(args: BuildExecutionMapArgs): ExecutionMa
       actualHours: parent.actualHours ?? signals.actualHours,
       varianceHours: signals.varianceHours,
       criticalAtRisk: signals.criticalAtRisk,
+      // Root-first affordance: how many subtasks are hidden behind the root.
+      rootExpanded,
+      hasChildren: subtasks.length > 0,
     },
   });
+
+  // NotebookLM root-first: the map opens showing ONLY the root node. Its child
+  // branches (subtasks, blockers, dependencies) are revealed on explicit expand.
+  if (!rootExpanded) {
+    return { nodes, edges, signals, hiddenSubtaskIds: subtasks.map((s) => s.id) };
+  }
 
   // ── Auto-grouping for large maps (performance + clutter control) ──
   const effectiveGrouping: ExecutionMapGrouping =

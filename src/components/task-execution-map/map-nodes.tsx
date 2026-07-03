@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   CircleDashed,
   Clock,
   Eye,
@@ -121,6 +123,8 @@ export function ParentTaskNode({ data }: NodeProps<ParentNodeType>) {
     actualHours: number | null;
     varianceHours: number | null;
     criticalAtRisk: boolean;
+    rootExpanded?: boolean;
+    hasChildren?: boolean;
   };
   return (
     <div
@@ -188,6 +192,26 @@ export function ParentTaskNode({ data }: NodeProps<ParentNodeType>) {
           </dd>
         </div>
       </dl>
+      {/* Root-first affordance (NotebookLM): when collapsed, invite the user to
+          reveal subtasks. Clicking the node toggles expansion in the client. */}
+      {d.hasChildren && (
+        <div
+          className="mt-2 flex items-center justify-center gap-1 rounded-md border border-primary/30 bg-primary/5 py-1 text-[10px] font-medium text-primary"
+          data-testid="tem-root-expand-hint"
+        >
+          {d.rootExpanded ? (
+            <>
+              <ChevronDown className="h-3 w-3" aria-hidden />
+              {t("node.collapseSubtasks")}
+            </>
+          ) : (
+            <>
+              <ChevronRight className="h-3 w-3" aria-hidden />
+              {t("node.expandSubtasks", { count: d.activeCount })}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

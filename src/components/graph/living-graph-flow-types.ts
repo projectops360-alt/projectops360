@@ -31,6 +31,9 @@ export type LivingNodeData = {
   isDropTarget: boolean;
   /** Cluster nodes aggregate several process events of one source entity. */
   clusterSize: number;
+  /** Toggle progressive subtask expansion for a task node (NotebookLM-style).
+   *  Present only for task nodes that have subtasks; undefined otherwise. */
+  onToggleSubtasks?: (taskId: string) => void;
 };
 
 export type LivingFlowNode = Node<LivingNodeData, "living" | "milestoneCard">;

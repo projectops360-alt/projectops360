@@ -50,6 +50,9 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
   const [selection, setSelection] = useState<PanelSelection | null>(null);
   const [editing, setEditing] = useState<Subtask | null>(null);
   const [creating, setCreating] = useState(false);
+  // NotebookLM root-first: the Subtask Map opens showing ONLY the root task;
+  // the user clicks the root to reveal its subtasks (progressive expansion).
+  const [rootExpanded, setRootExpanded] = useState(false);
 
   const asOf = useMemo(() => new Date(), []);
 
@@ -64,9 +67,10 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
         grouping,
         layout,
         expandedGroups,
+        rootExpanded,
         asOf,
       }),
-    [props.parent, props.subtasks, props.dependencies, props.ownerNames, filters, grouping, layout, expandedGroups, asOf],
+    [props.parent, props.subtasks, props.dependencies, props.ownerNames, filters, grouping, layout, expandedGroups, rootExpanded, asOf],
   );
 
   const selectedNodeId =
@@ -79,8 +83,11 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
           : null;
 
   const handleNodeClick = (nodeId: string, kind: string) => {
-    if (kind === "parentTask") setSelection({ kind: "parent" });
-    else if (kind === "subtask") setSelection({ kind: "subtask", subtaskId: nodeId.replace("subtask:", "") });
+    if (kind === "parentTask") {
+      // Clicking the root expands its subtasks (NotebookLM); also selects it.
+      if (!rootExpanded && props.subtasks.length > 0) setRootExpanded(true);
+      setSelection({ kind: "parent" });
+    } else if (kind === "subtask") setSelection({ kind: "subtask", subtaskId: nodeId.replace("subtask:", "") });
     else if (kind === "blocker") setSelection({ kind: "blocker", subtaskId: nodeId.replace("blocker:", "") });
     else if (kind === "group") {
       const key = nodeId.replace("group:", "");
@@ -90,7 +97,7 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
 
   const toggleFilter = (patch: Partial<ExecutionMapFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
-  const fitKey = `${layout}|${grouping}|${JSON.stringify(filters)}|${expandedGroups.join(",")}|${view}`;
+  const fitKey = `${layout}|${grouping}|${JSON.stringify(filters)}|${expandedGroups.join(",")}|${view}|${rootExpanded}`;
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="tem-root">
@@ -194,7 +201,34 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
           {t("toolbar.onlyCritical")}
         </label>
 
-        {view === "map" && (
+        {view === "map" && props.subtasks.length > 0 && (
+          <div className="inline-flex overflow-hidden rounded-md border border-border" role="group">
+            <button
+              type="button"
+              data-testid="tem-expand-root"
+              onClick={() => setRootExpanded(true)}
+              disabled={rootExpanded}
+              aria-pressed={rootExpanded}
+              className={`px-2.5 py-1.5 text-xs font-medium ${rootExpanded ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"} disabled:cursor-default`}
+            >
+              {t("toolbar.expandRoot")}
+            </button>
+            <button
+              type="button"
+              data-testid="tem-collapse-root"
+              onClick={() => {
+                setRootExpanded(false);
+                setExpandedGroups([]);
+              }}
+              disabled={!rootExpanded}
+              className={`px-2.5 py-1.5 text-xs font-medium ${!rootExpanded ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"} disabled:cursor-default`}
+            >
+              {t("toolbar.collapseRoot")}
+            </button>
+          </div>
+        )}
+
+        {view === "map" && rootExpanded && (
           <>
             {/* Grouping */}
             <select
