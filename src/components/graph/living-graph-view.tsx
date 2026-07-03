@@ -34,7 +34,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ExecutiveSummaryPanel } from "./executive-summary-panel";
-import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users, ListTree } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -91,6 +91,14 @@ import {
   mapWorkforceResourceNodes,
   mapWorkforceAssignmentEdges,
 } from "@/lib/graph/workforce-graph-mapping";
+import {
+  appendSubtaskGraphLayer,
+  groupSubtasksByTask,
+  toggleSubtaskExpansion,
+  expandAllSubtaskParents,
+  collapseAllSubtaskParents,
+  type SubtaskLayerRow,
+} from "@/lib/graph/subtask-graph-layer";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
@@ -168,11 +176,16 @@ export interface LivingGraphViewProps {
   varianceCauses?: import("@/lib/labor/variance-cause-classification").VarianceCauseResult[];
   /** Generic resource capacity result (optional — enables the workforceCapacity overlay). */
   resourceCapacity?: ResourceCapacityResult;
+  /** Task subtasks (already org/project-scoped + RBAC-validated server-side).
+   *  Enables NotebookLM-style progressive subtask expansion. Presentation-only. */
+  subtasks?: SubtaskLayerRow[];
+  /** Subtask owner id → display name (read-only team context for the inspector). */
+  subtaskOwnerNames?: Record<string, string>;
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -240,6 +253,8 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             varianceResult={varianceResult}
             varianceCauses={varianceCauses}
             resourceCapacity={resourceCapacity}
+            subtasks={subtasks}
+            subtaskOwnerNames={subtaskOwnerNames}
           />
         </ReactFlowProvider>
       </div>
@@ -249,7 +264,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -340,6 +355,23 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // Prune the temporal-proximity edge mesh for readability (toggleable)
   const [simplifyEdges, setSimplifyEdges] = useState(true);
+
+  // ── Subtask visibility (NotebookLM-style progressive expansion) ──────────────
+  // Session/client state only — presentation, never canonical. Empty by default
+  // so NOTHING is dumped on first load: the user clicks a task to reveal its
+  // subtasks. Referencing task ids in local state (not persisted) avoids stale
+  // expansion state (allowed by the requirement).
+  const [expandedSubtaskParents, setExpandedSubtaskParents] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const subtasksByTask = useMemo(
+    () => groupSubtasksByTask(subtasks ?? []),
+    [subtasks],
+  );
+  const taskIdsWithSubtasks = useMemo(
+    () => [...subtasksByTask.keys()],
+    [subtasksByTask],
+  );
 
   // ── Labor-enriched graph (inject risk nodes + edges, enrich existing nodes) ──
   const laborEnrichedData = useMemo(() => {
@@ -547,12 +579,37 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     viewLevel,
   ]);
 
+  // ── Subtask layer (NotebookLM progressive expansion) ────────────────────────
+  // Append synthetic subtask nodes + `subtask_of` hierarchy edges for EXPANDED
+  // task nodes that are currently visible. Nothing is added when no parent is
+  // expanded (clean collapsed default). Applied AFTER filtering so subtasks
+  // inherit their parent's visibility; it never mutates canonical data.
+  const withSubtasks = useMemo(() => {
+    if (subtasksByTask.size === 0) return filtered;
+    return appendSubtaskGraphLayer(filtered, {
+      projectId,
+      subtasksByTask,
+      expandedTaskIds: expandedSubtaskParents,
+      generatedAt: data.generatedAt,
+    });
+  }, [filtered, subtasksByTask, expandedSubtaskParents, projectId, data.generatedAt]);
+
+  const toggleSubtaskParent = useCallback((taskId: string) => {
+    setExpandedSubtaskParents((prev) => toggleSubtaskExpansion(prev, taskId));
+  }, []);
+  const handleExpandAllSubtasks = useCallback(() => {
+    setExpandedSubtaskParents(expandAllSubtaskParents(taskIdsWithSubtasks));
+  }, [taskIdsWithSubtasks]);
+  const handleCollapseAllSubtasks = useCallback(() => {
+    setExpandedSubtaskParents(collapseAllSubtaskParents());
+  }, []);
+
   const layoutPositions = useMemo(
     () =>
       viewLevel === "milestones"
-        ? milestoneFlowLayout(filtered.nodes) // serpentine roadmap, layoutMode ignored
-        : computeLayout(layoutMode, filtered.nodes, filtered.edges),
-    [viewLevel, layoutMode, filtered],
+        ? milestoneFlowLayout(withSubtasks.nodes) // serpentine roadmap, layoutMode ignored
+        : computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges),
+    [viewLevel, layoutMode, withSubtasks],
   );
 
   // User drags win over the computed layout
@@ -573,7 +630,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // context-load on every filter change (refs must not be set during render).
   // Declared before the load effect so the IDs commit first on a context switch.
   useEffect(() => {
-    filteredIdsRef.current = filtered.nodes.map((n) => n.id);
+    filteredIdsRef.current = withSubtasks.nodes.map((n) => n.id);
   });
 
   // Load the saved layout for a context: apply saved coordinates to nodes that
@@ -603,8 +660,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // (TASK 7): some saved nodes are gone, or some visible nodes are new.
   const layoutPartiallyApplied = useMemo(() => {
     if (!savedLayout) return false;
-    return isPartialApply(applySavedPositions(savedLayout, filtered.nodes.map((n) => n.id)));
-  }, [savedLayout, filtered.nodes]);
+    return isPartialApply(applySavedPositions(savedLayout, withSubtasks.nodes.map((n) => n.id)));
+  }, [savedLayout, withSubtasks.nodes]);
 
   // Auto-dismiss the transient save/reset/clear notice.
   useEffect(() => {
@@ -677,7 +734,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 2) return new Set<string>();
     return new Set(
-      filtered.nodes
+      withSubtasks.nodes
         .filter(
           (n) =>
             n.label.toLowerCase().includes(q) ||
@@ -687,7 +744,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         )
         .map((n) => n.id),
     );
-  }, [searchQuery, filtered.nodes]);
+  }, [searchQuery, withSubtasks.nodes]);
 
   // ── Timeline playback ──
   const timelineActive = overlay === "timeline";
@@ -752,8 +809,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const isMilestoneLevel = viewLevel === "milestones";
 
   const rfNodes = useMemo<LivingFlowNode[]>(() => {
-    const total = filtered.nodes.length;
-    return filtered.nodes.map((node, index) => {
+    const total = withSubtasks.nodes.length;
+    return withSubtasks.nodes.map((node, index) => {
       const metrics = analysis.metrics.get(node.id) ?? null;
       const emphasis: OverlayEmphasis = nodeOverlayEmphasis(
         overlay,
@@ -799,11 +856,18 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           isFocusNode: focusIds != null && node.id === selectedNodeId,
           isDropTarget: node.id === dropTargetId,
           clusterSize,
+          // Only task nodes that actually have subtasks get the toggle affordance.
+          onToggleSubtasks:
+            node.sourceEntityType === "roadmap_tasks" &&
+            node.nodeType !== "subtask_item" &&
+            subtasksByTask.has(node.sourceEntityId)
+              ? toggleSubtaskParent
+              : undefined,
         },
       };
     });
   }, [
-    filtered.nodes,
+    withSubtasks.nodes,
     positions,
     analysis,
     overlay,
@@ -820,6 +884,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     isMilestoneLevel,
     milestonePicks,
     dropTargetId,
+    subtasksByTask,
+    toggleSubtaskParent,
   ]);
 
   // Drill-down: show only the picked milestones' activities
@@ -855,7 +921,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [rfNodes]);
 
   const rfEdges = useMemo<LivingFlowEdge[]>(() => {
-    const edges: LivingFlowEdge[] = filtered.edges.map((edge) => {
+    const edges: LivingFlowEdge[] = withSubtasks.edges.map((edge) => {
       const style = EDGE_TYPE_STYLES[edge.edgeType];
       const isCritical =
         analysis.criticalEdgeIds.has(edge.id) && overlay === "criticalPath";
@@ -924,7 +990,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
     return edges;
   }, [
-    filtered.edges,
+    withSubtasks.edges,
     analysis,
     overlay,
     dimmedNodeIds,
@@ -938,8 +1004,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // ── Selection helpers ──
   const selectedNode = useMemo(
-    () => (selectedNodeId ? (analysis.adjacency.nodeById.get(selectedNodeId) ?? null) : null),
-    [selectedNodeId, analysis],
+    () =>
+      selectedNodeId
+        ? (analysis.adjacency.nodeById.get(selectedNodeId) ??
+          // Synthetic subtask nodes live outside the analysis graph.
+          withSubtasks.nodes.find((n) => n.id === selectedNodeId) ??
+          null)
+        : null,
+    [selectedNodeId, analysis, withSubtasks.nodes],
   );
   const selectedEdge = useMemo(
     () =>
@@ -1418,6 +1490,41 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         </div>
       )}
 
+      {/* Subtask visibility controls (NotebookLM-style). Shown only where task
+          nodes exist (activities/events level) and some task has subtasks. The
+          graph starts collapsed; expand-all is an explicit user action. */}
+      {!isMilestoneLevel && taskIdsWithSubtasks.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 px-3 py-1.5 text-xs text-violet-700 dark:text-violet-300"
+          data-testid="graph-subtask-controls"
+        >
+          <span className="inline-flex items-center gap-1 font-medium">
+            <ListTree className="h-3.5 w-3.5" aria-hidden />
+            {t("subtasks.controlLabel", { count: taskIdsWithSubtasks.length })}
+          </span>
+          <span className="text-muted-foreground">
+            {t("subtasks.expandedCount", { count: expandedSubtaskParents.size })}
+          </span>
+          <button
+            type="button"
+            onClick={handleExpandAllSubtasks}
+            className="rounded-md border border-violet-500/40 px-2 py-1 font-medium transition-colors hover:bg-violet-500/10"
+            data-testid="graph-subtask-expand-all"
+          >
+            {t("subtasks.expandAll")}
+          </button>
+          <button
+            type="button"
+            onClick={handleCollapseAllSubtasks}
+            disabled={expandedSubtaskParents.size === 0}
+            className="rounded-md border border-violet-500/40 px-2 py-1 font-medium transition-colors hover:bg-violet-500/10 disabled:opacity-40"
+            data-testid="graph-subtask-collapse-all"
+          >
+            {t("subtasks.collapseAll")}
+          </button>
+        </div>
+      )}
+
       {/* Status hints (hidden in Focus Mode to maximize the canvas) */}
       {!focusMode && isMilestoneLevel && milestonePicks.length === 0 && (
         <p className="text-[11px] text-muted-foreground">{t("drill.hint")}</p>
@@ -1767,6 +1874,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               onFocusNode={handleFocusNode}
               onRunScenario={handleRunScenario}
               onEditEntity={handleEditNode}
+              ownerNames={subtaskOwnerNames}
+              onOpenTeam={() => router.push(localizedHref(locale, `/projects/${projectId}/team`))}
               onClose={() => {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);

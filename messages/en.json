@@ -395,14 +395,14 @@
       "cancel": "Cancel"
     },
     "subtasks": {
-      "executionMap": "Execution Map",
+      "executionMap": "Subtask Map",
       "blocked": "Blocked subtasks",
       "overdue": "Overdue subtasks",
       "done": "Subtasks completed"
     }
   },
   "taskExecutionMap": {
-    "pageTitle": "Task Execution Map",
+    "pageTitle": "Subtask Map",
     "backToWorkboard": "Back to Workboard",
     "empty": "No subtasks yet. Add the first one to start calculating progress.",
     "unassigned": "Unassigned",
@@ -435,7 +435,9 @@
       "critical": "Critical path",
       "overdue": "Overdue",
       "dueDate": "Due date",
-      "weightOrHours": "Weight / estimated hours"
+      "weightOrHours": "Weight / estimated hours",
+      "expandSubtasks": "Click to reveal {count} subtasks",
+      "collapseSubtasks": "Click to collapse subtasks"
     },
     "blocker": {
       "title": "Blocker",
@@ -514,7 +516,9 @@
       "layoutRadial": "Radial",
       "layoutHierarchical": "Hierarchical",
       "layoutLeftRight": "Left to right",
-      "hiddenByFilters": "{count} subtask(s) hidden by active filters."
+      "hiddenByFilters": "{count} subtask(s) hidden by active filters.",
+      "expandRoot": "Expand",
+      "collapseRoot": "Collapse"
     },
     "form": {
       "createTitle": "New subtask",
@@ -1783,7 +1787,8 @@
       "inspection_event": "Inspection",
       "permit_event": "Permit",
       "critical_path_event": "Critical Path",
-      "import_event": "Imported File"
+      "import_event": "Imported File",
+      "subtask_item": "Subtask"
     },
     "edgeTypes": {
       "caused": "Caused",
@@ -1805,7 +1810,8 @@
       "mitigates_risk": "Mitigates risk",
       "supplied_by": "Supplied by",
       "contains": "Contains",
-      "imported_from": "Imported from file"
+      "imported_from": "Imported from file",
+      "subtask_of": "Subtask of"
     },
     "edgeMeanings": {
       "caused": "This activity directly triggered the next one — a causal dependency in the execution flow.",
@@ -1962,6 +1968,20 @@
       "strongestDependency": "Strongest downstream dependency: {label}",
       "riskDelta": "Risk impact",
       "mitigation": "Suggested mitigation: re-sequence parallel work, resolve blockers upstream, or re-baseline the affected milestone dates."
+    },
+    "subtasks": {
+      "toggle": "{count} subtasks — click to expand or collapse",
+      "blocked": "Blocked subtasks",
+      "controlLabel": "{count} task(s) with subtasks",
+      "expandedCount": "{count} expanded",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "owner": "Owner",
+      "unassigned": "Unassigned",
+      "dueDate": "Due date",
+      "priority": "Priority",
+      "blockedReason": "Blocked reason",
+      "viewTeam": "View project team"
     }
   },
   "placeholders": {

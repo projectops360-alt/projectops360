@@ -87,6 +87,10 @@ export interface LivingGraphDetailPanelProps {
   onRunScenario: (nodeId: string, scenario: LivingGraphSimulationScenario) => void;
   onEditEntity: (node: LivingGraphNode) => void;
   onClose: () => void;
+  /** Owner id → display name (team members / assignees). Read-only context. */
+  ownerNames?: Record<string, string>;
+  /** Open the project team member roster from the map context. */
+  onOpenTeam?: () => void;
 }
 
 /** Tasks and milestones can be edited in place via the roadmap dialogs. */
@@ -123,6 +127,8 @@ function LivingGraphDetailPanelComponent({
   onRunScenario,
   onEditEntity,
   onClose,
+  ownerNames,
+  onOpenTeam,
 }: LivingGraphDetailPanelProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale();
@@ -214,6 +220,50 @@ function LivingGraphDetailPanelComponent({
             <Field label={t("detailPanel.progress")}>
               {selectedNode.progress != null ? `${selectedNode.progress}%` : "—"}
             </Field>
+
+            {/* Subtask node inspector — owner (team member), due date, priority,
+                and blocker reason from the read-only subtask layer metadata. */}
+            {selectedNode.nodeType === "subtask_item" && (
+              <>
+                <Field label={t("subtasks.owner")}>
+                  {(() => {
+                    const ownerId = selectedNode.metadata.owner_id;
+                    if (typeof ownerId !== "string" || !ownerId) return t("subtasks.unassigned");
+                    return ownerNames?.[ownerId] ?? t("subtasks.unassigned");
+                  })()}
+                </Field>
+                <Field label={t("subtasks.dueDate")}>
+                  {formatDate(
+                    typeof selectedNode.metadata.due_date === "string"
+                      ? selectedNode.metadata.due_date
+                      : null,
+                  )}
+                </Field>
+                <Field label={t("subtasks.priority")}>
+                  {typeof selectedNode.metadata.priority === "string"
+                    ? selectedNode.metadata.priority.toUpperCase()
+                    : "—"}
+                </Field>
+                {typeof selectedNode.metadata.blocked_reason === "string" &&
+                  selectedNode.metadata.blocked_reason && (
+                    <Field label={t("subtasks.blockedReason")}>
+                      {selectedNode.metadata.blocked_reason}
+                    </Field>
+                  )}
+                {onOpenTeam && (
+                  <button
+                    type="button"
+                    onClick={onOpenTeam}
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                    data-testid="graph-open-team"
+                  >
+                    <ExternalLink className="h-3 w-3" aria-hidden />
+                    {t("subtasks.viewTeam")}
+                  </button>
+                )}
+              </>
+            )}
+
             <Field label={t("detailPanel.occurredAt")}>{formatDate(selectedNode.occurredAt)}</Field>
             <Field label={t("detailPanel.createdAt")}>{formatDate(selectedNode.createdAt)}</Field>
             <Field label={t("detailPanel.updatedAt")}>{formatDate(selectedNode.updatedAt)}</Field>

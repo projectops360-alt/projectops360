@@ -555,7 +555,11 @@ export type ProcessNodeType =
   | "inspection_event"
   | "permit_event"
   | "critical_path_event"
-  | "import_event";
+  | "import_event"
+  // Task Execution Map — SYNTHETIC client-side node for expanded subtasks.
+  // Presentation-only: never written to process_nodes (the layer is derived
+  // from task_subtasks at render time).
+  | "subtask_item";
 
 export type ProcessEdgeType =
   | "caused"
@@ -578,7 +582,10 @@ export type ProcessEdgeType =
   | "mitigates_risk"
   | "supplied_by"
   | "contains"
-  | "imported_from";
+  | "imported_from"
+  // Task Execution Map — SYNTHETIC client-side hierarchy edge (parent task →
+  // subtask). Presentation-only: never written to process_edges.
+  | "subtask_of";
 
 export type ProcessNodeSourceType =
   | "roadmap_tasks"
@@ -601,7 +608,9 @@ export type ProcessNodeSourceType =
   | "inspections"
   | "permits"
   | "critical_path_snapshots"
-  | "project_import_jobs";
+  | "project_import_jobs"
+  // Task Execution Map — SYNTHETIC client-side subtask nodes (never persisted).
+  | "task_subtasks";
 
 export interface ProcessNode {
   id: string;

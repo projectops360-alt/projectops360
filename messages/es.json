@@ -395,14 +395,14 @@
       "cancel": "Cancelar"
     },
     "subtasks": {
-      "executionMap": "Mapa de Ejecución",
+      "executionMap": "Mapa de Subtareas",
       "blocked": "Subtareas bloqueadas",
       "overdue": "Subtareas vencidas",
       "done": "Subtareas completadas"
     }
   },
   "taskExecutionMap": {
-    "pageTitle": "Mapa de Ejecución de la Tarea",
+    "pageTitle": "Mapa de Subtareas",
     "backToWorkboard": "Volver al Workboard",
     "empty": "Aún no hay subtareas. Añade la primera para empezar a calcular el progreso.",
     "unassigned": "Sin asignar",
@@ -435,7 +435,9 @@
       "critical": "Ruta crítica",
       "overdue": "Vencida",
       "dueDate": "Fecha límite",
-      "weightOrHours": "Peso / horas estimadas"
+      "weightOrHours": "Peso / horas estimadas",
+      "expandSubtasks": "Clic para revelar {count} subtareas",
+      "collapseSubtasks": "Clic para colapsar subtareas"
     },
     "blocker": {
       "title": "Bloqueo",
@@ -514,7 +516,9 @@
       "layoutRadial": "Radial",
       "layoutHierarchical": "Jerárquica",
       "layoutLeftRight": "Izquierda a derecha",
-      "hiddenByFilters": "{count} subtarea(s) ocultas por los filtros activos."
+      "hiddenByFilters": "{count} subtarea(s) ocultas por los filtros activos.",
+      "expandRoot": "Expandir",
+      "collapseRoot": "Colapsar"
     },
     "form": {
       "createTitle": "Nueva subtarea",
@@ -1783,7 +1787,8 @@
       "inspection_event": "Inspección",
       "permit_event": "Permiso",
       "critical_path_event": "Ruta Crítica",
-      "import_event": "Archivo Importado"
+      "import_event": "Archivo Importado",
+      "subtask_item": "Subtarea"
     },
     "edgeTypes": {
       "caused": "Causó",
@@ -1805,7 +1810,8 @@
       "mitigates_risk": "Mitiga riesgo",
       "supplied_by": "Suministrado por",
       "contains": "Contiene",
-      "imported_from": "Importado de archivo"
+      "imported_from": "Importado de archivo",
+      "subtask_of": "Subtarea de"
     },
     "edgeMeanings": {
       "caused": "Esta actividad disparó directamente la siguiente — una dependencia causal en el flujo de ejecución.",
@@ -1962,6 +1968,20 @@
       "strongestDependency": "Dependencia aguas abajo más fuerte: {label}",
       "riskDelta": "Impacto en riesgo",
       "mitigation": "Mitigación sugerida: re-secuencia el trabajo paralelo, resuelve bloqueos aguas arriba o re-planifica las fechas del hito afectado."
+    },
+    "subtasks": {
+      "toggle": "{count} subtareas — clic para expandir o colapsar",
+      "blocked": "Subtareas bloqueadas",
+      "controlLabel": "{count} tarea(s) con subtareas",
+      "expandedCount": "{count} expandidas",
+      "expandAll": "Expandir todo",
+      "collapseAll": "Colapsar todo",
+      "owner": "Responsable",
+      "unassigned": "Sin asignar",
+      "dueDate": "Fecha límite",
+      "priority": "Prioridad",
+      "blockedReason": "Motivo del bloqueo",
+      "viewTeam": "Ver equipo del proyecto"
     }
   },
   "placeholders": {
