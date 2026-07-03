@@ -19,6 +19,13 @@ export * from "./recalculation-service";
 export * from "./delta-types";
 export * from "./delta-builder";
 export * from "./delta-store";
+// Phase 4 / Task 6 — realtime performance, throttling & observability safeguards.
+export * from "./performance-budget";
+export * from "./critical-update";
+export * from "./update-scheduler";
+export * from "./reconnect-backoff";
+export * from "./large-graph";
+export * from "./perf-observability";
 // NOTE: the DB transport adapter (supabase-transport.ts) is deliberately NOT
 // re-exported: callers wire it explicitly with an authenticated client, so the
 // pure core keeps zero transitive client-library dependencies (LGRE-FOUNDATION

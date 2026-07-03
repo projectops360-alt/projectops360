@@ -406,6 +406,9 @@
     "subtitle": "Live hierarchy-safe execution graph — click to reveal the next level.",
     "backToLivingGraph": "Living Graph",
     "collapsedHidden": "{count} subtask(s) hidden — expand a task to reveal them.",
+    "largeGraphWarning": "This scope is large. Expanding everything may slow the view.",
+    "largeGraphConfirm": "Expand anyway",
+    "largeGraphCancel": "Cancel",
     "node": {
       "subtasks": "{count} subtasks",
       "evidence": "Evidence"

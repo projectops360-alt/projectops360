@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   createLivingGraphSubscriptionManager,
+  isCriticalNotice,
   type LivingGraphRealtimeConnectionState,
 } from "@/lib/living-graph/realtime";
 // The DB transport adapter is intentionally not exported from the barrel (keeps
@@ -68,6 +69,19 @@ export function useLiveGraphSync(args: UseLiveGraphSyncArgs): LiveGraphSyncStatu
         if (disposed) return;
         // Only this project's notices matter (the manager already scope-checks).
         if (delivery.notice.projectId !== args.projectId) return;
+        // Priority-aware coalescing (Task 6 critical-update policy): a critical
+        // notice (status / progress / topology / delete / unknown) flushes
+        // IMMEDIATELY, bypassing the debounce, so task-status changes are never
+        // delayed. Cosmetic notices are debounced into one refetch. The final
+        // state always wins because the consumer re-checks the content signature.
+        if (isCriticalNotice(delivery.notice)) {
+          if (coalesceTimer != null) {
+            window.clearTimeout(coalesceTimer);
+            coalesceTimer = null;
+          }
+          onChangeRef.current();
+          return;
+        }
         if (coalesceTimer != null) window.clearTimeout(coalesceTimer);
         coalesceTimer = window.setTimeout(() => {
           if (!disposed) onChangeRef.current();

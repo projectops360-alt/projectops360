@@ -32,6 +32,7 @@ import { Bot, Layers, ListTree, RotateCcw } from "lucide-react";
 import { askIsabella } from "@/lib/isabella/ask-isabella";
 import { localizedHref } from "@/i18n/href";
 import type { HierarchicalGraphDelta, LivingGraphRootScope } from "@/lib/living-graph/realtime";
+import { assessGraphLoad, resolvePerfBudget } from "@/lib/living-graph/realtime";
 import {
   applyDelta,
   rebuildFromDeltas,
@@ -247,18 +248,37 @@ function Inner(props: RealtimeLivingGraphProps) {
     return () => window.clearTimeout(id);
   }, [rootScope, layoutMode, evidenceOverlay, dependencyOverlay, statusFilter, fitView]);
 
+  // Task 6 large-graph guard: expanding EVERYTHING in a large scope can trigger
+  // a render storm. When the scope is large we arm a one-click confirmation
+  // instead of expanding immediately (progressive, hierarchy-safe — Expand all
+  // stays SCOPED to the selected milestone/task; it never dumps the whole
+  // project). A second click confirms.
+  const perfBudget = useMemo(() => resolvePerfBudget(), []);
+  const [expandAllArmed, setExpandAllArmed] = useState(false);
+
   const handleExpandAll = useCallback(() => {
     const ids = scopedExpandableNodeIds(model, ctx);
+    const load = assessGraphLoad(
+      { nodeCount: ids.length, edgeCount: visible.edges.length },
+      perfBudget,
+    );
+    if (load.isLarge && !expandAllArmed) {
+      setExpandAllArmed(true);
+      return;
+    }
+    setExpandAllArmed(false);
     setExpansion((s) => expandAllScoped(s, scopeKey, ids));
     window.setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 80);
-  }, [model, ctx, scopeKey, fitView]);
+  }, [model, ctx, scopeKey, fitView, perfBudget, visible.edges.length, expandAllArmed]);
 
   const handleCollapseAll = useCallback(() => {
+    setExpandAllArmed(false);
     setExpansion((s) => collapseAllScoped(s, scopeKey));
     window.setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 80);
   }, [scopeKey, fitView]);
 
   const handleReset = useCallback(() => {
+    setExpandAllArmed(false);
     setRootScope({ type: "project", id: null });
     setExpansion((s) => resetScope(s, scopeKey));
     setEvidenceOverlay(false);
@@ -348,6 +368,31 @@ function Inner(props: RealtimeLivingGraphProps) {
           </button>
         </div>
       </div>
+
+      {expandAllArmed && (
+        <p
+          className="flex flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-800 dark:text-amber-300"
+          data-testid="rt-large-graph-warning"
+          role="alert"
+        >
+          {t("largeGraphWarning")}
+          <button
+            type="button"
+            data-testid="rt-expand-all-confirm"
+            onClick={handleExpandAll}
+            className="rounded border border-amber-500/60 px-1.5 py-0.5 font-medium hover:bg-amber-500/20"
+          >
+            {t("largeGraphConfirm")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpandAllArmed(false)}
+            className="rounded border border-border px-1.5 py-0.5 font-medium text-muted-foreground hover:bg-muted"
+          >
+            {t("largeGraphCancel")}
+          </button>
+        </p>
+      )}
 
       {visible.collapsedChildCount > 0 && (
         <p className="border-b border-border bg-violet-500/5 px-3 py-1 text-[11px] text-violet-700 dark:text-violet-300" data-testid="rt-collapsed-notice">
