@@ -2172,5 +2172,293 @@
       "sign_failed": "Could not load the audio. Please try again.",
       "playFailed": "Could not play the audio. Please try again."
     }
+  },
+  "milestoneFlow": {
+    "title": "Milestone Process Flow",
+    "subtitle": "Engine-derived execution flow between milestones — health, friction and evidence.",
+    "backToExecutionMap": "Execution Map",
+    "selectPrompt": "Select a transition to inspect its flow, metrics, findings and evidence.",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "unknown": "Unknown"
+    },
+    "observability": {
+      "generatedAt": "Generated",
+      "engine": "Engine",
+      "summary": "{transitions} transitions · {segments} segments · {findings} findings · {packets} Isabella packets",
+      "unknownHealth": "{count} with unknown health",
+      "warnings": "{count} engine warnings",
+      "dataQuality": "Data quality"
+    },
+    "filters": {
+      "title": "Filters",
+      "segmentType": "Segment type",
+      "findingType": "Finding type",
+      "severity": "Severity",
+      "all": "All",
+      "onlyUncertainty": "Only with uncertainty",
+      "onlyWarnings": "Only with warnings",
+      "onlyOpenFindings": "Only with open findings",
+      "clear": "Clear",
+      "showing": "Showing {shown} of {total}",
+      "noMatch": "No transitions match the current filters."
+    },
+    "corridor": {
+      "start": "Project start",
+      "transitionStatuses": {
+        "pending": "Pending",
+        "active": "Active",
+        "completed": "Completed",
+        "regressed": "Regressed",
+        "unknown": "Unknown"
+      },
+      "uncertainty": "Uncertainty",
+      "warnings": "Warnings",
+      "segmentCount": "{count} segments",
+      "findingCount": "{count} findings",
+      "openFindingCount": "{count} open",
+      "barLabel": "Flow segment composition",
+      "started": "Started",
+      "completed": "Completed",
+      "lastEvent": "Last event"
+    },
+    "health": {
+      "title": "Transition health",
+      "confidence": "Confidence",
+      "primaryReason": "Primary reason",
+      "otherReasons": "Also",
+      "recommendedAction": "Recommended action",
+      "uncertaintyTitle": "Uncertainty",
+      "evidenceCount": "{count} evidence refs",
+      "warningCount": "{count} warnings",
+      "machineDetail": "Machine-readable detail",
+      "statuses": {
+        "healthy": "Healthy",
+        "watch": "Watch",
+        "degraded": "Degraded",
+        "blocked": "Blocked",
+        "at_risk": "At risk",
+        "recovering": "Recovering",
+        "regressed": "Regressed",
+        "unknown": "Unknown"
+      },
+      "actionCategories": {
+        "resolve_blocker": "Resolve blocker",
+        "escalate_risk": "Escalate risk",
+        "investigate_friction": "Investigate friction",
+        "review_regression": "Review regression",
+        "monitor_recovery": "Monitor recovery",
+        "monitor": "Monitor",
+        "gather_evidence": "Gather evidence",
+        "none": "None"
+      },
+      "reasonCodes": {
+        "insufficient_evidence": "Insufficient evidence",
+        "no_material_friction": "No material friction",
+        "minor_friction": "Minor friction",
+        "waiting": "Waiting time",
+        "blocker_open": "Open blocker",
+        "blocker_resolved": "Blocker resolved",
+        "decision_delay": "Decision delay",
+        "approval_delay": "Approval delay",
+        "rework": "Rework",
+        "bottleneck_candidate": "Bottleneck candidate",
+        "propagation": "Constraint propagation",
+        "poor_flow_efficiency": "Poor flow efficiency",
+        "high_unknown_time": "High unknown time",
+        "missing_evidence": "Missing evidence",
+        "recovered": "Recovered",
+        "regressed": "Regressed",
+        "conflicting_evidence": "Conflicting evidence",
+        "unknown": "Unknown"
+      },
+      "uncertaintyNotes": {
+        "missing_metrics": "Metrics are missing for this transition",
+        "missing_evidence": "Supporting evidence is missing",
+        "ambiguous_blocker_cause": "Blocker cause is ambiguous — dependency is a conservative default, not a confirmed cause",
+        "possible_propagation": "Propagation is possible, not confirmed",
+        "unknown_duration": "Some durations are unknown",
+        "backfilled_only_evidence": "Evidence comes only from backfilled events",
+        "conflicting_signals": "Signals conflict with each other",
+        "insufficient_transition_evidence": "Not enough evidence for this transition"
+      }
+    },
+    "segmentsPanel": {
+      "title": "Flow segments",
+      "openEnded": "Open",
+      "evidenceCount": "{count} evidence",
+      "types": {
+        "active_work": "Active work",
+        "waiting": "Waiting",
+        "blocked": "Blocked",
+        "decision_delay": "Decision delay",
+        "approval_delay": "Approval delay",
+        "rework": "Rework",
+        "handoff": "Handoff",
+        "review": "Review",
+        "external_constraint": "External constraint",
+        "unknown": "Unknown"
+      }
+    },
+    "metrics": {
+      "title": "Flow metrics",
+      "unavailable": "No metrics are available for this transition.",
+      "unknownValue": "Unknown",
+      "plannedDuration": "Planned duration",
+      "actualDuration": "Actual duration",
+      "elapsedDuration": "Elapsed duration",
+      "activeWorkTime": "Active work time",
+      "waitingTime": "Waiting time",
+      "blockedTime": "Blocked time",
+      "decisionDelayTime": "Decision delay time",
+      "approvalDelayTime": "Approval delay time",
+      "reworkTime": "Rework time",
+      "unknownTime": "Unknown time",
+      "totalKnownSegmentTime": "Total known segment time",
+      "flowEfficiency": "Flow efficiency",
+      "segmentCounts": "{total} segments · {open} open · {unknown} unknown",
+      "completeness": "Completeness",
+      "completenessValues": {
+        "complete": "Complete",
+        "partial": "Partial",
+        "unknown": "Unknown",
+        "unavailable": "Unavailable"
+      }
+    },
+    "findingsPanel": {
+      "title": "Findings",
+      "delayTitle": "Delays & blockers",
+      "bottleneckTitle": "Bottleneck candidates",
+      "propagationTitle": "Constraint propagation",
+      "candidate": "Candidate",
+      "possible": "Possible",
+      "structuralCandidate": "Structural candidate",
+      "ambiguousDependency": "The specific cause is unknown — the engine conservatively defaults to dependency. This is NOT a confirmed dependency bottleneck.",
+      "occurrences": "{count}×",
+      "origin": "Origin here",
+      "affected": "Affected here",
+      "delayImpact": "Delay impact",
+      "types": {
+        "blocker": "Blocker",
+        "waiting_time": "Waiting time",
+        "decision_delay": "Decision delay",
+        "approval_delay": "Approval delay",
+        "rework": "Rework",
+        "bottleneck": "Bottleneck",
+        "propagation": "Propagation"
+      },
+      "statuses": {
+        "open": "Open",
+        "resolved": "Resolved",
+        "partial": "Partial",
+        "possible": "Possible",
+        "unknown": "Unknown"
+      },
+      "severities": {
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low",
+        "unknown": "Unknown"
+      },
+      "reworkTypes": {
+        "task_reopened": "Task reopened",
+        "approval_rejection": "Approval rejected",
+        "decision_reversal": "Decision reversed",
+        "scope_change": "Scope change",
+        "requirement_change": "Requirement change",
+        "defect_or_quality_failure": "Defect / quality failure",
+        "deliverable_revision": "Deliverable revision",
+        "milestone_regression": "Milestone regression",
+        "unknown": "Unknown"
+      },
+      "bottleneckTypes": {
+        "decision": "Decision",
+        "approval": "Approval",
+        "dependency": "Dependency",
+        "resource": "Resource",
+        "ownership": "Ownership",
+        "requirement_clarity": "Requirement clarity",
+        "quality": "Quality",
+        "rework": "Rework",
+        "communication": "Communication",
+        "external_constraint": "External constraint",
+        "process_design": "Process design",
+        "unknown": "Unknown"
+      },
+      "propagationTypes": {
+        "direct_dependency": "Direct dependency",
+        "decision": "Decision",
+        "approval": "Approval",
+        "risk": "Risk",
+        "blocker": "Blocker",
+        "resource": "Resource",
+        "rework": "Rework",
+        "scope_change": "Scope change",
+        "external_constraint": "External constraint",
+        "unknown": "Unknown"
+      }
+    },
+    "isabella": {
+      "title": "Isabella evidence packet",
+      "subtitle": "Structured evidence Isabella may use — nothing here is generated language.",
+      "fact": "Facts",
+      "inference": "Inferences",
+      "prediction": "Predictions",
+      "predictionBadge": "Prediction — not a fact",
+      "recommendation": "Recommendation",
+      "actionCategoryOnly": "(action category only — no generated advice)",
+      "uncertainty": "Uncertainty",
+      "claimsTitle": "Allowed & disallowed claims",
+      "allowedClaims": "Allowed claims",
+      "disallowedClaims": "Disallowed claims",
+      "noClaims": "None",
+      "whyDisallowed": "Isabella must never assert these claims — the evidence does not support them.",
+      "emptySection": "None derived by the engine."
+    },
+    "evidence": {
+      "title": "Evidence drill-down",
+      "empty": "No evidence references exist for this transition yet.",
+      "showRefs": "Show {count} evidence references",
+      "event": "Event",
+      "metric": "Metric",
+      "unavailableDetail": "Detailed evidence records are not available in this view — references only.",
+      "kinds": {
+        "fact": "Fact",
+        "inference": "Inference",
+        "prediction": "Prediction",
+        "recommendation": "Recommendation",
+        "uncertainty": "Uncertainty"
+      }
+    },
+    "empty": {
+      "noMilestones": {
+        "title": "No milestones yet",
+        "description": "Milestone Process Flow needs at least two milestones to derive transitions. Create milestones in the Execution Map first."
+      },
+      "noTransitions": {
+        "title": "No milestone transitions are available for this project yet",
+        "description": "The engine could not derive transitions from the current milestones and events. This is honest output — nothing is fabricated."
+      },
+      "insufficientEvidence": {
+        "title": "Insufficient evidence",
+        "description": "Milestone Process Flow has insufficient event evidence for this project. As execution events accumulate, flow intelligence will appear here."
+      },
+      "noProjection": {
+        "description": "No health assessment is available for this transition."
+      },
+      "noFindings": "No blockers or delays were detected for this transition.",
+      "noPacket": "No Isabella evidence packet exists for this transition.",
+      "unauthorized": {
+        "title": "No access",
+        "description": "You do not have access to this project's milestone flow."
+      },
+      "error": {
+        "title": "Milestone Process Flow could not be loaded",
+        "description": "Something went wrong while building the flow projection. Try again — no data was changed."
+      }
+    }
   }
 }

@@ -167,6 +167,28 @@ advanced counts on the run summary. Test id **PEG-MPF-ADVANCED-DETECTION**. Full
 detail: [milestone-process-flow-advanced-detectors.md](./milestone-process-flow-advanced-detectors.md).
 Next task: **Generate Transition Health & Isabella Evidence Packets.**
 
+## Living Graph UI Consumer (Task 8 — added)
+
+The first UI surface, and a **pure consumer**: `src/lib/milestone-flow-ui/`
+(read-only projection adapter + pure display selectors) and
+`src/components/milestone-flow/` render the full projection at
+`/projects/[projectId]/execution-map/milestone-flow` (sibling of the Living
+Graph subpage, linked from the Execution Map tab bar). Transitions, segments,
+metrics, delay/rework/bottleneck/propagation findings, transition health, and
+the Isabella evidence packet are **displayed exactly as the engine derived
+them** — no rebuild, no recalculation, no reclassification, no re-detection, no
+Isabella language, no LLM, no Projection Engine Runtime, no canonical mutation
+(`project_event_log` SELECT-only; `process_nodes`/`process_edges` untouched).
+Bottlenecks are always **candidates**, `possible` stays possible, the fallback
+dependency cause renders as **ambiguous — never confirmed fact**, predictions are
+visually distinct from facts, recommendations are action categories only,
+allowed/disallowed claims stay inspectable, and unknown values render as
+"Unknown". Deny-by-default RBAC at the adapter + engine gate; unauthorized →
+safe state with no data. i18n: full EN/ES `milestoneFlow` namespace (UX-012).
+Test id **PEG-MPF-LIVING-GRAPH-UI-CONSUMER**. Full detail:
+[milestone-process-flow-living-graph-ui.md](./milestone-process-flow-living-graph-ui.md).
+Next: **Phase 3 Final Audit and Release Readiness Review.**
+
 ## Rework Detector standalone API (Task 6A — added)
 
 Task 6A re-scoped rework as a standalone concern. Rework detection was **already
