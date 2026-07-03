@@ -250,10 +250,11 @@ projects. No contract in this document changes for that step.
 
 ## 17. Intentionally NOT implemented (Task 1)
 
-Subscription runtime (channel attach/detach), selective recalculation
-attribution, the delta builder, snapshot persistence, the polling fallback
-runtime, any UI, and any Isabella wiring. Unimplemented operations throw
-`UNSUPPORTED_ENGINE_OPERATION` — the engine never fakes liveness or change data.
+Subscription runtime (channel attach/detach) *(delivered by Task 2 — §18a)*,
+selective recalculation attribution, the delta builder, snapshot persistence,
+the polling fallback runtime, any UI, and any Isabella wiring. Unimplemented
+operations throw `UNSUPPORTED_ENGINE_OPERATION` — the engine never fakes
+liveness or change data.
 
 ## 18. How Task 2 should extend this
 
@@ -265,6 +266,53 @@ lifecycle class), with: authorization before attach (§12), at-least-once
 delivery + consumer dedup by sequence, reconnection with the fallback ladder
 (§14), and tick summaries (§11). Extend the foundation — never replace it, and
 never add a write capability to the subscription layer.
+
+## 18a. Event Subscription Layer (Task 2 — added)
+
+The subscription runtime now exists as a transport-agnostic core plus one DB
+adapter, fulfilling `LivingGraphRealtimeSubscriptionContract` (§8):
+
+- **`subscription-types.ts`** — the transport abstraction
+  (`LivingGraphRealtimeTransport`, normalized channel statuses), the untrusted
+  `ProjectEventLogRowLike` row projection, the typed notice stream
+  (`LivingGraphNoticeDelivery`), the closed subscription-observability event
+  vocabulary, reconnect results, and defaults (stale threshold 60 s, bounded
+  dedup memory 1 000 keys).
+- **`notice-mapper.ts`** — pure mapping from an appended `project_event_log`
+  row to a **frozen** `LivingGraphChangeNotice` (`source:
+  "project_event_graph"`). Missing identity fields ⇒ `null` (reject-and-count,
+  never guess); `noticeDedupKey` gives the stable at-least-once dedup key.
+- **`subscription-manager.ts`** — `createLivingGraphSubscriptionManager`:
+  authorization **before** attachment (deny ⇒ no channel, ever); duplicate
+  prevention (same consumer+scope+topics ⇒ same handle, one channel);
+  wrong-scope/malformed rows rejected and counted; per-subscription dedup that
+  **survives reconnects** (replayed rows never double-deliver, FIFO-bounded);
+  transport-status handling driving the Task 1 fallback ladder; `reconnect()`
+  **re-authorizes with current permissions first** — permission loss detaches
+  the feed (`permission_revoked_on_reconnect`); `sweepStale()` degrades silent
+  live subscriptions to `degraded_polling` (honest, never fake-live);
+  structured observability events for every lifecycle step; released records
+  ignore late channel callbacks. The manager is a listener — no DB client, no
+  writes, no event emission.
+- **`supabase-transport.ts`** — the ONLY file that knows about Supabase:
+  adapts Realtime channels (`postgres_changes` **INSERT-only** on
+  `project_event_log`, `project_id=eq.{id}` filtered, under the existing RLS
+  read policy) to the transport abstraction via minimal structural typing.
+  **Deliberately not exported from the barrel** so the pure core keeps zero
+  client-library dependencies; callers wire it explicitly with an
+  authenticated client. It opens/closes channels only — no query builder, no
+  writes (guarded).
+- **Engine wiring** — `createLivingGraphRealtimeEngine` accepts an optional
+  `subscriptionManager`; `registerSubscription`/`releaseSubscription` delegate
+  when present and still throw `UNSUPPORTED_ENGINE_OPERATION` without one.
+- **Migration `20260833000000_project_event_log_realtime.sql`** — idempotently
+  adds `project_event_log` to the `supabase_realtime` publication (delivery
+  only; table/data/RLS/immutability untouched). **Operational prerequisite —
+  not yet applied to prod.**
+
+UI never consumes raw database changes: the typed notice stream is the only
+output, and its consumers are the future recalculation (Task 3) and delta
+layers. Guard: **LGRE-SUBSCRIPTION**.
 
 ## 19. Files (Phase 4, Task 1)
 
