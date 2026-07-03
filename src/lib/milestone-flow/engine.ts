@@ -40,6 +40,7 @@ import { aggregateConfidence } from "./evidence";
 import { buildMilestoneTransitions } from "./transition-builder";
 import { buildFlowSegmentsForTransition } from "./flow-segment-builder";
 import { calculateMilestoneFlowMetrics, calculateMilestoneTransitionMetrics } from "./metrics-calculator";
+import { detectMilestoneFlowDelays } from "./delay-detector";
 import type {
   MilestoneProcessFlowEngine,
   MilestoneFlowInputContract,
@@ -146,6 +147,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       transitions: build.transitions,
     });
 
+    // Task 5: detect blockers / waiting / decision & approval delays from the
+    // built transitions + metrics. Detection reads metric durations (never
+    // recomputes, never reads the wall clock) — severity is detection severity,
+    // NOT health, and no health/bottleneck classification is produced.
+    const detection = detectMilestoneFlowDelays({
+      scope: input.scope,
+      transitions: build.transitions,
+      metricsByTransition: metrics.metricsByTransition,
+    });
+
     const summary = closeRunSummary(
       ctx,
       {
@@ -165,7 +176,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
         openSegmentDurationCount: metrics.stats.openSegmentDurationCount,
         invalidDurationCount: metrics.stats.invalidDurationCount,
         totalKnownSegmentTimeMs: metrics.stats.totalKnownSegmentTimeMs,
-        warnings: [...build.warnings, ...metrics.warnings],
+        delayFindingCount: detection.stats.delayFindingCount,
+        blockerFindingCount: detection.stats.blockerFindingCount,
+        waitingFindingCount: detection.stats.waitingFindingCount,
+        decisionDelayFindingCount: detection.stats.decisionDelayFindingCount,
+        approvalDelayFindingCount: detection.stats.approvalDelayFindingCount,
+        openFindingCount: detection.stats.openFindingCount,
+        resolvedFindingCount: detection.stats.resolvedFindingCount,
+        unknownFindingCount: detection.stats.unknownFindingCount,
+        highSeverityFindingCount: detection.stats.highSeverityFindingCount,
+        warnings: [...build.warnings, ...metrics.warnings, ...detection.warnings],
       },
       this.now,
     );
@@ -183,6 +203,7 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       bottlenecks: [],
       constraintPropagations: [],
       dataQualityFlags,
+      findingsByTransition: detection.findingsByTransition,
       observability: summary,
     };
 

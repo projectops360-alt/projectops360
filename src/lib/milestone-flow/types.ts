@@ -23,6 +23,9 @@ import type {
   MPF_DATA_QUALITY_FLAGS,
   MPF_ACCESS_SCOPES,
 } from "./constants";
+// Type-only import (erased at runtime → no import cycle) for the Task 5 finding
+// used by the projection's optional findingsByTransition.
+import type { MilestoneFlowDetectionFinding } from "./delay-detector-types";
 
 // ── 1. Engine identity ────────────────────────────────────────────────────────
 
@@ -395,6 +398,16 @@ export interface MilestoneFlowEngineRunSummary {
   openSegmentDurationCount?: number;
   invalidDurationCount?: number;
   totalKnownSegmentTimeMs?: number;
+  /** Detection-stage counts (Task 5) — optional; default 0 when detection did not run. */
+  delayFindingCount?: number;
+  blockerFindingCount?: number;
+  waitingFindingCount?: number;
+  decisionDelayFindingCount?: number;
+  approvalDelayFindingCount?: number;
+  openFindingCount?: number;
+  resolvedFindingCount?: number;
+  unknownFindingCount?: number;
+  highSeverityFindingCount?: number;
   warningCount: number;
   errorCount: number;
   startedAt: string; // ISO
@@ -443,5 +456,11 @@ export interface MilestoneFlowProjection {
   bottlenecks: MilestoneFlowBottleneckClassification[];
   constraintPropagations: MilestoneConstraintPropagation[];
   dataQualityFlags: MilestoneFlowDataQualityFlag[];
+  /**
+   * Delay/blocker detection findings keyed by transition (Task 5). Optional +
+   * additive — detection is derived intelligence, never health. Structured for a
+   * future Health Classifier / Bottleneck Detector to consume.
+   */
+  findingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowDetectionFinding[]>;
   observability: MilestoneFlowEngineRunSummary;
 }
