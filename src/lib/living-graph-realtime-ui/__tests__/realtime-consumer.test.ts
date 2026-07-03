@@ -22,7 +22,9 @@ import {
   emptyViewModel,
   applyDelta,
   rebuildFromDeltas,
+  markChangesAgainstPrevious,
   decayChangeStates,
+  computeGraphSignature,
   emptyExpansion,
   expansionScopeKey,
   toggleExpanded,
@@ -142,6 +144,60 @@ describe("snapshot adapter — replay-safe delta application", () => {
     m = applyDelta(m, delta([], [], 1, 5)).model; // advance version to 5
     const decayed = decayChangeStates(m, 2); // cutoff = 3; v1 changes decay
     expect(decayed.nodes["task:t1"].changeState).toBe("stable");
+  });
+});
+
+// ── Realtime task-status sync (Workboard → LGRE → Living Graph) ───────────────
+
+describe("realtime task status sync — end-to-end consumer path", () => {
+  it("a status change flips the graph signature (drives the polling refetch)", () => {
+    const before = computeGraphSignature([], [{ id: "t1", token: "in_progress" }], []);
+    const after = computeGraphSignature([], [{ id: "t1", token: "done" }], []);
+    expect(before).not.toBe(after);
+    // Unchanged data → identical signature (no needless refetch/render).
+    expect(computeGraphSignature([], [{ id: "t1", token: "done" }], [])).toBe(after);
+  });
+
+  it("a polled full-resync updates the visible task node status and pulses ONLY it", () => {
+    // Browser state: task t1 in_progress.
+    const v1 = applyDelta(emptyViewModel(PROJ, ORG), seedDelta()).model;
+    expect(v1.nodes["task:t1"].payload.status).toBe("in_progress");
+    // A poll detects the change and rebuilds from the new snapshot (t1 → done).
+    const newSnapshot = delta(
+      [
+        ent("milestone:m1", "added", { nodeKind: "milestone", title: "Phase 1", status: "in_progress" }),
+        ent("task:t1", "added", { title: "Build X", status: "done", milestone_id: "m1", subtask_total: 2 }),
+        ent("subtask:s1", "added", { is_subtask: true, parent_task_id: "task:t1", parent_node_id: "task:t1", milestone_id: "m1", title: "Sub 1", status: "in_progress" }),
+        ent("subtask:s2", "added", { is_subtask: true, parent_task_id: "task:t1", parent_node_id: "task:t1", milestone_id: "m1", title: "Sub 2", status: "blocked" }),
+        ent("event:e1", "added", { nodeKind: "event", title: "Evt" }),
+      ],
+      [],
+      0, 1,
+    );
+    const rebuilt = rebuildFromDeltas(PROJ, ORG, [newSnapshot]);
+    const marked = markChangesAgainstPrevious(rebuilt, v1);
+    // The task node now shows "done" — WITHOUT any manual refresh.
+    expect(marked.nodes["task:t1"].payload.status).toBe("done");
+    // Only the changed node is marked updated (pulse); unchanged nodes stay stable.
+    expect(marked.nodes["task:t1"].changeState).toBe("updated");
+    expect(marked.nodes["subtask:s1"].changeState).toBe("stable");
+    expect(marked.nodes["event:e1"].changeState).toBe("stable");
+    expect(marked.version).toBe(v1.version + 1);
+  });
+
+  it("two clients converge on the same delta stream (cross-browser simulation)", () => {
+    // Browser A and Browser B both start from the same snapshot.
+    const a0 = applyDelta(emptyViewModel(PROJ, ORG), seedDelta()).model;
+    const b0 = applyDelta(emptyViewModel(PROJ, ORG), seedDelta()).model;
+    // Browser A moves t1 → done (persist happens server-side; both poll the new snapshot).
+    const changed = delta([ent("task:t1", "added", { title: "Build X", status: "done", milestone_id: "m1", subtask_total: 2 })], [], 0, 1);
+    // A rebuilds from its own action's result; B rebuilds from the SAME server snapshot.
+    const aFinal = markChangesAgainstPrevious(rebuildFromDeltas(PROJ, ORG, [changed]), a0);
+    const bFinal = markChangesAgainstPrevious(rebuildFromDeltas(PROJ, ORG, [changed]), b0);
+    // Both browsers show the same task status — B never touched the DB, just the delta.
+    expect(aFinal.nodes["task:t1"].payload.status).toBe("done");
+    expect(bFinal.nodes["task:t1"].payload.status).toBe("done");
+    expect(bFinal.nodes["task:t1"].changeState).toBe("updated"); // pulses on B too
   });
 });
 

@@ -12,7 +12,7 @@
 // state and never mutate canonical data.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -34,6 +34,8 @@ import { localizedHref } from "@/i18n/href";
 import type { HierarchicalGraphDelta, LivingGraphRootScope } from "@/lib/living-graph/realtime";
 import {
   applyDelta,
+  rebuildFromDeltas,
+  markChangesAgainstPrevious,
   emptyViewModel,
   selectVisibleGraph,
   scopedExpandableNodeIds,
@@ -46,10 +48,16 @@ import {
   expandedIds,
   computeRealtimeLayout,
   applySyncResponse,
+  markStaleIfExpired,
   nodeOwnerName,
   type RealtimeLayoutMode,
   type RealtimeGraphViewModel,
+  type RealtimeSyncState,
 } from "@/lib/living-graph-realtime-ui";
+import {
+  getRealtimeGraphSignatureAction,
+  getRealtimeGraphSnapshotAction,
+} from "@/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/actions";
 import { REALTIME_NODE_TYPES, realtimeNodeType, type RealtimeNodeData } from "./realtime-graph-nodes";
 import { RealtimeSyncBar } from "./realtime-sync-bar";
 import { RealtimeNodeInspector } from "./realtime-node-inspector";
@@ -67,7 +75,14 @@ export interface RealtimeLivingGraphProps {
   initialDelta: HierarchicalGraphDelta;
   ownerNames: Record<string, string>;
   milestones: { id: string; title: string }[];
+  /** Content signature of the initial snapshot (drives the polling sync). */
+  initialSignature: string;
 }
+
+// The realtime consumer uses the LGRE "polling" delivery fallback until the
+// live Supabase channel is wired: poll a cheap signature, refetch on change.
+const POLL_INTERVAL_MS = 10_000;
+const FRESHNESS_BUDGET_MS = 25_000;
 
 function Inner(props: RealtimeLivingGraphProps) {
   const t = useTranslations("realtimeGraph");
@@ -80,9 +95,54 @@ function Inner(props: RealtimeLivingGraphProps) {
     const res = applyDelta(empty, props.initialDelta);
     return res.applied ? res.model : empty;
   });
-  const [syncState] = useState(() =>
+  const [syncState, setSyncState] = useState<RealtimeSyncState>(() =>
     applySyncResponse({ kind: "noop", reason: "initial_snapshot", deltas: [], snapshot: null, targetVersion: props.initialDelta.producedVersion }, props.initialDelta.generatedAt),
   );
+  const [ownerNames, setOwnerNames] = useState(props.ownerNames);
+  const signatureRef = useRef(props.initialSignature);
+  const modelRef = useRef(model);
+  modelRef.current = model;
+  const lastSyncMsRef = useRef(Date.now());
+
+  // ── Polling sync (LGRE polling fallback) ───────────────────────────────────
+  // Poll a cheap signature; on change refetch the approved snapshot delta and
+  // rebuild (full_resync) so the graph auto-updates without a manual refresh —
+  // and other browser sessions converge on the same signature. Honest freshness:
+  // a landed poll → live; a failed poll → stale (never silently outdated).
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const { signature } = await getRealtimeGraphSignatureAction(props.projectId);
+        if (cancelled) return;
+        if (signature == null) {
+          // Unauthorized / unavailable — do not claim live.
+          setSyncState((s) => markStaleIfExpired(s, Date.now() - lastSyncMsRef.current, FRESHNESS_BUDGET_MS));
+          return;
+        }
+        lastSyncMsRef.current = Date.now();
+        if (signature === signatureRef.current) {
+          setSyncState((s) => (s.freshness === "stale" ? { ...s, freshness: "live", lastSyncedAt: new Date().toISOString() } : { ...s, lastSyncedAt: new Date().toISOString() }));
+          return;
+        }
+        // Changed — refetch the full approved snapshot and full-resync.
+        const { snapshot } = await getRealtimeGraphSnapshotAction(props.projectId);
+        if (cancelled || !snapshot) return;
+        signatureRef.current = snapshot.signature;
+        setOwnerNames(snapshot.ownerNames);
+        const rebuilt = rebuildFromDeltas(snapshot.projectId, snapshot.organizationId, [snapshot.delta]);
+        setModel((prev) => markChangesAgainstPrevious(rebuilt, prev));
+        setSyncState(applySyncResponse({ kind: "deltas", reason: "polled_update", deltas: [], snapshot: null, targetVersion: modelRef.current.version + 1 }, new Date().toISOString()));
+      } catch {
+        if (!cancelled) setSyncState((s) => markStaleIfExpired(s, Date.now() - lastSyncMsRef.current, FRESHNESS_BUDGET_MS));
+      }
+    };
+    const timer = window.setInterval(tick, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [props.projectId]);
 
   const [rootScope, setRootScope] = useState<LivingGraphRootScope>({ type: "project", id: null });
   const [expansion, setExpansion] = useState(emptyExpansion());
@@ -124,14 +184,14 @@ function Inner(props: RealtimeLivingGraphProps) {
         selected: n.nodeId === selectedId,
         data: {
           node: n,
-          ownerName: nodeOwnerName(n, props.ownerNames),
+          ownerName: nodeOwnerName(n, ownerNames),
           expanded: expandedSet.has(n.nodeId),
           isCurrentVersion: n.changedAtVersion === model.version && model.version > 1,
           onToggleExpand: toggleExpand,
           onOpenInspector: setSelectedId,
         },
       })),
-    [filteredNodes, positions, selectedId, expandedSet, model.version, props.ownerNames, toggleExpand],
+    [filteredNodes, positions, selectedId, expandedSet, model.version, ownerNames, toggleExpand],
   );
 
   const visibleNodeIds = useMemo(() => new Set(filteredNodes.map((n) => n.nodeId)), [filteredNodes]);
@@ -289,7 +349,7 @@ function Inner(props: RealtimeLivingGraphProps) {
         {selectedNode && (
           <RealtimeNodeInspector
             node={selectedNode}
-            ownerName={nodeOwnerName(selectedNode, props.ownerNames)}
+            ownerName={nodeOwnerName(selectedNode, ownerNames)}
             onClose={() => setSelectedId(null)}
             onOpenTeam={() => router.push(localizedHref(props.locale, `/projects/${props.projectId}/team`))}
           />
