@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { emitAndAutoLink } from "@/lib/graph/emit-event";
+import { emitAndAutoLink, emitProcessNode } from "@/lib/graph/emit-event";
 import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/roadmap/progress";
 import {
   createTaskSchema,
@@ -474,6 +474,25 @@ export async function createMilestoneAction(input: {
     metadata: { title: data.title, status: data.status },
   });
 
+  // Materialize the milestone into the Living Graph projection via the APPROVED
+  // path (emit-event). The classic Living Graph / Project Execution Map derives
+  // milestone nodes exclusively from process_nodes (source_entity_type =
+  // 'milestones', node_type = 'milestone_gate'); without this a newly created
+  // milestone would exist in Roadmap but be invisible in the graph (bug:
+  // LIVING-GRAPH-NEW-MILESTONE-AUTO-INCLUSION). Awaited (not fire-and-forget) so
+  // the node exists BEFORE revalidate → the milestone appears on the next render
+  // with 0 tasks and no milestone-flow edge yet (planned/unconnected node).
+  // emitProcessNode is idempotent (unique violation → existing id).
+  await emitProcessNode({
+    organizationId: org.organizationId,
+    projectId: data.projectId,
+    nodeType: "milestone_gate",
+    sourceEntityType: "milestones",
+    sourceEntityId: milestone.id,
+    title: data.title,
+    metadata: { status: data.status, progress: data.progress_percent },
+  });
+
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   return { milestoneId: milestone.id };
@@ -679,6 +698,24 @@ export async function createTaskAction(input: {
     entityType: "roadmap_tasks",
     entityId: task.id,
     metadata: { title: data.title, status: data.status, priority: data.priority },
+  });
+
+  // Materialize the task into the Living Graph projection via the APPROVED path,
+  // parallel to milestone creation above. The graph derives task nodes from
+  // process_nodes (source_entity_type = 'roadmap_tasks', node_type =
+  // 'task_transition'); previously a task node only appeared once its STATUS
+  // changed (updateTaskStatusAction), so tasks created and left untouched were
+  // invisible — and a milestone's direct tasks would not appear on expansion
+  // (bug: LIVING-GRAPH-NEW-MILESTONE-AUTO-INCLUSION, hierarchy gate). Awaited so
+  // the node exists before revalidate. Idempotent.
+  await emitProcessNode({
+    organizationId: org.organizationId,
+    projectId: data.projectId,
+    nodeType: "task_transition",
+    sourceEntityType: "roadmap_tasks",
+    sourceEntityId: task.id,
+    title: data.title,
+    metadata: { status: data.status, priority: data.priority },
   });
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
