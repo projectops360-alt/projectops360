@@ -147,3 +147,15 @@ three optional projection fields (type-only imports to avoid a cycle) + nine opt
 advanced counts on the run summary. Test id **PEG-MPF-ADVANCED-DETECTION**. Full
 detail: [milestone-process-flow-advanced-detectors.md](./milestone-process-flow-advanced-detectors.md).
 Next task: **Generate Transition Health & Isabella Evidence Packets.**
+
+## Rework Detector standalone API (Task 6A — added)
+
+Task 6A re-scoped rework as a standalone concern. Rework detection was **already
+delivered** by Task 6; rather than duplicate it, Task 6A exposes the rework-only
+public entry point `detectMilestoneFlowReworkFindings(input)` (+
+`determineMilestoneReworkTriggerType`, `validateMilestoneReworkDetectionInput`) in
+`rework-detector.ts` and pins it with its own regression
+(**PEG-MPF-REWORK-DETECTION**). Status/severity/confidence/evidence use the shared
+advanced-detection primitives — one implementation, no duplication. Bottleneck and
+constraint propagation from Task 6 are unchanged. Detail:
+[milestone-process-flow-rework-detector.md](./milestone-process-flow-rework-detector.md).
