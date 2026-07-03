@@ -52,3 +52,7 @@ export * from "./rework-detector";
 export * from "./bottleneck-detector";
 export * from "./constraint-propagation-detector";
 export * from "./advanced-detection";
+export * from "./transition-health-types";
+export * from "./transition-health-classifier";
+export * from "./isabella-evidence-packet-types";
+export * from "./isabella-evidence-packet-builder";

@@ -25,7 +25,6 @@ import {
   detectMilestoneFlowDelays,
   calculateMilestoneTransitionMetrics,
   createMilestoneProcessFlowEngine,
-  MpfUnsupportedOperationError,
   MPF_CONFIG_VERSION,
   type BuiltMilestoneFlowSegment,
   type BuiltMilestoneTransition,
@@ -242,14 +241,15 @@ describe("engine integration", () => {
     expect(out.projection.bottleneckFindingsByTransition).toBeDefined();
     expect(Array.isArray(out.projection.constraintPropagationFindings)).toBe(true);
     expect(typeof out.observability.reworkFindingCount).toBe("number");
-    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(0);
+    // Health is populated by Task 7 (one assessment per transition).
+    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(1);
   });
 
-  it("classifyTransitionHealth remains not implemented", () => {
+  it("classifyTransitionHealth is implemented (Task 7) and no longer throws", () => {
     const engine = createMilestoneProcessFlowEngine({ now: fixedNow });
     const t = transition([]);
     const m = engine.calculateFlowMetrics(t);
-    expect(() => engine.classifyTransitionHealth(t, m)).toThrow(MpfUnsupportedOperationError);
+    expect(() => engine.classifyTransitionHealth(t, m)).not.toThrow();
   });
 
   it("empty input returns empty advanced findings", () => {

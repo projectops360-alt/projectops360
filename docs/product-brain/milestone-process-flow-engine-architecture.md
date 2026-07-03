@@ -127,6 +127,25 @@ import to avoid a cycle) + nine optional finding counts on the run summary.
 [milestone-process-flow-delay-detector.md](./milestone-process-flow-delay-detector.md).
 Next task: **Detect Rework, Bottlenecks & Constraint Propagation.**
 
+## Transition Health & Isabella Evidence Packets (Task 7 — added)
+
+`transition-health-types.ts`, `transition-health-classifier.ts`,
+`isabella-evidence-packet-types.ts`, and `isabella-evidence-packet-builder.ts`
+converge the engine: **evidence-backed transition health** (conservative ladder,
+machine reason codes, confidence capping, `unknown` on weak evidence) + **Isabella
+evidence packets** (facts require evidence; predictions never facts; recommendations
+are action categories; explicit uncertainties; allowed/disallowed claim guardrails —
+a fallback dependency bottleneck is never a confirmed cause). **No LLM/AI call, no
+natural language, no UI, no `Date.now()`.** `buildMilestoneFlowProjection` now
+populates `healthByTransition` (Task 1 base contract) + optional
+`healthSummariesByTransition` + `isabellaEvidencePacketsByTransition`, and
+`classifyTransitionHealth` **delegates to the classifier (no longer throws)** — every
+MPF engine contract method is now implemented. Additive-only: two optional projection
+fields (type-only imports) + six optional health counts on the run summary. Test id
+**PEG-MPF-TRANSITION-HEALTH-ISABELLA-EVIDENCE**. Full detail:
+[milestone-process-flow-transition-health.md](./milestone-process-flow-transition-health.md).
+Next task: **Build Milestone Process Flow Living Graph UI Consumer.**
+
 ## Advanced Detectors (Task 6 — added)
 
 `advanced-detection-types.ts`, `advanced-detection-shared.ts`, `rework-detector.ts`,
