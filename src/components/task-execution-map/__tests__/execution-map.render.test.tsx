@@ -197,6 +197,27 @@ describe("Execution Map — subtask node", () => {
     expect(html).toContain("opacity-50");
     expect(html).toContain("Completed");
   });
+
+  it("shows a delete button ONLY when a delete handler is supplied (RBAC-gated)", () => {
+    const base = {
+      subtaskId: "s1",
+      title: "Removable",
+      status: "in_progress",
+      progress: 10,
+      ownerName: null,
+      dueDate: null,
+      weight: null,
+      estimatedHours: null,
+      isCritical: false,
+      isOverdue: false,
+      isBlocked: false,
+      muted: false,
+    };
+    const withDelete = render(<SubtaskMapNode {...nodeProps({ ...base, onDeleteSubtask: () => {} })} />);
+    expect(withDelete).toContain('data-testid="tem-node-delete"');
+    const withoutDelete = render(<SubtaskMapNode {...nodeProps(base)} />);
+    expect(withoutDelete).not.toContain('data-testid="tem-node-delete"');
+  });
 });
 
 describe("Execution Map — blocker + dependency nodes", () => {

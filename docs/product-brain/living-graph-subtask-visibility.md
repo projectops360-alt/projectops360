@@ -48,7 +48,30 @@ Map") so the two are never ambiguously both "Execution Map".
   returns to the root-only view. Grouping/layout controls appear only once
   expanded. Pan / zoom / fit-to-view / center-selected / reset and the three
   layouts (radial / hierarchical / left-to-right) are all available.
+- **Default layout is left-to-right**, so expanded subtasks flow horizontally
+  from the parent (matching the Living Graph milestone drill-down, §11).
+- **Manual drag + save (UX-007 parity):** nodes are draggable; a user drag
+  overrides the auto-layout (presentation only). **Save layout** persists the
+  arrangement + viewport to localStorage scoped per **project + task + layout
+  mode** (`src/lib/subtasks/subtask-map-layout.ts`); it is restored on the next
+  visit and reconciled against the live nodes (stale positions dropped, new
+  subtasks auto-placed, with an honest "partially applied" notice). **Reset to
+  auto** returns to the deterministic layout; **Clear saved** removes the
+  stored arrangement. Saved data is **coordinates + viewport only** — never
+  subtask data, status, or relationships.
+- **Delete from the node:** managers (owner/admin) get a trash button on each
+  subtask node (and in the detail panel) that deletes the subtask through the
+  audited `deleteSubtaskAction` after a confirmation. Contributors/viewers
+  never see it (RBAC — the handler is only supplied when `canManage`).
 - The Table/List fallback view remains for fast editing.
+
+## 11. Milestone drill-down flows left-to-right (Living Graph)
+
+Selecting/drilling into a milestone in the Project Execution Map now switches
+the layout to **timeline (left-to-right)** so the milestone's tasks read
+horizontally — the same left-to-right flow the Subtask Map uses when it
+expands. This is a presentation default; the user can still pick any layout
+mode, and each mode keeps its own saved arrangement (UX-007).
 
 ## 4. Expand / collapse / reset behavior
 

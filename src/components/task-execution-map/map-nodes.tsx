@@ -23,6 +23,7 @@ import {
   Flame,
   Layers,
   Link2,
+  Trash2,
   User,
   XCircle,
 } from "lucide-react";
@@ -223,6 +224,7 @@ export type SubtaskNodeType = Node<Record<string, unknown>, "subtask">;
 export function SubtaskMapNode({ data }: NodeProps<SubtaskNodeType>) {
   const t = useTranslations("taskExecutionMap");
   const d = data as {
+    subtaskId: string;
     title: string;
     status: SubtaskStatus;
     progress: number;
@@ -234,11 +236,12 @@ export function SubtaskMapNode({ data }: NodeProps<SubtaskNodeType>) {
     isOverdue: boolean;
     isBlocked: boolean;
     muted: boolean;
+    onDeleteSubtask?: (subtaskId: string) => void;
   };
   return (
     <div
       data-testid="tem-subtask-node"
-      className={`w-[240px] rounded-lg border bg-card p-2.5 shadow-sm transition-opacity ${
+      className={`group w-[240px] rounded-lg border bg-card p-2.5 shadow-sm transition-opacity ${
         d.muted ? "opacity-50" : ""
       } ${d.isBlocked ? "border-red-500/60" : d.isCritical ? "border-amber-500/60" : "border-border"}`}
     >
@@ -255,6 +258,23 @@ export function SubtaskMapNode({ data }: NodeProps<SubtaskNodeType>) {
               className="h-3.5 w-3.5 text-amber-600"
               aria-label={t("node.overdue")}
             />
+          )}
+          {/* Quick delete straight from the node (RBAC-gated: the handler is
+              only supplied to managers). Confirms before deleting. */}
+          {d.onDeleteSubtask && (
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted-foreground/50 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              aria-label={t("actions.delete")}
+              title={t("actions.delete")}
+              data-testid="tem-node-delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(t("actions.deleteConfirm"))) d.onDeleteSubtask?.(d.subtaskId);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
           )}
         </div>
       </div>
