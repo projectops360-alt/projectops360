@@ -60,6 +60,11 @@ export interface GuideContext {
   // by the client. Holds record-backed source/traceability facts the model must
   // use verbatim (and never invent). Populated in askLivingGuideAction.
   provenanceFacts?: string;
+  // ── Task execution facts (Task Execution Map) — DETERMINISTIC, server-stamped
+  // only. Record-backed subtask/progress/blocker facts for the selected task so
+  // Isabella explains WHY a task moves, is blocked, delayed, or at risk —
+  // never inventing counts or causes. Populated in askLivingGuideAction.
+  executionFacts?: string;
 }
 
 /** One retrieved chunk with provenance, after hybrid fusion. */

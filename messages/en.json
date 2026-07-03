@@ -393,6 +393,155 @@
       "confirmBody": "This task has no milestone. It will be removed from the project (archived — an administrator can restore it). Tasks assigned to a milestone cannot be deleted from the board.",
       "confirmDelete": "Delete task",
       "cancel": "Cancel"
+    },
+    "subtasks": {
+      "executionMap": "Execution Map",
+      "blocked": "Blocked subtasks",
+      "overdue": "Overdue subtasks",
+      "done": "Subtasks completed"
+    }
+  },
+  "taskExecutionMap": {
+    "pageTitle": "Task Execution Map",
+    "backToWorkboard": "Back to Workboard",
+    "empty": "No subtasks yet. Add the first one to start calculating progress.",
+    "unassigned": "Unassigned",
+    "yes": "Yes",
+    "view": {
+      "map": "Execution Map",
+      "table": "Table"
+    },
+    "status": {
+      "not_started": "Not started",
+      "in_progress": "In progress",
+      "blocked": "Blocked",
+      "in_review": "In review",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "parent": {
+      "criticalAtRisk": "Critical risk",
+      "criticalPath": "Critical path",
+      "progressFromSubtasks": "Progress calculated from subtasks",
+      "progressManual": "Manual progress (no subtasks)",
+      "done": "Done",
+      "blocked": "Blocked",
+      "overdue": "Overdue",
+      "estimated": "Est.",
+      "actual": "Actual",
+      "variance": "Variance"
+    },
+    "node": {
+      "critical": "Critical path",
+      "overdue": "Overdue",
+      "dueDate": "Due date",
+      "weightOrHours": "Weight / estimated hours"
+    },
+    "blocker": {
+      "title": "Blocker",
+      "noReason": "No reason recorded",
+      "age": "{days} day(s) old",
+      "impact": {
+        "critical": "Critical impact",
+        "normal": "Normal impact"
+      },
+      "affectsCriticalPath": "Affects critical path"
+    },
+    "dependency": {
+      "title": "Dependency"
+    },
+    "group": {
+      "expandHint": "Click to expand this group"
+    },
+    "panel": {
+      "ariaLabel": "Node details",
+      "parentTitle": "Task details",
+      "subtaskTitle": "Subtask details",
+      "close": "Close panel",
+      "completedAt": "Completed on",
+      "blockedReason": "Blocked reason",
+      "updateProgress": "Update progress",
+      "notFound": "This item is no longer available.",
+      "calcMethod": "Calculation method",
+      "breakdown": "Progress breakdown",
+      "blockers": "Blockers",
+      "closeGate": "This task cannot be closed: {count} active subtask(s) are incomplete. An authorized override with a reason is required."
+    },
+    "calc": {
+      "count": "Count-based (completed / active)",
+      "weighted": "Weighted (by subtask weight)",
+      "hours": "Hours-based (by estimated hours)",
+      "fallback": {
+        "no_valid_weights": "No valid weights — fell back to count-based.",
+        "no_valid_estimates": "No valid hour estimates — fell back to the next method."
+      }
+    },
+    "actions": {
+      "complete": "Complete",
+      "block": "Block",
+      "unblock": "Unblock",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this subtask? This is audited and can be restored by an administrator.",
+      "blockReasonLabel": "Blocking reason (required)",
+      "blockReasonPlaceholder": "What is impeding this subtask?",
+      "confirmBlock": "Block subtask",
+      "addSubtask": "Add subtask"
+    },
+    "isabella": {
+      "ask": "Ask Isabella",
+      "askAboutTask": "Ask Isabella about this task",
+      "askAboutSubtask": "Ask Isabella about this subtask",
+      "mapQuestion": "Explain the execution map of the task \"{title}\": progress, blockers, overdue subtasks and what to focus on first.",
+      "parentQuestion": "Why is the task \"{title}\" at its current progress, and what is blocking or delaying it?",
+      "subtaskQuestion": "What is the status of the subtask \"{title}\" and how does it affect its parent task?"
+    },
+    "toolbar": {
+      "search": "Search nodes…",
+      "filterStatus": "Filter by status",
+      "allStatuses": "All statuses",
+      "filterOwner": "Filter by owner",
+      "allOwners": "All owners",
+      "onlyBlocked": "Blocked",
+      "onlyOverdue": "Overdue",
+      "onlyCritical": "Critical path",
+      "groupBy": "Group by",
+      "groupNone": "No grouping",
+      "groupStatus": "Group by status",
+      "groupOwner": "Group by owner",
+      "groupPriority": "Group by priority",
+      "layout": "Layout",
+      "layoutRadial": "Radial",
+      "layoutHierarchical": "Hierarchical",
+      "layoutLeftRight": "Left to right",
+      "hiddenByFilters": "{count} subtask(s) hidden by active filters."
+    },
+    "form": {
+      "createTitle": "New subtask",
+      "editTitle": "Edit subtask",
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "weight": "Weight",
+      "estimatedHours": "Estimated hours",
+      "actualHours": "Actual hours",
+      "isCritical": "Critical path subtask",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…"
+    },
+    "table": {
+      "status": "Status",
+      "progress": "Progress",
+      "owner": "Owner",
+      "hours": "Hours",
+      "flags": "Flags"
+    },
+    "errors": {
+      "forbidden": "You don't have permission for this action.",
+      "not_authenticated": "Your session has expired. Please sign in again.",
+      "unexpected": "Something went wrong. Please try again.",
+      "blockReasonRequired": "A blocking reason is required."
     }
   },
   "dashboard": {

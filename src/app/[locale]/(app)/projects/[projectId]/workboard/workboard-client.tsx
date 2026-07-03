@@ -3,12 +3,14 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import Link from "next/link";
 import {
   CheckCircle2, Loader2, Circle, Ban, Pause,
   FileText, Send, Code, ShieldCheck, AlertCircle,
   GripVertical, Filter, ChevronLeft, ChevronRight,
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
-  CornerDownRight, User, Rows3, Rows4, Trash2,
+  CornerDownRight, User, Rows3, Rows4, Trash2, Network,
+  AlertTriangle, ListChecks,
 } from "lucide-react";
 import { updateTaskStatusAction, reorderTasksAction, archiveTaskAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { applyBoardDrag } from "@/lib/workboard/reorder";
@@ -21,6 +23,7 @@ import {
 } from "@/hooks/use-workboard-preferences";
 import { useColumnResize } from "@/hooks/use-column-resize";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency, Locale } from "@/types/database";
+import type { SubtaskDashboardSummary } from "@/lib/subtasks/map-model";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,13 @@ interface WorkboardTranslations {
     confirmDelete: string;
     cancel: string;
   };
+  /** Task Execution Map — subtask signals on cards + header chips. */
+  subtasks: {
+    executionMap: string;
+    blocked: string;
+    overdue: string;
+    done: string;
+  };
   taskForm: TaskFormTranslations;
 }
 
@@ -79,6 +89,8 @@ interface WorkboardClientProps {
   assignees: Record<string, AssigneeInfo>;
   locale: Locale;
   translations: WorkboardTranslations;
+  /** Task Execution Map — per-task subtask signals (blocked/overdue/done). */
+  subtaskSummary?: SubtaskDashboardSummary;
 }
 
 // ── Column Configuration ────────────────────────────────────────────────────────
@@ -152,6 +164,9 @@ interface BoardColumnProps {
   onTaskClick: (task: RoadmapTask) => void;
   /** Workboard Cleanup — opens the delete confirmation for a NO-MILESTONE task. */
   onDeleteRequest: (task: RoadmapTask) => void;
+  /** Task Execution Map — per-task subtask signals + map link base. */
+  subtaskSummary?: SubtaskDashboardSummary;
+  taskMapBase?: string;
   translations: {
     columns: Record<TaskStatus, string>;
     empty: string;
@@ -164,6 +179,7 @@ interface BoardColumnProps {
     unassigned: string;
     assignedUserUnavailable: string;
     deleteTask: string;
+    subtasks: { executionMap: string; blocked: string; overdue: string; done: string };
   };
 }
 
@@ -185,6 +201,8 @@ function BoardColumn({
   onResizeEnd,
   onTaskClick,
   onDeleteRequest,
+  subtaskSummary,
+  taskMapBase,
   translations: t,
 }: BoardColumnProps) {
   const color = STATUS_COLOR[status];
@@ -352,6 +370,46 @@ function BoardColumn({
                               );
                             })()}
                             {task.estimate_hours && <span className="text-[10px] text-muted-foreground/60 mt-0.5">{task.estimate_hours}h</span>}
+                            {/* Task Execution Map — subtask signals (record-backed) + map link.
+                                Additive only: never changes status semantics, counts, or layout. */}
+                            {(() => {
+                              const sig = subtaskSummary?.byTask[task.id];
+                              if (!sig && !taskMapBase) return null;
+                              return (
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap" data-testid="workboard-subtask-signals">
+                                  {sig && sig.total > 0 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground" title={t.subtasks.done}>
+                                      <ListChecks className="h-3 w-3" aria-hidden />
+                                      {sig.completed}/{sig.active}
+                                    </span>
+                                  )}
+                                  {sig && sig.blocked > 0 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-600" title={t.subtasks.blocked}>
+                                      <Ban className="h-3 w-3" aria-hidden />
+                                      {sig.blocked}
+                                    </span>
+                                  )}
+                                  {sig && sig.overdue > 0 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-600" title={t.subtasks.overdue}>
+                                      <AlertTriangle className="h-3 w-3" aria-hidden />
+                                      {sig.overdue}
+                                    </span>
+                                  )}
+                                  {taskMapBase && (
+                                    <Link
+                                      href={`${taskMapBase}/${task.id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-900/30"
+                                      title={t.subtasks.executionMap}
+                                      data-testid="workboard-execution-map-link"
+                                    >
+                                      <Network className="h-3 w-3" aria-hidden />
+                                      {t.subtasks.executionMap}
+                                    </Link>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {task.progress > 0 && (
                               <div className="mt-1.5 flex items-center gap-1">
                                 <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
@@ -404,6 +462,7 @@ export function WorkboardClient({
   assignees,
   locale,
   translations: t,
+  subtaskSummary,
 }: WorkboardClientProps) {
   const router = useRouter();
   const isEs = locale === "es";
@@ -790,6 +849,23 @@ export function WorkboardClient({
         <p className="text-sm font-semibold text-brand-600 dark:text-brand-400">{projectTitle}</p>
         <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+        {/* Task Execution Map — project-level subtask alerts (record-backed). */}
+        {subtaskSummary && (subtaskSummary.totals.blocked > 0 || subtaskSummary.totals.overdue > 0) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="workboard-subtask-alerts">
+            {subtaskSummary.totals.blocked > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+                <Ban className="h-3 w-3" aria-hidden />
+                {t.subtasks.blocked}: {subtaskSummary.totals.blocked}
+              </span>
+            )}
+            {subtaskSummary.totals.overdue > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                <AlertTriangle className="h-3 w-3" aria-hidden />
+                {t.subtasks.overdue}: {subtaskSummary.totals.overdue}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">{t.dragHint}</p>
@@ -997,6 +1073,8 @@ export function WorkboardClient({
                           onResizeEnd={handleResizeEnd}
                           onTaskClick={(task) => setEditingTask(task)}
                           onDeleteRequest={(task) => setPendingDelete(task)}
+                          subtaskSummary={subtaskSummary}
+                          taskMapBase={`/${locale}/projects/${projectId}/tasks`}
                           translations={{
                             columns: t.columns,
                             empty: t.empty,
@@ -1009,6 +1087,7 @@ export function WorkboardClient({
                             unassigned: t.unassigned,
                             assignedUserUnavailable: t.assignedUserUnavailable,
                             deleteTask: t.cleanup.deleteTask,
+                            subtasks: t.subtasks,
                           }}
                         />
                       ))}

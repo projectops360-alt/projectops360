@@ -98,6 +98,21 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   TaskDependencyAdded: sem("TaskDependencyAdded", "dependency", { frictionType: "dependency", bottleneckCandidateType: "dependency", constraintPropagationSignal: "creates_constraint", notes: "Dependency added; may constrain downstream flow." }),
   TaskDependencyRemoved: sem("TaskDependencyRemoved", "dependency", { constraintPropagationSignal: "resolves_constraint", notes: "Dependency removed; constraint relieved." }),
 
+  // ── Subtask (Task Execution Map) — mirror their task-level counterparts ──
+  SubtaskCreated: sem("SubtaskCreated", "work", { notes: "Subtask defined (planning); no flow signal yet." }),
+  SubtaskUpdated: sem("SubtaskUpdated", "work", { notes: "Subtask metadata updated." }),
+  SubtaskStarted: sem("SubtaskStarted", "work", { transitionSignal: "progresses_transition", flowSegmentType: "active_work", notes: "Work active on a subtask." }),
+  SubtaskCompleted: sem("SubtaskCompleted", "work", { transitionSignal: "progresses_transition", flowSegmentType: "active_work", healthSignal: "improves_health", notes: "Subtask completed; contributes to parent-task progress." }),
+  SubtaskBlocked: sem("SubtaskBlocked", "blocker", { transitionSignal: "blocks_transition", flowSegmentType: "blocked", healthSignal: "blocks_health", constraintPropagationSignal: "creates_constraint", notes: "Active impediment blocks a subtask; blocks flow." }),
+  SubtaskUnblocked: sem("SubtaskUnblocked", "blocker", { transitionSignal: "unblocks_transition", flowSegmentType: "active_work", healthSignal: "indicates_recovery", constraintPropagationSignal: "resolves_constraint", notes: "Subtask impediment cleared; flow can resume." }),
+  SubtaskReassigned: sem("SubtaskReassigned", "work", { notes: "Subtask owner reassigned; relieves ownership gap." }),
+  SubtaskDueDateChanged: sem("SubtaskDueDateChanged", "work", { notes: "Subtask due date changed (schedule)." }),
+  SubtaskEstimateChanged: sem("SubtaskEstimateChanged", "work", { notes: "Subtask estimate changed." }),
+  SubtaskProgressChanged: sem("SubtaskProgressChanged", "work", { transitionSignal: "progresses_transition", flowSegmentType: "active_work", notes: "Subtask progress moved; feeds calculated parent progress." }),
+  SubtaskDeleted: sem("SubtaskDeleted", "work", { notes: "Subtask deleted (audit)." }),
+  ParentTaskProgressRecalculated: sem("ParentTaskProgressRecalculated", "work", { ...DERIVED, notes: "Derived parent progress recalculated from subtasks (audit trail of why progress moved)." }),
+  ParentTaskProgressOverride: sem("ParentTaskProgressOverride", "work", { notes: "Authorized manual parent-progress override with reason (audited)." }),
+
   // ── Risk / Issue ──────────────────────────────────────────────────────────
   RiskIdentified: sem("RiskIdentified", "risk", { healthSignal: "increases_risk", constraintPropagationSignal: "creates_constraint", notes: "Risk identified." }),
   RiskEscalated: sem("RiskEscalated", "risk", { healthSignal: "increases_risk", constraintPropagationSignal: "intensifies_constraint", notes: "Risk escalated (critical)." }),
