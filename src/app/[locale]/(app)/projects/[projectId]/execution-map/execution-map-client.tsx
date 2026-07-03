@@ -543,6 +543,15 @@ export function ExecutionMapClient({
           <Share2 className="h-3.5 w-3.5" />
           {locale === "es" ? "Grafo Vivo" : "Living Graph"}
         </button>
+        {/* Milestone Process Flow lives on its own route (MPF Engine consumer) */}
+        <button
+          type="button"
+          onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/milestone-flow`))}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <GitBranch className="h-3.5 w-3.5" />
+          {locale === "es" ? "Flujo entre Hitos" : "Milestone Flow"}
+        </button>
       </div>
 
       {/* Tab content */}

@@ -2172,5 +2172,293 @@
       "sign_failed": "No se pudo cargar el audio. Inténtalo de nuevo.",
       "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo."
     }
+  },
+  "milestoneFlow": {
+    "title": "Flujo de Proceso entre Hitos",
+    "subtitle": "Flujo de ejecución entre hitos derivado por el motor — salud, fricción y evidencia.",
+    "backToExecutionMap": "Mapa de Ejecución",
+    "selectPrompt": "Selecciona una transición para inspeccionar su flujo, métricas, hallazgos y evidencia.",
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "unknown": "Desconocida"
+    },
+    "observability": {
+      "generatedAt": "Generado",
+      "engine": "Motor",
+      "summary": "{transitions} transiciones · {segments} segmentos · {findings} hallazgos · {packets} paquetes de Isabella",
+      "unknownHealth": "{count} con salud desconocida",
+      "warnings": "{count} advertencias del motor",
+      "dataQuality": "Calidad de datos"
+    },
+    "filters": {
+      "title": "Filtros",
+      "segmentType": "Tipo de segmento",
+      "findingType": "Tipo de hallazgo",
+      "severity": "Severidad",
+      "all": "Todos",
+      "onlyUncertainty": "Solo con incertidumbre",
+      "onlyWarnings": "Solo con advertencias",
+      "onlyOpenFindings": "Solo con hallazgos abiertos",
+      "clear": "Limpiar",
+      "showing": "Mostrando {shown} de {total}",
+      "noMatch": "Ninguna transición coincide con los filtros actuales."
+    },
+    "corridor": {
+      "start": "Inicio del proyecto",
+      "transitionStatuses": {
+        "pending": "Pendiente",
+        "active": "Activa",
+        "completed": "Completada",
+        "regressed": "Regresada",
+        "unknown": "Desconocida"
+      },
+      "uncertainty": "Incertidumbre",
+      "warnings": "Advertencias",
+      "segmentCount": "{count} segmentos",
+      "findingCount": "{count} hallazgos",
+      "openFindingCount": "{count} abiertos",
+      "barLabel": "Composición de segmentos del flujo",
+      "started": "Iniciada",
+      "completed": "Completada",
+      "lastEvent": "Último evento"
+    },
+    "health": {
+      "title": "Salud de la transición",
+      "confidence": "Confianza",
+      "primaryReason": "Razón principal",
+      "otherReasons": "También",
+      "recommendedAction": "Acción recomendada",
+      "uncertaintyTitle": "Incertidumbre",
+      "evidenceCount": "{count} referencias de evidencia",
+      "warningCount": "{count} advertencias",
+      "machineDetail": "Detalle legible por máquina",
+      "statuses": {
+        "healthy": "Saludable",
+        "watch": "En observación",
+        "degraded": "Degradada",
+        "blocked": "Bloqueada",
+        "at_risk": "En riesgo",
+        "recovering": "En recuperación",
+        "regressed": "Regresada",
+        "unknown": "Desconocida"
+      },
+      "actionCategories": {
+        "resolve_blocker": "Resolver bloqueo",
+        "escalate_risk": "Escalar riesgo",
+        "investigate_friction": "Investigar fricción",
+        "review_regression": "Revisar regresión",
+        "monitor_recovery": "Monitorear recuperación",
+        "monitor": "Monitorear",
+        "gather_evidence": "Recopilar evidencia",
+        "none": "Ninguna"
+      },
+      "reasonCodes": {
+        "insufficient_evidence": "Evidencia insuficiente",
+        "no_material_friction": "Sin fricción material",
+        "minor_friction": "Fricción menor",
+        "waiting": "Tiempo de espera",
+        "blocker_open": "Bloqueo abierto",
+        "blocker_resolved": "Bloqueo resuelto",
+        "decision_delay": "Retraso de decisión",
+        "approval_delay": "Retraso de aprobación",
+        "rework": "Retrabajo",
+        "bottleneck_candidate": "Candidato a cuello de botella",
+        "propagation": "Propagación de restricciones",
+        "poor_flow_efficiency": "Baja eficiencia de flujo",
+        "high_unknown_time": "Alto tiempo desconocido",
+        "missing_evidence": "Evidencia faltante",
+        "recovered": "Recuperada",
+        "regressed": "Regresada",
+        "conflicting_evidence": "Evidencia contradictoria",
+        "unknown": "Desconocida"
+      },
+      "uncertaintyNotes": {
+        "missing_metrics": "Faltan métricas para esta transición",
+        "missing_evidence": "Falta evidencia de soporte",
+        "ambiguous_blocker_cause": "La causa del bloqueo es ambigua — dependencia es un valor conservador por defecto, no una causa confirmada",
+        "possible_propagation": "La propagación es posible, no confirmada",
+        "unknown_duration": "Algunas duraciones son desconocidas",
+        "backfilled_only_evidence": "La evidencia proviene solo de eventos reconstruidos",
+        "conflicting_signals": "Las señales se contradicen entre sí",
+        "insufficient_transition_evidence": "No hay evidencia suficiente para esta transición"
+      }
+    },
+    "segmentsPanel": {
+      "title": "Segmentos del flujo",
+      "openEnded": "Abierto",
+      "evidenceCount": "{count} evidencias",
+      "types": {
+        "active_work": "Trabajo activo",
+        "waiting": "En espera",
+        "blocked": "Bloqueado",
+        "decision_delay": "Retraso de decisión",
+        "approval_delay": "Retraso de aprobación",
+        "rework": "Retrabajo",
+        "handoff": "Traspaso",
+        "review": "Revisión",
+        "external_constraint": "Restricción externa",
+        "unknown": "Desconocido"
+      }
+    },
+    "metrics": {
+      "title": "Métricas de flujo",
+      "unavailable": "No hay métricas disponibles para esta transición.",
+      "unknownValue": "Desconocido",
+      "plannedDuration": "Duración planificada",
+      "actualDuration": "Duración real",
+      "elapsedDuration": "Duración transcurrida",
+      "activeWorkTime": "Tiempo de trabajo activo",
+      "waitingTime": "Tiempo de espera",
+      "blockedTime": "Tiempo bloqueado",
+      "decisionDelayTime": "Tiempo de retraso de decisión",
+      "approvalDelayTime": "Tiempo de retraso de aprobación",
+      "reworkTime": "Tiempo de retrabajo",
+      "unknownTime": "Tiempo desconocido",
+      "totalKnownSegmentTime": "Tiempo total conocido de segmentos",
+      "flowEfficiency": "Eficiencia de flujo",
+      "segmentCounts": "{total} segmentos · {open} abiertos · {unknown} desconocidos",
+      "completeness": "Completitud",
+      "completenessValues": {
+        "complete": "Completa",
+        "partial": "Parcial",
+        "unknown": "Desconocida",
+        "unavailable": "No disponible"
+      }
+    },
+    "findingsPanel": {
+      "title": "Hallazgos",
+      "delayTitle": "Retrasos y bloqueos",
+      "bottleneckTitle": "Candidatos a cuello de botella",
+      "propagationTitle": "Propagación de restricciones",
+      "candidate": "Candidato",
+      "possible": "Posible",
+      "structuralCandidate": "Candidato estructural",
+      "ambiguousDependency": "La causa específica es desconocida — el motor asume dependencia de forma conservadora. Esto NO es un cuello de botella de dependencia confirmado.",
+      "occurrences": "{count}×",
+      "origin": "Origen aquí",
+      "affected": "Afectada aquí",
+      "delayImpact": "Impacto de retraso",
+      "types": {
+        "blocker": "Bloqueo",
+        "waiting_time": "Tiempo de espera",
+        "decision_delay": "Retraso de decisión",
+        "approval_delay": "Retraso de aprobación",
+        "rework": "Retrabajo",
+        "bottleneck": "Cuello de botella",
+        "propagation": "Propagación"
+      },
+      "statuses": {
+        "open": "Abierto",
+        "resolved": "Resuelto",
+        "partial": "Parcial",
+        "possible": "Posible",
+        "unknown": "Desconocido"
+      },
+      "severities": {
+        "critical": "Crítica",
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja",
+        "unknown": "Desconocida"
+      },
+      "reworkTypes": {
+        "task_reopened": "Tarea reabierta",
+        "approval_rejection": "Aprobación rechazada",
+        "decision_reversal": "Decisión revertida",
+        "scope_change": "Cambio de alcance",
+        "requirement_change": "Cambio de requisito",
+        "defect_or_quality_failure": "Defecto / falla de calidad",
+        "deliverable_revision": "Revisión de entregable",
+        "milestone_regression": "Regresión de hito",
+        "unknown": "Desconocido"
+      },
+      "bottleneckTypes": {
+        "decision": "Decisión",
+        "approval": "Aprobación",
+        "dependency": "Dependencia",
+        "resource": "Recursos",
+        "ownership": "Responsabilidad",
+        "requirement_clarity": "Claridad de requisitos",
+        "quality": "Calidad",
+        "rework": "Retrabajo",
+        "communication": "Comunicación",
+        "external_constraint": "Restricción externa",
+        "process_design": "Diseño del proceso",
+        "unknown": "Desconocido"
+      },
+      "propagationTypes": {
+        "direct_dependency": "Dependencia directa",
+        "decision": "Decisión",
+        "approval": "Aprobación",
+        "risk": "Riesgo",
+        "blocker": "Bloqueo",
+        "resource": "Recursos",
+        "rework": "Retrabajo",
+        "scope_change": "Cambio de alcance",
+        "external_constraint": "Restricción externa",
+        "unknown": "Desconocido"
+      }
+    },
+    "isabella": {
+      "title": "Paquete de evidencia de Isabella",
+      "subtitle": "Evidencia estructurada que Isabella puede usar — nada de esto es lenguaje generado.",
+      "fact": "Hechos",
+      "inference": "Inferencias",
+      "prediction": "Predicciones",
+      "predictionBadge": "Predicción — no es un hecho",
+      "recommendation": "Recomendación",
+      "actionCategoryOnly": "(solo categoría de acción — sin consejo generado)",
+      "uncertainty": "Incertidumbre",
+      "claimsTitle": "Afirmaciones permitidas y prohibidas",
+      "allowedClaims": "Afirmaciones permitidas",
+      "disallowedClaims": "Afirmaciones prohibidas",
+      "noClaims": "Ninguna",
+      "whyDisallowed": "Isabella nunca debe hacer estas afirmaciones — la evidencia no las respalda.",
+      "emptySection": "El motor no derivó ninguna."
+    },
+    "evidence": {
+      "title": "Detalle de evidencia",
+      "empty": "Aún no existen referencias de evidencia para esta transición.",
+      "showRefs": "Mostrar {count} referencias de evidencia",
+      "event": "Evento",
+      "metric": "Métrica",
+      "unavailableDetail": "Los registros detallados de evidencia no están disponibles en esta vista — solo referencias.",
+      "kinds": {
+        "fact": "Hecho",
+        "inference": "Inferencia",
+        "prediction": "Predicción",
+        "recommendation": "Recomendación",
+        "uncertainty": "Incertidumbre"
+      }
+    },
+    "empty": {
+      "noMilestones": {
+        "title": "Aún no hay hitos",
+        "description": "El Flujo de Proceso entre Hitos necesita al menos dos hitos para derivar transiciones. Crea hitos primero en el Mapa de Ejecución."
+      },
+      "noTransitions": {
+        "title": "Aún no hay transiciones entre hitos disponibles para este proyecto",
+        "description": "El motor no pudo derivar transiciones con los hitos y eventos actuales. Esta es una salida honesta — nada se fabrica."
+      },
+      "insufficientEvidence": {
+        "title": "Evidencia insuficiente",
+        "description": "El Flujo de Proceso entre Hitos tiene evidencia de eventos insuficiente para este proyecto. A medida que se acumulen eventos de ejecución, la inteligencia de flujo aparecerá aquí."
+      },
+      "noProjection": {
+        "description": "No hay evaluación de salud disponible para esta transición."
+      },
+      "noFindings": "No se detectaron bloqueos ni retrasos para esta transición.",
+      "noPacket": "No existe un paquete de evidencia de Isabella para esta transición.",
+      "unauthorized": {
+        "title": "Sin acceso",
+        "description": "No tienes acceso al flujo entre hitos de este proyecto."
+      },
+      "error": {
+        "title": "No se pudo cargar el Flujo de Proceso entre Hitos",
+        "description": "Algo falló al construir la proyección de flujo. Inténtalo de nuevo — no se modificó ningún dato."
+      }
+    }
   }
 }
