@@ -57,6 +57,29 @@ export function collapseAllSubtaskParents(): Set<string> {
   return new Set();
 }
 
+/**
+ * The task ids "Expand all" may expand, SCOPED to the currently visible graph
+ * (the milestone/phase the user drilled into). Only VISIBLE task nodes that
+ * actually have subtasks qualify — so Expand all never reveals tasks from other
+ * milestones or subtasks from other tasks (requirements #3/#5/#6). Pure.
+ */
+export function scopedExpandableTaskIds(
+  visibleNodes: readonly Pick<LivingGraphNode, "sourceEntityType" | "nodeType" | "sourceEntityId">[],
+  subtasksByTask: ReadonlyMap<string, unknown>,
+): string[] {
+  const ids = new Set<string>();
+  for (const n of visibleNodes) {
+    if (
+      n.sourceEntityType === "roadmap_tasks" &&
+      n.nodeType !== "subtask_item" &&
+      subtasksByTask.has(n.sourceEntityId)
+    ) {
+      ids.add(n.sourceEntityId);
+    }
+  }
+  return [...ids];
+}
+
 // ── Grouping helper ───────────────────────────────────────────────────────────
 
 export function groupSubtasksByTask(

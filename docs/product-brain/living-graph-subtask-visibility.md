@@ -29,9 +29,16 @@ Map") so the two are never ambiguously both "Execution Map".
   connected by **hierarchy edges** (`subtask_of`: solid violet, curved),
   visually distinct from dependency edges (`caused`: gray solid) and signal
   edges (dashed).
-- A **subtask controls bar** appears at the activities/events levels when any
-  task has subtasks: it shows how many tasks have subtasks, how many are
-  currently expanded, and **Expand all / Collapse all** (explicit user action).
+- A **subtask controls bar** appears at the activities/events levels when a
+  **visible** task has subtasks: it shows how many *visible* tasks have
+  subtasks, how many are currently expanded, and **Expand all / Collapse all**
+  (explicit user action). **Expand all is SCOPED to the current view** — it
+  expands only the tasks visible in the drilled-into milestone/phase, never
+  tasks from other milestones or subtasks from other tasks. **Collapse all**
+  returns to the clean task-only view. Both auto **fit-to-view** afterwards
+  (and the canvas Controls always offer a manual fit-to-view). Expansion is
+  session state and there is no cross-milestone leak: a subtask node renders
+  only when its parent task is visible.
 - Subtask nodes respect the source subtask's status, priority, owner, progress,
   blocked flag, due date, and inherit the parent's milestone. Selecting a
   subtask node opens the detail panel with owner (team member name), due date,
@@ -75,14 +82,25 @@ mode, and each mode keeps its own saved arrangement (UX-007).
 
 ## 4. Expand / collapse / reset behavior
 
-- **Project Execution Map:** per-task toggle (client/session `Set<taskId>`),
-  Expand all, Collapse all. Switching view level resets naturally.
-- **Subtask Map:** root Expand / Collapse (client state), plus the existing
-  group expand for large sets. Collapse returns to the clean root-only view.
+- **Project Execution Map:** per-task click-to-expand (`toggleSubtaskParent`),
+  plus **Expand all (scoped)** and **Collapse all**. Expand all expands only the
+  currently-visible tasks (the drilled-into milestone) via the pure
+  `scopedExpandableTaskIds`, then auto fit-to-view; Collapse all clears
+  everything to the clean default view. Clicking a task node toggles that one
+  task's direct subtasks; expanded branches stay connected to their parent by
+  `subtask_of` edges. Switching view level resets naturally.
+- **Subtask Map:** **Expand** performs a true expand-all under the task — it
+  reveals the root AND every group the map would render (via the shared
+  `resolveEffectiveGrouping`), so the whole one-level subtask set shows even
+  when the map auto-groups (>24 subtasks). **Collapse** returns to the clean
+  root-only view. Clicking the root expands its subtasks; clicking a group
+  expands that group.
 - Expansion state is **session/client state only** — presentation, never
-  persisted as canonical data. (The app's saved-layout model, UX-007, persists
-  node coordinates only; expansion is intentionally kept in memory to avoid
-  stale references.)
+  persisted as canonical data. It is scoped to the current graph context and
+  never leaks between milestones, tasks, or projects (a subtask renders only
+  when its parent is visible). Expansion/collapse never mutate task status,
+  milestone, owner, order, or dependencies. (The app's saved-layout model,
+  UX-007, persists node coordinates only.)
 
 ## 5. Layout controls
 

@@ -20,6 +20,7 @@ import {
   toggleSubtaskExpansion,
   expandAllSubtaskParents,
   collapseAllSubtaskParents,
+  scopedExpandableTaskIds,
   isSubtaskGraphNodeId,
   type SubtaskLayerRow,
 } from "@/lib/graph/subtask-graph-layer";
@@ -197,6 +198,39 @@ describe("reducers (pure)", () => {
   it("expand-all expands every task with subtasks; collapse-all/reset clears", () => {
     expect([...expandAllSubtaskParents(["t1", "t2"])].sort()).toEqual(["t1", "t2"]);
     expect(collapseAllSubtaskParents().size).toBe(0);
+  });
+});
+
+describe("scopedExpandableTaskIds (Expand all scope — requirements #3/#5/#6)", () => {
+  const subtasksByTask = groupSubtasksByTask([
+    subtaskRow("t1", { id: "a" }),
+    subtaskRow("t2", { id: "b" }),
+    subtaskRow("t3", { id: "c" }),
+  ]);
+
+  it("returns ONLY visible task nodes that have subtasks (never other milestones' tasks)", () => {
+    // Visible = only t1 and t2 (t3 is in another milestone → not in the filtered set).
+    const visible = [taskNode("n1", "t1"), taskNode("n2", "t2")];
+    expect(scopedExpandableTaskIds(visible, subtasksByTask).sort()).toEqual(["t1", "t2"]);
+    // t3 has subtasks but is NOT visible → never expanded.
+    expect(scopedExpandableTaskIds(visible, subtasksByTask)).not.toContain("t3");
+  });
+
+  it("excludes visible tasks that have no subtasks", () => {
+    const visible = [taskNode("n1", "t1"), taskNode("nx", "t-none")];
+    expect(scopedExpandableTaskIds(visible, subtasksByTask)).toEqual(["t1"]);
+  });
+
+  it("excludes milestone/synthetic nodes (only roadmap_tasks qualify)", () => {
+    const visible = [
+      taskNode("ms", "t1", { nodeType: "milestone_gate", sourceEntityType: "milestones" }),
+      taskNode("st", "t2", { nodeType: "subtask_item", sourceEntityType: "task_subtasks" }),
+    ];
+    expect(scopedExpandableTaskIds(visible, subtasksByTask)).toEqual([]);
+  });
+
+  it("is empty when nothing visible has subtasks (Expand all is a no-op)", () => {
+    expect(scopedExpandableTaskIds([], subtasksByTask)).toEqual([]);
   });
 });
 
