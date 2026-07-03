@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
 import { resolveCanonicalNodeLabel } from "@/lib/graph/node-label";
+import { loadRealtimeGraphSignature } from "@/lib/living-graph-realtime-ui/load-snapshot";
+import { LivingGraphAutoRefresh } from "@/components/graph/living-graph-auto-refresh";
 import { getOrgContext } from "@/lib/auth";
 import type {
   ProcessNode,
@@ -493,6 +495,16 @@ export default async function LivingGraphPage({
     // No capacity data — the workforce overlay simply stays empty.
   }
 
+  // Auto-refresh baseline: the content signature the client compares against to
+  // decide when to router.refresh() (on a live event notice or a poll). Cheap;
+  // never fatal.
+  let autoRefreshSignature = "";
+  try {
+    autoRefreshSignature = (await loadRealtimeGraphSignature(projectId)) ?? "";
+  } catch {
+    // Fall through with an empty signature — the first poll will set it.
+  }
+
   return (
     <div className="space-y-2">
       {/* Sprint #2 — slim, single-row header so the graph owns the viewport.
@@ -504,6 +516,12 @@ export default async function LivingGraphPage({
           <p className="hidden truncate text-xs text-muted-foreground md:block">{t("subtitle")}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          <LivingGraphAutoRefresh
+            projectId={projectId}
+            organizationId={org.organizationId}
+            userId={org.userId}
+            initialSignature={autoRefreshSignature}
+          />
           <Link
             href={`/projects/${projectId}/execution-map/realtime`}
             className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary shadow-sm transition-colors hover:bg-primary/10"
