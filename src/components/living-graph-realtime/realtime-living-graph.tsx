@@ -61,6 +61,7 @@ import {
 import { REALTIME_NODE_TYPES, realtimeNodeType, type RealtimeNodeData } from "./realtime-graph-nodes";
 import { RealtimeSyncBar } from "./realtime-sync-bar";
 import { RealtimeNodeInspector } from "./realtime-node-inspector";
+import { useLiveGraphSync } from "./use-live-graph-sync";
 
 const EDGE_STYLE: Record<string, { stroke: string; dash?: string }> = {
   hierarchy: { stroke: "#7c3aed" },
@@ -71,6 +72,8 @@ const EDGE_STYLE: Record<string, { stroke: string; dash?: string }> = {
 
 export interface RealtimeLivingGraphProps {
   projectId: string;
+  organizationId: string;
+  userId: string;
   locale: string;
   initialDelta: HierarchicalGraphDelta;
   ownerNames: Record<string, string>;
@@ -103,46 +106,73 @@ function Inner(props: RealtimeLivingGraphProps) {
   const modelRef = useRef(model);
   modelRef.current = model;
   const lastSyncMsRef = useRef(Date.now());
+  const busyRef = useRef(false);
 
-  // ── Polling sync (LGRE polling fallback) ───────────────────────────────────
-  // Poll a cheap signature; on change refetch the approved snapshot delta and
-  // rebuild (full_resync) so the graph auto-updates without a manual refresh —
-  // and other browser sessions converge on the same signature. Honest freshness:
-  // a landed poll → live; a failed poll → stale (never silently outdated).
+  // Refetch the approved snapshot delta and full-resync the view model. Shared
+  // by the LIVE push (instant, on a typed notice) and the polling fallback.
+  const refetchSnapshot = useCallback(
+    async (reason: string) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      try {
+        const { snapshot } = await getRealtimeGraphSnapshotAction(props.projectId);
+        if (!snapshot) return;
+        signatureRef.current = snapshot.signature;
+        setOwnerNames(snapshot.ownerNames);
+        const rebuilt = rebuildFromDeltas(snapshot.projectId, snapshot.organizationId, [snapshot.delta]);
+        setModel((prev) => markChangesAgainstPrevious(rebuilt, prev));
+        lastSyncMsRef.current = Date.now();
+        setSyncState(applySyncResponse({ kind: "deltas", reason, deltas: [], snapshot: null, targetVersion: modelRef.current.version + 1 }, new Date().toISOString()));
+      } finally {
+        busyRef.current = false;
+      }
+    },
+    [props.projectId],
+  );
+
+  // ── LIVE push (LGRE Task 2 subscription → typed notices → instant refetch) ──
+  const { connected: liveConnected } = useLiveGraphSync({
+    projectId: props.projectId,
+    organizationId: props.organizationId,
+    userId: props.userId,
+    onChange: () => void refetchSnapshot("realtime_push"),
+    onConnectionChange: (state) => {
+      if (state === "live") {
+        lastSyncMsRef.current = Date.now();
+        setSyncState((s) => ({ ...s, freshness: "live", reason: "realtime_connected", lastSyncedAt: new Date().toISOString() }));
+      }
+    },
+  });
+
+  // ── Polling fallback (LGRE ladder). Runs slower while the live channel is
+  //    connected (safety net); primary delivery when the channel is down. ──
   useEffect(() => {
     let cancelled = false;
+    const interval = liveConnected ? POLL_INTERVAL_MS * 3 : POLL_INTERVAL_MS;
     const tick = async () => {
       try {
         const { signature } = await getRealtimeGraphSignatureAction(props.projectId);
         if (cancelled) return;
         if (signature == null) {
-          // Unauthorized / unavailable — do not claim live.
           setSyncState((s) => markStaleIfExpired(s, Date.now() - lastSyncMsRef.current, FRESHNESS_BUDGET_MS));
           return;
         }
-        lastSyncMsRef.current = Date.now();
         if (signature === signatureRef.current) {
+          lastSyncMsRef.current = Date.now();
           setSyncState((s) => (s.freshness === "stale" ? { ...s, freshness: "live", lastSyncedAt: new Date().toISOString() } : { ...s, lastSyncedAt: new Date().toISOString() }));
           return;
         }
-        // Changed — refetch the full approved snapshot and full-resync.
-        const { snapshot } = await getRealtimeGraphSnapshotAction(props.projectId);
-        if (cancelled || !snapshot) return;
-        signatureRef.current = snapshot.signature;
-        setOwnerNames(snapshot.ownerNames);
-        const rebuilt = rebuildFromDeltas(snapshot.projectId, snapshot.organizationId, [snapshot.delta]);
-        setModel((prev) => markChangesAgainstPrevious(rebuilt, prev));
-        setSyncState(applySyncResponse({ kind: "deltas", reason: "polled_update", deltas: [], snapshot: null, targetVersion: modelRef.current.version + 1 }, new Date().toISOString()));
+        await refetchSnapshot("polled_update");
       } catch {
         if (!cancelled) setSyncState((s) => markStaleIfExpired(s, Date.now() - lastSyncMsRef.current, FRESHNESS_BUDGET_MS));
       }
     };
-    const timer = window.setInterval(tick, POLL_INTERVAL_MS);
+    const timer = window.setInterval(tick, interval);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [props.projectId]);
+  }, [props.projectId, liveConnected, refetchSnapshot]);
 
   const [rootScope, setRootScope] = useState<LivingGraphRootScope>({ type: "project", id: null });
   const [expansion, setExpansion] = useState(emptyExpansion());

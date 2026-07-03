@@ -25,28 +25,33 @@ live subscription was wired and `project_event_log` was not in the
 emitted its event, but no consumer picked it up → the graph stayed stale, and
 other browsers never learned of the change.
 
-## 2. Fix — the LGRE polling delivery fallback
+## 2. Fix — live push (primary) + polling fallback (LGRE ladder)
 
-The realtime consumer now uses the sanctioned **polling** delivery mode (Task 1
-ladder: realtime → polling → manual_refresh) until the live Supabase channel is
-wired:
+The realtime consumer now delivers updates two ways, per the LGRE delivery
+ladder (realtime → polling → manual_refresh):
 
-- The client polls a **cheap content signature** (`getRealtimeGraphSignatureAction`
-  → `computeGraphSignature` over milestone/task/subtask status+progress tokens)
-  every 10s. Moving a task to Done flips its status token → the signature
-  changes.
-- On a signature change it refetches the **approved snapshot delta**
-  (`getRealtimeGraphSnapshotAction` → the Task 4 hierarchy-safe delta built from
-  the CANONICAL owners, never `process_nodes`/raw events), rebuilds the view
-  model (full-resync), and `markChangesAgainstPrevious` pulses ONLY the changed
-  node.
-- The sync bar shows honest freshness: a landed poll → **live**; a failed poll →
-  **stale** (`markStaleIfExpired`, never silently outdated). Unauthorized →
-  never claims live.
+**Live push (primary).** `useLiveGraphSync` wires the **Task 2 subscription
+layer** into the browser: the Supabase transport
+(`createSupabaseLivingGraphTransport`) subscribes to `postgres_changes` **INSERT
+on `project_event_log`**, project-filtered, under RLS; the subscription manager
+maps each row to a **typed `LivingGraphChangeNotice`**. The UI consumes TYPED
+NOTICES (never raw payloads). On a notice for this project it fires a coalesced
+(~350ms) refetch of the **approved snapshot delta** and full-resyncs — so a task
+move appears **instantly**, and other browsers get the same INSERT and converge.
+`markChangesAgainstPrevious` pulses ONLY the changed node. When the channel is
+live the sync bar shows **live (realtime)**.
 
-Migration `20260833000000_project_event_log_realtime` (idempotent) was applied
-to prod so `project_event_log` is in the realtime publication — enabling the
-future live `postgres_changes` channel.
+**Polling fallback.** A cheap content signature (`computeGraphSignature` over
+milestone/task/subtask status+progress tokens) is polled — every ~30s while the
+live channel is connected (safety net), every ~10s when it isn't (primary). On a
+signature change it refetches the approved snapshot delta and rebuilds. A failed
+poll flips freshness to **stale** (`markStaleIfExpired`) — never silently
+outdated; unauthorized never claims live.
+
+The snapshot delta is the Task 4 hierarchy-safe delta built from the CANONICAL
+owners (`load-snapshot`), never `process_nodes`/raw events. Migration
+`20260833000000_project_event_log_realtime` (idempotent) is applied to prod so
+`project_event_log` is in the realtime publication — enabling the live channel.
 
 ## 3. Cross-browser behavior
 
@@ -79,17 +84,21 @@ client filtering is never the gate.
 
 ## 7. Known limitations
 
-- The live `postgres_changes` subscription (Task 2 channel runtime) is not yet
-  wired into the UI; today delivery is **polling** (10s). The publication
-  migration is applied, so wiring the live channel is a follow-up that swaps the
-  poll for a push without changing the consumer (same delta shape / sync state).
+- Delivery is **live push** (Task 2 Supabase channel) with a **polling safety
+  net**. Live push requires the browser Realtime connection + the publication
+  (applied) + RLS read on `project_event_log` (in place). If the socket can't
+  connect, the polling fallback keeps the graph fresh and the sync bar stays
+  honest.
+- The live notice triggers a **snapshot refetch** (coalesced), not a per-notice
+  incremental delta — correct and simple, at the cost of a small refetch per
+  change burst. A future optimization can feed the notice through the
+  recalculation service for a truly incremental delta.
 - The classic SSR Living Graph (`/execution-map/living-graph`) still updates on
   navigation/`router.refresh`; the **auto-updating** experience is the realtime
-  view (`/execution-map/realtime`). Polling the SSR page is a possible future
-  parity step.
+  view (`/execution-map/realtime`).
 
 ## 8. Recommended next task
 
-Wire the live `postgres_changes` subscription (replace polling with push), then
 **Task 6 — Living Graph Realtime Performance, Throttling & Observability
-Safeguards**.
+Safeguards** (coalescing budgets, backpressure, and per-notice incremental
+deltas over full refetches).
