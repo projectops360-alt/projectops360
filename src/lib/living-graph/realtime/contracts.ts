@@ -13,6 +13,7 @@
 // never writes project_event_log, and never touches process_nodes/process_edges.
 // ============================================================================
 
+import type { LivingGraphSnapshotIndex } from "./recalculation-types";
 import type {
   LivingGraphRealtimeEngineVersion,
   LivingGraphRealtimeConfigVersion,
@@ -60,6 +61,12 @@ export interface LivingGraphRecalculationInput {
   notices: readonly LivingGraphChangeNotice[];
   /** The snapshot the consumer currently holds; null before the first sync. */
   currentSnapshot: LivingGraphSnapshotDescriptor | null;
+  /**
+   * Task 3 — attribution index built from the current snapshot. When present,
+   * planning is SELECTIVE (affected nodes/edges attributed via invalidation
+   * tags); without it the engine keeps the conservative full-rebuild fallback.
+   */
+  snapshotIndex?: LivingGraphSnapshotIndex | null;
 }
 
 // ── 1. Engine Contract ────────────────────────────────────────────────────────
