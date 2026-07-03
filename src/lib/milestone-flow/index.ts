@@ -41,3 +41,5 @@ export * from "./event-semantics";
 export * from "./transition-builder-types";
 export * from "./flow-segment-builder";
 export * from "./transition-builder";
+export * from "./metrics-calculator-types";
+export * from "./metrics-calculator";

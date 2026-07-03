@@ -389,6 +389,12 @@ export interface MilestoneFlowEngineRunSummary {
   unknownSegmentCount: number;
   openTransitionCount: number;
   completedTransitionCount: number;
+  /** Metrics-stage counts (Task 4) — optional; default 0 when metrics did not run. */
+  metricsCalculatedCount?: number;
+  metricsUnknownCount?: number;
+  openSegmentDurationCount?: number;
+  invalidDurationCount?: number;
+  totalKnownSegmentTimeMs?: number;
   warningCount: number;
   errorCount: number;
   startedAt: string; // ISO

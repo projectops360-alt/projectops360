@@ -87,3 +87,22 @@ Additive-only type extensions: `MilestoneFlowEventRef.milestoneId?` and four bui
 counts on the run summary. Test id **PEG-MPF-TRANSITION-SEGMENT-BUILDER**. Full
 detail: [milestone-process-flow-transition-builder.md](./milestone-process-flow-transition-builder.md).
 The **Metrics Calculator** (next task) consumes segment `startedAt`/`endedAt`/`type`.
+
+## Milestone Flow Metrics Calculator (Task 4 — added)
+
+`metrics-calculator-types.ts` and `metrics-calculator.ts` compute **measurement
+only** from Task 3 transitions + segments: planned/actual/forecast/elapsed
+durations, per-segment durations, flow-time buckets by segment type, composition
+percentages (denominator = `totalKnownSegmentTimeMs`), flow efficiency
+(`activeWork / totalKnown`), segment counters, provenance-aware confidence, and
+deduped evidence. **Replay-stable:** open durations are computed only against an
+explicit `analysisAsOf` — no `Date.now()` anywhere; the engine projection passes
+no `analysisAsOf`, so it is deterministic. `buildMilestoneFlowProjection` now
+populates `metricsByTransition`; `calculateFlowMetrics` delegates to the calculator
+(no longer throws). Final **health** and bottlenecks stay deferred
+(`classifyTransitionHealth` still unsupported; `escalationCount` /
+`unresolvedConstraintCount` left null). Additive-only: `MilestoneFlowTransitionMetrics`
+extends the Task 1 `MilestoneFlowMetrics`; five optional metrics counts on the run
+summary. Test id **PEG-MPF-FLOW-METRICS**. Full detail:
+[milestone-process-flow-metrics-calculator.md](./milestone-process-flow-metrics-calculator.md).
+Next task: **Detect Blockers, Waiting Time, Decision Delays & Approval Delays.**
