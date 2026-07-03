@@ -393,6 +393,155 @@
       "confirmBody": "Esta tarea no tiene hito. Se quitará del proyecto (archivada — un administrador puede restaurarla). Las tareas asignadas a un hito no se pueden eliminar desde el tablero.",
       "confirmDelete": "Eliminar tarea",
       "cancel": "Cancelar"
+    },
+    "subtasks": {
+      "executionMap": "Mapa de Ejecución",
+      "blocked": "Subtareas bloqueadas",
+      "overdue": "Subtareas vencidas",
+      "done": "Subtareas completadas"
+    }
+  },
+  "taskExecutionMap": {
+    "pageTitle": "Mapa de Ejecución de la Tarea",
+    "backToWorkboard": "Volver al Workboard",
+    "empty": "Aún no hay subtareas. Añade la primera para empezar a calcular el progreso.",
+    "unassigned": "Sin asignar",
+    "yes": "Sí",
+    "view": {
+      "map": "Mapa de Ejecución",
+      "table": "Tabla"
+    },
+    "status": {
+      "not_started": "No iniciada",
+      "in_progress": "En progreso",
+      "blocked": "Bloqueada",
+      "in_review": "En revisión",
+      "completed": "Completada",
+      "cancelled": "Cancelada"
+    },
+    "parent": {
+      "criticalAtRisk": "Riesgo crítico",
+      "criticalPath": "Ruta crítica",
+      "progressFromSubtasks": "Progreso calculado desde subtareas",
+      "progressManual": "Progreso manual (sin subtareas)",
+      "done": "Hechas",
+      "blocked": "Bloqueadas",
+      "overdue": "Vencidas",
+      "estimated": "Est.",
+      "actual": "Real",
+      "variance": "Varianza"
+    },
+    "node": {
+      "critical": "Ruta crítica",
+      "overdue": "Vencida",
+      "dueDate": "Fecha límite",
+      "weightOrHours": "Peso / horas estimadas"
+    },
+    "blocker": {
+      "title": "Bloqueo",
+      "noReason": "Sin motivo registrado",
+      "age": "{days} día(s) de antigüedad",
+      "impact": {
+        "critical": "Impacto crítico",
+        "normal": "Impacto normal"
+      },
+      "affectsCriticalPath": "Afecta la ruta crítica"
+    },
+    "dependency": {
+      "title": "Dependencia"
+    },
+    "group": {
+      "expandHint": "Haz clic para expandir este grupo"
+    },
+    "panel": {
+      "ariaLabel": "Detalles del nodo",
+      "parentTitle": "Detalles de la tarea",
+      "subtaskTitle": "Detalles de la subtarea",
+      "close": "Cerrar panel",
+      "completedAt": "Completada el",
+      "blockedReason": "Motivo del bloqueo",
+      "updateProgress": "Actualizar progreso",
+      "notFound": "Este elemento ya no está disponible.",
+      "calcMethod": "Método de cálculo",
+      "breakdown": "Desglose del progreso",
+      "blockers": "Bloqueos",
+      "closeGate": "Esta tarea no puede cerrarse: {count} subtarea(s) activa(s) incompleta(s). Se requiere una anulación autorizada con motivo."
+    },
+    "calc": {
+      "count": "Por conteo (completadas / activas)",
+      "weighted": "Ponderado (por peso de subtarea)",
+      "hours": "Por horas (por horas estimadas)",
+      "fallback": {
+        "no_valid_weights": "Sin pesos válidos — se usó el cálculo por conteo.",
+        "no_valid_estimates": "Sin estimaciones de horas válidas — se usó el siguiente método."
+      }
+    },
+    "actions": {
+      "complete": "Completar",
+      "block": "Bloquear",
+      "unblock": "Desbloquear",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar esta subtarea? Queda auditado y un administrador puede restaurarla.",
+      "blockReasonLabel": "Motivo del bloqueo (obligatorio)",
+      "blockReasonPlaceholder": "¿Qué impide avanzar esta subtarea?",
+      "confirmBlock": "Bloquear subtarea",
+      "addSubtask": "Añadir subtarea"
+    },
+    "isabella": {
+      "ask": "Preguntar a Isabella",
+      "askAboutTask": "Preguntar a Isabella sobre esta tarea",
+      "askAboutSubtask": "Preguntar a Isabella sobre esta subtarea",
+      "mapQuestion": "Explica el mapa de ejecución de la tarea \"{title}\": progreso, bloqueos, subtareas vencidas y en qué enfocarse primero.",
+      "parentQuestion": "¿Por qué la tarea \"{title}\" está en su progreso actual y qué la bloquea o retrasa?",
+      "subtaskQuestion": "¿Cuál es el estado de la subtarea \"{title}\" y cómo afecta a su tarea principal?"
+    },
+    "toolbar": {
+      "search": "Buscar nodos…",
+      "filterStatus": "Filtrar por estado",
+      "allStatuses": "Todos los estados",
+      "filterOwner": "Filtrar por responsable",
+      "allOwners": "Todos los responsables",
+      "onlyBlocked": "Bloqueadas",
+      "onlyOverdue": "Vencidas",
+      "onlyCritical": "Ruta crítica",
+      "groupBy": "Agrupar por",
+      "groupNone": "Sin agrupación",
+      "groupStatus": "Agrupar por estado",
+      "groupOwner": "Agrupar por responsable",
+      "groupPriority": "Agrupar por prioridad",
+      "layout": "Distribución",
+      "layoutRadial": "Radial",
+      "layoutHierarchical": "Jerárquica",
+      "layoutLeftRight": "Izquierda a derecha",
+      "hiddenByFilters": "{count} subtarea(s) ocultas por los filtros activos."
+    },
+    "form": {
+      "createTitle": "Nueva subtarea",
+      "editTitle": "Editar subtarea",
+      "title": "Título",
+      "description": "Descripción",
+      "priority": "Prioridad",
+      "weight": "Peso",
+      "estimatedHours": "Horas estimadas",
+      "actualHours": "Horas reales",
+      "isCritical": "Subtarea de ruta crítica",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "saving": "Guardando…"
+    },
+    "table": {
+      "status": "Estado",
+      "progress": "Progreso",
+      "owner": "Responsable",
+      "hours": "Horas",
+      "flags": "Indicadores"
+    },
+    "errors": {
+      "forbidden": "No tienes permiso para esta acción.",
+      "not_authenticated": "Tu sesión ha expirado. Vuelve a iniciar sesión.",
+      "unexpected": "Algo salió mal. Inténtalo de nuevo.",
+      "blockReasonRequired": "El motivo del bloqueo es obligatorio."
     }
   },
   "dashboard": {

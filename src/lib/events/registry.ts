@@ -77,6 +77,21 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
   TaskDependencyAdded: { category: "dependency", subjectType: "task", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["dependency_id"], invalidationScopes: ["scope:schedule"] },
   TaskDependencyRemoved: { category: "dependency", subjectType: "task", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["dependency_id"], invalidationScopes: ["scope:schedule"] },
 
+  // ── Subtask (Task Execution Map) ──
+  SubtaskCreated: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["title", "task_id"] },
+  SubtaskUpdated: { category: "task", subjectType: "subtask", importance: "LOW", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskStarted: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskCompleted: { category: "task", subjectType: "subtask", importance: "HIGH", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskBlocked: { category: "blocker", subjectType: "subtask", importance: "HIGH", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["impediment", "task_id"] },
+  SubtaskUnblocked: { category: "blocker", subjectType: "subtask", importance: "HIGH", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskReassigned: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskDueDateChanged: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"], invalidationScopes: ["scope:schedule"] },
+  SubtaskEstimateChanged: { category: "task", subjectType: "subtask", importance: "LOW", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id"] },
+  SubtaskProgressChanged: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: ["task_id", "new_value"] },
+  SubtaskDeleted: { category: "task", subjectType: "subtask", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["task_id"] },
+  ParentTaskProgressRecalculated: { category: "task", subjectType: "task", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: DER, requiredPayload: ["new_value"] },
+  ParentTaskProgressOverride: { category: "task", subjectType: "task", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["reason", "new_value"] },
+
   // ── Milestone / Phase ──
   MilestoneCreated: { category: "milestone", subjectType: "milestone", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: [] },
   MilestoneUpdated: { category: "milestone", subjectType: "milestone", importance: "LOW", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: [] },

@@ -38,8 +38,9 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       userId: org.userId,
       organizationId: org.organizationId,
       role: org.role,
-      // Never trust a client-supplied provenanceFacts — only the server sets it.
+      // Never trust client-supplied server-stamped facts — only the server sets them.
       provenanceFacts: undefined,
+      executionFacts: undefined,
     },
   };
 
@@ -66,6 +67,27 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       }
     } catch {
       // Never break the answer flow over provenance enrichment.
+    }
+  }
+
+  // ── Task Execution Map facts ────────────────────────────────────────────────
+  // When the ask is about a task (or one of its subtasks), stamp DETERMINISTIC
+  // subtask-execution facts (calculated progress, blockers, overdue, critical
+  // path, recommended focus) so Isabella explains the map with real numbers.
+  if (projectId && entity && (entity.type === "task" || entity.type === "subtask")) {
+    try {
+      const lang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+      const { getTaskExecutionFactsForIsabella } = await import("@/lib/subtasks/service");
+      const facts = await getTaskExecutionFactsForIsabella({
+        org,
+        projectId,
+        entityType: entity.type,
+        entityId: entity.id,
+        language: lang,
+      });
+      if (facts) safeInput.context.executionFacts = facts;
+    } catch {
+      // Never break the answer flow over execution enrichment.
     }
   }
 

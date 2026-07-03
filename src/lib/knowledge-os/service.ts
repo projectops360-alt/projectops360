@@ -93,6 +93,9 @@ function serializeContext(input: AskGuideInput): string {
     // PD-012: deterministic, server-stamped provenance facts. Authoritative —
     // the model must use these numbers/sources verbatim and never invent a source.
     c.provenanceFacts && `\n${c.provenanceFacts}`,
+    // Task Execution Map: deterministic, server-stamped subtask execution facts.
+    // Authoritative — progress/blocker/overdue counts must be used verbatim.
+    c.executionFacts && `\n${c.executionFacts}`,
   ].filter(Boolean);
   return parts.join("\n") || "No additional context provided.";
 }

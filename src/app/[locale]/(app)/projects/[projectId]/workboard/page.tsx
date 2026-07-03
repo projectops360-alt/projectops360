@@ -6,6 +6,8 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale, Milestone, RoadmapTask, TaskStatus, TaskPriority, TaskDependency } from "@/types/database";
 import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
+import { aggregateSubtaskSignals } from "@/lib/subtasks/map-model";
+import type { Subtask } from "@/lib/subtasks/types";
 import type { AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { workboardColumnLabels, type DeliveryMethod } from "@/lib/delivery/config";
 import { WorkboardClient } from "./workboard-dynamic";
@@ -57,6 +59,19 @@ export default async function WorkboardPage({
       .eq("organization_id", org.organizationId)
       .order("created_at", { ascending: true }),
   ]);
+
+  // Task Execution Map — subtask signals for card badges + header alerts.
+  // Table may not exist before the migration is applied — treat errors as empty.
+  const { data: subtaskRows } = await supabase
+    .from("task_subtasks")
+    .select("task_id, status, due_date")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
+  const subtaskSummary = aggregateSubtaskSignals(
+    ((subtaskRows as Pick<Subtask, "task_id" | "status" | "due_date">[] | null) ?? []),
+    new Date(),
+  );
 
   const project = projectResult.data;
   if (!project) {
@@ -150,6 +165,7 @@ export default async function WorkboardPage({
       dependencies={dependencies}
       assignees={assignees}
       locale={locale as Locale}
+      subtaskSummary={subtaskSummary}
       translations={{
         title: t("title"),
         description: t("description"),
@@ -231,6 +247,12 @@ export default async function WorkboardPage({
           confirmBody: t("cleanup.confirmBody"),
           confirmDelete: t("cleanup.confirmDelete"),
           cancel: t("cleanup.cancel"),
+        },
+        subtasks: {
+          executionMap: t("subtasks.executionMap"),
+          blocked: t("subtasks.blocked"),
+          overdue: t("subtasks.overdue"),
+          done: t("subtasks.done"),
         },
         taskForm: {
           createTitle: tTaskForm("createTask"),
