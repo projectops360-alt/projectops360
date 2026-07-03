@@ -304,13 +304,14 @@ describe("engine integration", () => {
   }
   const fixedNow = () => new Date("2026-07-02T10:00:00.000Z");
 
-  it("returns transitions + segments and keeps health unknown (no health assessments)", () => {
+  it("returns transitions + segments (health now populated by Task 7)", () => {
     const engine = createMilestoneProcessFlowEngine({ now: fixedNow });
     const events = [ev({ eventId: "e", eventType: "MilestoneAchieved", occurredAt: "2026-01-30T00:00:00.000Z", subjectType: "milestone", subjectId: "m2" })];
     const out = engine.buildMilestoneFlowProjection(input([M1, M2], events));
     expect(out.projection.transitions.length).toBe(1);
-    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(0);
-    expect(out.observability.healthAssessmentCount).toBe(0);
+    // Task 7 populates health; Task 3's own concern (transitions/segments) is unchanged.
+    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(1);
+    expect(out.observability.healthAssessmentCount).toBe(1);
     expect(out.observability.transitionCount).toBe(1);
     expect(typeof out.observability.segmentCount).toBe("number");
   });

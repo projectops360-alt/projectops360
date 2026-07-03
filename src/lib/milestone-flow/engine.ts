@@ -29,7 +29,6 @@ import {
   MpfUnauthorizedAccessError,
   MpfInvalidEventInputError,
   MpfInvalidMilestoneInputError,
-  MpfUnsupportedOperationError,
 } from "./errors";
 import {
   resolveMilestoneFlowAccess,
@@ -42,6 +41,12 @@ import { buildFlowSegmentsForTransition } from "./flow-segment-builder";
 import { calculateMilestoneFlowMetrics, calculateMilestoneTransitionMetrics } from "./metrics-calculator";
 import { detectMilestoneFlowDelays } from "./delay-detector";
 import { detectMilestoneFlowAdvancedFindings } from "./advanced-detection";
+import {
+  classifyMilestoneTransitionHealth,
+  classifySingleMilestoneTransitionHealth,
+  toBaseTransitionHealth,
+} from "./transition-health-classifier";
+import { buildIsabellaMilestoneFlowEvidencePackets } from "./isabella-evidence-packet-builder";
 import type {
   MilestoneProcessFlowEngine,
   MilestoneFlowInputContract,
@@ -168,6 +173,25 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       findingsByTransition: detection.findingsByTransition,
     });
 
+    // Task 7: evidence-backed transition health + Isabella evidence packets.
+    // Conservative: weak/incomplete evidence → lower confidence / unknown. No LLM,
+    // no natural language, no Date.now, no canonical mutation.
+    const health = classifyMilestoneTransitionHealth({
+      scope: input.scope,
+      transitions: build.transitions,
+      metricsByTransition: metrics.metricsByTransition,
+      findingsByTransition: detection.findingsByTransition,
+      reworkFindingsByTransition: advanced.reworkFindingsByTransition,
+      bottleneckFindingsByTransition: advanced.bottleneckFindingsByTransition,
+      constraintPropagationFindings: advanced.constraintPropagationFindings,
+    });
+    const isabella = buildIsabellaMilestoneFlowEvidencePackets(health);
+
+    const healthByTransition: MilestoneFlowProjection["healthByTransition"] = {};
+    for (const [id, s] of Object.entries(health.healthSummariesByTransition)) {
+      healthByTransition[id] = toBaseTransitionHealth(s);
+    }
+
     const summary = closeRunSummary(
       ctx,
       {
@@ -177,7 +201,6 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
         transitionCount: build.stats.transitionCount,
         segmentCount: build.stats.segmentCount,
         bottleneckCount: 0,
-        healthAssessmentCount: 0, // final health is a later task — kept unknown
         unassignedEventCount: build.stats.unassignedEventCount,
         unknownSegmentCount: build.stats.unknownSegmentCount,
         openTransitionCount: build.stats.openTransitionCount,
@@ -205,7 +228,14 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
         resolvedAdvancedFindingCount: advanced.stats.resolvedAdvancedFindingCount,
         unknownAdvancedFindingCount: advanced.stats.unknownAdvancedFindingCount,
         highSeverityAdvancedFindingCount: advanced.stats.highSeverityAdvancedFindingCount,
-        warnings: [...build.warnings, ...metrics.warnings, ...detection.warnings, ...advanced.warnings],
+        healthAssessmentCount: health.stats.healthAssessmentCount,
+        healthyTransitionCount: health.stats.healthyTransitionCount,
+        atRiskTransitionCount: health.stats.atRiskTransitionCount,
+        blockedHealthTransitionCount: health.stats.blockedTransitionCount,
+        regressedHealthTransitionCount: health.stats.regressedTransitionCount,
+        unknownHealthCount: health.stats.unknownHealthCount,
+        isabellaPacketCount: Object.keys(isabella.packetsByTransition).length,
+        warnings: [...build.warnings, ...metrics.warnings, ...detection.warnings, ...advanced.warnings, ...health.warnings],
       },
       this.now,
     );
@@ -218,8 +248,7 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       generatedAt: ctx.startedAt,
       transitions: build.transitions,
       metricsByTransition: metrics.metricsByTransition,
-      // Final health is deferred to a later Phase 3 task (kept empty / unknown).
-      healthByTransition: {},
+      healthByTransition,
       bottlenecks: [],
       constraintPropagations: [],
       dataQualityFlags,
@@ -227,6 +256,8 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       reworkFindingsByTransition: advanced.reworkFindingsByTransition,
       bottleneckFindingsByTransition: advanced.bottleneckFindingsByTransition,
       constraintPropagationFindings: advanced.constraintPropagationFindings,
+      healthSummariesByTransition: health.healthSummariesByTransition,
+      isabellaEvidencePacketsByTransition: isabella.packetsByTransition,
       observability: summary,
     };
 
@@ -260,13 +291,20 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
     return calculateMilestoneTransitionMetrics(transition);
   }
 
-  // ── Algorithmic methods — not implemented yet (never faked) ─────────────────
+  // ── Transition health (Task 7) ──────────────────────────────────────────────
 
   classifyTransitionHealth(
-    _transition: MilestoneTransition,
-    _metrics: MilestoneFlowMetrics,
+    transition: MilestoneTransition,
+    metrics: MilestoneFlowMetrics,
   ): MilestoneTransitionHealth {
-    throw new MpfUnsupportedOperationError("classifyTransitionHealth");
+    // Single-transition contract: no findings available → conservative. The base
+    // metrics satisfies the classifier's minimal metrics view.
+    const summary = classifySingleMilestoneTransitionHealth({
+      scope: transition.scope,
+      transition,
+      metrics,
+    });
+    return toBaseTransitionHealth(summary);
   }
 
   buildEvidencePacket(transition: MilestoneTransition): MilestoneFlowEvidencePacket {

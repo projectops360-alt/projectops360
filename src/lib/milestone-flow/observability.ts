@@ -89,6 +89,13 @@ export interface RunTallies {
   resolvedAdvancedFindingCount?: number;
   unknownAdvancedFindingCount?: number;
   highSeverityAdvancedFindingCount?: number;
+  /** Health-stage counts (Task 7) — optional; default 0. */
+  healthyTransitionCount?: number;
+  atRiskTransitionCount?: number;
+  blockedHealthTransitionCount?: number;
+  regressedHealthTransitionCount?: number;
+  unknownHealthCount?: number;
+  isabellaPacketCount?: number;
   warnings?: MilestoneFlowEngineWarning[];
   errors?: MilestoneFlowEngineError[];
 }
@@ -148,6 +155,12 @@ export function closeRunSummary(
     resolvedAdvancedFindingCount: tallies.resolvedAdvancedFindingCount ?? 0,
     unknownAdvancedFindingCount: tallies.unknownAdvancedFindingCount ?? 0,
     highSeverityAdvancedFindingCount: tallies.highSeverityAdvancedFindingCount ?? 0,
+    healthyTransitionCount: tallies.healthyTransitionCount ?? 0,
+    atRiskTransitionCount: tallies.atRiskTransitionCount ?? 0,
+    blockedHealthTransitionCount: tallies.blockedHealthTransitionCount ?? 0,
+    regressedHealthTransitionCount: tallies.regressedHealthTransitionCount ?? 0,
+    unknownHealthCount: tallies.unknownHealthCount ?? 0,
+    isabellaPacketCount: tallies.isabellaPacketCount ?? 0,
     warningCount: warnings.length,
     errorCount: errors.length,
     startedAt: ctx.startedAt,

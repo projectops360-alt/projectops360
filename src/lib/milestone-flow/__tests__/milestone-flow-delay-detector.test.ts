@@ -27,7 +27,6 @@ import {
   aggregateMilestoneFlowTimeBuckets,
   calculateMilestoneSegmentDurationMetrics,
   createMilestoneProcessFlowEngine,
-  MpfUnsupportedOperationError,
   MPF_CONFIG_VERSION,
   type BuiltMilestoneFlowSegment,
   type BuiltMilestoneTransition,
@@ -264,15 +263,15 @@ describe("engine integration", () => {
     const findings = out.projection.findingsByTransition![trId];
     expect(findings.some((f) => f.findingType === "blocker")).toBe(true);
     expect(typeof out.observability.blockerFindingCount).toBe("number");
-    // Health remains unknown.
-    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(0);
+    // Health is populated by Task 7 (one assessment per transition).
+    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(1);
   });
 
-  it("classifyTransitionHealth remains not implemented", () => {
+  it("classifyTransitionHealth is implemented (Task 7) and no longer throws", () => {
     const engine = createMilestoneProcessFlowEngine({ now: fixedNow });
     const t = transition([]);
     const m = engine.calculateFlowMetrics(t);
-    expect(() => engine.classifyTransitionHealth(t, m)).toThrow(MpfUnsupportedOperationError);
+    expect(() => engine.classifyTransitionHealth(t, m)).not.toThrow();
   });
 
   it("empty input returns empty findings", () => {

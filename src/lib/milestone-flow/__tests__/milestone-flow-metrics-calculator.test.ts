@@ -23,7 +23,6 @@ import {
   mergeMilestoneFlowMetricEvidence,
   calculateMilestoneSegmentDurationMetrics,
   createMilestoneProcessFlowEngine,
-  MpfUnsupportedOperationError,
   MPF_CONFIG_VERSION,
   type BuiltMilestoneFlowSegment,
   type BuiltMilestoneTransition,
@@ -272,8 +271,8 @@ describe("engine integration", () => {
     const trId = out.projection.transitions[0].transitionId;
     expect(out.projection.metricsByTransition[trId]).toBeDefined();
     expect(typeof out.observability.metricsCalculatedCount).toBe("number");
-    // Health remains unknown (no health assessments).
-    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(0);
+    // Health is populated by Task 7 (one assessment per transition).
+    expect(Object.keys(out.projection.healthByTransition)).toHaveLength(1);
   });
 
   it("calculateFlowMetrics delegates to the calculator (no longer throws)", () => {
@@ -284,11 +283,12 @@ describe("engine integration", () => {
     expect(m.duration.actualDurationMs).toBe(DAY);
   });
 
-  it("classifyTransitionHealth remains not implemented", () => {
+  it("classifyTransitionHealth is implemented (Task 7) and no longer throws", () => {
     const engine = createMilestoneProcessFlowEngine({ now: fixedNow });
     const t = transition([], {});
     const m = engine.calculateFlowMetrics(t);
-    expect(() => engine.classifyTransitionHealth(t, m)).toThrow(MpfUnsupportedOperationError);
+    expect(() => engine.classifyTransitionHealth(t, m)).not.toThrow();
+    expect(engine.classifyTransitionHealth(t, m).status).toBeDefined();
   });
 
   it("empty input returns safe empty metrics", () => {

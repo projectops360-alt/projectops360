@@ -31,6 +31,8 @@ import type {
   MilestoneFlowBottleneckFinding,
   MilestoneConstraintPropagationFinding,
 } from "./advanced-detection-types";
+import type { MilestoneTransitionHealthSummaryResult } from "./transition-health-types";
+import type { MilestoneFlowIsabellaEvidencePacket } from "./isabella-evidence-packet-types";
 
 // ── 1. Engine identity ────────────────────────────────────────────────────────
 
@@ -423,6 +425,13 @@ export interface MilestoneFlowEngineRunSummary {
   resolvedAdvancedFindingCount?: number;
   unknownAdvancedFindingCount?: number;
   highSeverityAdvancedFindingCount?: number;
+  /** Health-stage counts (Task 7) — optional; default 0. `healthAssessmentCount` above. */
+  healthyTransitionCount?: number;
+  atRiskTransitionCount?: number;
+  blockedHealthTransitionCount?: number;
+  regressedHealthTransitionCount?: number;
+  unknownHealthCount?: number;
+  isabellaPacketCount?: number;
   warningCount: number;
   errorCount: number;
   startedAt: string; // ISO
@@ -484,5 +493,12 @@ export interface MilestoneFlowProjection {
   reworkFindingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowReworkFinding[]>;
   bottleneckFindingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowBottleneckFinding[]>;
   constraintPropagationFindings?: MilestoneConstraintPropagationFinding[];
+  /**
+   * Transition health (Task 7) — the rich summaries + Isabella evidence packets.
+   * Optional + additive; `healthByTransition` above holds the Task 1 base contract.
+   * Derived intelligence, never canonical truth.
+   */
+  healthSummariesByTransition?: Record<MilestoneTransitionId, MilestoneTransitionHealthSummaryResult>;
+  isabellaEvidencePacketsByTransition?: Record<MilestoneTransitionId, MilestoneFlowIsabellaEvidencePacket>;
   observability: MilestoneFlowEngineRunSummary;
 }

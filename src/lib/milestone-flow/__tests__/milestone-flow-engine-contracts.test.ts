@@ -26,8 +26,6 @@ import {
   closeRunSummary,
   MpfUnauthorizedAccessError,
   MpfMissingProjectScopeError,
-  MpfUnsupportedOperationError,
-  isMpfError,
   MPF_ENGINE_VERSION,
   MPF_CONFIG_VERSION,
   MPF_HEALTH_STATUSES,
@@ -235,10 +233,10 @@ describe("MPF engine — input validation + typed errors", () => {
     ).toThrow(MpfMissingProjectScopeError);
   });
 
-  it("not-yet-implemented algorithmic methods throw MpfUnsupportedOperationError (never fake output)", () => {
-    // buildTransitionModel/buildFlowSegments (Task 3) and calculateFlowMetrics
-    // (Task 4) are implemented; the final HEALTH classifier remains deferred and
-    // must never fabricate a health conclusion.
+  it("algorithmic methods are implemented and stay honest (empty transition → unknown health, never fabricated)", () => {
+    // buildTransitionModel/buildFlowSegments (Task 3), calculateFlowMetrics (Task 4)
+    // and classifyTransitionHealth (Task 7) are all implemented. An empty transition
+    // must yield honest `unknown` health, never a fabricated conclusion.
     const engine = createMilestoneProcessFlowEngine();
     const transition = {
       transitionId: "tr1",
@@ -251,14 +249,10 @@ describe("MPF engine — input validation + typed errors", () => {
       segments: [],
       evidenceEventIds: [],
     };
-    const metrics = engine.calculateFlowMetrics(transition); // now implemented
-    expect(() => engine.classifyTransitionHealth(transition, metrics)).toThrow(MpfUnsupportedOperationError);
-    try {
-      engine.classifyTransitionHealth(transition, metrics);
-    } catch (err) {
-      expect(isMpfError(err)).toBe(true);
-      if (isMpfError(err)) expect(err.code).toBe("UNSUPPORTED_ENGINE_OPERATION");
-    }
+    const metrics = engine.calculateFlowMetrics(transition);
+    const health = engine.classifyTransitionHealth(transition, metrics);
+    expect(health.status).toBe("unknown");
+    expect(health.confidence).toBe("unknown");
   });
 });
 
