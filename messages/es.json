@@ -386,7 +386,14 @@
     "bySprint": "Por sprint",
     "byMilestone": "Por milestone",
     "allMilestones": "Todos los milestones",
-    "noMilestone": "Sin milestone"
+    "noMilestone": "Sin milestone",
+    "cleanup": {
+      "deleteTask": "Eliminar tarea (sin hito)",
+      "confirmTitle": "¿Eliminar esta tarea?",
+      "confirmBody": "Esta tarea no tiene hito. Se quitará del proyecto (archivada — un administrador puede restaurarla). Las tareas asignadas a un hito no se pueden eliminar desde el tablero.",
+      "confirmDelete": "Eliminar tarea",
+      "cancel": "Cancelar"
+    }
   },
   "dashboard": {
     "title": "Panel",

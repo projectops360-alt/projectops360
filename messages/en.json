@@ -386,7 +386,14 @@
     "bySprint": "By sprint",
     "byMilestone": "By milestone",
     "allMilestones": "All milestones",
-    "noMilestone": "No milestone"
+    "noMilestone": "No milestone",
+    "cleanup": {
+      "deleteTask": "Delete task (no milestone)",
+      "confirmTitle": "Delete this task?",
+      "confirmBody": "This task has no milestone. It will be removed from the project (archived — an administrator can restore it). Tasks assigned to a milestone cannot be deleted from the board.",
+      "confirmDelete": "Delete task",
+      "cancel": "Cancel"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
