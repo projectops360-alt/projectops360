@@ -69,6 +69,16 @@ export interface RunTallies {
   openSegmentDurationCount?: number;
   invalidDurationCount?: number;
   totalKnownSegmentTimeMs?: number;
+  /** Detection-stage counts (Task 5) — optional; default 0. */
+  delayFindingCount?: number;
+  blockerFindingCount?: number;
+  waitingFindingCount?: number;
+  decisionDelayFindingCount?: number;
+  approvalDelayFindingCount?: number;
+  openFindingCount?: number;
+  resolvedFindingCount?: number;
+  unknownFindingCount?: number;
+  highSeverityFindingCount?: number;
   warnings?: MilestoneFlowEngineWarning[];
   errors?: MilestoneFlowEngineError[];
 }
@@ -110,6 +120,15 @@ export function closeRunSummary(
     openSegmentDurationCount: tallies.openSegmentDurationCount ?? 0,
     invalidDurationCount: tallies.invalidDurationCount ?? 0,
     totalKnownSegmentTimeMs: tallies.totalKnownSegmentTimeMs ?? 0,
+    delayFindingCount: tallies.delayFindingCount ?? 0,
+    blockerFindingCount: tallies.blockerFindingCount ?? 0,
+    waitingFindingCount: tallies.waitingFindingCount ?? 0,
+    decisionDelayFindingCount: tallies.decisionDelayFindingCount ?? 0,
+    approvalDelayFindingCount: tallies.approvalDelayFindingCount ?? 0,
+    openFindingCount: tallies.openFindingCount ?? 0,
+    resolvedFindingCount: tallies.resolvedFindingCount ?? 0,
+    unknownFindingCount: tallies.unknownFindingCount ?? 0,
+    highSeverityFindingCount: tallies.highSeverityFindingCount ?? 0,
     warningCount: warnings.length,
     errorCount: errors.length,
     startedAt: ctx.startedAt,

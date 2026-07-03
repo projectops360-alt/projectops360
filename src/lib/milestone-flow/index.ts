@@ -43,3 +43,6 @@ export * from "./flow-segment-builder";
 export * from "./transition-builder";
 export * from "./metrics-calculator-types";
 export * from "./metrics-calculator";
+export * from "./delay-detector-types";
+export * from "./delay-detector";
+export * from "./blocker-detector";

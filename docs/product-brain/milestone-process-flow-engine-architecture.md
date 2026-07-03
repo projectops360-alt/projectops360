@@ -106,3 +106,23 @@ extends the Task 1 `MilestoneFlowMetrics`; five optional metrics counts on the r
 summary. Test id **PEG-MPF-FLOW-METRICS**. Full detail:
 [milestone-process-flow-metrics-calculator.md](./milestone-process-flow-metrics-calculator.md).
 Next task: **Detect Blockers, Waiting Time, Decision Delays & Approval Delays.**
+
+## Delay Detector (Task 5 — added)
+
+`delay-detector-types.ts`, `delay-detector.ts`, and `blocker-detector.ts` (re-export)
+are the first **detection layer**: structured findings for `blocker`,
+`waiting_time`, `decision_delay`, and `approval_delay` from Task 3 segments + Task 4
+metric durations (**read, never recomputed** — no `Date.now()`). Each finding
+carries status (open/resolved/partial/unknown), **detection severity** (explicitly
+NOT health), provenance-aware confidence, deduped evidence, and metric refs.
+Unknown segments are skipped with a warning; missing metrics → partial + warning
+(never a crash). `buildMilestoneFlowProjection` now populates the optional
+`findingsByTransition` + detection observability counts. Final **health** and
+**bottlenecks** stay deferred (`classifyTransitionHealth` still unsupported).
+Additive-only: optional `MilestoneFlowProjection.findingsByTransition` (type-only
+import to avoid a cycle) + nine optional finding counts on the run summary.
+**Task 4 pre-flight verified:** unknown segments remain represented
+(`unknownTimeMs`/`unknownSegmentCount`); efficiency denominator unchanged. Test id
+**PEG-MPF-DELAY-DETECTION**. Full detail:
+[milestone-process-flow-delay-detector.md](./milestone-process-flow-delay-detector.md).
+Next task: **Detect Rework, Bottlenecks & Constraint Propagation.**
