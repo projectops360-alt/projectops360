@@ -23,9 +23,14 @@ import type {
   MPF_DATA_QUALITY_FLAGS,
   MPF_ACCESS_SCOPES,
 } from "./constants";
-// Type-only import (erased at runtime → no import cycle) for the Task 5 finding
-// used by the projection's optional findingsByTransition.
+// Type-only imports (erased at runtime → no import cycle) for the Task 5/6
+// findings used by the projection's optional additive outputs.
 import type { MilestoneFlowDetectionFinding } from "./delay-detector-types";
+import type {
+  MilestoneFlowReworkFinding,
+  MilestoneFlowBottleneckFinding,
+  MilestoneConstraintPropagationFinding,
+} from "./advanced-detection-types";
 
 // ── 1. Engine identity ────────────────────────────────────────────────────────
 
@@ -408,6 +413,16 @@ export interface MilestoneFlowEngineRunSummary {
   resolvedFindingCount?: number;
   unknownFindingCount?: number;
   highSeverityFindingCount?: number;
+  /** Advanced-detection counts (Task 6) — optional; default 0. */
+  reworkFindingCount?: number;
+  bottleneckFindingCount?: number;
+  constraintPropagationFindingCount?: number;
+  structuralBottleneckCandidateCount?: number;
+  possiblePropagationCount?: number;
+  openAdvancedFindingCount?: number;
+  resolvedAdvancedFindingCount?: number;
+  unknownAdvancedFindingCount?: number;
+  highSeverityAdvancedFindingCount?: number;
   warningCount: number;
   errorCount: number;
   startedAt: string; // ISO
@@ -462,5 +477,12 @@ export interface MilestoneFlowProjection {
    * future Health Classifier / Bottleneck Detector to consume.
    */
   findingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowDetectionFinding[]>;
+  /**
+   * Advanced detection (Task 6) — rework / bottleneck candidates / constraint
+   * propagation. Optional + additive; derived intelligence, never health.
+   */
+  reworkFindingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowReworkFinding[]>;
+  bottleneckFindingsByTransition?: Record<MilestoneTransitionId, MilestoneFlowBottleneckFinding[]>;
+  constraintPropagationFindings?: MilestoneConstraintPropagationFinding[];
   observability: MilestoneFlowEngineRunSummary;
 }

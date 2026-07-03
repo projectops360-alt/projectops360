@@ -126,3 +126,24 @@ import to avoid a cycle) + nine optional finding counts on the run summary.
 **PEG-MPF-DELAY-DETECTION**. Full detail:
 [milestone-process-flow-delay-detector.md](./milestone-process-flow-delay-detector.md).
 Next task: **Detect Rework, Bottlenecks & Constraint Propagation.**
+
+## Advanced Detectors (Task 6 — added)
+
+`advanced-detection-types.ts`, `advanced-detection-shared.ts`, `rework-detector.ts`,
+`bottleneck-detector.ts`, `constraint-propagation-detector.ts`, and
+`advanced-detection.ts` (orchestrator) are the second **detection layer**: rework
+findings (definite from `rework` segments; possible from scope/quality friction),
+bottleneck **candidates** (evidence-gated — **not every delay** — via conservative
+criteria: long duration / repeated occurrence / high-severity source / open-long /
+significant non-trivial time-share), and **conservative** constraint propagation
+(shared-evidence across transitions, or sequential unresolved → `possible`/low;
+**never fabricated** without linkage). Durations are **read** from Task 4 (no
+`Date.now()`); bottleneck detection consumes Task 5 findings. Severity is detection
+severity, **not health**. `buildMilestoneFlowProjection` now populates the optional
+`reworkFindingsByTransition` / `bottleneckFindingsByTransition` /
+`constraintPropagationFindings` + observability. Final **health** stays deferred
+(`classifyTransitionHealth` still unsupported); no Isabella NL, no UI. Additive-only:
+three optional projection fields (type-only imports to avoid a cycle) + nine optional
+advanced counts on the run summary. Test id **PEG-MPF-ADVANCED-DETECTION**. Full
+detail: [milestone-process-flow-advanced-detectors.md](./milestone-process-flow-advanced-detectors.md).
+Next task: **Generate Transition Health & Isabella Evidence Packets.**

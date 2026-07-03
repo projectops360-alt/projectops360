@@ -41,6 +41,7 @@ import { buildMilestoneTransitions } from "./transition-builder";
 import { buildFlowSegmentsForTransition } from "./flow-segment-builder";
 import { calculateMilestoneFlowMetrics, calculateMilestoneTransitionMetrics } from "./metrics-calculator";
 import { detectMilestoneFlowDelays } from "./delay-detector";
+import { detectMilestoneFlowAdvancedFindings } from "./advanced-detection";
 import type {
   MilestoneProcessFlowEngine,
   MilestoneFlowInputContract,
@@ -157,6 +158,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       metricsByTransition: metrics.metricsByTransition,
     });
 
+    // Task 6: advanced detection (rework, bottleneck candidates, constraint
+    // propagation) over the built transitions + metrics + Task 5 findings.
+    // Read-only, no metric recompute, no Date.now, no health/bottleneck-as-health.
+    const advanced = detectMilestoneFlowAdvancedFindings({
+      scope: input.scope,
+      transitions: build.transitions,
+      metricsByTransition: metrics.metricsByTransition,
+      findingsByTransition: detection.findingsByTransition,
+    });
+
     const summary = closeRunSummary(
       ctx,
       {
@@ -185,7 +196,16 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
         resolvedFindingCount: detection.stats.resolvedFindingCount,
         unknownFindingCount: detection.stats.unknownFindingCount,
         highSeverityFindingCount: detection.stats.highSeverityFindingCount,
-        warnings: [...build.warnings, ...metrics.warnings, ...detection.warnings],
+        reworkFindingCount: advanced.stats.reworkFindingCount,
+        bottleneckFindingCount: advanced.stats.bottleneckFindingCount,
+        constraintPropagationFindingCount: advanced.stats.constraintPropagationFindingCount,
+        structuralBottleneckCandidateCount: advanced.stats.structuralBottleneckCandidateCount,
+        possiblePropagationCount: advanced.stats.possiblePropagationCount,
+        openAdvancedFindingCount: advanced.stats.openAdvancedFindingCount,
+        resolvedAdvancedFindingCount: advanced.stats.resolvedAdvancedFindingCount,
+        unknownAdvancedFindingCount: advanced.stats.unknownAdvancedFindingCount,
+        highSeverityAdvancedFindingCount: advanced.stats.highSeverityAdvancedFindingCount,
+        warnings: [...build.warnings, ...metrics.warnings, ...detection.warnings, ...advanced.warnings],
       },
       this.now,
     );
@@ -204,6 +224,9 @@ export class MilestoneProcessFlowEngineStub implements MilestoneProcessFlowEngin
       constraintPropagations: [],
       dataQualityFlags,
       findingsByTransition: detection.findingsByTransition,
+      reworkFindingsByTransition: advanced.reworkFindingsByTransition,
+      bottleneckFindingsByTransition: advanced.bottleneckFindingsByTransition,
+      constraintPropagationFindings: advanced.constraintPropagationFindings,
       observability: summary,
     };
 
