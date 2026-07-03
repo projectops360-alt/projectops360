@@ -395,6 +395,32 @@ The Task 1 `engine.buildDelta(descriptor, descriptor)` intentionally stays
 from two count-only descriptors — the delta path is **recalc result → delta
 store/builder**. Guard: **LGRE-DELTA-SYNC-HIERARCHY-SAFE**.
 
+## 18d. High-Fidelity Realtime Visualization (Task 5 — added)
+
+The pure UI consumer (`src/lib/living-graph-realtime-ui/` + React Flow components)
+of the Task 4 delta/sync contract. Full detail:
+[living-graph-high-fidelity-visualization.md](living-graph-high-fidelity-visualization.md).
+Guard: **LIVING-GRAPH-HIGH-FIDELITY-REALTIME-VISUALIZATION**.
+
+## 18e. Performance, Throttling & Observability Safeguards (Task 6 — added)
+
+Hardens the realtime pipeline against load **without weakening correctness**.
+Pure, client-free primitives: `performance-budget.ts` (single `LgrePerformanceBudget`,
+inherits the Task-1 `maxDeltaOperations`, `resolvePerfBudget` clamps unsafe
+overrides), `critical-update.ts` (**fail-safe** critical classification — unknown
+types are critical), `update-scheduler.ts` (coalescing buffer: dedup-to-latest +
+debounce + throttle + batch, **critical flush-on-arrival**, force-flush on unmount,
+final state never lost), `reconnect-backoff.ts` (bounded exponential + give-up →
+degrade), `large-graph.ts` (load classification + max-delta `full_resync`
+fallback — never a partial merge of an oversized delta), `perf-observability.ts`
+(numeric-only, privacy-safe counters). Consumer wiring: `useLiveGraphSync` applies
+the critical policy (critical → instant refetch, cosmetic → coalesced) preserving
+cross-browser task-status sync; the realtime UI arms a **scoped** Expand-all
+confirmation when the graph is large (never dumps the project, evidence hidden by
+default). Full detail:
+[living-graph-realtime-performance-safeguards.md](living-graph-realtime-performance-safeguards.md).
+Guard: **LGRE-PERFORMANCE-THROTTLING-OBSERVABILITY-SAFEGUARDS**.
+
 ## 19. Files (Phase 4, Task 1)
 
 | File (`src/lib/living-graph/realtime/`) | Responsibility |

@@ -406,6 +406,9 @@
     "subtitle": "Grafo de ejecución en vivo, seguro por jerarquía — haz clic para revelar el siguiente nivel.",
     "backToLivingGraph": "Living Graph",
     "collapsedHidden": "{count} subtarea(s) ocultas — expande una tarea para revelarlas.",
+    "largeGraphWarning": "Este alcance es grande. Expandir todo puede ralentizar la vista.",
+    "largeGraphConfirm": "Expandir de todos modos",
+    "largeGraphCancel": "Cancelar",
     "node": {
       "subtasks": "{count} subtareas",
       "evidence": "Evidencia"
