@@ -130,7 +130,7 @@ describe("realtime node inspector", () => {
 });
 
 describe("import boundary — UI never consumes raw events / DB", () => {
-  it("realtime components never import Supabase or the event write path", () => {
+  it("realtime view/node components never import Supabase or the event write path", () => {
     const dir = join(process.cwd(), "src/components/living-graph-realtime");
     for (const f of ["realtime-living-graph.tsx", "realtime-graph-nodes.tsx", "realtime-sync-bar.tsx", "realtime-node-inspector.tsx"]) {
       const src = readFileSync(join(dir, f), "utf8");
@@ -138,9 +138,23 @@ describe("import boundary — UI never consumes raw events / DB", () => {
       expect(code).not.toMatch(/@\/lib\/supabase|createClient|createAdminClient/i);
       expect(code).not.toMatch(/project_event_log|process_nodes|process_edges/);
       expect(code).not.toMatch(/@\/lib\/events\/|postgres_changes/);
-      // The UI consumes the load-snapshot loader only on the server page, never
-      // in a client component.
       expect(code).not.toMatch(/load-snapshot/);
     }
+  });
+
+  it("the live-sync hook consumes TYPED notices via the Task 2 subscription manager (never raw payloads)", () => {
+    const src = readFileSync(
+      join(process.cwd(), "src/components/living-graph-realtime/use-live-graph-sync.ts"),
+      "utf8",
+    );
+    const code = src.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*")).join("\n");
+    // It wires the APPROVED transport + subscription manager and reads typed notices.
+    expect(code).toMatch(/createLivingGraphSubscriptionManager/);
+    expect(code).toMatch(/createSupabaseLivingGraphTransport/);
+    expect(code).toMatch(/\.onNotice\(/);
+    // It never handles raw postgres_changes payloads itself (that's the transport's job).
+    expect(code).not.toMatch(/postgres_changes|payload\.new|\.from\(/);
+    // It never writes canonical data or touches the process graph.
+    expect(code).not.toMatch(/project_event_log|process_nodes|process_edges|emitProjectEvent/);
   });
 });

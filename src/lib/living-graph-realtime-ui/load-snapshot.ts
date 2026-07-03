@@ -25,6 +25,8 @@ import { computeGraphSignature } from "./signature";
 export interface RealtimeGraphSnapshot {
   projectId: string;
   organizationId: string;
+  /** The caller's user id — for the live subscription's access context. */
+  userId: string;
   delta: HierarchicalGraphDelta;
   ownerNames: Record<string, string>;
   /** Milestone id → title, for scope breadcrumbs / the milestone picker. */
@@ -219,6 +221,7 @@ export async function loadRealtimeGraphSnapshot(projectId: string): Promise<Real
   return {
     projectId,
     organizationId: org.organizationId,
+    userId: org.userId,
     delta,
     ownerNames,
     milestones: milestones.map((m) => ({ id: m.id, title: m.title })),

@@ -42,6 +42,8 @@ export default async function RealtimeLivingGraphPage({
       <div className="min-h-0 flex-1 rounded-lg border border-border bg-background">
         <RealtimeLivingGraph
           projectId={projectId}
+          organizationId={snapshot.organizationId}
+          userId={snapshot.userId}
           locale={locale}
           initialDelta={snapshot.delta}
           ownerNames={snapshot.ownerNames}
