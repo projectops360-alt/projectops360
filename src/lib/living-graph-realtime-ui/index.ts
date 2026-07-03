@@ -12,6 +12,7 @@ export * from "./expansion-reducer";
 export * from "./visibility-selector";
 export * from "./sync-state";
 export * from "./layout";
+export * from "./signature";
 // NOTE: load-snapshot.ts is server-only (Supabase) — imported directly by the
 // server page, deliberately NOT re-exported here so the client barrel stays
 // free of DB/server dependencies.

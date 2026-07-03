@@ -120,6 +120,33 @@ export function rebuildFromDeltas(
   return model;
 }
 
+/**
+ * After a polling full-resync (a freshly rebuilt model), mark what actually
+ * changed relative to the previous model so only the changed nodes pulse:
+ * new node → "added", payload-changed node → "updated", else "stable". Version
+ * advances by one. Pure — used by the polling delivery fallback.
+ */
+export function markChangesAgainstPrevious(
+  next: RealtimeGraphViewModel,
+  prev: RealtimeGraphViewModel,
+): RealtimeGraphViewModel {
+  const version = prev.version + 1;
+  const sig = (p: Readonly<Record<string, unknown>>) => JSON.stringify(p);
+  const nodes: Record<string, RealtimeGraphNode> = {};
+  for (const [id, node] of Object.entries(next.nodes)) {
+    const before = prev.nodes[id];
+    if (!before) nodes[id] = { ...node, changeState: "added", changedAtVersion: version };
+    else if (sig(before.payload) !== sig(node.payload)) nodes[id] = { ...node, changeState: "updated", changedAtVersion: version };
+    else nodes[id] = { ...node, changeState: "stable", changedAtVersion: before.changedAtVersion };
+  }
+  const edges: Record<string, RealtimeGraphEdge> = {};
+  for (const [id, edge] of Object.entries(next.edges)) {
+    const before = prev.edges[id];
+    edges[id] = before ? { ...edge, changeState: "stable", changedAtVersion: before.changedAtVersion } : { ...edge, changeState: "added", changedAtVersion: version };
+  }
+  return { ...next, version, nodes, edges };
+}
+
 /** Decay stale change markers to "stable" once past the pulse window (pure). */
 export function decayChangeStates(
   model: RealtimeGraphViewModel,

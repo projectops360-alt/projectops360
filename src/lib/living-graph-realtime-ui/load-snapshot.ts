@@ -20,6 +20,7 @@ import type {
   LivingGraphRecalculationResult,
 } from "@/lib/living-graph/realtime";
 import { LGRE_ENGINE_VERSION, LGRE_CONFIG_VERSION } from "@/lib/living-graph/realtime";
+import { computeGraphSignature } from "./signature";
 
 export interface RealtimeGraphSnapshot {
   projectId: string;
@@ -28,6 +29,8 @@ export interface RealtimeGraphSnapshot {
   ownerNames: Record<string, string>;
   /** Milestone id → title, for scope breadcrumbs / the milestone picker. */
   milestones: { id: string; title: string }[];
+  /** Content signature — the polling sync refetches only when this changes. */
+  signature: string;
 }
 
 interface MilestoneRow { id: string; title: string; status: string | null; progress_percent: number | null; order_index: number | null; }
@@ -207,11 +210,47 @@ export async function loadRealtimeGraphSnapshot(projectId: string): Promise<Real
     deltaId: `snapshot:${projectId}:v1`,
   });
 
+  const signature = computeGraphSignature(
+    milestones.map((m) => ({ id: m.id, token: `${m.status ?? ""}:${m.progress_percent ?? ""}` })),
+    tasks.map((t) => ({ id: t.id, token: `${t.status ?? ""}:${t.progress ?? ""}:${t.milestone_id ?? ""}:${t.is_blocked ? 1 : 0}` })),
+    subtasks.map((s) => ({ id: s.id, token: `${s.status}:${s.progress}` })),
+  );
+
   return {
     projectId,
     organizationId: org.organizationId,
     delta,
     ownerNames,
     milestones: milestones.map((m) => ({ id: m.id, title: m.title })),
+    signature,
   };
+}
+
+/**
+ * Cheap signature-only query for the polling sync: RBAC-scoped, returns null
+ * (fail closed) when the project isn't in the caller's org. Selects only the
+ * status/progress tokens needed to detect a change — not the full graph.
+ */
+export async function loadRealtimeGraphSignature(projectId: string): Promise<string | null> {
+  const org = await getOrgContext();
+  const supabase = await createClient();
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!project) return null;
+
+  const [ms, ts, ss] = await Promise.all([
+    supabase.from("milestones").select("id, status, progress_percent").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
+    supabase.from("roadmap_tasks").select("id, status, progress, milestone_id, is_blocked").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
+    supabase.from("task_subtasks").select("id, status, progress").eq("project_id", projectId).eq("organization_id", org.organizationId).is("deleted_at", null),
+  ]);
+  return computeGraphSignature(
+    ((ms.data ?? []) as { id: string; status: string | null; progress_percent: number | null }[]).map((m) => ({ id: m.id, token: `${m.status ?? ""}:${m.progress_percent ?? ""}` })),
+    ((ts.data ?? []) as { id: string; status: string | null; progress: number | null; milestone_id: string | null; is_blocked: boolean | null }[]).map((t) => ({ id: t.id, token: `${t.status ?? ""}:${t.progress ?? ""}:${t.milestone_id ?? ""}:${t.is_blocked ? 1 : 0}` })),
+    ((ss.data ?? []) as { id: string; status: string; progress: number }[]).map((s) => ({ id: s.id, token: `${s.status}:${s.progress}` })),
+  );
 }

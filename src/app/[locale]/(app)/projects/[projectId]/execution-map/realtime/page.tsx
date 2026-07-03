@@ -46,6 +46,7 @@ export default async function RealtimeLivingGraphPage({
           initialDelta={snapshot.delta}
           ownerNames={snapshot.ownerNames}
           milestones={snapshot.milestones}
+          initialSignature={snapshot.signature}
         />
       </div>
     </div>
