@@ -29,6 +29,7 @@ import type {
   LivingGraphRealtimeEngine,
   LivingGraphRecalculationInput,
   LivingGraphRealtimeSecurityContract,
+  LivingGraphRealtimeSubscriptionContract,
 } from "./contracts";
 import type {
   LivingGraphChangeNotice,
@@ -118,6 +119,11 @@ export const livingGraphRealtimeSecurityContract: LivingGraphRealtimeSecurityCon
 export interface CreateLivingGraphRealtimeEngineOptions {
   now?: () => Date;
   planIdSeed?: string;
+  /**
+   * Task 2 — Event Subscription Layer. When provided, subscription operations
+   * delegate to it; without it they throw UNSUPPORTED (never fake liveness).
+   */
+  subscriptionManager?: LivingGraphRealtimeSubscriptionContract;
 }
 
 export function createLivingGraphRealtimeEngine(
@@ -189,10 +195,15 @@ export function createLivingGraphRealtimeEngine(
       validateSubscriptionRequest(request);
       const decision = resolveLivingGraphRealtimeAccess(request.access, request.scope);
       if (!decision.allowed) throw new LgreUnauthorizedAccessError(decision.reason);
+      if (options.subscriptionManager) return options.subscriptionManager.subscribe(request);
       throw new LgreUnsupportedOperationError("registerSubscription");
     },
 
-    releaseSubscription() {
+    releaseSubscription(subscriptionId) {
+      if (options.subscriptionManager) {
+        options.subscriptionManager.unsubscribe(subscriptionId);
+        return;
+      }
       throw new LgreUnsupportedOperationError("releaseSubscription");
     },
 
