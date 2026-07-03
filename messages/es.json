@@ -1712,6 +1712,10 @@
     "recalculateHint": "Reconstruye el grafo con los datos actuales (quita milestones/tareas borrados).",
     "backToExecutionMap": "Mapa de Ejecución",
     "realtimeCta": "Tiempo Real",
+    "autoSync": {
+      "live": "En vivo",
+      "polling": "Auto-sync"
+    },
     "summary": "{nodes} nodos · {edges} aristas · {blocked} bloqueados · {waiting} en espera",
     "noSelection": "Selecciona un nodo o una arista para inspeccionarla.",
     "selectedNode": "Detalle del nodo",

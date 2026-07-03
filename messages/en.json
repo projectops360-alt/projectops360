@@ -1712,6 +1712,10 @@
     "recalculateHint": "Rebuild the graph from current data (removes deleted milestones/tasks).",
     "backToExecutionMap": "Execution Map",
     "realtimeCta": "Realtime",
+    "autoSync": {
+      "live": "Live",
+      "polling": "Auto-sync"
+    },
     "summary": "{nodes} nodes · {edges} edges · {blocked} blocked · {waiting} waiting",
     "noSelection": "Select a node or edge to inspect it.",
     "selectedNode": "Node details",
