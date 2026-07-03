@@ -183,6 +183,16 @@ phase's. Showing the destination's tasks hid the current (and first) phase's tas
 on "Phase 0 (current)" could not see Phase 0's tasks. Source-scoped keeps every phase's own tasks
 visible and matches the user's mental model ("the N tasks to reach the next phase").
 
+## 11e. Realtime Engine (Phase 4 — architecture defined)
+The **Living Graph Realtime Engine (LGRE)** makes the graph live: change detection over
+approved canonical/PEG/projection outputs, coalesced recalculation planning (through the SAME
+resolvers that guarantee REG-008/REG-010/REG-018), versioned snapshot deltas (DATA-only — saved
+layouts stay client-owned, UX-007), honest freshness disclosure, and a realtime → polling →
+manual-refresh fallback ladder. It is **orchestration only** — never an owner of truth, never a
+writer of `project_event_log`/`process_nodes`/`process_edges`. Constitution:
+[living-graph-realtime-engine-constitution.md](living-graph-realtime-engine-constitution.md) ·
+contracts: `src/lib/living-graph/realtime/` · guard: **LGRE-FOUNDATION**.
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration
