@@ -138,6 +138,82 @@ export const LGRE_CONFIDENCE_LEVELS = ["high", "medium", "low", "unknown"] as co
 /** The safe default: without provenance information, confidence is Unknown. */
 export const LGRE_DEFAULT_CONFIDENCE = "unknown" as const;
 
+// ── Delta Store & Sync — hierarchy-safe model (Task 4) ────────────────────────
+
+/**
+ * The kind of graph entity a node delta describes. Explicit so a future UI
+ * NEVER guesses whether a node is a milestone, task, subtask, or evidence.
+ * Constitution §18c.
+ */
+export const LGRE_NODE_KINDS = [
+  "project",
+  "milestone",
+  "phase",
+  "task",
+  "subtask",
+  "evidence",
+  "event",
+  "risk",
+  "decision",
+  "approval",
+  "dependency",
+  "unknown",
+] as const;
+
+/**
+ * The meaning of an edge. Hierarchy is DISTINCT from dependency, evidence, and
+ * milestone-flow so the UI never treats a dependency as a parent-child link.
+ */
+export const LGRE_EDGE_KINDS = [
+  "hierarchy", // milestone → task, task → subtask, subtask → child subtask
+  "dependency", // task/subtask depends-on relationships
+  "evidence", // task/subtask/milestone → event/evidence (evidence layer)
+  "milestone_flow", // milestone transition corridor (MPF) — display link
+  "unknown",
+] as const;
+
+/**
+ * Display-safe visibility policy each node/edge delta carries so the UI knows
+ * what to show by default vs. only on expansion / in an evidence overlay.
+ * Evidence/events are NEVER default_visible.
+ */
+export const LGRE_VISIBILITY_POLICIES = [
+  "default_visible", // milestone root + direct tasks in milestone scope
+  "visible_when_parent_expanded", // subtasks (parent task expanded)
+  "visible_when_branch_expanded", // child subtasks (parent subtask expanded)
+  "visible_in_evidence_overlay", // events/evidence — only with the overlay on
+  "visible_in_inspector_only", // shown in the node inspector, never on canvas
+  "hidden_unauthorized", // RBAC-hidden (never emitted as visible)
+  "hidden_deleted_or_archived", // soft-deleted/archived
+  "hidden_out_of_scope", // outside the current root scope
+] as const;
+
+/** The root scope a delta batch is anchored to (narrowing context). */
+export const LGRE_ROOT_SCOPE_TYPES = [
+  "project",
+  "milestone",
+  "task",
+  "subtask",
+  "evidence_overlay",
+] as const;
+
+/** The layer a node/edge belongs to (drives the evidence separation). */
+export const LGRE_LAYER_KINDS = ["hierarchy", "dependency", "evidence", "milestone_flow"] as const;
+
+/** What a sync request resolves to for the consumer. */
+export const LGRE_SYNC_RESPONSE_KINDS = [
+  "noop", // consumer already at the current version (fresh)
+  "deltas", // ordered missed deltas the consumer can safely apply
+  "full_resync", // version gap / too stale / mismatch — fetch a full snapshot
+  "unauthorized", // RBAC denied — safe, no data
+] as const;
+
+/** Delta-store retention/policy defaults (documented; overridable). */
+export const LGRE_DELTA_STORE_DEFAULTS = {
+  /** How many recent deltas to retain per scope for missed-update recovery. */
+  retainedDeltaWindow: 200,
+} as const;
+
 // ── Access scope ──────────────────────────────────────────────────────────────
 
 /**
@@ -183,6 +259,8 @@ export const LGRE_ERROR_CODES = [
   "DELTA_LIMIT_EXCEEDED",
   "SUBSCRIPTION_CHANNEL_FAILURE",
   "UNSUPPORTED_ENGINE_OPERATION",
+  "INVALID_ROOT_SCOPE",
+  "MISSED_DELTA_WINDOW",
   "UNKNOWN_ENGINE_FAILURE",
 ] as const;
 
@@ -197,3 +275,9 @@ export const CONNECTION_STATE_SET: ReadonlySet<string> = new Set(LGRE_CONNECTION
 export const FALLBACK_MODE_SET: ReadonlySet<string> = new Set(LGRE_FALLBACK_MODES);
 export const FRESHNESS_STATE_SET: ReadonlySet<string> = new Set(LGRE_FRESHNESS_STATES);
 export const LGRE_ACCESS_SCOPE_SET: ReadonlySet<string> = new Set(LGRE_ACCESS_SCOPES);
+export const NODE_KIND_SET: ReadonlySet<string> = new Set(LGRE_NODE_KINDS);
+export const EDGE_KIND_SET: ReadonlySet<string> = new Set(LGRE_EDGE_KINDS);
+export const VISIBILITY_POLICY_SET: ReadonlySet<string> = new Set(LGRE_VISIBILITY_POLICIES);
+export const ROOT_SCOPE_TYPE_SET: ReadonlySet<string> = new Set(LGRE_ROOT_SCOPE_TYPES);
+export const LAYER_KIND_SET: ReadonlySet<string> = new Set(LGRE_LAYER_KINDS);
+export const SYNC_RESPONSE_KIND_SET: ReadonlySet<string> = new Set(LGRE_SYNC_RESPONSE_KINDS);

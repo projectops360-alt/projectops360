@@ -73,6 +73,20 @@ export class LgreSubscriptionChannelFailureError extends LgreError {
   }
 }
 
+export class LgreInvalidRootScopeError extends LgreError {
+  constructor(message = "Root scope is invalid or not in the registered set.") {
+    super("INVALID_ROOT_SCOPE", message);
+    this.name = "LgreInvalidRootScopeError";
+  }
+}
+
+export class LgreMissedDeltaWindowError extends LgreError {
+  constructor(message = "The requested version predates the retained delta window; full resync required.") {
+    super("MISSED_DELTA_WINDOW", message);
+    this.name = "LgreMissedDeltaWindowError";
+  }
+}
+
 export class LgreUnsupportedOperationError extends LgreError {
   constructor(operation: string) {
     super(

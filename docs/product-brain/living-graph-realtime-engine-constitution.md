@@ -355,6 +355,46 @@ attribution — while keeping full rebuild as the **safe fallback**:
 Guard: **LGRE-RECALCULATION**. Next layer: the Delta Store & Sync Contract
 (Task 4) persists versioned snapshots and turns results into consumer deltas.
 
+## 18c. Delta Store & Sync Contract (Task 4 — added)
+
+The delivery layer that turns Task 3 recalculation results into **hierarchy-safe,
+replay-safe** deltas a future UI consumes — never raw events, never raw recalc
+internals. Full detail: [living-graph-delta-sync-contract.md](living-graph-delta-sync-contract.md).
+
+- **`delta-types.ts`** — the model: `LivingGraphNodeKind` (project/milestone/
+  phase/task/subtask/evidence/event/risk/decision/approval), `LivingGraphEdgeKind`
+  (**hierarchy** / dependency / evidence / milestone_flow — hierarchy is DISTINCT
+  from dependency), `LivingGraphVisibilityPolicy` (default_visible /
+  visible_when_parent_expanded / visible_when_branch_expanded /
+  visible_in_evidence_overlay / visible_in_inspector_only / hidden_*), the
+  `HierarchicalGraphDeltaScope` (root scope + affected milestone/task/subtask ids
+  + layer kinds + `evidenceLayerIncluded`), `HierarchyNodeDelta` /
+  `HierarchyEdgeDelta` (kind + visibility + parent/milestone/task refs +
+  hierarchyPath + directChildCount/hasDescendants for expand affordances +
+  version + updatedAt), the `HierarchicalGraphDelta` payload
+  (basedOnVersion→producedVersion, isEmpty), `GraphSnapshotDescriptor`,
+  `GraphSyncRequest`/`GraphSyncResponse`, and `DeltaStoreObservability`.
+- **`delta-builder.ts`** — pure classifiers (`classifyGraphNodeKind`,
+  `classifyGraphEdgeKind`, `resolveNodeVisibility`) + `buildHierarchicalDelta`:
+  converts a recalc result into a delta, classifying every node/edge KIND from
+  explicit payload hints then sanctioned id conventions (`milestone:`/`task:`/
+  `subtask:`/`event:`/`evidence:`; `subtask_of`→hierarchy; `caused`→dependency).
+  **Evidence/events are never default-visible.** Emits a valid EMPTY delta when
+  nothing changed. Never fabricates entities, never mutates its input.
+- **`delta-store.ts`** — `createLivingGraphDeltaStore(scope)`: monotonic version
+  per scope (basedOn→produced chain), bounded retained window for missed-update
+  recovery, dedup by delta id, and `requestSync` → **noop** (fresh) / **deltas**
+  (safe ordered replay) / **full_resync** (client ahead, brand-new, evicted
+  window, or non-contiguous chain — never an unsafe partial merge) /
+  **unauthorized** (deny-by-default RBAC + tenant isolation; a mismatched scope
+  is treated as unauthorized). Observability counts the full lifecycle. It is a
+  DELIVERY mechanism — never canonical truth, no DB client, no write path, no UI.
+
+The Task 1 `engine.buildDelta(descriptor, descriptor)` intentionally stays
+`UNSUPPORTED_ENGINE_OPERATION` (LGRE-FOUNDATION): a content delta cannot be built
+from two count-only descriptors — the delta path is **recalc result → delta
+store/builder**. Guard: **LGRE-DELTA-SYNC-HIERARCHY-SAFE**.
+
 ## 19. Files (Phase 4, Task 1)
 
 | File (`src/lib/living-graph/realtime/`) | Responsibility |
