@@ -79,6 +79,16 @@ export interface RunTallies {
   resolvedFindingCount?: number;
   unknownFindingCount?: number;
   highSeverityFindingCount?: number;
+  /** Advanced-detection counts (Task 6) — optional; default 0. */
+  reworkFindingCount?: number;
+  bottleneckFindingCount?: number;
+  constraintPropagationFindingCount?: number;
+  structuralBottleneckCandidateCount?: number;
+  possiblePropagationCount?: number;
+  openAdvancedFindingCount?: number;
+  resolvedAdvancedFindingCount?: number;
+  unknownAdvancedFindingCount?: number;
+  highSeverityAdvancedFindingCount?: number;
   warnings?: MilestoneFlowEngineWarning[];
   errors?: MilestoneFlowEngineError[];
 }
@@ -129,6 +139,15 @@ export function closeRunSummary(
     resolvedFindingCount: tallies.resolvedFindingCount ?? 0,
     unknownFindingCount: tallies.unknownFindingCount ?? 0,
     highSeverityFindingCount: tallies.highSeverityFindingCount ?? 0,
+    reworkFindingCount: tallies.reworkFindingCount ?? 0,
+    bottleneckFindingCount: tallies.bottleneckFindingCount ?? 0,
+    constraintPropagationFindingCount: tallies.constraintPropagationFindingCount ?? 0,
+    structuralBottleneckCandidateCount: tallies.structuralBottleneckCandidateCount ?? 0,
+    possiblePropagationCount: tallies.possiblePropagationCount ?? 0,
+    openAdvancedFindingCount: tallies.openAdvancedFindingCount ?? 0,
+    resolvedAdvancedFindingCount: tallies.resolvedAdvancedFindingCount ?? 0,
+    unknownAdvancedFindingCount: tallies.unknownAdvancedFindingCount ?? 0,
+    highSeverityAdvancedFindingCount: tallies.highSeverityAdvancedFindingCount ?? 0,
     warningCount: warnings.length,
     errorCount: errors.length,
     startedAt: ctx.startedAt,
