@@ -17,6 +17,11 @@ import {
   resolveBottleneckThresholds,
   advWarn,
 } from "./advanced-detection-shared";
+import {
+  MpfMissingProjectScopeError,
+  MpfMissingOrganizationScopeError,
+  MpfUnknownFailureError,
+} from "./errors";
 import type { MilestoneFlowEvidenceRef, MilestoneFlowEngineWarning, MilestoneFlowProjectScope } from "./types";
 import type { MilestoneFlowSemanticCategory } from "./event-semantics-types";
 import type { BuiltMilestoneTransition } from "./transition-builder-types";
@@ -172,4 +177,56 @@ export function detectMilestoneTransitionReworkFindings(
     );
   }
   return out;
+}
+
+/** (5) Determine the rework trigger type from the segment (mirrors the rework type). */
+export function determineMilestoneReworkTriggerType(segment: SegmentForDetection): MilestoneFlowReworkTriggerType {
+  return TRIGGER_FOR_TYPE[determineMilestoneReworkType(segment)];
+}
+
+// ── Standalone rework detection entry point (Task 6A) ─────────────────────────
+// Rework detection also flows through the advanced-detection orchestrator (Task 6);
+// this is the focused, rework-only public API. It consumes Task 3 transitions +
+// Task 4 metrics read-only, never rebuilds them, and never touches bottleneck or
+// constraint-propagation detection.
+
+export interface MilestoneFlowReworkDetectionInput {
+  scope: MilestoneFlowProjectScope;
+  transitions: BuiltMilestoneTransition[];
+  metricsByTransition: Record<string, MilestoneFlowTransitionMetrics>;
+  options?: MilestoneFlowAdvancedDetectionOptions;
+}
+
+export interface MilestoneFlowReworkDetectionResult {
+  reworkFindingsByTransition: Record<string, MilestoneFlowReworkFinding[]>;
+  findings: MilestoneFlowReworkFinding[];
+  warnings: MilestoneFlowEngineWarning[];
+}
+
+/** (10) Validate rework-detection input (hard-fails only on structural issues). */
+export function validateMilestoneReworkDetectionInput(input: MilestoneFlowReworkDetectionInput): void {
+  if (!input.scope || !input.scope.organizationId) throw new MpfMissingOrganizationScopeError();
+  if (!input.scope.projectId) throw new MpfMissingProjectScopeError();
+  if (!Array.isArray(input.transitions)) throw new MpfUnknownFailureError("transitions must be an array");
+  if (input.metricsByTransition == null || typeof input.metricsByTransition !== "object") {
+    throw new MpfUnknownFailureError("metricsByTransition must be an object");
+  }
+}
+
+/** (1) Detect rework findings across all transitions. */
+export function detectMilestoneFlowReworkFindings(
+  input: MilestoneFlowReworkDetectionInput,
+): MilestoneFlowReworkDetectionResult {
+  validateMilestoneReworkDetectionInput(input);
+  const reworkFindingsByTransition: Record<string, MilestoneFlowReworkFinding[]> = {};
+  const findings: MilestoneFlowReworkFinding[] = [];
+  const warnings: MilestoneFlowEngineWarning[] = [];
+  for (const transition of input.transitions) {
+    const metrics = input.metricsByTransition[transition.transitionId];
+    const rework = detectMilestoneTransitionReworkFindings(transition, metrics, input.options);
+    reworkFindingsByTransition[transition.transitionId] = rework;
+    findings.push(...rework);
+    warnings.push(...rework.flatMap((r) => r.warnings));
+  }
+  return { reworkFindingsByTransition, findings, warnings };
 }
