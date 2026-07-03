@@ -7,16 +7,19 @@ import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitAndAutoLink } from "@/lib/graph/emit-event";
 import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/roadmap/progress";
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  buildTaskUpdatePatch,
+  taskStatusValues,
+} from "@/lib/workboard/task-schemas";
 import type { AuditAction, Milestone, RoadmapTask } from "@/types/database";
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────────────
+// Task create/update schemas + the preserve-on-absent update patch live in
+// src/lib/workboard/task-schemas.ts (directly unit-tested).
 
 const milestoneStatusValues = ["planned", "in_progress", "completed", "blocked", "deferred"] as const;
-const taskStatusValues = [
-  "not_started", "prompt_ready", "sent_to_ai", "in_progress",
-  "implemented", "tested", "done", "blocked", "deferred",
-] as const;
-const taskPriorityValues = ["p1", "p2", "p3"] as const;
 const iconKeyValues = ["setup", "shield_database", "users", "notebook", "link", "sparkles", "chart", "loop", "check_circle", "rocket"] as const;
 
 const createMilestoneSchema = z.object({
@@ -46,71 +49,6 @@ const updateMilestoneSchema = z.object({
   projectId: z.string().uuid("invalid_project_id"),
 });
 
-const createTaskSchema = z.object({
-  title: z.string().min(1, "titleRequired").max(200, "titleTooLong").transform((s) => s.trim()),
-  description: z.string().max(20000, "descriptionTooLong").transform((s) => s.trim()).optional().default(""),
-  milestone_id: z.string().uuid("invalid_milestone_id").optional().default(""),
-  status: z.enum(taskStatusValues).default("not_started"),
-  priority: z.enum(taskPriorityValues).default("p2"),
-  sprint_name: z.string().max(100, "sprintTooLong").transform((s) => s.trim()).optional().default(""),
-  estimate_hours: z.coerce.number().min(0).max(9999.99).optional().nullable(),
-  actual_hours: z.coerce.number().min(0).max(9999.99).optional().nullable(),
-  dependency_notes: z.string().max(20000, "dependencyTooLong").transform((s) => s.trim()).optional().default(""),
-  acceptance_criteria: z.string().max(20000, "acceptanceTooLong").transform((s) => s.trim()).optional().default(""),
-  order_index: z.coerce.number().int().min(0).default(0),
-  prompt_body: z.string().max(500000, "promptTooLong").transform((s) => s.trim()).optional().default(""),
-  prompt_context: z.string().max(100000, "promptContextTooLong").transform((s) => s.trim()).optional().default(""),
-  ai_tool_target: z.string().max(100, "aiToolTooLong").transform((s) => s.trim()).optional().default(""),
-  implementation_notes: z.string().max(100000, "implementationNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  test_notes: z.string().max(100000, "testNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  execution_notes: z.string().max(100000, "executionNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  blocker_reason: z.string().max(2000, "blockerReasonTooLong").transform((s) => s.trim()).optional().default(""),
-  start_date: z.string().optional().default(""),
-  end_date: z.string().optional().default(""),
-  progress: z.coerce.number().int().min(0).max(100).default(0),
-  assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
-  assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
-  project_team_member_id: z.string().uuid("invalid_team_member").nullable().optional(),
-  predecessor_ids: z.array(z.string().uuid()).max(50).optional().default([]),
-  material_ids: z.array(z.string().uuid()).max(200).optional().default([]),
-  new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional().default([]),
-  projectId: z.string().uuid("invalid_project_id"),
-});
-
-const updateTaskSchema = z.object({
-  taskId: z.string().uuid("invalid_task_id"),
-  title: z.string().min(1, "titleRequired").max(200, "titleTooLong").transform((s) => s.trim()),
-  description: z.string().max(20000, "descriptionTooLong").transform((s) => s.trim()).optional().default(""),
-  milestone_id: z.string().uuid("invalid_milestone_id").optional().nullable(),
-  status: z.enum(taskStatusValues),
-  priority: z.enum(taskPriorityValues),
-  sprint_name: z.string().max(100, "sprintTooLong").transform((s) => s.trim()).optional().default(""),
-  estimate_hours: z.coerce.number().min(0).max(9999.99).optional().nullable(),
-  actual_hours: z.coerce.number().min(0).max(9999.99).optional().nullable(),
-  dependency_notes: z.string().max(20000, "dependencyTooLong").transform((s) => s.trim()).optional().default(""),
-  acceptance_criteria: z.string().max(20000, "acceptanceTooLong").transform((s) => s.trim()).optional().default(""),
-  order_index: z.coerce.number().int().min(0).optional(),
-  // UX-014 — internal AI metadata. NO `.default("")`: when the form omits these
-  // (it now always does), they stay `undefined` so the update PRESERVES the
-  // stored value instead of wiping it (preserve-on-absent below).
-  prompt_body: z.string().max(500000, "promptTooLong").transform((s) => s.trim()).optional(),
-  prompt_context: z.string().max(100000, "promptContextTooLong").transform((s) => s.trim()).optional(),
-  ai_tool_target: z.string().max(100, "aiToolTooLong").transform((s) => s.trim()).optional(),
-  implementation_notes: z.string().max(100000, "implementationNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  test_notes: z.string().max(100000, "testNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  execution_notes: z.string().max(100000, "executionNotesTooLong").transform((s) => s.trim()).optional().default(""),
-  blocker_reason: z.string().max(2000, "blockerReasonTooLong").transform((s) => s.trim()).optional().default(""),
-  start_date: z.string().optional().default(""),
-  end_date: z.string().optional().default(""),
-  progress: z.coerce.number().int().min(0).max(100).default(0),
-  assigned_to: z.string().uuid("invalid_assignee").nullable().optional(),
-  assigned_resource_id: z.string().uuid("invalid_assignee_resource").nullable().optional(),
-  project_team_member_id: z.string().uuid("invalid_team_member").nullable().optional(),
-  predecessor_ids: z.array(z.string().uuid()).max(50).optional(),
-  material_ids: z.array(z.string().uuid()).max(200).optional(),
-  new_materials: z.array(z.string().min(1).max(200).transform((s) => s.trim())).max(50).optional(),
-  projectId: z.string().uuid("invalid_project_id"),
-});
 
 // ── Assignment type resolution ─────────────────────────────────────────────────────
 
@@ -536,7 +474,7 @@ export async function createMilestoneAction(input: {
     metadata: { title: data.title, status: data.status },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   return { milestoneId: milestone.id };
 }
@@ -608,7 +546,7 @@ export async function updateMilestoneAction(input: {
     metadata: { title: data.title, status: data.status },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   return {};
 }
@@ -743,7 +681,7 @@ export async function createTaskAction(input: {
     metadata: { title: data.title, status: data.status, priority: data.priority },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   // Fire-and-forget: generate embedding for semantic search
   import("@/lib/embeddings/generate").then(({ generateAndStoreEmbedding }) => {
@@ -814,32 +752,12 @@ export async function updateTaskAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
-  const updateData: Record<string, unknown> = {
-    title: data.title,
-    description: data.description || null,
-    milestone_id: data.milestone_id ?? null,
-    status: data.status,
-    priority: data.priority,
-    sprint_name: data.sprint_name || null,
-    estimate_hours: data.estimate_hours ?? null,
-    actual_hours: data.actual_hours ?? null,
-    dependency_notes: data.dependency_notes || null,
-    acceptance_criteria: data.acceptance_criteria || null,
-    implementation_notes: data.implementation_notes || null,
-    test_notes: data.test_notes || null,
-    execution_notes: data.execution_notes || null,
-    blocker_reason: data.blocker_reason || null,
-    start_date: data.start_date || null,
-    end_date: data.end_date || null,
-    progress: data.progress,
-  };
-  // UX-014 — internal AI metadata is preserve-on-absent: only written when the
-  // caller explicitly provided it. The normal task editor no longer sends these,
-  // so an edit/save must never null out an existing prompt (data preservation).
-  if (data.prompt_body !== undefined) updateData.prompt_body = data.prompt_body || null;
-  if (data.prompt_context !== undefined) updateData.prompt_context = data.prompt_context || null;
-  if (data.ai_tool_target !== undefined) updateData.ai_tool_target = data.ai_tool_target || null;
-  if (data.order_index !== undefined) updateData.order_index = data.order_index;
+  // Preserve-on-absent for EVERY optional field (UX-014 pattern, generalized):
+  // only columns the caller explicitly sent are written — an omitted field
+  // (collapsed section, partial caller, gated AI Execution) keeps its stored
+  // value; an explicit "" clears it. Built by the unit-tested pure patch
+  // builder in src/lib/workboard/task-schemas.ts.
+  const updateData: Record<string, unknown> = buildTaskUpdatePatch(data);
   if (data.assigned_to !== undefined || data.assigned_resource_id !== undefined || data.project_team_member_id !== undefined) {
     const own = await resolveTeamAssignment(supabase, data.project_team_member_id, data.assigned_to, data.assigned_resource_id);
     updateData.assigned_to = own.assignedTo;
@@ -877,7 +795,7 @@ export async function updateTaskAction(input: {
     metadata: { title: data.title, status: data.status, priority: data.priority },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   // Fire-and-forget: regenerate embedding after task update
   import("@/lib/embeddings/generate").then(({ generateAndStoreEmbedding }) => {
@@ -1074,7 +992,7 @@ export async function updateTaskStatusAction(input: {
   });
 
   // Revalidate the project page so all tabs see fresh data
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   // ── Recalculate parent milestone status ──────────────────────────────────
   // After a task status changes, recompute the parent milestone's computed
@@ -1151,7 +1069,7 @@ export async function reorderTasksAction(input: {
     metadata: { field: "order_index", count: data.updates.length },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   return {};
 }
@@ -1222,7 +1140,7 @@ export async function recordPromptSentAction(input: {
     },
   });
 
-  revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
   return {};
 }
@@ -1414,7 +1332,7 @@ export async function archiveTaskAction(
     await recalculateMilestoneStatus(task.milestone_id, projectId, org.organizationId, supabase);
   }
 
-  revalidatePath(`/(app)/projects/${projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
   return {};
 }
 
@@ -1470,6 +1388,6 @@ export async function archiveMilestoneAction(
     metadata: { soft_delete: true, cascaded_to_tasks: true },
   });
 
-  revalidatePath(`/(app)/projects/${projectId}`, "layout");
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
   return {};
 }
