@@ -518,7 +518,16 @@
       "layoutLeftRight": "Izquierda a derecha",
       "hiddenByFilters": "{count} subtarea(s) ocultas por los filtros activos.",
       "expandRoot": "Expandir",
-      "collapseRoot": "Colapsar"
+      "collapseRoot": "Colapsar",
+      "saveLayout": "Guardar diseño",
+      "resetLayout": "Volver a automático",
+      "clearLayout": "Borrar guardado",
+      "layoutPartial": "Diseño guardado aplicado parcialmente — las subtareas cambiaron desde que se guardó.",
+      "layoutNotice": {
+        "saved": "Diseño guardado. Se restaurará en tu próxima visita.",
+        "reset": "De vuelta al diseño automático.",
+        "cleared": "Diseño guardado borrado."
+      }
     },
     "form": {
       "createTitle": "Nueva subtarea",

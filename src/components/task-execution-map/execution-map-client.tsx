@@ -11,12 +11,15 @@
 // project-level view — this is the task-level drill-down.
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Bot, ListTree, Map as MapIcon, Plus } from "lucide-react";
+import { Bot, ListTree, Map as MapIcon, Plus, Save, RotateCcw } from "lucide-react";
+import type { Viewport } from "@xyflow/react";
 import { askIsabella } from "@/lib/isabella/ask-isabella";
 import type { Subtask, SubtaskStatus } from "@/lib/subtasks/types";
 import { SUBTASK_STATUSES } from "@/lib/subtasks/types";
+import { deleteSubtaskAction } from "@/lib/subtasks/actions";
 import {
   buildExecutionMapModel,
   type ExecutionMapFilters,
@@ -25,6 +28,16 @@ import {
   type ExternalDependencyInfo,
   type ParentTaskInfo,
 } from "@/lib/subtasks/map-model";
+import {
+  loadSubtaskLayout,
+  saveSubtaskLayout,
+  clearSubtaskLayout,
+  applySavedSubtaskPositions,
+  isSubtaskLayoutPartial,
+  type SavedSubtaskLayout,
+  type SavedSubtaskNodePosition,
+  SUBTASK_LAYOUT_SCHEMA_VERSION,
+} from "@/lib/subtasks/subtask-map-layout";
 import { ExecutionMapCanvas } from "./execution-map-canvas";
 import { SubtaskDetailPanel, type PanelSelection } from "./subtask-detail-panel";
 import { SubtaskTableView } from "./subtask-table-view";
@@ -42,8 +55,10 @@ export interface ExecutionMapClientProps {
 
 export function ExecutionMapClient(props: ExecutionMapClientProps) {
   const t = useTranslations("taskExecutionMap");
+  const router = useRouter();
   const [view, setView] = useState<"map" | "table">("map");
-  const [layout, setLayout] = useState<ExecutionMapLayout>("radial");
+  // Default layout is LEFT-TO-RIGHT so expanded subtasks flow horizontally.
+  const [layout, setLayout] = useState<ExecutionMapLayout>("left_to_right");
   const [grouping, setGrouping] = useState<ExecutionMapGrouping>("none");
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [filters, setFilters] = useState<ExecutionMapFilters>({});
@@ -53,6 +68,16 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
   // NotebookLM root-first: the Subtask Map opens showing ONLY the root task;
   // the user clicks the root to reveal its subtasks (progressive expansion).
   const [rootExpanded, setRootExpanded] = useState(false);
+
+  // ── Manual layout (drag + save) — presentation state only ───────────────────
+  const [manualPositions, setManualPositions] = useState<Map<string, SavedSubtaskNodePosition>>(
+    () => new Map(),
+  );
+  const [savedLayout, setSavedLayout] = useState<SavedSubtaskLayout | null>(null);
+  const [hasUnsavedLayout, setHasUnsavedLayout] = useState(false);
+  const [layoutNotice, setLayoutNotice] = useState<"saved" | "reset" | "cleared" | null>(null);
+  const viewportRef = useRef<Viewport | null>(null);
+  const [, startTransition] = useTransition();
 
   const asOf = useMemo(() => new Date(), []);
 
@@ -72,6 +97,87 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
       }),
     [props.parent, props.subtasks, props.dependencies, props.ownerNames, filters, grouping, layout, expandedGroups, rootExpanded, asOf],
   );
+
+  // Live node ids (for reconciling a saved layout against the current graph).
+  const liveNodeIds = useMemo(() => model.nodes.map((n) => n.id), [model.nodes]);
+
+  // Load the saved layout for this task + layout context. Reloads on a context
+  // switch (layout mode) — never on filters/expansion — so a manual arrangement
+  // survives filtering. Presentation-only (localStorage; SSR-safe).
+  useEffect(() => {
+    const loaded = loadSubtaskLayout(props.projectId, props.parent.id, layout);
+    setSavedLayout(loaded);
+    setManualPositions(applySavedSubtaskPositions(loaded, liveNodeIds).positions);
+    setHasUnsavedLayout(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.projectId, props.parent.id, layout]);
+
+  const layoutPartiallyApplied = useMemo(
+    () => (savedLayout ? isSubtaskLayoutPartial(applySavedSubtaskPositions(savedLayout, liveNodeIds)) : false),
+    [savedLayout, liveNodeIds],
+  );
+
+  const handleNodeDragStop = useCallback((nodeId: string, position: SavedSubtaskNodePosition) => {
+    setManualPositions((prev) => {
+      const next = new Map(prev);
+      next.set(nodeId, position);
+      return next;
+    });
+    setHasUnsavedLayout(true);
+  }, []);
+
+  const handleSaveLayout = useCallback(() => {
+    const nodes: Record<string, SavedSubtaskNodePosition> = {};
+    for (const [id, pos] of manualPositions) nodes[id] = pos;
+    const ok = saveSubtaskLayout({
+      version: SUBTASK_LAYOUT_SCHEMA_VERSION,
+      projectId: props.projectId,
+      taskId: props.parent.id,
+      layout,
+      nodes,
+      viewport: viewportRef.current ?? undefined,
+      savedAt: new Date().toISOString(),
+    });
+    if (ok) {
+      setSavedLayout(loadSubtaskLayout(props.projectId, props.parent.id, layout));
+      setHasUnsavedLayout(false);
+      setLayoutNotice("saved");
+    }
+  }, [manualPositions, props.projectId, props.parent.id, layout]);
+
+  const handleResetLayout = useCallback(() => {
+    // Back to the deterministic auto-layout (drops manual positions this session).
+    setManualPositions(new Map());
+    setHasUnsavedLayout(savedLayout != null);
+    setLayoutNotice("reset");
+  }, [savedLayout]);
+
+  const handleClearSavedLayout = useCallback(() => {
+    clearSubtaskLayout(props.projectId, props.parent.id, layout);
+    setSavedLayout(null);
+    setManualPositions(new Map());
+    setHasUnsavedLayout(false);
+    setLayoutNotice("cleared");
+  }, [props.projectId, props.parent.id, layout]);
+
+  const handleDeleteSubtask = useCallback(
+    (subtaskId: string) => {
+      startTransition(async () => {
+        const res = await deleteSubtaskAction({ projectId: props.projectId, subtaskId });
+        if (!res.error) {
+          setSelection((cur) => (cur?.kind !== "parent" && cur?.subtaskId === subtaskId ? null : cur));
+          router.refresh();
+        }
+      });
+    },
+    [props.projectId, router],
+  );
+
+  useEffect(() => {
+    if (!layoutNotice) return;
+    const id = window.setTimeout(() => setLayoutNotice(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [layoutNotice]);
 
   const selectedNodeId =
     selection?.kind === "parent"
@@ -259,6 +365,45 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
               <option value="hierarchical">{t("toolbar.layoutHierarchical")}</option>
               <option value="left_to_right">{t("toolbar.layoutLeftRight")}</option>
             </select>
+
+            {/* Saved layout controls (UX-007 parity) — drag nodes, then save.
+                Presentation-only: coordinates + viewport, never task data. */}
+            <div className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                data-testid="tem-save-layout"
+                onClick={handleSaveLayout}
+                disabled={!hasUnsavedLayout}
+                title={t("toolbar.saveLayout")}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+              >
+                <Save className="h-3.5 w-3.5" aria-hidden />
+                {t("toolbar.saveLayout")}
+                {hasUnsavedLayout && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
+              </button>
+              <button
+                type="button"
+                data-testid="tem-reset-layout"
+                onClick={handleResetLayout}
+                disabled={manualPositions.size === 0}
+                title={t("toolbar.resetLayout")}
+                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                {t("toolbar.resetLayout")}
+              </button>
+              {savedLayout && (
+                <button
+                  type="button"
+                  data-testid="tem-clear-layout"
+                  onClick={handleClearSavedLayout}
+                  title={t("toolbar.clearLayout")}
+                  className="rounded-md border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                  {t("toolbar.clearLayout")}
+                </button>
+              )}
+            </div>
           </>
         )}
 
@@ -294,6 +439,22 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
         </p>
       )}
 
+      {/* Saved-layout transient notice + honest "partially applied" hint */}
+      {view === "map" && layoutNotice && (
+        <p
+          role="status"
+          className="border-b border-border bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400"
+          data-testid="tem-layout-notice"
+        >
+          {t(`toolbar.layoutNotice.${layoutNotice}`)}
+        </p>
+      )}
+      {view === "map" && rootExpanded && layoutPartiallyApplied && !layoutNotice && (
+        <p className="border-b border-border bg-amber-500/10 px-3 py-1 text-[11px] text-amber-700 dark:text-amber-400">
+          {t("toolbar.layoutPartial")}
+        </p>
+      )}
+
       {/* ── Content ── */}
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
@@ -304,6 +465,13 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
                 selectedNodeId={selectedNodeId}
                 onNodeClick={handleNodeClick}
                 fitKey={fitKey}
+                manualPositions={manualPositions}
+                onNodeDragStop={handleNodeDragStop}
+                onDeleteSubtask={props.canManage ? handleDeleteSubtask : undefined}
+                savedViewport={savedLayout?.viewport ?? null}
+                onViewportChange={(vp) => {
+                  viewportRef.current = vp;
+                }}
               />
             </div>
           ) : (

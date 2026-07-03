@@ -888,7 +888,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     toggleSubtaskParent,
   ]);
 
-  // Drill-down: show only the picked milestones' activities
+  // Drill-down: show only the picked milestones' activities. Flow the tasks
+  // LEFT-TO-RIGHT (timeline mode) so a milestone's execution reads horizontally,
+  // consistent with the Subtask Map's left-to-right expansion. The layout-key
+  // effect then loads THIS context's saved arrangement (or the auto-layout).
   const handleDrillIntoPicks = useCallback(() => {
     if (milestonePicks.length === 0) return;
     setMilestoneFocus(new Set(milestonePicks));
@@ -896,8 +899,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     // Manual positions are reloaded for the new context by the layout-key effect.
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    setLayoutMode("timeline");
     setViewLevel("activities");
-  }, [milestonePicks]);
+  }, [milestonePicks, setLayoutMode, setViewLevel]);
 
   const pickedLabels = useMemo(
     () =>

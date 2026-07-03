@@ -518,7 +518,16 @@
       "layoutLeftRight": "Left to right",
       "hiddenByFilters": "{count} subtask(s) hidden by active filters.",
       "expandRoot": "Expand",
-      "collapseRoot": "Collapse"
+      "collapseRoot": "Collapse",
+      "saveLayout": "Save layout",
+      "resetLayout": "Reset to auto",
+      "clearLayout": "Clear saved",
+      "layoutPartial": "Saved layout partially applied — the subtasks changed since it was saved.",
+      "layoutNotice": {
+        "saved": "Layout saved. It will be restored on your next visit.",
+        "reset": "Back to the automatic layout.",
+        "cleared": "Saved layout cleared."
+      }
     },
     "form": {
       "createTitle": "New subtask",
