@@ -314,6 +314,47 @@ UI never consumes raw database changes: the typed notice stream is the only
 output, and its consumers are the future recalculation (Task 3) and delta
 layers. Guard: **LGRE-SUBSCRIPTION**.
 
+## 18b. Incremental Recalculation Service (Task 3 — added)
+
+Selective recalculation now exists, replacing the blanket full rebuild with
+attribution — while keeping full rebuild as the **safe fallback**:
+
+- **`recalculation-types.ts`** — the read-only **snapshot index** the planner
+  matches against (`subjectRefs` per node/edge in the invalidation-tag grammar:
+  `task:{id}`, `milestone:{id}`, …; identity only — no status/counts/layout),
+  pure entity records (verbatim engine payloads), the attribution detail
+  (entity → source notices evidence chain), and the deterministic
+  `LivingGraphRecalculationResult` (added/updated/removed entities, reasons,
+  provenance confidence, warnings, versions).
+- **`recalculation-attribution.ts`** — pure planner: accepted notices + index →
+  affected nodes/edges/overlays/targets. `subject:*`/`milestone:*` tags match
+  subject refs; `scope:risk` targets the risk overlay; `scope:schedule`
+  **propagates downstream** along the index edges (dependency-path closure,
+  reason `dependency_path_propagation`). Honest fallbacks: an unattributable
+  notice (`unattributable_change` — could be a brand-new graph area) or an
+  affected area beyond the partial budget (`partial_budget_exceeded`,
+  default ratio 0.6) ⇒ full rebuild, disclosed in reasons + warnings.
+- **`recalculation-result.ts`** — pure deterministic diff (stable sorted-key
+  stringify; replay-stable): partial mode diffs ONLY the plan's affected sets
+  (an unaffected entity missing from a partial recompute is **not** a removal);
+  recomputed entities outside the plan are included **with a warning** (never
+  silently dropped, never silently trusted); every change carries
+  `sourceNoticeIds` + `sourceEventIds` where attribution knows them;
+  `confidenceFromNotices` derives weakest-wins provenance confidence
+  (backfilled/derived/AI cap at medium; none ⇒ unknown).
+- **`recalculation-service.ts`** — `createLivingGraphRecalculationService`:
+  authorize (deny-by-default) → accept/reject notices → attribute → invoke the
+  caller's `recompute(plan)` step (**the existing deterministic engines** —
+  REG-008/REG-010/REG-018 resolvers; the service computes no graph content) →
+  diff → counts. No accepted notices ⇒ explicit `noop` and **recompute is never
+  invoked**.
+- **Engine upgrade (additive)** — `LivingGraphRecalculationInput.snapshotIndex?`:
+  with an index `planRecalculation` plans selectively; without one the Task 1
+  conservative full rebuild (disclosed) remains byte-for-byte identical.
+
+Guard: **LGRE-RECALCULATION**. Next layer: the Delta Store & Sync Contract
+(Task 4) persists versioned snapshots and turns results into consumer deltas.
+
 ## 19. Files (Phase 4, Task 1)
 
 | File (`src/lib/living-graph/realtime/`) | Responsibility |

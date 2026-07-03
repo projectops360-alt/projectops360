@@ -25,6 +25,7 @@ import {
   LgreUnsupportedOperationError,
 } from "./errors";
 import { resolveLivingGraphRealtimeAccess, filterAuthorizedProjectIds } from "./security";
+import { attributeGraphRecalculation } from "./recalculation-attribution";
 import type {
   LivingGraphRealtimeEngine,
   LivingGraphRecalculationInput,
@@ -169,8 +170,22 @@ export function createLivingGraphRealtimeEngine(
       };
     }
 
-    // Foundation behavior: selective attribution is a later Phase 4 task. The
-    // honest conservative default is a full rebuild — disclosed, never hidden.
+    // Task 3 — selective attribution when the caller supplies the snapshot
+    // index; the attribution planner still falls back to a full rebuild for
+    // anything it cannot attribute honestly.
+    if (input.snapshotIndex) {
+      return attributeGraphRecalculation({
+        scope: input.scope,
+        acceptedNotices: accepted,
+        rejectedNoticeCount: rejected,
+        index: input.snapshotIndex,
+        planId: newPlanId(),
+        now,
+      }).plan;
+    }
+
+    // Without an index selective attribution is impossible: the honest
+    // conservative default is a full rebuild — disclosed, never hidden.
     warnings.push("Selective recalculation not implemented; planning a full rebuild.");
     return {
       planId: newPlanId(),

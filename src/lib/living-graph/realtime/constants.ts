@@ -61,6 +61,11 @@ export const LGRE_RECALC_REASONS = [
   "upstream_projection_refreshed", // an engine published a newer projection
   "manual_refresh_requested",
   "selective_recalculation_not_implemented", // foundation fallback: full rebuild
+  // ── Task 3 (Incremental Recalculation Service) ──
+  "dependency_path_propagation", // schedule change propagated downstream
+  "unattributable_change", // notice could not be attributed → safe full rebuild
+  "partial_budget_exceeded", // affected area too large → full rebuild is safer
+  "snapshot_index_unavailable", // no index to attribute against → full rebuild
 ] as const;
 
 // ── Delta / sync model ────────────────────────────────────────────────────────
@@ -115,6 +120,24 @@ export const LGRE_FRESHNESS_STATES = [
 /** The safe default: without sync information, freshness is Unknown. */
 export const LGRE_DEFAULT_FRESHNESS = "unknown" as const;
 
+// ── Recalculation results (Task 3) ────────────────────────────────────────────
+
+/** How a recalculation result was produced. */
+export const LGRE_RECALC_MODES = [
+  "partial", // only the attributed affected subgraph was recomputed
+  "full", // safe fallback: the whole scope was recomputed
+  "noop", // nothing changed — explicit, honest no-op
+] as const;
+
+/** How an entity changed between the previous and recomputed graph. */
+export const LGRE_ENTITY_CHANGE_KINDS = ["added", "updated", "removed"] as const;
+
+/** Provenance-derived confidence of a recalculation result (weakest wins). */
+export const LGRE_CONFIDENCE_LEVELS = ["high", "medium", "low", "unknown"] as const;
+
+/** The safe default: without provenance information, confidence is Unknown. */
+export const LGRE_DEFAULT_CONFIDENCE = "unknown" as const;
+
 // ── Access scope ──────────────────────────────────────────────────────────────
 
 /**
@@ -140,6 +163,11 @@ export const LGRE_DEFAULT_PERFORMANCE_BUDGET = {
   maxRealtimeFailuresBeforePolling: 1,
   /** Consecutive failures before degrading polling → manual_refresh. */
   maxFailuresBeforeManualRefresh: 4,
+  /**
+   * Partial recalculation budget: when the attributed area exceeds this share
+   * of the graph, a full rebuild is cheaper and safer than a partial one.
+   */
+  partialRebuildNodeRatio: 0.6,
 } as const;
 
 // ── Error codes ───────────────────────────────────────────────────────────────
