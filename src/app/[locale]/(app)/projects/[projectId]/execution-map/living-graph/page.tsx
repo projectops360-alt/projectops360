@@ -13,6 +13,7 @@ import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { removeOrphanGraphNodes } from "@/lib/roadmap/living-graph-sync";
+import { resolveCanonicalNodeLabel } from "@/lib/graph/node-label";
 import { getOrgContext } from "@/lib/auth";
 import type {
   ProcessNode,
@@ -56,6 +57,7 @@ const TASK_COMPLETED_STATUSES = new Set(["done", "tested"]);
 type TaskEnrichment = Pick<
   RoadmapTask,
   | "id"
+  | "title"
   | "milestone_id"
   | "status"
   | "priority"
@@ -131,7 +133,15 @@ function normalizeNode(
     nodeType: row.node_type,
     sourceEntityType: row.source_entity_type,
     sourceEntityId: row.source_entity_id,
-    label: row.title,
+    // "Different views, same truth" (REG-018 / CAP-001): the node label comes
+    // from the CANONICAL owner (roadmap_tasks / milestones) so the graph shows
+    // the same title as the Workboard — never a stale process_node snapshot
+    // captured at event time. See resolveCanonicalNodeLabel (unit-tested).
+    label: resolveCanonicalNodeLabel({
+      processTitle: row.title,
+      taskTitle: task?.title,
+      milestoneTitle: milestone?.title,
+    }),
     description: row.description,
     status:
       task?.status ??
