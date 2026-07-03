@@ -8,9 +8,9 @@ import {
   FileText, Send, Code, ShieldCheck, AlertCircle,
   GripVertical, Filter, ChevronLeft, ChevronRight,
   ChevronDown, Columns3, Eye, EyeOff, PanelLeftClose,
-  CornerDownRight, User, Rows3, Rows4,
+  CornerDownRight, User, Rows3, Rows4, Trash2,
 } from "lucide-react";
-import { updateTaskStatusAction, reorderTasksAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
+import { updateTaskStatusAction, reorderTasksAction, archiveTaskAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { applyBoardDrag } from "@/lib/workboard/reorder";
 import { resolveTaskOwner, type AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
@@ -58,6 +58,14 @@ interface WorkboardTranslations {
     moveWith: string;
     cancel: string;
     statusLabels: Record<string, string>;
+  };
+  /** Workboard Cleanup — safe delete for NO-MILESTONE tasks only. */
+  cleanup: {
+    deleteTask: string;
+    confirmTitle: string;
+    confirmBody: string;
+    confirmDelete: string;
+    cancel: string;
   };
   taskForm: TaskFormTranslations;
 }
@@ -142,6 +150,8 @@ interface BoardColumnProps {
   onResizeStart: () => void;
   onResizeEnd: () => void;
   onTaskClick: (task: RoadmapTask) => void;
+  /** Workboard Cleanup — opens the delete confirmation for a NO-MILESTONE task. */
+  onDeleteRequest: (task: RoadmapTask) => void;
   translations: {
     columns: Record<TaskStatus, string>;
     empty: string;
@@ -153,6 +163,7 @@ interface BoardColumnProps {
     owner: string;
     unassigned: string;
     assignedUserUnavailable: string;
+    deleteTask: string;
   };
 }
 
@@ -173,6 +184,7 @@ function BoardColumn({
   onResizeStart,
   onResizeEnd,
   onTaskClick,
+  onDeleteRequest,
   translations: t,
 }: BoardColumnProps) {
   const color = STATUS_COLOR[status];
@@ -257,7 +269,26 @@ function BoardColumn({
                         <div className="flex items-start gap-1.5">
                           <GripVertical className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-foreground truncate">{task.title}</p>
+                            <div className="flex items-start gap-1">
+                              <p className="flex-1 text-xs font-medium text-foreground truncate">{task.title}</p>
+                              {/* Workboard Cleanup: safe delete ONLY for tasks WITHOUT a
+                                  milestone. Tasks with a milestone never show this option
+                                  (they belong to the plan — archive them from the editor
+                                  flows, not from a quick board action). Requires the
+                                  confirmation dialog before anything is deleted. */}
+                              {!task.milestone_id && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onDeleteRequest(task); }}
+                                  className="shrink-0 rounded p-0.5 text-muted-foreground/50 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                                  aria-label={t.deleteTask}
+                                  title={t.deleteTask}
+                                  data-testid="workboard-delete-no-milestone"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
                             {!compact && task.description && <p className="text-[10px] text-muted-foreground/60 mt-0.5 line-clamp-1">{task.description}</p>}
                             {(predecessorsByTask.get(task.id) ?? []).map((pred) => (
                               <p
@@ -388,6 +419,9 @@ export function WorkboardClient({
   const [isDragging, setIsDragging] = useState(false);
   const [dependencyWarning, setDependencyWarning] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<RoadmapTask | null>(null);
+  // Workboard Cleanup: pending delete confirmation for a NO-MILESTONE task.
+  const [pendingDelete, setPendingDelete] = useState<RoadmapTask | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -711,6 +745,31 @@ export function WorkboardClient({
     setPendingStatusChange(null);
   }, [pendingStatusChange]);
 
+  // ── Workboard Cleanup: confirmed delete of a NO-MILESTONE task ──────────────
+  // Server authorization lives in archiveTaskAction (org-scoped soft delete +
+  // audit log). The guard here is presentation: the button only exists on
+  // no-milestone cards, and this handler re-checks it defensively.
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!pendingDelete || deleting) return;
+    if (pendingDelete.milestone_id) {
+      setPendingDelete(null);
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await archiveTaskAction(pendingDelete.id, projectId);
+      if (res.error) {
+        setDependencyWarning(t.errors[res.error] ?? t.errors.unexpected);
+      } else {
+        setTasks((prev) => prev.filter((tk) => tk.id !== pendingDelete.id));
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, deleting, projectId, router, t.errors]);
+
   // ── Resize callbacks ───────────────────────────────────────────────────────
   const handleResizeStart = useCallback(() => setAnyResizing(true), []);
   const handleResizeEnd = useCallback(() => setAnyResizing(false), []);
@@ -937,6 +996,7 @@ export function WorkboardClient({
                           onResizeStart={handleResizeStart}
                           onResizeEnd={handleResizeEnd}
                           onTaskClick={(task) => setEditingTask(task)}
+                          onDeleteRequest={(task) => setPendingDelete(task)}
                           translations={{
                             columns: t.columns,
                             empty: t.empty,
@@ -948,6 +1008,7 @@ export function WorkboardClient({
                             owner: t.owner,
                             unassigned: t.unassigned,
                             assignedUserUnavailable: t.assignedUserUnavailable,
+                            deleteTask: t.cleanup.deleteTask,
                           }}
                         />
                       ))}
@@ -970,6 +1031,41 @@ export function WorkboardClient({
           onConfirm={handleStatusConfirm}
           onCancel={handleStatusCancel}
         />
+      )}
+
+      {/* Workboard Cleanup — delete confirmation (NO-MILESTONE tasks only).
+          Nothing is deleted until the user explicitly confirms here. */}
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" role="alertdialog" aria-modal="true">
+            <h2 className="inline-flex items-center gap-2 text-base font-semibold text-foreground">
+              <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden />
+              {t.cleanup.confirmTitle}
+            </h2>
+            <p className="mt-2 break-words text-sm font-medium text-foreground">{pendingDelete.title}</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">{t.cleanup.confirmBody}</p>
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                disabled={deleting}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t.cleanup.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="workboard-delete-confirm"
+              >
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t.cleanup.confirmDelete}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Task Form Dialog */}

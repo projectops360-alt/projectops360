@@ -43,12 +43,30 @@ export interface MilestoneTaskCensus {
  * function that produces milestone task counts/lists for projections — so every
  * view stays consistent by construction ("different views, same truth").
  */
+/**
+ * Canonical, deterministic task order for census lists: the user's persisted
+ * Workboard order (`order_index`, written by drag-and-drop reordering), then
+ * `created_at`, then `id` — the exact tiebreak the Workboard query uses. This
+ * makes the UX-008 edge tooltip show tasks in the same order the user arranged
+ * on the board, with a stable fallback when order_index ties (same inputs →
+ * same output, regardless of the caller's fetch order).
+ */
+function compareCensusOrder(a: RoadmapTask, b: RoadmapTask): number {
+  if (a.order_index !== b.order_index) return a.order_index - b.order_index;
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 export function computeMilestoneTaskCensus(
   tasks: readonly RoadmapTask[],
 ): Map<string, MilestoneTaskCensus> {
   const byMilestone = new Map<string, MilestoneTaskCensus>();
 
-  for (const task of tasks) {
+  // Deterministic order first — counts are order-independent, but taskList is
+  // user-facing (UX-008 tooltip) and must match the persisted board order.
+  const ordered = [...tasks].sort(compareCensusOrder);
+
+  for (const task of ordered) {
     const milestoneId = task.milestone_id;
     if (!milestoneId) continue;
 

@@ -225,6 +225,13 @@ export default async function WorkboardPage({
             deferred: columnOverrides.deferred ?? t("columns.deferred"),
           },
         },
+        cleanup: {
+          deleteTask: t("cleanup.deleteTask"),
+          confirmTitle: t("cleanup.confirmTitle"),
+          confirmBody: t("cleanup.confirmBody"),
+          confirmDelete: t("cleanup.confirmDelete"),
+          cancel: t("cleanup.cancel"),
+        },
         taskForm: {
           createTitle: tTaskForm("createTask"),
           editTitle: tTaskForm("editTask"),
