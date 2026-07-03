@@ -13,6 +13,7 @@ import {
   buildExecutionMapModel,
   filterSubtasks,
   groupSubtasks,
+  resolveEffectiveGrouping,
   aggregateSubtaskSignals,
   type ParentTaskInfo,
 } from "@/lib/subtasks/map-model";
@@ -235,6 +236,15 @@ describe("grouping + layouts", () => {
     expect([...groupSubtasks(rows, "status").keys()].sort()).toEqual(["blocked", "completed"]);
     expect([...groupSubtasks(rows, "owner").keys()].sort()).toEqual(["u1", "unassigned"]);
     expect([...groupSubtasks(rows, "priority").keys()].sort()).toEqual(["p1", "p2"]);
+  });
+
+  it("resolveEffectiveGrouping auto-promotes 'none' to 'status' only above the threshold", () => {
+    // "Expand all" uses this so it expands exactly the groups the map renders.
+    expect(resolveEffectiveGrouping("none", 30, 24)).toBe("status");
+    expect(resolveEffectiveGrouping("none", 10, 24)).toBe("none");
+    // An explicit grouping is respected regardless of count.
+    expect(resolveEffectiveGrouping("owner", 30, 24)).toBe("owner");
+    expect(resolveEffectiveGrouping("priority", 5, 24)).toBe("priority");
   });
 
   it("auto-groups into collapsed group nodes above the threshold (clutter control)", () => {

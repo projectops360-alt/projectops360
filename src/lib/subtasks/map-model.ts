@@ -104,6 +104,22 @@ export function filterSubtasks(
 
 // ── Grouping (pure) ───────────────────────────────────────────────────────────
 
+export const DEFAULT_AUTO_GROUP_THRESHOLD = 24;
+
+/**
+ * The grouping the map actually renders: "none" auto-promotes to "status" when
+ * there are more visible subtasks than the clutter threshold. Shared by the
+ * model builder and the client (so "Expand all" can expand exactly the groups
+ * the map will show).
+ */
+export function resolveEffectiveGrouping(
+  grouping: ExecutionMapGrouping,
+  visibleCount: number,
+  autoGroupThreshold: number = DEFAULT_AUTO_GROUP_THRESHOLD,
+): ExecutionMapGrouping {
+  return grouping === "none" && visibleCount > autoGroupThreshold ? "status" : grouping;
+}
+
 export function groupSubtasks(
   subtasks: readonly Subtask[],
   grouping: ExecutionMapGrouping,
@@ -230,8 +246,7 @@ export function buildExecutionMapModel(args: BuildExecutionMapArgs): ExecutionMa
   }
 
   // ── Auto-grouping for large maps (performance + clutter control) ──
-  const effectiveGrouping: ExecutionMapGrouping =
-    grouping === "none" && visible.length > autoGroupThreshold ? "status" : grouping;
+  const effectiveGrouping = resolveEffectiveGrouping(grouping, visible.length, autoGroupThreshold);
 
   type Branch =
     | { type: "subtask"; subtask: Subtask }

@@ -22,6 +22,9 @@ import { SUBTASK_STATUSES } from "@/lib/subtasks/types";
 import { deleteSubtaskAction } from "@/lib/subtasks/actions";
 import {
   buildExecutionMapModel,
+  filterSubtasks,
+  groupSubtasks,
+  resolveEffectiveGrouping,
   type ExecutionMapFilters,
   type ExecutionMapGrouping,
   type ExecutionMapLayout,
@@ -179,6 +182,21 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
     return () => window.clearTimeout(id);
   }, [layoutNotice]);
 
+  // Expand ALL under this task: reveal the root and every group so the whole
+  // subtask hierarchy shows (NotebookLM "Expand all"). Collapse ALL returns to
+  // the clean parent-only view (requirement #8).
+  const handleExpandAll = useCallback(() => {
+    setRootExpanded(true);
+    const { visible } = filterSubtasks(props.subtasks, filters, asOf);
+    const eff = resolveEffectiveGrouping(grouping, visible.length);
+    setExpandedGroups(eff === "none" ? [] : [...groupSubtasks(visible, eff).keys()]);
+  }, [props.subtasks, filters, grouping, asOf]);
+
+  const handleCollapseAll = useCallback(() => {
+    setRootExpanded(false);
+    setExpandedGroups([]);
+  }, []);
+
   const selectedNodeId =
     selection?.kind === "parent"
       ? `task:${props.parent.id}`
@@ -312,20 +330,16 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
             <button
               type="button"
               data-testid="tem-expand-root"
-              onClick={() => setRootExpanded(true)}
-              disabled={rootExpanded}
+              onClick={handleExpandAll}
               aria-pressed={rootExpanded}
-              className={`px-2.5 py-1.5 text-xs font-medium ${rootExpanded ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"} disabled:cursor-default`}
+              className={`px-2.5 py-1.5 text-xs font-medium ${rootExpanded ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
               {t("toolbar.expandRoot")}
             </button>
             <button
               type="button"
               data-testid="tem-collapse-root"
-              onClick={() => {
-                setRootExpanded(false);
-                setExpandedGroups([]);
-              }}
+              onClick={handleCollapseAll}
               disabled={!rootExpanded}
               className={`px-2.5 py-1.5 text-xs font-medium ${!rootExpanded ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"} disabled:cursor-default`}
             >

@@ -95,8 +95,8 @@ import {
   appendSubtaskGraphLayer,
   groupSubtasksByTask,
   toggleSubtaskExpansion,
-  expandAllSubtaskParents,
   collapseAllSubtaskParents,
+  scopedExpandableTaskIds,
   type SubtaskLayerRow,
 } from "@/lib/graph/subtask-graph-layer";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
@@ -368,10 +368,6 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     () => groupSubtasksByTask(subtasks ?? []),
     [subtasks],
   );
-  const taskIdsWithSubtasks = useMemo(
-    () => [...subtasksByTask.keys()],
-    [subtasksByTask],
-  );
 
   // ── Labor-enriched graph (inject risk nodes + edges, enrich existing nodes) ──
   const laborEnrichedData = useMemo(() => {
@@ -594,15 +590,33 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     });
   }, [filtered, subtasksByTask, expandedSubtaskParents, projectId, data.generatedAt]);
 
+  // Tasks the user CAN expand right now — scoped to the visible graph (the
+  // milestone/phase drilled into). Expand all never touches other milestones'
+  // tasks (requirements #3/#5/#6). `filtered.nodes` already respects the
+  // milestone focus + filters, so scoping to it is scoping to the current view.
+  const visibleTaskIdsWithSubtasks = useMemo(
+    () => scopedExpandableTaskIds(filtered.nodes, subtasksByTask),
+    [filtered.nodes, subtasksByTask],
+  );
+
   const toggleSubtaskParent = useCallback((taskId: string) => {
     setExpandedSubtaskParents((prev) => toggleSubtaskExpansion(prev, taskId));
   }, []);
   const handleExpandAllSubtasks = useCallback(() => {
-    setExpandedSubtaskParents(expandAllSubtaskParents(taskIdsWithSubtasks));
-  }, [taskIdsWithSubtasks]);
+    // Expand ONLY the currently-visible tasks (current scope), then auto
+    // fit-to-view so the newly revealed subtasks are all framed (#14).
+    setExpandedSubtaskParents((prev) => {
+      const next = new Set(prev);
+      for (const id of visibleTaskIdsWithSubtasks) next.add(id);
+      return next;
+    });
+    window.setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 80);
+  }, [visibleTaskIdsWithSubtasks, fitView]);
   const handleCollapseAllSubtasks = useCallback(() => {
+    // Clean default view: nothing expanded anywhere, then re-fit (#8/#14).
     setExpandedSubtaskParents(collapseAllSubtaskParents());
-  }, []);
+    window.setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 80);
+  }, [fitView]);
 
   const layoutPositions = useMemo(
     () =>
@@ -1495,16 +1509,18 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       )}
 
       {/* Subtask visibility controls (NotebookLM-style). Shown only where task
-          nodes exist (activities/events level) and some task has subtasks. The
-          graph starts collapsed; expand-all is an explicit user action. */}
-      {!isMilestoneLevel && taskIdsWithSubtasks.length > 0 && (
+          nodes exist (activities/events level) and a VISIBLE task has subtasks.
+          The graph starts collapsed; Expand all is an explicit user action and
+          is SCOPED to the current view (the drilled-into milestone) — it never
+          reveals other milestones' tasks. */}
+      {!isMilestoneLevel && visibleTaskIdsWithSubtasks.length > 0 && (
         <div
           className="flex flex-wrap items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 px-3 py-1.5 text-xs text-violet-700 dark:text-violet-300"
           data-testid="graph-subtask-controls"
         >
           <span className="inline-flex items-center gap-1 font-medium">
             <ListTree className="h-3.5 w-3.5" aria-hidden />
-            {t("subtasks.controlLabel", { count: taskIdsWithSubtasks.length })}
+            {t("subtasks.controlLabel", { count: visibleTaskIdsWithSubtasks.length })}
           </span>
           <span className="text-muted-foreground">
             {t("subtasks.expandedCount", { count: expandedSubtaskParents.size })}
@@ -1512,7 +1528,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           <button
             type="button"
             onClick={handleExpandAllSubtasks}
-            className="rounded-md border border-violet-500/40 px-2 py-1 font-medium transition-colors hover:bg-violet-500/10"
+            disabled={visibleTaskIdsWithSubtasks.every((id) => expandedSubtaskParents.has(id))}
+            className="rounded-md border border-violet-500/40 px-2 py-1 font-medium transition-colors hover:bg-violet-500/10 disabled:opacity-40"
             data-testid="graph-subtask-expand-all"
           >
             {t("subtasks.expandAll")}
