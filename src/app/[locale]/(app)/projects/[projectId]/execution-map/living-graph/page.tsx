@@ -8,7 +8,7 @@
 
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Radio } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -503,13 +503,22 @@ export default async function LivingGraphPage({
           <h1 className="text-lg font-bold tracking-tight text-foreground">{t("title")}</h1>
           <p className="hidden truncate text-xs text-muted-foreground md:block">{t("subtitle")}</p>
         </div>
-        <Link
-          href={`/projects/${projectId}/execution-map`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-          {t("backToExecutionMap")}
-        </Link>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            href={`/projects/${projectId}/execution-map/realtime`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary shadow-sm transition-colors hover:bg-primary/10"
+          >
+            <Radio className="h-3.5 w-3.5" aria-hidden />
+            {t("realtimeCta")}
+          </Link>
+          <Link
+            href={`/projects/${projectId}/execution-map`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+            {t("backToExecutionMap")}
+          </Link>
+        </div>
       </div>
 
       <LivingGraphView

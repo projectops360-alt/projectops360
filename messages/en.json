@@ -401,6 +401,72 @@
       "done": "Subtasks completed"
     }
   },
+  "realtimeGraph": {
+    "pageTitle": "Project Execution Map — Realtime",
+    "subtitle": "Live hierarchy-safe execution graph — click to reveal the next level.",
+    "backToLivingGraph": "Living Graph",
+    "collapsedHidden": "{count} subtask(s) hidden — expand a task to reveal them.",
+    "node": {
+      "subtasks": "{count} subtasks",
+      "evidence": "Evidence"
+    },
+    "kind": {
+      "project": "Project",
+      "milestone": "Milestone",
+      "phase": "Phase",
+      "task": "Task",
+      "subtask": "Subtask",
+      "evidence": "Evidence",
+      "event": "Event",
+      "risk": "Risk",
+      "decision": "Decision",
+      "approval": "Approval",
+      "dependency": "Dependency",
+      "unknown": "Node"
+    },
+    "sync": {
+      "live": "Live",
+      "recovering": "Recovering…",
+      "stale": "Stale",
+      "resync_required": "Resync required",
+      "unknown": "Offline",
+      "at": "synced {time}"
+    },
+    "toolbar": {
+      "focusMilestone": "Focus a milestone",
+      "wholeProject": "Whole project",
+      "layout": "Layout",
+      "layoutMindMap": "Mind map",
+      "layoutHierarchical": "Hierarchical",
+      "layoutLeftRight": "Left to right",
+      "evidenceOverlay": "Evidence",
+      "dependencyOverlay": "Dependencies",
+      "filterStatus": "Filter by status",
+      "allStatuses": "All statuses",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "reset": "Reset view"
+    },
+    "inspector": {
+      "title": "Node details",
+      "close": "Close",
+      "kind": "Type",
+      "status": "Status",
+      "progress": "Progress",
+      "owner": "Owner",
+      "unassigned": "Unassigned",
+      "priority": "Priority",
+      "dueDate": "Due date",
+      "version": "Version",
+      "evidence": "Evidence",
+      "evidenceAvailable": "Available",
+      "viewTeam": "View project team"
+    },
+    "isabella": {
+      "ask": "Ask Isabella",
+      "question": "Explain the current state of this project's execution graph: what's progressing, blocked, and what changed recently."
+    }
+  },
   "taskExecutionMap": {
     "pageTitle": "Subtask Map",
     "backToWorkboard": "Back to Workboard",
@@ -1645,6 +1711,7 @@
     "recalculate": "Recalculate",
     "recalculateHint": "Rebuild the graph from current data (removes deleted milestones/tasks).",
     "backToExecutionMap": "Execution Map",
+    "realtimeCta": "Realtime",
     "summary": "{nodes} nodes · {edges} edges · {blocked} blocked · {waiting} waiting",
     "noSelection": "Select a node or edge to inspect it.",
     "selectedNode": "Node details",

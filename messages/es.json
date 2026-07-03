@@ -401,6 +401,72 @@
       "done": "Subtareas completadas"
     }
   },
+  "realtimeGraph": {
+    "pageTitle": "Mapa de Ejecución del Proyecto — Tiempo Real",
+    "subtitle": "Grafo de ejecución en vivo, seguro por jerarquía — haz clic para revelar el siguiente nivel.",
+    "backToLivingGraph": "Living Graph",
+    "collapsedHidden": "{count} subtarea(s) ocultas — expande una tarea para revelarlas.",
+    "node": {
+      "subtasks": "{count} subtareas",
+      "evidence": "Evidencia"
+    },
+    "kind": {
+      "project": "Proyecto",
+      "milestone": "Hito",
+      "phase": "Fase",
+      "task": "Tarea",
+      "subtask": "Subtarea",
+      "evidence": "Evidencia",
+      "event": "Evento",
+      "risk": "Riesgo",
+      "decision": "Decisión",
+      "approval": "Aprobación",
+      "dependency": "Dependencia",
+      "unknown": "Nodo"
+    },
+    "sync": {
+      "live": "En vivo",
+      "recovering": "Recuperando…",
+      "stale": "Desactualizado",
+      "resync_required": "Requiere resync",
+      "unknown": "Sin conexión",
+      "at": "sincronizado {time}"
+    },
+    "toolbar": {
+      "focusMilestone": "Enfocar un hito",
+      "wholeProject": "Todo el proyecto",
+      "layout": "Distribución",
+      "layoutMindMap": "Mapa mental",
+      "layoutHierarchical": "Jerárquica",
+      "layoutLeftRight": "Izquierda a derecha",
+      "evidenceOverlay": "Evidencia",
+      "dependencyOverlay": "Dependencias",
+      "filterStatus": "Filtrar por estado",
+      "allStatuses": "Todos los estados",
+      "expandAll": "Expandir todo",
+      "collapseAll": "Colapsar todo",
+      "reset": "Restablecer vista"
+    },
+    "inspector": {
+      "title": "Detalles del nodo",
+      "close": "Cerrar",
+      "kind": "Tipo",
+      "status": "Estado",
+      "progress": "Progreso",
+      "owner": "Responsable",
+      "unassigned": "Sin asignar",
+      "priority": "Prioridad",
+      "dueDate": "Fecha límite",
+      "version": "Versión",
+      "evidence": "Evidencia",
+      "evidenceAvailable": "Disponible",
+      "viewTeam": "Ver equipo del proyecto"
+    },
+    "isabella": {
+      "ask": "Preguntar a Isabella",
+      "question": "Explica el estado actual del grafo de ejecución de este proyecto: qué avanza, qué está bloqueado y qué cambió recientemente."
+    }
+  },
   "taskExecutionMap": {
     "pageTitle": "Mapa de Subtareas",
     "backToWorkboard": "Volver al Workboard",
@@ -1645,6 +1711,7 @@
     "recalculate": "Recalcular",
     "recalculateHint": "Reconstruye el grafo con los datos actuales (quita milestones/tareas borrados).",
     "backToExecutionMap": "Mapa de Ejecución",
+    "realtimeCta": "Tiempo Real",
     "summary": "{nodes} nodos · {edges} aristas · {blocked} bloqueados · {waiting} en espera",
     "noSelection": "Selecciona un nodo o una arista para inspeccionarla.",
     "selectedNode": "Detalle del nodo",
