@@ -227,11 +227,12 @@ function FormSection({
         )}
         <ChevronDown className={`ml-auto h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="space-y-4 border-t border-border px-3 pb-4 pt-3">
-          {children}
-        </div>
-      )}
+      {/* Data-loss guard: children stay MOUNTED when the section is collapsed
+          (CSS hidden, not conditional render). Unmounted inputs drop out of the
+          submitted FormData, which used to wipe their stored values on save. */}
+      <div className={open ? "space-y-4 border-t border-border px-3 pb-4 pt-3" : "hidden"}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -401,32 +402,41 @@ export function TaskFormDialog({
   }
 
   async function handleSubmit(_prevState: FormState, formData: FormData): Promise<FormState> {
-    const title = (formData.get("title") as string)?.trim();
-    const description = (formData.get("description") as string)?.trim();
-    const milestoneId = (formData.get("milestone_id") as string) || "";
-    const status = (formData.get("status") as string) || "not_started";
-    const priority = (formData.get("priority") as string) || "p2";
-    const sprintName = (formData.get("sprint_name") as string)?.trim();
-    const estimateHours = formData.get("estimate_hours") as string;
-    const acceptanceCriteria = (formData.get("acceptance_criteria") as string)?.trim();
-    const dependencyNotes = (formData.get("dependency_notes") as string)?.trim();
+    // Presence-aware reads (preserve-on-absent, client side): a field that is
+    // not in the submitted FormData (not mounted — e.g. gated AI Execution)
+    // stays `undefined` and is NOT sent, so the server keeps its stored value.
+    // An empty mounted field sends "" = explicit clear. Never `?? ""` here.
+    const readStr = (name: string): string | undefined => {
+      const v = formData.get(name);
+      return v == null ? undefined : (v as string);
+    };
+    const title = readStr("title")?.trim();
+    const description = readStr("description")?.trim();
+    const milestoneId = readStr("milestone_id") || "";
+    const status = readStr("status") || "not_started";
+    const priority = readStr("priority") || "p2";
+    const sprintName = readStr("sprint_name")?.trim();
+    const estimateHours = readStr("estimate_hours");
+    const acceptanceCriteria = readStr("acceptance_criteria")?.trim();
+    const dependencyNotes = readStr("dependency_notes")?.trim();
     // UX-014 scoped exception (PD-013 amended): send the AI Execution fields ONLY
     // for AI-oriented project types. For every other type we do NOT read/send them,
     // so the server preserves existing stored values (preserve-on-absent).
     const aiExec = showAiExecution
       ? {
-          prompt_body: (formData.get("prompt_body") as string)?.trim() ?? "",
-          prompt_context: (formData.get("prompt_context") as string)?.trim() ?? "",
-          ai_tool_target: (formData.get("ai_tool_target") as string)?.trim() ?? "",
+          prompt_body: readStr("prompt_body")?.trim(),
+          prompt_context: readStr("prompt_context")?.trim(),
+          ai_tool_target: readStr("ai_tool_target")?.trim(),
         }
       : null;
-    const implementationNotes = (formData.get("implementation_notes") as string)?.trim();
-    const testNotes = (formData.get("test_notes") as string)?.trim();
-    const executionNotes = (formData.get("execution_notes") as string)?.trim();
-    const blockerReason = (formData.get("blocker_reason") as string)?.trim();
-    const startDate = (formData.get("start_date") as string) || "";
-    const endDate = (formData.get("end_date") as string) || "";
-    const progress = parseInt(formData.get("progress") as string) || 0;
+    const implementationNotes = readStr("implementation_notes")?.trim();
+    const testNotes = readStr("test_notes")?.trim();
+    const executionNotes = readStr("execution_notes")?.trim();
+    const blockerReason = readStr("blocker_reason")?.trim();
+    const startDate = readStr("start_date");
+    const endDate = readStr("end_date");
+    const progressRaw = readStr("progress");
+    const progress = progressRaw === undefined ? undefined : parseInt(progressRaw) || 0;
     const assigneeRaw = (formData.get("assigned_to") as string) || "";
     const teamMemberId = assigneeRaw.startsWith("team:") ? assigneeRaw.slice(5) : null;
     const assignedTo = assigneeRaw.startsWith("user:") ? assigneeRaw.slice(5) : null;
@@ -438,7 +448,9 @@ export function TaskFormDialog({
       return { error: t.errors.titleRequired || "Title is required" };
     }
 
-    const parsedEstimate = estimateHours ? parseFloat(estimateHours) : null;
+    // undefined = not mounted → preserve; "" = mounted-and-empty → clear (null).
+    const parsedEstimate =
+      estimateHours === undefined ? undefined : estimateHours ? parseFloat(estimateHours) : null;
 
     if (isEdit && task) {
       const result = await updateTaskAction({

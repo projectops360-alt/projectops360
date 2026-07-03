@@ -378,6 +378,13 @@ export function WorkboardClient({
   const isEs = locale === "es";
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<RoadmapTask[]>(initialTasks);
+  // Auto-refresh after save: `tasks` is local state (optimistic DnD), so when
+  // the server re-renders (router.refresh() after a task edit) the fresh
+  // server truth must replace it — otherwise saved edits stay invisible until
+  // a full browser reload and reopening a task shows stale content.
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
   const [isDragging, setIsDragging] = useState(false);
   const [dependencyWarning, setDependencyWarning] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<RoadmapTask | null>(null);
