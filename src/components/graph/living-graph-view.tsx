@@ -73,7 +73,7 @@ import {
   MILESTONE_NODE_HEIGHT,
   type SnakeSide,
 } from "@/lib/graph/living-graph-layout";
-import { computeMilestoneFocusPositions } from "@/lib/graph/milestone-focus-layout";
+import { computeMilestoneFocusPositions, getMilestoneFocusLayoutKey } from "@/lib/graph/milestone-focus-layout";
 import {
   NODE_TYPE_STYLES,
   EDGE_TYPE_STYLES,
@@ -641,22 +641,32 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
   }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus]);
 
-  // User drags win over the computed layout — EXCEPT in milestone focus mode,
-  // where a global saved layout must never be (partially) applied (it scatters
-  // the focused map). Focus mode always uses the deterministic focus layout.
+  // User drags win over the computed layout. In milestone focus mode the manual
+  // positions come from a PER-MILESTONE saved layout (scoped by the focus layout
+  // key below), so the global layout never leaks in but drag-to-rearrange still
+  // persists — exactly like the rest of the Living Graph.
   const positions = useMemo(() => {
-    if (isMilestoneFocusMode || manualPositions.size === 0) return layoutPositions;
+    if (manualPositions.size === 0) return layoutPositions;
     const merged = new Map(layoutPositions);
     for (const [id, pos] of manualPositions) {
       if (merged.has(id)) merged.set(id, pos);
     }
     return merged;
-  }, [layoutPositions, manualPositions, isMilestoneFocusMode]);
+  }, [layoutPositions, manualPositions]);
 
   // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
   // The context a saved arrangement is scoped to (level + layout mode). Switching
   // context loads ITS saved layout instead of destroying the manual one.
-  const layoutKey = useMemo(() => buildLayoutKey(viewLevel, layoutMode), [viewLevel, layoutMode]);
+  // In milestone focus mode the saved arrangement is scoped PER MILESTONE (its
+  // own key), so dragging persists per focused milestone and the global layout is
+  // never applied to — nor overwritten by — the focus map.
+  const layoutKey = useMemo(
+    () =>
+      isMilestoneFocusMode && milestoneFocus
+        ? getMilestoneFocusLayoutKey(projectId, [...milestoneFocus][0])
+        : buildLayoutKey(viewLevel, layoutMode),
+    [isMilestoneFocusMode, milestoneFocus, projectId, viewLevel, layoutMode],
+  );
   // Keep the live node IDs fresh for the context loader without re-running the
   // context-load on every filter change (refs must not be set during render).
   // Declared before the load effect so the IDs commit first on a context switch.

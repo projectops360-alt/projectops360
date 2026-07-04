@@ -103,6 +103,34 @@ describe("external dependencies (compact summaries, not scattered)", () => {
   });
 });
 
+describe("mind-map (radial) is the default initial layout", () => {
+  it("fans tasks to the right of the center, spread vertically around y=0, order preserved", () => {
+    const nodes = [
+      node({ id: "a", status: "in_progress", label: "Alpha" }),
+      node({ id: "b", status: "in_progress", label: "Beta" }),
+      node({ id: "c", status: "in_progress", label: "Gamma" }),
+    ];
+    const res = computeMilestoneFocusLayout({ selectedMilestoneId: "M1", nodes, edges: [] }); // default mind_map
+    // all tasks to the RIGHT of the root (x > 0)
+    expect(res.nodes.every((n) => n.x > 0)).toBe(true);
+    // vertically spread around the center (some above, some below 0)
+    const ys = res.nodes.map((n) => n.y);
+    expect(Math.min(...ys)).toBeLessThan(0);
+    expect(Math.max(...ys)).toBeGreaterThan(0);
+    // deterministic order preserved (Alpha, Beta, Gamma top→bottom)
+    const byY = [...res.nodes].sort((p, q) => p.y - q.y).map((n) => n.id);
+    expect(byY).toEqual(["a", "b", "c"]);
+  });
+
+  it("still supports the compact flow (columns) mode explicitly", () => {
+    const nodes = [node({ id: "x", status: "blocked" }), node({ id: "y", status: "done" })];
+    const res = computeMilestoneFocusLayout({ selectedMilestoneId: "M1", nodes, edges: [], mode: "flow" });
+    // flow places groups in distinct columns (different x)
+    const xs = new Set(res.nodes.map((n) => n.x));
+    expect(xs.size).toBe(2);
+  });
+});
+
 describe("compact, bounded, stable positions", () => {
   it("produces bounded compact coordinates (no huge gaps) and is stable", () => {
     const nodes = Array.from({ length: 6 }, (_, i) => node({ id: `t${i}`, status: i % 2 ? "in_progress" : "not_started" }));
