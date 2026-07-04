@@ -69,6 +69,12 @@ export interface MilestoneFocusLayoutInput {
   edges: LivingGraphEdge[];
   savedLayout?: SavedGraphLayout | null;
   mode?: MilestoneFocusLayoutMode;
+  /**
+   * The visible milestone/root node id (if present). When set, it is placed at
+   * the CENTER (0,0) as the mind-map hub and excluded from the task fan, so tasks
+   * radiate from it like a NotebookLM mind map.
+   */
+  rootNodeId?: string | null;
 }
 
 export interface MilestoneFocusLayoutResult {
@@ -235,9 +241,13 @@ export function summarizeExternalDependencies(
 
 // ── Saved-layout scoping ─────────────────────────────────────────────────────
 
-/** Layout-context key for a milestone focus map (distinct from global keys). */
+/**
+ * Layout-context key for a milestone focus map (distinct from global keys). The
+ * `v2` generation orphans any pre-mind-map saved arrangement so the new radial
+ * hub layout is what the user sees (old saves under `v1`/no-version are ignored).
+ */
 export function getMilestoneFocusLayoutKey(projectId: string, selectedMilestoneId: string): string {
-  return `milestone-focus:${projectId}:${selectedMilestoneId}`;
+  return `milestone-focus:v2:${projectId}:${selectedMilestoneId}`;
 }
 
 /**
@@ -279,13 +289,17 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
   const { selectedMilestoneId, nodes, edges } = input;
   const mode: MilestoneFocusLayoutMode = input.mode ?? "mind_map";
 
+  const rootNodeId = input.rootNodeId ?? null;
   // Subtask nodes branch off their parent task (below); other nodes with no
   // milestone belong via a parent too but aren't subtask items → misc leftover.
-  const subtaskNodes = nodes.filter((n) => n.nodeType === "subtask_item");
+  // The root (milestone hub) node, when present, is centered — never in the fan.
+  const subtaskNodes = nodes.filter((n) => n.nodeType === "subtask_item" && n.id !== rootNodeId);
   const milestoneTasks = nodes.filter(
-    (n) => n.nodeType !== "subtask_item" && isMilestoneTask(n, selectedMilestoneId),
+    (n) => n.id !== rootNodeId && n.nodeType !== "subtask_item" && isMilestoneTask(n, selectedMilestoneId),
   );
-  const leftover = nodes.filter((n) => n.nodeType !== "subtask_item" && n.milestoneId == null);
+  const leftover = nodes.filter(
+    (n) => n.id !== rootNodeId && n.nodeType !== "subtask_item" && n.milestoneId == null,
+  );
   const taskIds = new Set(milestoneTasks.map((n) => n.id));
 
   // parent task id → its subtask child nodes (from `subtask_of` hierarchy edges).
@@ -380,6 +394,11 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
       positioned.push({ id: c.id, x: MINDMAP_RADIUS_X, y: i * SUBTASK_BRANCH_Y, group: "unsequenced", level: 0 });
     });
 
+  // The milestone hub node sits at the center; tasks radiate from it.
+  if (rootNodeId && nodes.some((n) => n.id === rootNodeId)) {
+    positioned.push({ id: rootNodeId, x: MILESTONE_FOCUS_ROOT_POSITION.x, y: MILESTONE_FOCUS_ROOT_POSITION.y, group: "unsequenced", level: -1 });
+  }
+
   const cycleWarnings: CycleWarning[] = cycleNodeIds.size > 0 ? [{ nodeIds: [...cycleNodeIds].sort() }] : [];
 
   return {
@@ -390,6 +409,39 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
     appliedSavedLayout: false,
     fitView: true,
   };
+}
+
+/**
+ * Synthetic PRESENTATION-ONLY hub edges from the milestone root to each of its
+ * tasks, so every task is visibly connected to its milestone (nothing floats).
+ * Marked `milestone_focus_hub` so they are never treated as real dependencies.
+ */
+export function buildMilestoneFocusHubEdges(input: {
+  rootNodeId: string;
+  nodes: LivingGraphNode[];
+  selectedMilestoneId: string;
+  projectId: string;
+}): LivingGraphEdge[] {
+  const { rootNodeId, nodes, selectedMilestoneId, projectId } = input;
+  return nodes
+    .filter(
+      (n) =>
+        n.id !== rootNodeId &&
+        n.nodeType !== "subtask_item" &&
+        (isMilestoneTask(n, selectedMilestoneId) || n.milestoneId == null),
+    )
+    .map((n) => ({
+      id: `mfocus-hub:${rootNodeId}->${n.id}`,
+      projectId,
+      sourceNodeId: rootNodeId,
+      targetNodeId: n.id,
+      edgeType: "enabled",
+      weight: 1,
+      lagDays: null,
+      isCritical: false,
+      riskLevel: null,
+      metadata: { milestone_focus_hub: true },
+    }));
 }
 
 /** Adapter for the React Flow view: a positions map for every input node. */

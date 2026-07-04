@@ -99,10 +99,11 @@ scoping (global never applied; focus requires exact key + node set).
 
 ## 12. Known limitations
 
-- The mind-map fans the task cards around a central anchor, but a **rendered
-  milestone root card** (a visible central hub node with branch edges to each task,
-  like the Task Execution Map) is not injected yet — that means adding a synthetic
-  node into the (protected) Living Graph pipeline and is a focused follow-up.
+- The milestone node is **centered as the hub** and every task is connected to it
+  with a synthetic presentation-only **hub edge** (`buildMilestoneFocusHubEdges`,
+  `milestone_focus_hub` — never real dependency evidence), so no task floats
+  disconnected. The saved-layout key is `milestone-focus:v2:*` so a pre-mind-map
+  saved arrangement never hijacks the new layout (use Reset/Clear to drop old ones).
 - External-dependency chips + a Flow↔Mind-Map UI toggle are future (engine ready).
 - **Subtasks branch off their parent**: an expanded task's subtasks are positioned
   as a tight sub-fan to the right of the parent (via `subtask_of` edges), so a

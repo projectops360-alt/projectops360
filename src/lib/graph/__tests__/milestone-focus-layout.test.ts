@@ -12,6 +12,7 @@ import {
   summarizeExternalDependencies,
   shouldApplySavedFocusLayout,
   getMilestoneFocusLayoutKey,
+  buildMilestoneFocusHubEdges,
 } from "@/lib/graph/milestone-focus-layout";
 import type { LivingGraphNode, LivingGraphEdge } from "@/types/living-graph";
 import type { SavedGraphLayout } from "@/lib/graph/graph-layout-storage";
@@ -170,6 +171,30 @@ describe("a task's subtasks branch off the parent (attached, not scattered)", ()
     expect(Math.abs(a.y - p.y)).toBeLessThanOrEqual(120); // vertically near the parent
     expect(a.group).toBe(p.group); // same branch/group as the parent
     expect(res.groups.find((g) => g.key === "done")!.nodeIds).toContain("p");
+  });
+});
+
+describe("central milestone hub", () => {
+  it("centers the root node at (0,0) and excludes it from the task fan", () => {
+    const root = node({ id: "root", nodeType: "milestone_gate", label: "Phase 5", milestoneId: "M1" });
+    const t1 = node({ id: "t1", status: "in_progress", milestoneId: "M1" });
+    const res = computeMilestoneFocusLayout({ selectedMilestoneId: "M1", nodes: [root, t1], edges: [], rootNodeId: "root" });
+    const byId = new Map(res.nodes.map((n) => [n.id, n]));
+    expect(byId.get("root")).toMatchObject({ x: 0, y: 0 });
+    expect(byId.get("t1")!.x).toBeGreaterThan(0); // task fans to the right of the hub
+    // the root is NOT counted as a task in any group
+    expect(res.groups.every((g) => !g.nodeIds.includes("root"))).toBe(true);
+  });
+
+  it("buildMilestoneFocusHubEdges connects the milestone to every task (not subtasks/root)", () => {
+    const root = node({ id: "root", nodeType: "milestone_gate", milestoneId: "M1" });
+    const t1 = node({ id: "t1", milestoneId: "M1" });
+    const t2 = node({ id: "t2", milestoneId: "M1" });
+    const sub = node({ id: "s1", nodeType: "subtask_item", milestoneId: null });
+    const hub = buildMilestoneFocusHubEdges({ rootNodeId: "root", nodes: [root, t1, t2, sub], selectedMilestoneId: "M1", projectId: "p1" });
+    expect(hub.map((e) => e.targetNodeId).sort()).toEqual(["t1", "t2"]);
+    expect(hub.every((e) => e.sourceNodeId === "root")).toBe(true);
+    expect(hub.every((e) => e.metadata.milestone_focus_hub === true)).toBe(true);
   });
 });
 

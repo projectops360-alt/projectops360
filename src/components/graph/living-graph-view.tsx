@@ -73,7 +73,7 @@ import {
   MILESTONE_NODE_HEIGHT,
   type SnakeSide,
 } from "@/lib/graph/living-graph-layout";
-import { computeMilestoneFocusPositions, getMilestoneFocusLayoutKey } from "@/lib/graph/milestone-focus-layout";
+import { computeMilestoneFocusPositions, getMilestoneFocusLayoutKey, buildMilestoneFocusHubEdges } from "@/lib/graph/milestone-focus-layout";
 import {
   NODE_TYPE_STYLES,
   EDGE_TYPE_STYLES,
@@ -626,6 +626,27 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const isMilestoneFocusMode =
     milestoneFocus != null && milestoneFocus.size === 1 && viewLevel !== "milestones" && !workforceGraph;
 
+  // The visible milestone/root node (the hub the tasks radiate from), if present.
+  const focusRootNode = useMemo(
+    () =>
+      isMilestoneFocusMode
+        ? withSubtasks.nodes.find((n) => n.sourceEntityType === "milestones" || n.nodeType === "milestone_gate") ?? null
+        : null,
+    [isMilestoneFocusMode, withSubtasks.nodes],
+  );
+
+  // Synthetic PRESENTATION-ONLY hub edges (milestone → each task) so no task
+  // floats disconnected from its milestone. Never real dependency evidence.
+  const focusHubEdges = useMemo(() => {
+    if (!isMilestoneFocusMode || !focusRootNode || !milestoneFocus) return [];
+    return buildMilestoneFocusHubEdges({
+      rootNodeId: focusRootNode.id,
+      nodes: withSubtasks.nodes,
+      selectedMilestoneId: [...milestoneFocus][0],
+      projectId,
+    });
+  }, [isMilestoneFocusMode, focusRootNode, milestoneFocus, withSubtasks.nodes, projectId]);
+
   const layoutPositions = useMemo(() => {
     if (viewLevel === "milestones") {
       return milestoneFlowLayout(withSubtasks.nodes); // serpentine roadmap, layoutMode ignored
@@ -636,10 +657,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         selectedMilestoneId,
         nodes: withSubtasks.nodes,
         edges: withSubtasks.edges,
+        rootNodeId: focusRootNode?.id ?? null,
       });
     }
     return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
-  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus]);
+  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode]);
 
   // User drags win over the computed layout. In milestone focus mode the manual
   // positions come from a PER-MILESTONE saved layout (scoped by the focus layout
@@ -993,7 +1015,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [rfNodes]);
 
   const rfEdges = useMemo<LivingFlowEdge[]>(() => {
-    const edges: LivingFlowEdge[] = withSubtasks.edges.map((edge) => {
+    // In milestone focus mode, add synthetic hub edges (milestone → each task) so
+    // no task floats disconnected. They render like normal edges but are marked
+    // presentation-only and never drive dependency logic.
+    const sourceEdges = focusHubEdges.length > 0 ? [...withSubtasks.edges, ...focusHubEdges] : withSubtasks.edges;
+    const edges: LivingFlowEdge[] = sourceEdges.map((edge) => {
       const style = EDGE_TYPE_STYLES[edge.edgeType];
       const isCritical =
         analysis.criticalEdgeIds.has(edge.id) && overlay === "criticalPath";
@@ -1063,6 +1089,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return edges;
   }, [
     withSubtasks.edges,
+    focusHubEdges,
     analysis,
     overlay,
     dimmedNodeIds,
