@@ -679,8 +679,24 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const loadContextLayout = useCallback(
     (projectId: string, key: string) => {
       const loaded = loadSavedLayout(projectId, key);
+      const liveIds = filteredIdsRef.current;
+      // Milestone Focus Map: only restore a saved arrangement that EXACTLY matches
+      // the current node set. A stale/partial focus layout would scatter the clean
+      // deterministic mind-map (some nodes at old coords, some auto-laid) — so we
+      // ignore it and fall back to the mind-map. In-session drags still apply
+      // (they are added to manualPositions AFTER this load).
+      if (key.startsWith("milestone-focus:") && loaded) {
+        const savedIds = Object.keys(loaded.nodes);
+        const exact = savedIds.length === liveIds.length && liveIds.every((id) => id in loaded.nodes);
+        if (!exact) {
+          setSavedLayout(null);
+          setManualPositions(new Map());
+          setHasUnsavedLayout(false);
+          return;
+        }
+      }
       setSavedLayout(loaded);
-      setManualPositions(applySavedPositions(loaded, filteredIdsRef.current).positions);
+      setManualPositions(applySavedPositions(loaded, liveIds).positions);
       setHasUnsavedLayout(false);
     },
     [],
