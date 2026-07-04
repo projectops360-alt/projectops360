@@ -129,3 +129,57 @@ export function mergeDirectory(input: MergeInput): DirectoryPerson[] {
 export function unassignedLabel(locale: "en" | "es"): string {
   return locale === "es" ? "Sin asignar" : "Unassigned";
 }
+
+// ── Assignable owners (person-only) ──────────────────────────────────────────
+// SUBTASK-OWNER-ASSIGNMENT-PERSISTENCE. An OWNER is a real person (auth user /
+// profile id) — not an external contact or stakeholder. This mirrors the normal
+// task assignee source (org "Workspace users" ∪ "Project team" members that map
+// to a user), de-duplicated by the person's id so the same user never appears
+// twice. Pure: the server function scopes the rows by org/project (RBAC).
+
+export interface AssignableProfileRow {
+  id: string;
+  display_name: string | null;
+}
+export interface AssignableTeamMemberRow {
+  user_id: string | null;
+  display_name: string | null;
+}
+export interface AssignableOwner {
+  id: string;
+  name: string;
+}
+
+/**
+ * Merge org profiles (workspace users) with project team members that resolve to
+ * a real user into ONE de-duplicated, name-sorted list of assignable owners.
+ * A profile's display name wins; a team member's name is a fallback; a person
+ * with no name at all is still assignable under a short-id label (never dropped —
+ * so a valid team member never silently disappears from the dropdown). Team rows
+ * without a user_id are role placeholders and are excluded (not assignable).
+ */
+export function mergeAssignableOwners(input: {
+  profiles: AssignableProfileRow[];
+  teamMembers?: AssignableTeamMemberRow[];
+}): AssignableOwner[] {
+  const nameById = new Map<string, string>();
+
+  const consider = (id: string | null | undefined, name: string | null | undefined) => {
+    if (!id) return;
+    const clean = (name ?? "").trim();
+    const existing = nameById.get(id);
+    // Keep the first real (non-empty) name; only upgrade a placeholder.
+    if (existing && existing.length > 0) return;
+    nameById.set(id, clean);
+  };
+
+  for (const p of input.profiles) consider(p.id, p.display_name);
+  for (const m of input.teamMembers ?? []) consider(m.user_id, m.display_name);
+
+  const owners = [...nameById.entries()].map(([id, name]) => ({
+    id,
+    name: name.length > 0 ? name : id.slice(0, 8),
+  }));
+  owners.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return owners;
+}

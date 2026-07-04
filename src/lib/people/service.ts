@@ -10,7 +10,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
-import { mergeDirectory } from "./directory";
+import { mergeDirectory, mergeAssignableOwners, type AssignableOwner } from "./directory";
 import type { PeopleDirectoryResult } from "./types";
 
 /**
@@ -74,4 +74,48 @@ export async function getPeopleDirectory(projectId?: string): Promise<PeopleDire
   });
 
   return { ok: true, people };
+}
+
+/**
+ * Assignable OWNERS for a project — the person-only list an owner dropdown needs
+ * (SUBTASK-OWNER-ASSIGNMENT-PERSISTENCE). Same convention as the normal task
+ * assignee source: org "Workspace users" (`profiles`) ∪ this project's team
+ * members that resolve to a real user (`project_team_members.user_id`), all
+ * ORG-scoped (never cross-org) and PROJECT-scoped for the team. RBAC/org come
+ * from the trusted session. Never throws — returns a typed result. This is why
+ * a project with no explicit team rows still offers assignable people (the
+ * workspace users), instead of only "Unassigned".
+ */
+export async function getAssignableProjectOwners(
+  projectId: string,
+): Promise<
+  | { ok: true; owners: AssignableOwner[] }
+  | { ok: false; reason: "not_authorized" | "unavailable" }
+> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { ok: false, reason: "not_authorized" };
+  }
+  const supabase = createAdminClient();
+  const orgId = org.organizationId;
+
+  const [profilesRes, teamRes] = await Promise.all([
+    supabase.from("profiles").select("id, display_name").eq("organization_id", orgId),
+    supabase
+      .from("project_team_members")
+      .select("user_id, display_name")
+      .eq("project_id", projectId)
+      .eq("organization_id", orgId)
+      .neq("status", "removed"),
+  ]);
+
+  if (profilesRes.error && teamRes.error) return { ok: false, reason: "unavailable" };
+
+  const owners = mergeAssignableOwners({
+    profiles: (profilesRes.data ?? []) as Array<{ id: string; display_name: string | null }>,
+    teamMembers: (teamRes.data ?? []) as Array<{ user_id: string | null; display_name: string | null }>,
+  });
+  return { ok: true, owners };
 }
