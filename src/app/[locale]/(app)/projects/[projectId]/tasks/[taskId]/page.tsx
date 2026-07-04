@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
+import { getAssignableProjectOwners } from "@/lib/people/service";
 import type { Subtask } from "@/lib/subtasks/types";
 import type { ExternalDependencyInfo, ParentTaskInfo } from "@/lib/subtasks/map-model";
 import { ExecutionMapClient } from "@/components/task-execution-map/execution-map-client";
@@ -91,18 +92,18 @@ export default async function TaskExecutionMapPage({
       if (p.display_name) ownerNames[p.id] = p.display_name;
     }
   }
-  // Assignable people: project team members (existing convention).
-  const { data: teamRows } = await admin
-    .from("project_team_members")
-    .select("user_id, display_name")
-    .eq("project_id", projectId)
-    .not("user_id", "is", null);
+  // Assignable OWNERS: the SAME person source normal tasks use — org workspace
+  // users ∪ this project's team members (SUBTASK-OWNER-ASSIGNMENT-PERSISTENCE).
+  // Using only project_team_members left the dropdown empty ("Unassigned" only)
+  // for projects with no explicit team rows. Currently-assigned owners are always
+  // included (even if they later left the team) so the dropdown never hides the
+  // real owner.
+  const ownersRes = await getAssignableProjectOwners(projectId);
+  const assignableOwners = ownersRes.ok ? ownersRes.owners : [];
   const owners = [
     ...new Map(
       [
-        ...((teamRows ?? []) as { user_id: string | null; display_name: string | null }[])
-          .filter((m): m is { user_id: string; display_name: string | null } => !!m.user_id)
-          .map((m) => [m.user_id, { id: m.user_id, name: m.display_name ?? ownerNames[m.user_id] ?? m.user_id.slice(0, 8) }] as const),
+        ...assignableOwners.map((o) => [o.id, o] as const),
         ...ownerIds.map((id) => [id, { id, name: ownerNames[id] ?? id.slice(0, 8) }] as const),
       ],
     ).values(),

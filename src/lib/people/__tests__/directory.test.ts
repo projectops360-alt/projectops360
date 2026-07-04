@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   mergeDirectory,
+  mergeAssignableOwners,
   classifyContactType,
   normalizeEmail,
   unassignedLabel,
@@ -83,5 +84,68 @@ describe("unassignedLabel", () => {
   it("is intentional, bilingual, and not an error", () => {
     expect(unassignedLabel("en")).toBe("Unassigned");
     expect(unassignedLabel("es")).toBe("Sin asignar");
+  });
+});
+
+// ── SUBTASK-OWNER-ASSIGNMENT-PERSISTENCE — assignable owners (person-only) ─────
+
+describe("mergeAssignableOwners", () => {
+  it("lists org workspace users as assignable owners (fixes the empty dropdown)", () => {
+    const owners = mergeAssignableOwners({
+      profiles: [
+        { id: "u1", display_name: "Ana López" },
+        { id: "u2", display_name: "Beto Ruiz" },
+      ],
+      teamMembers: [],
+    });
+    expect(owners).toEqual([
+      { id: "u1", name: "Ana López" },
+      { id: "u2", name: "Beto Ruiz" },
+    ]);
+  });
+
+  it("unions project team members (by user_id) and de-dupes by person id", () => {
+    const owners = mergeAssignableOwners({
+      profiles: [{ id: "u1", display_name: "Ana" }],
+      teamMembers: [
+        { user_id: "u1", display_name: "Ana (team)" }, // same person → one entry, profile name wins
+        { user_id: "u3", display_name: "Cira" }, // team-only member still assignable
+      ],
+    });
+    expect(owners).toEqual([
+      { id: "u1", name: "Ana" },
+      { id: "u3", name: "Cira" },
+    ]);
+  });
+
+  it("excludes team rows without a user_id (role placeholders are not assignable)", () => {
+    const owners = mergeAssignableOwners({
+      profiles: [],
+      teamMembers: [{ user_id: null, display_name: "Unfilled QA role" }],
+    });
+    expect(owners).toEqual([]);
+  });
+
+  it("keeps a nameless person assignable under a short-id label (never silently dropped)", () => {
+    const owners = mergeAssignableOwners({
+      profiles: [{ id: "abcdef12-0000", display_name: null }],
+      teamMembers: [],
+    });
+    expect(owners).toEqual([{ id: "abcdef12-0000", name: "abcdef12" }]);
+  });
+
+  it("sorts by name, case-insensitively", () => {
+    const owners = mergeAssignableOwners({
+      profiles: [
+        { id: "z", display_name: "zeta" },
+        { id: "a", display_name: "Alpha" },
+        { id: "m", display_name: "mike" },
+      ],
+    });
+    expect(owners.map((o) => o.name)).toEqual(["Alpha", "mike", "zeta"]);
+  });
+
+  it("empty team + empty profiles → empty list (dropdown falls back to Unassigned only)", () => {
+    expect(mergeAssignableOwners({ profiles: [], teamMembers: [] })).toEqual([]);
   });
 });
