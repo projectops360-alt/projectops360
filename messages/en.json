@@ -401,6 +401,27 @@
       "done": "Subtasks completed"
     }
   },
+  "livingGraphObservability": {
+    "title": "Living Graph Observability",
+    "subtitle": "Internal realtime diagnostics for the Living Graph Realtime Engine.",
+    "selectProject": "Select a project",
+    "noProjectSelected": "Select a project to start a scoped diagnostic session (one subscription).",
+    "refresh": "Refresh",
+    "inMemoryNote": "Runtime counters are in-memory for this session only (per-consumer). Metrics not tracked here show as “not instrumented”, not zero.",
+    "notInstrumented": "not instrumented",
+    "state": {
+      "fresh": "Live",
+      "stale": "Stale",
+      "degraded": "Degraded",
+      "unknown": "Unknown"
+    },
+    "environmentTitle": "Environment",
+    "connectionTitle": "Connection",
+    "noticeTitle": "Notices / recalculation",
+    "deltaTitle": "Delta / sync",
+    "renderingTitle": "Rendering",
+    "errorsTitle": "Errors / warnings"
+  },
   "realtimeGraph": {
     "pageTitle": "Project Execution Map — Realtime",
     "subtitle": "Live hierarchy-safe execution graph — click to reveal the next level.",
