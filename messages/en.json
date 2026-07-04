@@ -1835,6 +1835,29 @@
       "viewFlow": "View flow",
       "hint": "Tip: drag one milestone onto another (or click two) to connect them and view the flow between them. Drag cards freely to rearrange the layout."
     },
+    "milestoneFocus": {
+      "title": "Milestone Focus",
+      "focusMap": "Focus Map",
+      "flow": "Flow",
+      "mindMap": "Mind Map",
+      "externalDependencies": "External dependencies",
+      "externalPredecessors": "External predecessors",
+      "externalSuccessors": "External successors",
+      "noDependencyEvidence": "No dependency evidence",
+      "cycleConflict": "Cycle / dependency conflict",
+      "fitToView": "Fit to view",
+      "groupByStatus": "Group by status",
+      "groupByDependency": "Group by dependency",
+      "groups": {
+        "blocked": "Blocked",
+        "in_progress": "In progress",
+        "not_started": "Not started",
+        "done": "Done",
+        "unsequenced": "No dependency evidence",
+        "cycle_conflict": "Cycle / dependency conflict",
+        "external_dependencies": "External dependencies"
+      }
+    },
     "milestoneCard": {
       "tasks": "tasks",
       "currentPhase": "Current phase"

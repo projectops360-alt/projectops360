@@ -1835,6 +1835,29 @@
       "viewFlow": "Ver flujo",
       "hint": "Consejo: arrastra un hito sobre otro (o haz clic en dos) para conectarlos y ver el flujo entre ambos. Arrastra las tarjetas libremente para reacomodar el lienzo."
     },
+    "milestoneFocus": {
+      "title": "Enfoque del milestone",
+      "focusMap": "Mapa de enfoque",
+      "flow": "Flujo",
+      "mindMap": "Mapa mental",
+      "externalDependencies": "Dependencias externas",
+      "externalPredecessors": "Predecesores externos",
+      "externalSuccessors": "Sucesores externos",
+      "noDependencyEvidence": "Sin evidencia de dependencia",
+      "cycleConflict": "Ciclo / conflicto de dependencia",
+      "fitToView": "Ajustar vista",
+      "groupByStatus": "Agrupar por estado",
+      "groupByDependency": "Agrupar por dependencia",
+      "groups": {
+        "blocked": "Bloqueado",
+        "in_progress": "En progreso",
+        "not_started": "No iniciado",
+        "done": "Completado",
+        "unsequenced": "Sin evidencia de dependencia",
+        "cycle_conflict": "Ciclo / conflicto de dependencia",
+        "external_dependencies": "Dependencias externas"
+      }
+    },
     "milestoneCard": {
       "tasks": "tareas",
       "currentPhase": "Fase actual"
