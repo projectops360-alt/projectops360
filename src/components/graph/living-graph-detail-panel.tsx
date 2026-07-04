@@ -151,6 +151,15 @@ function LivingGraphDetailPanelComponent({
   const outgoing = selectedNode
     ? (analysis.adjacency.out.get(selectedNode.id) ?? [])
     : [];
+  // The milestone-flow view draws a SYNTHETIC sequential chain (order_index) to
+  // show reading order — it is NOT a prerequisite dependency. Exclude it from the
+  // "Incoming/Outgoing dependencies" lists so a new/empty milestone does not read
+  // as depending on whatever phase merely precedes it in the chain. Structural
+  // counts (Neighbors / in-degree / upstream) keep the flow connection.
+  const isRealDep = (e: { metadata?: Record<string, unknown> }) =>
+    e.metadata?.milestone_chain !== true;
+  const incomingDeps = incoming.filter(isRealDep);
+  const outgoingDeps = outgoing.filter(isRealDep);
 
   const durationDays = (node: LivingGraphNode): string => {
     if (node.durationDays != null) return `${node.durationDays}d`;
@@ -309,16 +318,16 @@ function LivingGraphDetailPanelComponent({
             )}
           </dl>
 
-          {/* Dependencies */}
-          {(incoming.length > 0 || outgoing.length > 0) && (
+          {/* Dependencies (real prerequisites only — never the synthetic flow chain) */}
+          {(incomingDeps.length > 0 || outgoingDeps.length > 0) && (
             <div className="space-y-2">
-              {incoming.length > 0 && (
+              {incomingDeps.length > 0 && (
                 <div>
                   <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {t("detailPanel.incoming")}
                   </h4>
                   <ul className="space-y-1">
-                    {incoming.slice(0, 8).map((e) => (
+                    {incomingDeps.slice(0, 8).map((e) => (
                       <li key={e.id} className="flex items-center gap-1.5 text-[11px] text-foreground">
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -336,13 +345,13 @@ function LivingGraphDetailPanelComponent({
                   </ul>
                 </div>
               )}
-              {outgoing.length > 0 && (
+              {outgoingDeps.length > 0 && (
                 <div>
                   <h4 className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                     {t("detailPanel.outgoing")}
                   </h4>
                   <ul className="space-y-1">
-                    {outgoing.slice(0, 8).map((e) => (
+                    {outgoingDeps.slice(0, 8).map((e) => (
                       <li key={e.id} className="flex items-center gap-1.5 text-[11px] text-foreground">
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-full"

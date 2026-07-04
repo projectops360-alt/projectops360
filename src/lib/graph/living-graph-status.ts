@@ -18,7 +18,7 @@ import {
   type ExecutionStatus,
   type ExecutionSignals,
 } from "@/lib/execution/status-engine";
-import type { LivingGraphNode } from "@/types/living-graph";
+import type { LivingGraphNode, LivingGraphEdge } from "@/types/living-graph";
 import type { GraphAdjacency } from "./living-graph-analysis";
 
 const COMPLETED = new Set(["done", "completed", "tested"]);
@@ -36,6 +36,20 @@ const DEPENDENCY_EDGE_TYPES = new Set([
   "requires_approval",
   "supplied_by",
 ]);
+
+/**
+ * A real prerequisite dependency edge. The milestone-flow view draws a SYNTHETIC
+ * sequential chain (`aggregateByMilestone`, `metadata.milestone_chain`) purely to
+ * show reading/roadmap order (order_index) — it is NOT a prerequisite. Treating it
+ * as one made a brand-new empty milestone read as "Waiting on dependency" on
+ * whatever milestone precedes it in order_index (bug: a new Phase chained after an
+ * unrelated Phase). Presentation-only synthetic edges never drive execution status.
+ */
+function isRealDependencyEdge(e: LivingGraphEdge): boolean {
+  if (!DEPENDENCY_EDGE_TYPES.has(e.edgeType)) return false;
+  if (e.metadata?.milestone_chain === true) return false;
+  return true;
+}
 
 function isNodeCompleted(node: LivingGraphNode): boolean {
   const s = node.status?.toLowerCase() ?? null;
@@ -82,7 +96,7 @@ export function buildNodeExecutionSignals(
 
   // Pending predecessors: incoming dependency edges whose source is not complete.
   const incoming = adjacency.inc.get(node.id) ?? [];
-  const depEdges = incoming.filter((e) => DEPENDENCY_EDGE_TYPES.has(e.edgeType));
+  const depEdges = incoming.filter(isRealDependencyEdge);
   const pendingPredecessors = [];
   for (const e of depEdges) {
     const src = adjacency.nodeById.get(e.sourceNodeId);
