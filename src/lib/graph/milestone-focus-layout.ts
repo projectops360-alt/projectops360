@@ -85,6 +85,13 @@ export interface MilestoneFocusLayoutResult {
 const GROUP_X_SPACING = 320;
 const TASK_Y_SPACING = 108;
 const GROUP_TOP_PADDING = 0;
+// Mind-map (radial fan): tasks fan out to the RIGHT of a central root, spread
+// vertically around the center with a gentle horizontal arc — the NotebookLM look.
+const MINDMAP_RADIUS_X = 380;
+const MINDMAP_TASK_Y = 96;
+const MINDMAP_ARC_STEP = 10;
+/** Center anchor for the (conceptual/rendered) milestone root node. */
+export const MILESTONE_FOCUS_ROOT_POSITION = { x: 0, y: 0 } as const;
 
 // ── Status → group ───────────────────────────────────────────────────────────
 const DONE = new Set(["done", "completed", "tested"]);
@@ -265,6 +272,7 @@ function priorityRank(n: LivingGraphNode): number {
  */
 export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): MilestoneFocusLayoutResult {
   const { selectedMilestoneId, nodes, edges } = input;
+  const mode: MilestoneFocusLayoutMode = input.mode ?? "mind_map";
 
   const milestoneTasks = nodes.filter((n) => isMilestoneTask(n, selectedMilestoneId));
   // Leftover = nodes that belong via a parent (subtasks / misc with NO milestone).
@@ -277,33 +285,50 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
   // Leftover nodes (e.g. expanded subtasks with no milestoneId) → unsequenced.
   for (const n of leftover) groups.get("unsequenced")!.push(n);
 
-  const positioned: PositionedFocusNode[] = [];
   const resultGroups: MilestoneFocusGroup[] = [];
+  // Deterministic within-lane order: level → priority → title → id.
+  const orderInLane = (a: LivingGraphNode, b: LivingGraphNode): number => {
+    const la = level.get(a.id) ?? 0;
+    const lb = level.get(b.id) ?? 0;
+    if (la !== lb) return la - lb;
+    const pa = priorityRank(a);
+    const pb = priorityRank(b);
+    if (pa !== pb) return pa - pb;
+    const byLabel = (a.label ?? "").localeCompare(b.label ?? "", undefined, { sensitivity: "base" });
+    if (byLabel !== 0) return byLabel;
+    return a.id.localeCompare(b.id);
+  };
 
-  FOCUS_GROUP_ORDER.forEach((key, columnIndex) => {
-    const groupNodes = groups.get(key) ?? [];
-    if (groupNodes.length === 0) {
-      resultGroups.push({ key, nodeIds: [] });
-      return;
-    }
-    // Deterministic within-lane order: level → priority → title → id.
-    const ordered = [...groupNodes].sort((a, b) => {
-      const la = level.get(a.id) ?? 0;
-      const lb = level.get(b.id) ?? 0;
-      if (la !== lb) return la - lb;
-      const pa = priorityRank(a);
-      const pb = priorityRank(b);
-      if (pa !== pb) return pa - pb;
-      const byLabel = (a.label ?? "").localeCompare(b.label ?? "", undefined, { sensitivity: "base" });
-      if (byLabel !== 0) return byLabel;
-      return a.id.localeCompare(b.id);
-    });
-    const x = columnIndex * GROUP_X_SPACING;
-    ordered.forEach((n, i) => {
-      positioned.push({ id: n.id, x, y: GROUP_TOP_PADDING + i * TASK_Y_SPACING, group: key, level: level.get(n.id) ?? 0 });
-    });
+  // Ordered groups (drives both the groups report and the flat mind-map order).
+  const orderedGroups = FOCUS_GROUP_ORDER.map((key) => {
+    const ordered = [...(groups.get(key) ?? [])].sort(orderInLane);
     resultGroups.push({ key, nodeIds: ordered.map((n) => n.id) });
+    return { key, nodes: ordered };
   });
+
+  const positioned: PositionedFocusNode[] = [];
+
+  if (mode === "flow") {
+    // Compact status lanes (columns): milestone root at left, groups to the right.
+    orderedGroups.forEach(({ key, nodes: laneNodes }, columnIndex) => {
+      const x = columnIndex * GROUP_X_SPACING;
+      laneNodes.forEach((n, i) => {
+        positioned.push({ id: n.id, x, y: GROUP_TOP_PADDING + i * TASK_Y_SPACING, group: key, level: level.get(n.id) ?? 0 });
+      });
+    });
+  } else {
+    // Mind-map (NotebookLM): tasks fan out to the RIGHT of the central root,
+    // spread vertically around the center with a gentle horizontal arc so the
+    // curved branches read like a mind map. Order preserved (group → lane order).
+    const flat = orderedGroups.flatMap((g) => g.nodes.map((n) => ({ node: n, group: g.key })));
+    const n = flat.length;
+    flat.forEach(({ node, group }, i) => {
+      const rel = i - (n - 1) / 2; // signed distance from vertical center
+      const x = MINDMAP_RADIUS_X + Math.abs(rel) * MINDMAP_ARC_STEP;
+      const y = rel * MINDMAP_TASK_Y;
+      positioned.push({ id: node.id, x, y, group, level: level.get(node.id) ?? 0 });
+    });
+  }
 
   const cycleWarnings: CycleWarning[] = cycleNodeIds.size > 0 ? [{ nodeIds: [...cycleNodeIds].sort() }] : [];
 

@@ -21,9 +21,11 @@ are changed.
 
 ## 3. Layout mode
 
-`MilestoneFocusLayoutMode = "flow" | "mind_map"` (engine supports both; the wired
-default is a compact **flow**: status lanes as columns, tasks stacked within a lane).
-A UI toggle is a documented future enhancement.
+`MilestoneFocusLayoutMode = "flow" | "mind_map"`. The **initial/default is `mind_map`**
+(NotebookLM style): tasks fan out to the right of the central root, spread vertically
+around the center with a gentle horizontal arc so the curved branches read like a mind
+map. `flow` (compact status columns) remains available in the engine. A UI toggle is a
+documented future enhancement.
 
 ## 4. Root-centered layout rules
 
@@ -56,15 +58,20 @@ Edges crossing the milestone boundary are summarized compactly
 **not** scattered as distant nodes (they're excluded from the focused positioned set).
 Rendering these as chips is a documented future enhancement.
 
-## 8. Saved layout scoping rules
+## 8. Saved layout scoping rules (drag + rearrange)
 
-- Global saved layout applies only to global graph mode.
-- Focus saved layout would apply only with matching focus key
-  (`getMilestoneFocusLayoutKey(projectId, milestoneId)`) **and** an exact node-set
-  match (`shouldApplySavedFocusLayout`).
-- A global saved layout is **never** (partially) applied to focus mode; the
-  "partially applied" notice is suppressed in focus mode.
-- Focus mode always uses the deterministic focus layout.
+Focus mode is **drag-to-rearrange with a per-milestone saved layout**, exactly like
+the rest of the Living Graph:
+
+- The saved arrangement in focus mode is scoped by a **per-milestone key**
+  (`getMilestoneFocusLayoutKey(projectId, milestoneId)`), distinct from the global
+  `buildLayoutKey`. Dragging a node persists under that key and reloads on return.
+- Because the key is milestone-specific, a **global** saved layout is never applied
+  to the focus map, and focus drags never overwrite the global layout.
+- The deterministic `mind_map` layout is the initial state; manual drags override it
+  and are saved/reset/cleared with the existing Save/Reset/Clear controls.
+- `shouldApplySavedFocusLayout` documents the exact-match rule (matching key + node
+  set) for reference.
 
 ## 9. i18n labels
 
@@ -92,10 +99,12 @@ scoping (global never applied; focus requires exact key + node set).
 
 ## 12. Known limitations
 
-- No rendered milestone root node / external chips / layout toggle yet (engine ready).
-- Subtask nodes (expanded) fall into the `unsequenced` lane (no scatter) — richer
-  parent-branch placement is future.
-- Focus saved-layout persistence is not wired (global is correctly excluded).
+- The mind-map fans the task cards around a central anchor, but a **rendered
+  milestone root card** (a visible central hub node with branch edges to each task,
+  like the Task Execution Map) is not injected yet — that means adding a synthetic
+  node into the (protected) Living Graph pipeline and is a focused follow-up.
+- External-dependency chips + a Flow↔Mind-Map UI toggle are future (engine ready).
+- Subtask nodes (expanded) fall into the `unsequenced` order (no scatter).
 
 ## 13. Future enhancements
 
