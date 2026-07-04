@@ -12,7 +12,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
-import { Lock, Link2, ShieldAlert, FileQuestion, CheckCircle2, HardHat, ChevronRight, ChevronDown, ListTree } from "lucide-react";
+import { Lock, Link2, ShieldAlert, FileQuestion, CheckCircle2, HardHat, ChevronRight, ChevronDown, ListTree, Network } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   NODE_TYPE_STYLES,
@@ -119,6 +119,20 @@ function LivingGraphNodeComponent({
           >
             {node.label}
           </p>
+          {/* Has-subtasks badge — a glance-level "network" marker (matches the
+              violet subtask branches) so tasks WITH subtasks are obvious even
+              when collapsed. Presentation-only; never mutates task data. */}
+          {subtaskTotal > 0 && (
+            <span
+              className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-violet-500/10 px-1 py-px text-[9px] font-semibold text-violet-600 dark:text-violet-300"
+              title={t("subtasks.toggle", { count: subtaskTotal })}
+              aria-label={t("subtasks.toggle", { count: subtaskTotal })}
+              data-testid="graph-subtask-badge"
+            >
+              <Network className="h-2.5 w-2.5" aria-hidden />
+              {subtaskCompleted}/{subtaskTotal}
+            </span>
+          )}
           {/* Frequency badge — number of process events behind this activity */}
           <span
             className="shrink-0 rounded-full px-1.5 py-px font-mono text-[10px] font-bold tabular-nums"

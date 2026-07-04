@@ -90,6 +90,11 @@ const GROUP_TOP_PADDING = 0;
 const MINDMAP_RADIUS_X = 380;
 const MINDMAP_TASK_Y = 96;
 const MINDMAP_ARC_STEP = 10;
+// A task's expanded subtasks branch off to the RIGHT of their PARENT (a tight
+// sub-fan), so a task-with-subtasks reads as one branch and stays attached to
+// its milestone instead of scattering into the fan.
+const SUBTASK_BRANCH_X = 320;
+const SUBTASK_BRANCH_Y = 72;
 /** Center anchor for the (conceptual/rendered) milestone root node. */
 export const MILESTONE_FOCUS_ROOT_POSITION = { x: 0, y: 0 } as const;
 
@@ -274,11 +279,26 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
   const { selectedMilestoneId, nodes, edges } = input;
   const mode: MilestoneFocusLayoutMode = input.mode ?? "mind_map";
 
-  const milestoneTasks = nodes.filter((n) => isMilestoneTask(n, selectedMilestoneId));
-  // Leftover = nodes that belong via a parent (subtasks / misc with NO milestone).
-  // Nodes with a DIFFERENT milestoneId are external → summarized, never positioned.
-  const leftover = nodes.filter((n) => n.milestoneId == null);
+  // Subtask nodes branch off their parent task (below); other nodes with no
+  // milestone belong via a parent too but aren't subtask items → misc leftover.
+  const subtaskNodes = nodes.filter((n) => n.nodeType === "subtask_item");
+  const milestoneTasks = nodes.filter(
+    (n) => n.nodeType !== "subtask_item" && isMilestoneTask(n, selectedMilestoneId),
+  );
+  const leftover = nodes.filter((n) => n.nodeType !== "subtask_item" && n.milestoneId == null);
   const taskIds = new Set(milestoneTasks.map((n) => n.id));
+
+  // parent task id → its subtask child nodes (from `subtask_of` hierarchy edges).
+  const subtaskById = new Map(subtaskNodes.map((n) => [n.id, n]));
+  const childrenByParent = new Map<string, LivingGraphNode[]>();
+  for (const e of edges) {
+    if (e.edgeType !== "subtask_of") continue;
+    const child = subtaskById.get(e.targetNodeId);
+    if (!child) continue;
+    const arr = childrenByParent.get(e.sourceNodeId) ?? [];
+    arr.push(child);
+    childrenByParent.set(e.sourceNodeId, arr);
+  }
 
   const { level, cycleNodeIds } = topologicallyOrderMilestoneTasks(taskIds, edges);
   const groups = groupMilestoneTasks(milestoneTasks, cycleNodeIds);
@@ -329,6 +349,36 @@ export function computeMilestoneFocusLayout(input: MilestoneFocusLayoutInput): M
       positioned.push({ id: node.id, x, y, group, level: level.get(node.id) ?? 0 });
     });
   }
+
+  // ── Subtasks branch off their parent task (attached, never scattered) ──────
+  const posById = new Map(positioned.map((p) => [p.id, p]));
+  const placedChildren = new Set<string>();
+  for (const [parentId, children] of childrenByParent) {
+    const parent = posById.get(parentId);
+    if (!parent) continue;
+    const sorted = [...children].sort(
+      (a, b) => (a.label ?? "").localeCompare(b.label ?? "", undefined, { sensitivity: "base" }) || a.id.localeCompare(b.id),
+    );
+    sorted.forEach((c, i) => {
+      const rel = i - (sorted.length - 1) / 2;
+      positioned.push({
+        id: c.id,
+        x: parent.x + SUBTASK_BRANCH_X,
+        y: parent.y + rel * SUBTASK_BRANCH_Y,
+        group: parent.group,
+        level: parent.level + 1,
+      });
+      placedChildren.add(c.id);
+    });
+  }
+  // Orphan subtasks (no parent in view) → a small fallback column (never at 0,0).
+  const orphans = subtaskNodes.filter((n) => !placedChildren.has(n.id));
+  orphans
+    .slice()
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .forEach((c, i) => {
+      positioned.push({ id: c.id, x: MINDMAP_RADIUS_X, y: i * SUBTASK_BRANCH_Y, group: "unsequenced", level: 0 });
+    });
 
   const cycleWarnings: CycleWarning[] = cycleNodeIds.size > 0 ? [{ nodeIds: [...cycleNodeIds].sort() }] : [];
 
