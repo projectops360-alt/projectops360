@@ -104,7 +104,11 @@ scoping (global never applied; focus requires exact key + node set).
   like the Task Execution Map) is not injected yet — that means adding a synthetic
   node into the (protected) Living Graph pipeline and is a focused follow-up.
 - External-dependency chips + a Flow↔Mind-Map UI toggle are future (engine ready).
-- Subtask nodes (expanded) fall into the `unsequenced` order (no scatter).
+- **Subtasks branch off their parent**: an expanded task's subtasks are positioned
+  as a tight sub-fan to the right of the parent (via `subtask_of` edges), so a
+  task-with-subtasks stays attached to its milestone instead of scattering. Tasks
+  that have subtasks also show a glance-level **violet "network" badge** (count) in
+  the node title so they're identifiable even when collapsed.
 
 ## 13. Future enhancements
 

@@ -20,7 +20,7 @@ let seq = 0;
 function node(o: Partial<LivingGraphNode> = {}): LivingGraphNode {
   seq += 1;
   return {
-    id: o.id ?? `n${seq}`, projectId: "p1", nodeType: "task_transition", sourceEntityType: "roadmap_tasks",
+    id: o.id ?? `n${seq}`, projectId: "p1", nodeType: o.nodeType ?? "task_transition", sourceEntityType: "roadmap_tasks",
     sourceEntityId: o.id ?? `n${seq}`, label: o.label ?? `Task ${seq}`, description: null,
     status: o.status ?? "not_started", progress: o.progress ?? 0, startDate: null, endDate: null, durationDays: null,
     occurredAt: "2026-07-01T00:00:00Z", createdAt: "2026-07-01T00:00:00Z", updatedAt: "2026-07-01T00:00:00Z",
@@ -148,6 +148,28 @@ describe("compact, bounded, stable positions", () => {
     const map = computeMilestoneFocusPositions({ selectedMilestoneId: "M1", nodes, edges: [] });
     expect(map.has("task")).toBe(true);
     expect(map.has("sub")).toBe(true);
+  });
+});
+
+describe("a task's subtasks branch off the parent (attached, not scattered)", () => {
+  it("places subtasks to the right of and near their parent, sharing its group", () => {
+    const parent = node({ id: "p", status: "done", label: "Fix Isabella", milestoneId: "M1" });
+    const s1 = node({ id: "sub:1", milestoneId: null, nodeType: "subtask_item", label: "Sub A" });
+    const s2 = node({ id: "sub:2", milestoneId: null, nodeType: "subtask_item", label: "Sub B" });
+    const edges = [
+      edge("p", "sub:1", { edgeType: "subtask_of" }),
+      edge("p", "sub:2", { edgeType: "subtask_of" }),
+    ];
+    const res = computeMilestoneFocusLayout({ selectedMilestoneId: "M1", nodes: [parent, s1, s2], edges });
+    const byId = new Map(res.nodes.map((n) => [n.id, n]));
+    const p = byId.get("p")!;
+    const a = byId.get("sub:1")!;
+    const b = byId.get("sub:2")!;
+    expect(a.x).toBeGreaterThan(p.x); // to the right of the parent
+    expect(b.x).toBeGreaterThan(p.x);
+    expect(Math.abs(a.y - p.y)).toBeLessThanOrEqual(120); // vertically near the parent
+    expect(a.group).toBe(p.group); // same branch/group as the parent
+    expect(res.groups.find((g) => g.key === "done")!.nodeIds).toContain("p");
   });
 });
 
