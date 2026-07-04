@@ -73,6 +73,7 @@ import {
   MILESTONE_NODE_HEIGHT,
   type SnakeSide,
 } from "@/lib/graph/living-graph-layout";
+import { computeMilestoneFocusPositions } from "@/lib/graph/milestone-focus-layout";
 import {
   NODE_TYPE_STYLES,
   EDGE_TYPE_STYLES,
@@ -618,23 +619,39 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     window.setTimeout(() => void fitView({ padding: 0.15, duration: 300 }), 80);
   }, [fitView]);
 
-  const layoutPositions = useMemo(
-    () =>
-      viewLevel === "milestones"
-        ? milestoneFlowLayout(withSubtasks.nodes) // serpentine roadmap, layoutMode ignored
-        : computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges),
-    [viewLevel, layoutMode, withSubtasks],
-  );
+  // LIVING-GRAPH-MILESTONE-FOCUS-LAYOUT-READABILITY — when exactly ONE milestone
+  // is drilled into ("View flow"), use the deterministic compact focus layout
+  // (status-grouped, dependency-ordered) instead of the generic auto-layout that
+  // scatters tasks. The curated Workforce view manages its own geometry.
+  const isMilestoneFocusMode =
+    milestoneFocus != null && milestoneFocus.size === 1 && viewLevel !== "milestones" && !workforceGraph;
 
-  // User drags win over the computed layout
+  const layoutPositions = useMemo(() => {
+    if (viewLevel === "milestones") {
+      return milestoneFlowLayout(withSubtasks.nodes); // serpentine roadmap, layoutMode ignored
+    }
+    if (isMilestoneFocusMode && milestoneFocus) {
+      const selectedMilestoneId = [...milestoneFocus][0];
+      return computeMilestoneFocusPositions({
+        selectedMilestoneId,
+        nodes: withSubtasks.nodes,
+        edges: withSubtasks.edges,
+      });
+    }
+    return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
+  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus]);
+
+  // User drags win over the computed layout — EXCEPT in milestone focus mode,
+  // where a global saved layout must never be (partially) applied (it scatters
+  // the focused map). Focus mode always uses the deterministic focus layout.
   const positions = useMemo(() => {
-    if (manualPositions.size === 0) return layoutPositions;
+    if (isMilestoneFocusMode || manualPositions.size === 0) return layoutPositions;
     const merged = new Map(layoutPositions);
     for (const [id, pos] of manualPositions) {
       if (merged.has(id)) merged.set(id, pos);
     }
     return merged;
-  }, [layoutPositions, manualPositions]);
+  }, [layoutPositions, manualPositions, isMilestoneFocusMode]);
 
   // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
   // The context a saved arrangement is scoped to (level + layout mode). Switching
@@ -674,8 +691,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // (TASK 7): some saved nodes are gone, or some visible nodes are new.
   const layoutPartiallyApplied = useMemo(() => {
     if (!savedLayout) return false;
+    // Focus mode uses the deterministic focus layout — the global saved layout is
+    // never applied, so the "partially applied" notice must not appear there.
+    if (isMilestoneFocusMode) return false;
     return isPartialApply(applySavedPositions(savedLayout, withSubtasks.nodes.map((n) => n.id)));
-  }, [savedLayout, withSubtasks.nodes]);
+  }, [savedLayout, withSubtasks.nodes, isMilestoneFocusMode]);
 
   // Auto-dismiss the transient save/reset/clear notice.
   useEffect(() => {
@@ -683,6 +703,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     const id = setTimeout(() => setLayoutNotice(null), 2600);
     return () => clearTimeout(id);
   }, [layoutNotice]);
+
+  // Milestone Focus Map: auto-fit/center after the deterministic layout is placed
+  // so the focused milestone appears immediately (no huge empty canvas to pan).
+  useEffect(() => {
+    if (!isMilestoneFocusMode) return;
+    const id = window.setTimeout(() => void fitView({ padding: 0.18, duration: 300 }), 90);
+    return () => window.clearTimeout(id);
+  }, [isMilestoneFocusMode, layoutPositions, fitView]);
 
   const handleSaveLayout = useCallback(() => {
     setSavingLayout(true);
