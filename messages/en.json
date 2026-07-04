@@ -1571,6 +1571,8 @@
       "editMilestone": "Edit milestone",
       "archiveMilestone": "Archive milestone",
       "confirmArchiveMilestone": "Are you sure you want to archive this milestone? All its tasks will also be archived.",
+      "moveMilestoneUp": "Move up",
+      "moveMilestoneDown": "Move down",
       "addPredecessor": "Add predecessor",
       "addPredecessorPlaceholder": "Search tasks…",
       "predecessorAdded": "Predecessor added",

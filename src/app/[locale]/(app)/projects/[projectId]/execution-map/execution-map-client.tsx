@@ -637,6 +637,8 @@ export function ExecutionMapClient({
             editMilestone: (t.taskList as unknown as Record<string, unknown>).editMilestone as string ?? "Edit milestone",
             archiveMilestone: (t.taskList as unknown as Record<string, unknown>).archiveMilestone as string ?? "Archive milestone",
             confirmArchiveMilestone: (t.taskList as unknown as Record<string, unknown>).confirmArchiveMilestone as string ?? "Are you sure?",
+            moveMilestoneUp: (t.taskList as unknown as Record<string, unknown>).moveMilestoneUp as string ?? "Move up",
+            moveMilestoneDown: (t.taskList as unknown as Record<string, unknown>).moveMilestoneDown as string ?? "Move down",
           }}
           initialStatusFilter={statusFilter}
           onEditTask={(task) => { setEditingTask(task); setShowTaskForm(true); }}
@@ -649,6 +651,11 @@ export function ExecutionMapClient({
           onArchiveMilestone={async (milestoneId) => {
             const { archiveMilestoneAction } = await import("@/app/[locale]/(app)/projects/[projectId]/roadmap/actions");
             await archiveMilestoneAction(milestoneId, projectId);
+            router.refresh();
+          }}
+          onMoveMilestone={async (milestoneId, direction) => {
+            const { reorderMilestoneAction } = await import("@/app/[locale]/(app)/projects/[projectId]/roadmap/actions");
+            await reorderMilestoneAction(milestoneId, projectId, direction);
             router.refresh();
           }}
         />

@@ -1571,6 +1571,8 @@
       "editMilestone": "Editar hito",
       "archiveMilestone": "Archivar hito",
       "confirmArchiveMilestone": "¿Estás seguro de que deseas archivar este hito? Todas sus tareas también serán archivadas.",
+      "moveMilestoneUp": "Subir",
+      "moveMilestoneDown": "Bajar",
       "addPredecessor": "Agregar predecesor",
       "addPredecessorPlaceholder": "Buscar tareas…",
       "predecessorAdded": "Predecesor agregado",

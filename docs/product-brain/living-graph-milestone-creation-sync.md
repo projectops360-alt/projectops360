@@ -88,6 +88,14 @@ picks it up on the next signature poll (≤ 8s) — `router.refresh()` re-reads
 action). If realtime/polling is degraded, the sync pill shows the degraded state
 (never a fake "live"). No manual refresh is required when healthy.
 
+## 7b. Reordering the milestone flow (manual, no DB editing)
+
+The flow line follows `order_index`. Users reshape it from the milestone actions
+menu (**Move up / Move down**, `MilestoneSelector`), wired to
+`reorderMilestoneAction` → pure `computeMilestoneReorder` (swaps the target's
+`order_index` with its neighbor; boundary/unknown-id safe). No database editing
+is required. Guard: `LIVING-GRAPH-MILESTONE-MANUAL-REORDER`.
+
 ## 8. Known limitations
 
 - Milestone creation materializes the **projection node** (`process_nodes`) but

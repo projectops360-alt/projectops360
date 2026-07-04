@@ -7,6 +7,7 @@ import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitAndAutoLink, emitProcessNode } from "@/lib/graph/emit-event";
 import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/roadmap/progress";
+import { computeMilestoneReorder } from "@/lib/roadmap/milestone-reorder";
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -563,6 +564,71 @@ export async function updateMilestoneAction(input: {
     entityType: "milestones",
     entityId: data.milestoneId,
     metadata: { title: data.title, status: data.status },
+  });
+
+  revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
+
+  return {};
+}
+
+// ── Reorder Milestone (move up / down in the sequence) ───────────────────────────────
+
+/**
+ * Move a milestone one position earlier ("up") or later ("down") in the project
+ * sequence. This is the USER-FACING way to reshape the Living Graph flow line
+ * (which follows `order_index`) — no database editing required. Swaps the
+ * order_index with the adjacent milestone; a boundary move is a safe no-op.
+ */
+export async function reorderMilestoneAction(
+  milestoneId: string,
+  projectId: string,
+  direction: "up" | "down",
+): Promise<{ error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+
+  const supabase = createAdminClient();
+  const { data: rows, error: fetchError } = await supabase
+    .from("milestones")
+    .select("id, order_index")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .order("order_index", { ascending: true });
+
+  if (fetchError || !rows) {
+    console.error("Failed to load milestones for reorder:", fetchError);
+    return { error: "unexpected" };
+  }
+
+  const result = computeMilestoneReorder(rows, milestoneId, direction);
+  if (!result) return {}; // not found or already at the boundary — safe no-op
+
+  for (const u of result.updates) {
+    const { error: updateError } = await supabase
+      .from("milestones")
+      .update({ order_index: u.order_index })
+      .eq("id", u.id)
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", projectId)
+      .is("deleted_at", null);
+    if (updateError) {
+      console.error("Failed to reorder milestone:", updateError);
+      return { error: "unexpected" };
+    }
+  }
+
+  await logAudit({
+    org,
+    projectId,
+    action: "update",
+    entityType: "milestones",
+    entityId: milestoneId,
+    metadata: { reorder: direction },
   });
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");

@@ -7,8 +7,9 @@ import {
   CheckCircle2, Loader2, Circle, Ban, Pause,
   FileText, Send, Code, ShieldCheck,
   ListTodo, Filter, ChevronDown, Sparkles, Copy, Check, AlertTriangle, AlertCircle, History,
-  MoreVertical, Pencil, Archive, Trash2, Link2,
+  MoreVertical, Pencil, Archive, Trash2, Link2, ArrowUp, ArrowDown,
 } from "lucide-react";
+import { canMoveMilestone } from "@/lib/roadmap/milestone-reorder";
 import { createDependencyAction } from "@/app/[locale]/(app)/projects/[projectId]/execution-map/dependency-actions";
 import { updateTaskStatusAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import { recordPromptSentAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
@@ -73,6 +74,8 @@ interface TaskListTranslations {
   editMilestone: string;
   archiveMilestone: string;
   confirmArchiveMilestone: string;
+  moveMilestoneUp: string;
+  moveMilestoneDown: string;
   addPredecessor: string;
   addPredecessorPlaceholder: string;
   predecessorAdded: string;
@@ -101,6 +104,7 @@ interface TaskListByMilestoneProps {
   onArchiveTask?: (taskId: string) => Promise<void>;
   onEditMilestone?: (milestone: Milestone) => void;
   onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+  onMoveMilestone?: (milestoneId: string, direction: "up" | "down") => Promise<void>;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────────
@@ -166,6 +170,7 @@ function MilestoneSelector({
   t,
   onEditMilestone,
   onArchiveMilestone,
+  onMoveMilestone,
 }: {
   milestones: Milestone[];
   selectedId: string | null;
@@ -175,11 +180,16 @@ function MilestoneSelector({
   t: TaskListTranslations;
   onEditMilestone?: (milestone: Milestone) => void;
   onArchiveMilestone?: (milestoneId: string) => Promise<void>;
+  onMoveMilestone?: (milestoneId: string, direction: "up" | "down") => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [moving, setMoving] = useState(false);
   const selected = milestones.find((m) => m.id === selectedId);
+  const orderRows = milestones.map((m) => ({ id: m.id, order_index: m.order_index }));
+  const canUp = selected ? canMoveMilestone(orderRows, selected.id, "up") : false;
+  const canDown = selected ? canMoveMilestone(orderRows, selected.id, "down") : false;
 
   return (
     <div className="flex items-center">
@@ -236,7 +246,7 @@ function MilestoneSelector({
       )}
 
       {/* Milestone actions menu */}
-      {selected && (onEditMilestone || onArchiveMilestone) && (
+      {selected && (onEditMilestone || onArchiveMilestone || onMoveMilestone) && (
         <div className="relative ml-2">
           <button
             type="button"
@@ -250,6 +260,38 @@ function MilestoneSelector({
             <>
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-8 z-30 w-48 rounded-lg border border-border bg-card shadow-lg">
+                {onMoveMilestone && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={moving || !canUp}
+                      onClick={async () => {
+                        setMoving(true);
+                        setMenuOpen(false);
+                        await onMoveMilestone(selected.id, "up");
+                        setMoving(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                      {t.moveMilestoneUp}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={moving || !canDown}
+                      onClick={async () => {
+                        setMoving(true);
+                        setMenuOpen(false);
+                        await onMoveMilestone(selected.id, "down");
+                        setMoving(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                      {t.moveMilestoneDown}
+                    </button>
+                  </>
+                )}
                 {onEditMilestone && (
                 <button
                   type="button"
@@ -1118,6 +1160,7 @@ export function TaskListByMilestone({
   onArchiveTask,
   onEditMilestone,
   onArchiveMilestone,
+  onMoveMilestone,
 }: TaskListByMilestoneProps) {
   const router = useRouter();
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(() => {
@@ -1198,6 +1241,7 @@ export function TaskListByMilestone({
           t={t}
           onEditMilestone={onEditMilestone}
           onArchiveMilestone={onArchiveMilestone}
+          onMoveMilestone={onMoveMilestone}
         />
       </div>
 
