@@ -40,16 +40,28 @@ export interface BuildTaskReportParams {
   displayLimit?: number;
 }
 
+/** Shared retrieval outcome: the RBAC-scoped rows BEFORE any sort/slice. */
+export type TaskRowsOutcome =
+  | { ok: true; projectName: string; rows: TaskReportRow[] }
+  | { ok: false; reason: "no_project" | "not_authorized" | "unavailable" };
+
 /**
- * Build the deterministic, RBAC-scoped task report for the current project.
- * Never throws — returns a typed outcome the pure formatter turns into an answer.
+ * The single approved, RBAC-scoped retrieval of a project's task rows. Mirrors
+ * the REG-013 briefing access path (org gate on `projects`; `roadmap_tasks`/
+ * `milestones` scoped by org+project+deleted_at). Owner names resolved ONLY
+ * within the caller's org. Both the classic report AND the generic query engine
+ * consume this — one source of truth, no duplication. Never throws.
  */
-export async function buildTaskReport(params: BuildTaskReportParams): Promise<TaskReportOutcome> {
-  const { org, projectId, sortBy, sortDirection, language } = params;
+export async function retrieveTaskRows(params: {
+  org: OrgContext;
+  projectId: string | undefined;
+  language: "en" | "es";
+}): Promise<TaskRowsOutcome> {
+  const { org, projectId } = params;
   if (!projectId) return { ok: false, reason: "no_project" };
 
   const supabase = createAdminClient();
-  const lang = language === "es" ? "es" : "en";
+  const lang = params.language === "es" ? "es" : "en";
 
   // ── Project identity (also the org-scope gate — same as the Briefing) ──────
   const { data: project, error: projectErr } = await supabase
@@ -137,6 +149,19 @@ export async function buildTaskReport(params: BuildTaskReportParams): Promise<Ta
     blockerReason: t.blocker_reason,
     isSubtask: false,
   }));
+
+  return { ok: true, projectName, rows };
+}
+
+/**
+ * Build the deterministic, RBAC-scoped task report for the current project.
+ * Never throws — returns a typed outcome the pure formatter turns into an answer.
+ */
+export async function buildTaskReport(params: BuildTaskReportParams): Promise<TaskReportOutcome> {
+  const { org, projectId, sortBy, sortDirection, language } = params;
+  const retrieved = await retrieveTaskRows({ org, projectId, language });
+  if (!retrieved.ok) return { ok: false, reason: retrieved.reason };
+  const { projectName, rows } = retrieved;
 
   const sorted = sortTaskReportRows(rows, sortBy, sortDirection);
   const displayLimit = params.displayLimit ?? DEFAULT_TASK_REPORT_DISPLAY_LIMIT;
