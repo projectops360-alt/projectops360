@@ -221,6 +221,8 @@ function BoardColumn({
 
   return (
     <div
+      data-testid={`workboard-column-${status}`}
+      data-status={status}
       className={`rounded-xl border ${color.border} ${color.bg} flex flex-col relative transition-[width] duration-150`}
       style={{
         width: collapsed ? COLLAPSED_COLUMN_WIDTH : currentWidth,
@@ -281,6 +283,8 @@ function BoardColumn({
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
+                        data-testid={`workboard-card-${task.id}`}
+                        data-task-status={task.status}
                         onClick={() => { if (!snapshot.isDragging) onTaskClick(task); }}
                         className={`rounded-lg border border-border bg-card shadow-sm transition-shadow cursor-pointer ${compact ? "p-1.5" : "p-2.5"} ${snapshot.isDragging ? "shadow-lg ring-2 ring-brand-500/30" : "hover:shadow-md hover:border-brand-500/30"}`}
                       >

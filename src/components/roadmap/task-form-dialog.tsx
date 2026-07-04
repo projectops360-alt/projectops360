@@ -637,6 +637,7 @@ export function TaskFormDialog({
                 <select
                   id="task-status"
                   name="status"
+                  data-testid="task-status-select"
                   value={statusValue}
                   onChange={(e) => setStatusValue(e.target.value)}
                   className={inputClass}
@@ -1301,6 +1302,7 @@ export function TaskFormDialog({
             </button>
             <button
               type="submit"
+              data-testid="task-form-submit"
               disabled={isPending}
               className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >

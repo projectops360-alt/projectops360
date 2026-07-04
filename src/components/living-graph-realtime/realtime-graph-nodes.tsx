@@ -73,6 +73,8 @@ function BaseCard({
     <div
       data-testid={`rt-node-${data.node.nodeKind}`}
       data-node-kind={data.node.nodeKind}
+      data-node-id={data.node.nodeId}
+      data-node-status={nodeStatus(data.node) ?? ""}
       style={{ width }}
       className={`rounded-lg border-2 bg-card p-2.5 shadow-md transition-shadow ${accent} ${pulseClass(data.node, data.isCurrentVersion)}`}
       onClick={() => data.onOpenInspector?.(data.node.nodeId)}
