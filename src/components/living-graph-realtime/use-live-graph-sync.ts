@@ -45,9 +45,15 @@ export interface LiveGraphSyncStatus {
 export function useLiveGraphSync(args: UseLiveGraphSyncArgs): LiveGraphSyncStatus {
   const [connected, setConnected] = useState(false);
   const onChangeRef = useRef(args.onChange);
-  onChangeRef.current = args.onChange;
   const onConnRef = useRef(args.onConnectionChange);
-  onConnRef.current = args.onConnectionChange;
+
+  // Keep the latest callbacks in refs — updated AFTER render (never during it),
+  // so the subscription effect below never re-attaches just because a parent
+  // passed a new closure identity. This is what prevents duplicate channels.
+  useEffect(() => {
+    onChangeRef.current = args.onChange;
+    onConnRef.current = args.onConnectionChange;
+  });
 
   useEffect(() => {
     const coalesceMs = args.coalesceMs ?? 350;
@@ -115,12 +121,16 @@ export function useLiveGraphSync(args: UseLiveGraphSyncArgs): LiveGraphSyncStatu
       subscriptionId = handle.subscriptionId;
     } catch {
       // Subscription failed (unauthorized / no realtime) — stay on the caller's
-      // polling fallback; never claim live.
-      setConnected(false);
+      // polling fallback; never claim live. `connected` is already false (initial
+      // state, and reset in cleanup on scope change), so no synchronous setState
+      // is needed in the effect body here.
     }
 
     return () => {
       disposed = true;
+      // Reset freshness on unmount / scope change so a slow or failing
+      // re-subscribe never leaves a stale "live" from the previous scope.
+      setConnected(false);
       if (coalesceTimer != null) window.clearTimeout(coalesceTimer);
       releaseNotice?.();
       releaseObs?.();
