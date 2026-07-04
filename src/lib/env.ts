@@ -28,6 +28,13 @@ export const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
   /** Anthropic API key (server-side only) */
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
+  /**
+   * Feature flag — Isabella Tool Use Runtime Gateway (server-side only).
+   * Default OFF: disabled unless explicitly set to "true". When off, Isabella's
+   * current pipeline (deterministic query engine + RAG) is unchanged. Rollback =
+   * unset this flag (no migration). See isabella-tool-use-runtime-gateway.md.
+   */
+  ISABELLA_TOOL_USE_ENABLED: process.env.ISABELLA_TOOL_USE_ENABLED ?? "",
 } as const;
 
 /**
