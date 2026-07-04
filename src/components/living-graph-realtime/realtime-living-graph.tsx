@@ -105,9 +105,20 @@ function Inner(props: RealtimeLivingGraphProps) {
   const [ownerNames, setOwnerNames] = useState(props.ownerNames);
   const signatureRef = useRef(props.initialSignature);
   const modelRef = useRef(model);
-  modelRef.current = model;
-  const lastSyncMsRef = useRef(Date.now());
+  const lastSyncMsRef = useRef(0);
   const busyRef = useRef(false);
+
+  // Keep a ref to the latest model so refetchSnapshot can read its version
+  // WITHOUT depending on `model` (which would recreate the callback and restart
+  // the polling/subscription effects on every graph change). Updated after
+  // render, never during it.
+  useEffect(() => {
+    modelRef.current = model;
+  });
+  // Seed the freshness clock once, post-mount (Date.now() is impure in render).
+  useEffect(() => {
+    lastSyncMsRef.current = Date.now();
+  }, []);
 
   // Refetch the approved snapshot delta and full-resync the view model. Shared
   // by the LIVE push (instant, on a typed notice) and the polling fallback.

@@ -158,3 +158,42 @@ describe("import boundary — UI never consumes raw events / DB", () => {
     expect(code).not.toMatch(/project_event_log|process_nodes|process_edges|emitProjectEvent/);
   });
 });
+
+// ── PHASE4B-REALTIME-HOOKS-LINT-HARDENING ─────────────────────────────────────
+// Protects the React-hooks hygiene that keeps realtime beta-safe: the live
+// subscription must NOT re-attach because a parent passed a new callback closure
+// (that would leak duplicate channels), and render must stay pure (no ref writes
+// or impure calls during render). These source guards fail if the debt returns.
+describe("realtime hook hygiene (Phase 4B hardening)", () => {
+  const hook = readFileSync(
+    join(process.cwd(), "src/components/living-graph-realtime/use-live-graph-sync.ts"),
+    "utf8",
+  );
+  const view = readFileSync(
+    join(process.cwd(), "src/components/living-graph-realtime/realtime-living-graph.tsx"),
+    "utf8",
+  );
+
+  it("keeps the onChange/onConnectionChange callbacks in refs (stable across renders)", () => {
+    expect(hook).toMatch(/const onChangeRef = useRef\(args\.onChange\)/);
+    expect(hook).toMatch(/const onConnRef = useRef\(args\.onConnectionChange\)/);
+    // The ref sync happens inside an effect (post-render), never during render.
+    expect(hook).toMatch(/useEffect\(\(\) => \{\s*onChangeRef\.current = args\.onChange;/);
+  });
+
+  it("re-attaches the subscription ONLY on real scope change — never on callback identity", () => {
+    // The subscription effect depends solely on scope + coalesce window.
+    expect(hook).toMatch(/\}, \[args\.projectId, args\.organizationId, args\.userId, args\.coalesceMs\]\)/);
+    // A dependency array must never include the parent callbacks (would re-subscribe → duplicate channels).
+    expect(hook).not.toMatch(/\[[^\]]*\bargs\.onChange\b[^\]]*\]/);
+    expect(hook).not.toMatch(/\[[^\]]*\bargs\.onConnectionChange\b[^\]]*\]/);
+  });
+
+  it("does not call impure functions or write refs during render (purity)", () => {
+    // The freshness clock is seeded in an effect, not with an impure render call.
+    expect(view).not.toMatch(/useRef\(Date\.now\(\)\)/);
+    expect(view).toMatch(/const lastSyncMsRef = useRef\(0\)/);
+    // The latest-model ref is synced inside an effect, not assigned during render.
+    expect(view).toMatch(/useEffect\(\(\) => \{\s*modelRef\.current = model;/);
+  });
+});
