@@ -12,7 +12,14 @@
 import { getOrgContext } from "@/lib/auth";
 import { askKnowledgeOs, recordGuideFeedback } from "@/lib/knowledge-os/service";
 import { indexPendingKnowledge } from "@/lib/knowledge-os/indexer";
+import { resolveExpert } from "@/lib/knowledge-os/experts";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
+import {
+  buildTaskReportGuideAnswer,
+  detectTaskReportIntent,
+  type TaskReportOutcome,
+} from "@/lib/isabella/task-report";
+import { buildTaskReport } from "@/lib/isabella/task-report-service";
 import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
 import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
@@ -44,11 +51,37 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
     },
   };
 
+  const projectId = input.context.projectId;
+
+  // ── Deterministic Task Report (ISABELLA-TASK-REPORT-VERIFIED-PROJECT-DATA) ───
+  // A "report/list/table of all tasks" is a DETERMINISTIC project-data request,
+  // not an unknown knowledge question. Short-circuit BEFORE the RAG corpus so
+  // Isabella never answers "no tengo una respuesta verificada" when the app can
+  // produce the data. Retrieval is RBAC/org/project-scoped; the LLM never sorts.
+  const reportIntent = detectTaskReportIntent(input.query ?? "");
+  if (reportIntent) {
+    const reportLang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+    const expert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
+    const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[reportLang] };
+    let outcome: TaskReportOutcome;
+    try {
+      outcome = await buildTaskReport({
+        org,
+        projectId,
+        sortBy: reportIntent.sortBy,
+        sortDirection: reportIntent.sortDirection,
+        language: reportLang,
+      });
+    } catch {
+      outcome = { ok: false, reason: "unavailable" };
+    }
+    return buildTaskReportGuideAnswer(outcome, reportLang, expertInfo);
+  }
+
   // ── Provenance intelligence (PD-012) ────────────────────────────────────────
   // When inside a project and the question (or a selected item) is about where
   // work came from, stamp DETERMINISTIC, record-backed facts into the context so
   // Isabella answers with real numbers/sources and never invents provenance.
-  const projectId = input.context.projectId;
   const entity = input.context.currentEntity;
   const wantsProvenance = entity != null || PROVENANCE_HINT.test(input.query ?? "");
   if (projectId && wantsProvenance) {
