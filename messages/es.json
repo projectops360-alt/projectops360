@@ -401,6 +401,27 @@
       "done": "Subtareas completadas"
     }
   },
+  "livingGraphObservability": {
+    "title": "Observabilidad del Living Graph",
+    "subtitle": "Diagnóstico interno de tiempo real del motor Living Graph Realtime.",
+    "selectProject": "Selecciona un proyecto",
+    "noProjectSelected": "Selecciona un proyecto para iniciar una sesión de diagnóstico acotada (una suscripción).",
+    "refresh": "Actualizar",
+    "inMemoryNote": "Los contadores de tiempo de ejecución son en memoria solo para esta sesión (por consumidor). Las métricas no rastreadas aquí se muestran como «no instrumentado», no como cero.",
+    "notInstrumented": "no instrumentado",
+    "state": {
+      "fresh": "En vivo",
+      "stale": "Desactualizado",
+      "degraded": "Degradado",
+      "unknown": "Desconocido"
+    },
+    "environmentTitle": "Entorno",
+    "connectionTitle": "Conexión",
+    "noticeTitle": "Avisos / recálculo",
+    "deltaTitle": "Delta / sync",
+    "renderingTitle": "Renderizado",
+    "errorsTitle": "Errores / advertencias"
+  },
   "realtimeGraph": {
     "pageTitle": "Mapa de Ejecución del Proyecto — Tiempo Real",
     "subtitle": "Grafo de ejecución en vivo, seguro por jerarquía — haz clic para revelar el siguiente nivel.",
