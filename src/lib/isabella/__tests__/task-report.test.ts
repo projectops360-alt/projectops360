@@ -196,10 +196,20 @@ describe("buildTaskReportGuideAnswer — verified report", () => {
     expect(ans.grounded).toBe(true);
     expect(ans.confidenceScore).toBe(1);
     expect(ans.answer.toLowerCase()).not.toContain(NO_VERIFIED_ES);
+    expect(ans.answer.startsWith("Claro.")).toBe(true);
     expect(ans.answer).toContain("Tower A");
     expect(ans.answer).toContain("título"); // ES orthography preserved
     expect(ans.answer).toContain("descendente (Z → A)");
     expect(ans.answer).toContain("Total: 2 tareas");
+  });
+
+  it("includes a safe source statement (verified project data, no raw payload)", () => {
+    expect(buildTaskReportGuideAnswer({ ok: true, data: reportData() }, "es", EXPERT).answer).toContain(
+      "Fuente: tareas visibles del proyecto actual.",
+    );
+    expect(buildTaskReportGuideAnswer({ ok: true, data: reportData() }, "en", EXPERT).answer).toContain(
+      "Source: tasks visible in the current project.",
+    );
   });
 
   it("lists every authorized task and renders missing optional fields honestly", () => {
@@ -236,6 +246,54 @@ describe("buildTaskReportGuideAnswer — verified report", () => {
 
     const whole = buildTaskReportGuideAnswer({ ok: true, data: reportData() }, "es", EXPERT);
     expect(whole.answer).not.toContain("Mostrando las primeras");
+  });
+});
+
+// ── End-to-end: the exact reported prompt → verified Spanish report ────────────
+
+describe("exact reported prompt → deterministic verified Spanish report", () => {
+  it("detect → sort → format produces a title-DESC Spanish report from project data only", () => {
+    const prompt = "isabell anecesito un reporte con todas la tareas por title ordenado por desc";
+    const intent = detectTaskReportIntent(prompt);
+    expect(intent).toEqual({ sortBy: "title", sortDirection: "desc" });
+
+    // Deterministic sort happens BEFORE any phrasing (the LLM never sorts).
+    const rows = sortTaskReportRows(
+      [
+        row({ id: "a", title: "Anchor bolts", status: "done", priority: "p2" }),
+        row({ id: "z", title: "Zoning review", status: "in_progress", priority: "p1", milestoneTitle: "Design" }),
+        row({ id: "m", title: "Mobilization", status: "not_started", priority: "p3", ownerName: "Ana" }),
+      ],
+      intent!.sortBy,
+      intent!.sortDirection,
+    );
+    const data: TaskReportData = {
+      projectName: "Torre A",
+      rows,
+      total: rows.length,
+      displayed: rows.length,
+      truncated: false,
+      sortBy: intent!.sortBy,
+      sortDirection: intent!.sortDirection,
+    };
+    const ans = buildTaskReportGuideAnswer({ ok: true, data }, "es", EXPERT);
+
+    // Spanish, verified, title DESC, count, source, and never the wrong fallback.
+    expect(ans.language).toBe("es");
+    expect(ans.tier).toBe("verified");
+    expect(ans.answer).toContain("ordenado por título en orden descendente (Z → A)");
+    expect(ans.answer).toContain("Total: 3 tareas");
+    expect(ans.answer).toContain("Fuente: tareas visibles del proyecto actual.");
+    expect(ans.answer.toLowerCase()).not.toContain(NO_VERIFIED_ES);
+    // Rows appear title-DESC: Zoning → Mobilization → Anchor bolts.
+    const zIdx = ans.answer.indexOf("Zoning review");
+    const mIdx = ans.answer.indexOf("Mobilization");
+    const aIdx = ans.answer.indexOf("Anchor bolts");
+    expect(zIdx).toBeGreaterThan(-1);
+    expect(zIdx).toBeLessThan(mIdx);
+    expect(mIdx).toBeLessThan(aIdx);
+    // No hallucinated titles — only the three provided tasks are present.
+    expect(ans.answer).not.toMatch(/\bTask 999\b/);
   });
 });
 

@@ -58,18 +58,23 @@ is a task-report ask:
    low-confidence `ai_suggestion` fallback), grounded, cites *live project-task data*,
    states scope + sort + total count, lists every authorized task in a markdown table
    (`# | Title | Status | Milestone | Priority | Owner | Due`), renders missing optional
-   fields honestly as `—`, and notes truncation only when the list was actually
-   truncated (default display window: 50 rows; DB hard cap: 2000).
+   fields honestly as `—`, notes truncation only when the list was actually truncated
+   (default display window: 50 rows; DB hard cap: 2000), and ends with a safe inline
+   **source statement** — *"Fuente: tareas visibles del proyecto actual."* /
+   *"Source: tasks visible in the current project."* (never a raw payload). The
+   `sources` disclosure also carries a `verified` "Project tasks (N)" citation.
 
 ### Example (the exact reported request, `title` `desc`)
 
-> Aquí tienes el reporte de tareas de **Tower A**, ordenado por título en orden
-> descendente (Z → A). Total: 6 tareas.
+> Claro. Aquí tienes el reporte de tareas de **Tower A**, ordenado por título en
+> orden descendente (Z → A). Total: 6 tareas.
 >
 > | # | Título | Estado | Hito | Prioridad | Responsable | Vence |
 > | --- | --- | --- | --- | --- | --- | --- |
 > | 1 | Zoning review | En progreso | Design | P1 | — | 2026-08-01 |
 > | … | | | | | | |
+>
+> Fuente: tareas visibles del proyecto actual.
 
 ## RBAC / security
 

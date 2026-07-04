@@ -402,8 +402,8 @@ export function buildTaskReportGuideAnswer(
   const countWord = es ? (data.total === 1 ? "tarea" : "tareas") : data.total === 1 ? "task" : "tasks";
 
   const intro = es
-    ? `Aquí tienes el reporte de tareas de **${data.projectName}**, ordenado por ${fieldLabel} en orden ${dirLabel}. Total: ${data.total} ${countWord}.`
-    : `Here is the task report for **${data.projectName}**, sorted by ${fieldLabel} ${dirLabel}. Total: ${data.total} ${countWord}.`;
+    ? `Claro. Aquí tienes el reporte de tareas de **${data.projectName}**, ordenado por ${fieldLabel} en orden ${dirLabel}. Total: ${data.total} ${countWord}.`
+    : `Sure. Here is the task report for **${data.projectName}**, sorted by ${fieldLabel} ${dirLabel}. Total: ${data.total} ${countWord}.`;
 
   const table = buildReportTable(data.rows, es ? "es" : "en");
 
@@ -416,6 +416,13 @@ export function buildTaskReportGuideAnswer(
         : `Showing the first ${data.displayed} of ${data.total}. Open the **Workboard** to see them all.`,
     );
   }
+
+  // Safe, deterministic source statement (never a raw payload) — reinforces that
+  // this is VERIFIED project data, not an AI guess.
+  parts.push(
+    "",
+    es ? "Fuente: tareas visibles del proyecto actual." : "Source: tasks visible in the current project.",
+  );
 
   const sources: GuideAnswer["sources"] = [
     {
