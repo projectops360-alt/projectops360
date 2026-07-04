@@ -12,9 +12,11 @@
 import { getOrgContext } from "@/lib/auth";
 import { askKnowledgeOs, recordGuideFeedback } from "@/lib/knowledge-os/service";
 import { indexPendingKnowledge } from "@/lib/knowledge-os/indexer";
-import { resolveExpert } from "@/lib/knowledge-os/experts";
+import { resolveExpert, buildPersonaOverlay } from "@/lib/knowledge-os/experts";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
 import { parseProjectDataQuery, answerTaskQuery } from "@/lib/isabella/query-engine";
+import { isIsabellaToolUseEnabled } from "@/lib/isabella/tools/flag";
+import { maybeAnswerWithTools } from "@/lib/isabella/tools/gateway";
 import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
 import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
@@ -60,6 +62,22 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
   if (queryPlan) {
     const expert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
     const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[reportLang] };
+
+    // ISABELLA-TOOL-USE-RUNTIME-GATEWAY (Phase 5 · Task 2B) — flag-gated, default
+    // OFF. When enabled, a data question is answered via the approved read-only
+    // tool loop (LLM chooses tools; runtime executes the SAME approved layers).
+    // Any miss falls through to the DETERMINISTIC report below (unchanged
+    // behavior), so this is additive + rollback-safe.
+    if (isIsabellaToolUseEnabled()) {
+      try {
+        const persona = buildPersonaOverlay(expert, reportLang as Locale);
+        const toolAnswer = await maybeAnswerWithTools(org, safeInput, expertInfo, persona);
+        if (toolAnswer) return toolAnswer;
+      } catch {
+        // Never break the answer flow — fall through to the deterministic report.
+      }
+    }
+
     try {
       return await answerTaskQuery({ org, projectId, plan: queryPlan, expert: expertInfo });
     } catch {
