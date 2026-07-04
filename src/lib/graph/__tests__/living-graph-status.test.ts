@@ -83,6 +83,29 @@ describe("resolveNodeExecutionStatus (REG-008 / ADR-006)", () => {
     const status = resolveNodeExecutionStatus(succ, adj);
     expect(status).not.toBe("blocked");
   });
+
+  it("the SYNTHETIC milestone-flow chain edge does NOT make a milestone wait on its predecessor", () => {
+    // aggregateByMilestone chains milestones sequentially by order_index with a
+    // presentation-only `metadata.milestone_chain` edge — never a prerequisite.
+    // A brand-new empty milestone must not read as Waiting on Dependency just
+    // because it follows another phase in the flow line.
+    const prevPhase = node({ id: "phase-1a", nodeType: "milestone_gate", status: "in_progress" });
+    const newPhase = node({ id: "phase-4b", nodeType: "milestone_gate", status: "planned" });
+    const chain: LivingGraphEdge = {
+      ...edge("phase-1a", "phase-4b"),
+      metadata: { synthetic: true, milestone_chain: true },
+    };
+    const adj = buildAdjacency([prevPhase, newPhase], [chain]);
+    expect(resolveNodeExecutionStatus(newPhase, adj)).not.toBe("waiting_on_dependency");
+  });
+
+  it("a REAL prerequisite edge still makes the successor wait (chain fix is scoped)", () => {
+    const pred = node({ id: "pred", status: "in_progress" });
+    const succ = node({ id: "succ", status: "not_started" });
+    // Same edge type, but NOT a synthetic milestone chain → still a dependency.
+    const adj = buildAdjacency([pred, succ], [edge("pred", "succ")]);
+    expect(resolveNodeExecutionStatus(succ, adj)).toBe("waiting_on_dependency");
+  });
 });
 
 describe("computeGraphStatuses — header counts", () => {
