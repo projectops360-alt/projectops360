@@ -55,11 +55,13 @@ export default async function GitHubIntelligencePage({
     notFound();
   }
 
+  // Default to the full history so the graph can always be panned/zoomed back in
+  // time (the graph auto-zooms to recent activity but keeps all history loaded).
   const windowDays: DateWindow = sp.window === "all"
     ? "all"
     : WINDOWS.includes(Number(sp.window) as DateWindow)
       ? (Number(sp.window) as DateWindow)
-      : 14;
+      : "all";
 
   const data = await loadDashboardData(guard.org, projectId, {
     windowDays,
@@ -84,7 +86,7 @@ export default async function GitHubIntelligencePage({
 
   const m = data.metrics;
   const cards = [
-    { label: isEs ? "Commits" : "Commits", value: m.commitCount, icon: GitCommitHorizontal, tone: "text-foreground", sub: data.windowDays + (isEs ? " días" : " days") },
+    { label: isEs ? "Commits" : "Commits", value: m.commitCount, icon: GitCommitHorizontal, tone: "text-foreground", sub: data.windowDays === "all" ? (isEs ? "todo el historial" : "all history") : `${data.windowDays}${isEs ? " días" : " days"}` },
     { label: isEs ? "Ramas activas" : "Active Branches", value: m.activeBranchCount, icon: GitBranch, tone: "text-foreground", sub: "" },
     { label: isEs ? "PRs abiertos" : "Open PRs", value: m.openPrCount, icon: GitPullRequest, tone: "text-foreground", sub: `${m.mergedPrCount} ${isEs ? "fusionados" : "merged"}` },
     { label: isEs ? "Salud de CI" : "Workflow Health", value: m.failedWorkflowCount > 0 ? `${m.failedWorkflowCount} ✗` : `${m.successWorkflowCount} ✓`, icon: Activity, tone: m.failedWorkflowCount > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", sub: isEs ? "workflows" : "workflows" },
