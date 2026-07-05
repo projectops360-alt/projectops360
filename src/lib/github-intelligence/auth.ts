@@ -64,3 +64,26 @@ export async function getInstallationToken(installationId: number): Promise<{ to
   const data = (await res.json()) as { token: string; expires_at: string };
   return { token: data.token, expiresAt: data.expires_at };
 }
+
+/**
+ * Fetch installation metadata (account login/type) using the App JWT.
+ * Used by the install callback to record which account was connected.
+ */
+export async function getInstallationAccount(
+  installationId: number,
+): Promise<{ accountLogin: string | null; accountType: string | null }> {
+  const config = loadEnvAppConfig();
+  if (!config) throw new Error("GitHub App is not configured (env).");
+  const jwt = generateAppJwt(config.appId, config.privateKey);
+
+  const res = await fetch(`${GITHUB_API}/app/installations/${installationId}`, {
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub installation lookup failed (${res.status}).`);
+  const data = (await res.json()) as { account?: { login?: string; type?: string } };
+  return { accountLogin: data.account?.login ?? null, accountType: data.account?.type ?? null };
+}

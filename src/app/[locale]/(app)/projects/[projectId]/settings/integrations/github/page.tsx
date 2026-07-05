@@ -6,21 +6,27 @@ import { GitGraph, ShieldCheck, Lock, CheckCircle2, AlertTriangle, ExternalLink 
 import { assertGitHubIntelligenceAvailable } from "@/lib/github-intelligence/software-project-guard";
 import { getPublicAppConfigStatus } from "@/lib/github-intelligence/config";
 import { getConnectionStatus } from "@/lib/github-intelligence/read-model";
+import { listInstallationRepositories, type InstallableRepo } from "@/lib/github-intelligence/installation";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ConnectSampleButton,
   StartInstallButton,
   DisconnectButton,
   RefreshButton,
 } from "@/components/github-intelligence/github-action-buttons";
+import { RepoPicker } from "@/components/github-intelligence/repo-picker";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function GitHubIntegrationSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; projectId: string }>;
+  searchParams: Promise<{ installation_id?: string }>;
 }) {
   const { locale, projectId } = await params;
+  const sp = await searchParams;
   setRequestLocale(locale);
   const isEs = locale === "es";
   if (!UUID_RE.test(projectId)) notFound();
@@ -46,6 +52,30 @@ export default async function GitHubIntegrationSettingsPage({
   const conn = await getConnectionStatus(guard.org, projectId, appStatus.appConfigured, appStatus.appSlug);
   const dashboardHref = localizedHref(locale, `/projects/${projectId}/github`);
 
+  // After an install callback (?installation_id), show the repo picker for the
+  // active installation of this project (validated server-side).
+  let pickerInstallationId: number | null = null;
+  let installableRepos: InstallableRepo[] = [];
+  if (sp.installation_id && /^\d+$/.test(sp.installation_id) && guard.canManage) {
+    const admin = createAdminClient();
+    const { data: inst } = await admin
+      .from("github_installations")
+      .select("installation_id")
+      .eq("project_id", projectId)
+      .eq("organization_id", guard.org.organizationId)
+      .eq("installation_id", Number(sp.installation_id))
+      .eq("is_active", true)
+      .maybeSingle<{ installation_id: number }>();
+    if (inst) {
+      pickerInstallationId = inst.installation_id;
+      try {
+        installableRepos = await listInstallationRepositories(inst.installation_id);
+      } catch {
+        installableRepos = [];
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -66,6 +96,16 @@ export default async function GitHubIntegrationSettingsPage({
         <Badge icon={<Lock className="h-3.5 w-3.5" />} text={isEs ? "Solo lectura" : "Read-only"} />
         <Badge icon={<ShieldCheck className="h-3.5 w-3.5" />} text={isEs ? "Solo proyectos de software" : "Software projects only"} />
       </div>
+
+      {/* Repo picker (shown right after a GitHub App install callback) */}
+      {pickerInstallationId !== null && (
+        <RepoPicker
+          projectId={projectId}
+          installationId={pickerInstallationId}
+          repos={installableRepos}
+          isEs={isEs}
+        />
+      )}
 
       {/* Connected repositories */}
       {conn.repositories.length > 0 ? (
