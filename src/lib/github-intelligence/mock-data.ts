@@ -79,6 +79,9 @@ export function buildSampleGraphInput(): GraphBuildInput {
     repositoryName: "acme/web-app",
     windowLabel: "Last 14 days",
     defaultBranch: "main",
+    windowDays: 14,
+    rangeStartAt: daysAgo(14),
+    rangeEndAt: daysAgo(0),
     branches: [
       { branch_name: "main", branch_type: "main", head_sha: "a1b2c3d", base_branch: "main", last_commit_at: daysAgo(1), commit_count_window: 6, open_pr_number: null, merged_at: null, status: "active" },
       { branch_name: "feature/checkout-v2", branch_type: "feature", head_sha: "f1e2d3c", base_branch: "main", last_commit_at: daysAgo(2), commit_count_window: 4, open_pr_number: 42, merged_at: null, status: "active" },

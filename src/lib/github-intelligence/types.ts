@@ -129,6 +129,12 @@ export interface GitHubLivingGraphData {
   tags: Array<{ label: string; sha?: string; occurredAt?: string }>;
   /** Branches present in the window but not rendered (overcrowding guardrail). */
   hiddenBranchCount: number;
+  /** Selected window in days (7/14/30) — drives px-per-day + tick density. */
+  windowDays: number;
+  /** ISO start of the selected window (domain start for the time ruler). */
+  rangeStartAt: string;
+  /** ISO end of the window (≈ now) — domain end / "today" marker. */
+  rangeEndAt: string;
 }
 
 // ── Readiness ────────────────────────────────────────────────────────────────
