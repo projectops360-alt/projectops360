@@ -14,14 +14,18 @@ import type { IsabellaProjectScope } from "@/lib/isabella/process-context/types"
 import type { ToolResult } from "./serializers";
 import {
   getProjectSummaryArgsSchema,
+  processIntelligenceArgsSchema,
   queryProjectDataArgsSchema,
   queryTasksArgsSchema,
   TOOL_LIMIT_MAX,
   type GetProjectSummaryArgs,
+  type ProcessIntelligenceArgs,
   type QueryProjectDataArgs,
   type QueryTasksArgs,
 } from "./schemas";
 import { executeGetProjectSummary, executeQueryProjectData, executeQueryTasks } from "./executors";
+import { executeGetDailyDiagnosis, executeGetRecommendationPlan, executeGetRootCauseAnalysis } from "./intelligence-executors";
+import { isIsabellaProcessIntelligenceEnabled } from "@/lib/isabella/process-intelligence-runtime/flag";
 
 export interface IsabellaToolDef {
   name: string;
@@ -60,8 +64,48 @@ export const ISABELLA_TOOLS: Record<string, IsabellaToolDef> = {
   },
 };
 
+/**
+ * Process-intelligence tools (Phase 5 · Task 6). Read-only wrappers over the
+ * accepted Task 3/4/5 engines. Active ONLY when ISABELLA_PROCESS_INTELLIGENCE is
+ * enabled — otherwise never registered/offered to the LLM.
+ */
+export const ISABELLA_INTELLIGENCE_TOOLS: Record<string, IsabellaToolDef> = {
+  get_daily_diagnosis: {
+    name: "get_daily_diagnosis",
+    description:
+      "Read-only daily process diagnosis of the current project (what is happening, what needs attention today) with evidence + confidence. Use for 'what is happening / what needs attention'. Optional milestone_id/task_id to scope.",
+    schema: processIntelligenceArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetDailyDiagnosis(org, scope, args as ProcessIntelligenceArgs),
+  },
+  get_root_cause_analysis: {
+    name: "get_root_cause_analysis",
+    description:
+      "Read-only root-cause & constraint analysis (why execution problems appear) with evidence chains + confidence. Use for 'why is this blocked / delayed / at risk'. Optional milestone_id/task_id to scope. Never invents causes.",
+    schema: processIntelligenceArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetRootCauseAnalysis(org, scope, args as ProcessIntelligenceArgs),
+  },
+  get_recommendation_plan: {
+    name: "get_recommendation_plan",
+    description:
+      "Read-only, evidence-backed next-best-action recommendations. Use for 'what should I do next / recommend'. Advisory only: every recommendation requires human approval and is NOT executed automatically. Optional milestone_id/task_id to scope.",
+    schema: processIntelligenceArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetRecommendationPlan(org, scope, args as ProcessIntelligenceArgs),
+  },
+};
+
+/** The active tool set — process-intelligence tools only when the flag is on. */
+export function activeTools(): Record<string, IsabellaToolDef> {
+  return isIsabellaProcessIntelligenceEnabled()
+    ? { ...ISABELLA_TOOLS, ...ISABELLA_INTELLIGENCE_TOOLS }
+    : ISABELLA_TOOLS;
+}
+
 export function getTool(name: string): IsabellaToolDef | null {
-  return Object.prototype.hasOwnProperty.call(ISABELLA_TOOLS, name) ? ISABELLA_TOOLS[name] : null;
+  const tools = activeTools();
+  return Object.prototype.hasOwnProperty.call(tools, name) ? tools[name] : null;
 }
 
 export interface ToolSpec {
@@ -72,7 +116,7 @@ export interface ToolSpec {
 
 /** Tool specs (JSON-schema params) for the model. No executor exposed. */
 export function listToolSpecs(): ToolSpec[] {
-  return Object.values(ISABELLA_TOOLS).map((t) => ({
+  return Object.values(activeTools()).map((t) => ({
     name: t.name,
     description: t.description,
     parameters: z.toJSONSchema(t.schema) as Record<string, unknown>,
