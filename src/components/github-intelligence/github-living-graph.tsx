@@ -6,9 +6,12 @@
 // The graph is mounted on a controllable time domain: drag on the ruler to zoom
 // to a selection (brush), Ctrl+wheel / double-click / buttons to zoom around the
 // cursor, "reset" back to auto-zoom, "see full range" for the whole window.
-// Density, merges and ruler ticks re-bucket to the domain granularity
-// (month → week → day → hour). master = density band + merge badges; only live
-// branches get lanes; the rest live in a side panel. No color outside the legend.
+// Density and ruler ticks re-bucket to the domain granularity (month → week →
+// day → hour). master = a commit-density band. EVERY branch is drawn as a
+// packed bump-and-merge lane (rows are reused when spans don't overlap), each
+// carrying its own commits. Clicking a day on master collapses that day's
+// branches into a count badge (default: everything expanded). No color outside
+// the legend.
 // ============================================================================
 
 import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
@@ -26,6 +29,8 @@ const LANE_COLORS: Record<BranchType, string> = {
 const DENSITY_OPACITY = [0.08, 0.3, 0.55, 0.85];
 const STICKY_W = 66, PLOT_LEFT = STICKY_W + 12, MARGIN_RIGHT = 44, LANE_GAP = 54, NODE_R = 5, CURVE = 22;
 const TOP_PAD = 46, AXIS_H = 36, DENSITY_H = 12, MIN_PLOT = 680, MAX_PLOT = 6400, LABEL_MIN_SPACING = 54;
+// Interval packing: min horizontal gap to reuse a row; safety cap on rows/side.
+const LANE_MIN_GAP = 36, MAX_LANES = 40;
 
 const ms = (iso: string) => new Date(iso).getTime();
 
@@ -36,6 +41,21 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
   const [panel, setPanel] = useState<PanelState>(null);
+
+  // Per-day collapse: clicking a day on master folds that day's branches back
+  // into a count badge. Default = everything expanded (all lanes visible).
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(() => new Set());
+  const toggleDay = useCallback((k: string) => setCollapsedDays((s) => {
+    const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n;
+  }), []);
+  const allMergeDays = useMemo(() => new Set(data.merges.map((m) => m.mergedAt.slice(0, 10))), [data.merges]);
+  const allCollapsed = allMergeDays.size > 0 && collapsedDays.size >= allMergeDays.size;
+  const collapseAll = () => setCollapsedDays(allCollapsed ? new Set() : new Set(allMergeDays));
+  const hiddenBranchNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of data.branches) if (b.mergedAt && collapsedDays.has(b.mergedAt.slice(0, 10))) set.add(b.name);
+    return set;
+  }, [data.branches, collapsedDays]);
 
   const bounds = useMemo<Domain>(() => ({ start: ms(data.fullStartAt), end: ms(data.fullEndAt) }), [data.fullStartAt, data.fullEndAt]);
   const autoDomain = useMemo<Domain>(() => ({ start: ms(data.autoStartAt), end: ms(data.autoEndAt) }), [data.autoStartAt, data.autoEndAt]);
@@ -60,7 +80,7 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [domain]);
 
-  const layout = useMemo(() => computeLayout(data, view, isEs), [data, view, isEs]);
+  const layout = useMemo(() => computeLayout(data, view, isEs, hiddenBranchNames), [data, view, isEs, hiddenBranchNames]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return;
@@ -106,11 +126,11 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   };
   const onDblClick = (e: React.MouseEvent) => { const x = localX(e as unknown as React.PointerEvent, scrollRef.current); zoomBy(0.5, timeAt(x)); };
 
-  const isEmpty = data.masterCommitTimes.length === 0 && data.liveBranches.length === 0 && data.merges.length === 0;
+  const isEmpty = data.masterCommitTimes.length === 0 && data.branches.length === 0 && data.merges.length === 0;
   const totalMerges = data.merges.length;
   const summaryText = isEs
-    ? `${data.repositoryName || "repositorio"} — ${data.totalMasterCommits} commits, ${totalMerges} merges, ${data.liveBranches.length} ramas activas, ${data.inactiveBranches.length} inactivas.`
-    : `${data.repositoryName || "repository"} — ${data.totalMasterCommits} commits, ${totalMerges} merges, ${data.liveBranches.length} live branches, ${data.inactiveBranches.length} inactive.`;
+    ? `${data.repositoryName || "repositorio"} — ${data.totalMasterCommits} commits, ${totalMerges} merges, ${data.branches.length} ramas.`
+    : `${data.repositoryName || "repository"} — ${data.totalMasterCommits} commits, ${totalMerges} merges, ${data.branches.length} branches.`;
   const domainLabel = `${fmtDay(new Date(view.start).toISOString())} – ${fmtDay(new Date(view.end).toISOString())}${mode === "manual" ? " · zoom" : ""}`;
 
   return (
@@ -129,6 +149,11 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
           <button type="button" onClick={seeFull} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
             {mode === "full" ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}{mode === "full" ? (isEs ? "auto-zoom" : "auto-zoom") : (isEs ? "ver rango completo" : "see full range")}
           </button>
+          {allMergeDays.size > 0 && (
+            <button type="button" onClick={collapseAll} title={isEs ? "colapsar/expandir todos los días" : "collapse/expand all days"} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+              <Layers className="h-3 w-3" />{allCollapsed ? (isEs ? "expandir ramas" : "expand branches") : (isEs ? "colapsar ramas" : "collapse branches")}
+            </button>
+          )}
           {overflow && <span className="text-[11px] font-medium text-muted-foreground">{isEs ? "desliza →" : "scroll →"}</span>}
           <Legend isEs={isEs} />
         </div>
@@ -171,16 +196,24 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
 
               {layout.branches.map((b) => <BranchBump key={b.id} b={b} centerY={layout.centerY} isEs={isEs} />)}
 
-              {layout.merges.map((m, i) => (
-                <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => setPanel({ kind: "merges", day: m.day })}>
-                  <circle cx={m.x} cy={layout.centerY} r={5} className="fill-current" />
-                  {m.day.count > 1 && <>
-                    <rect x={m.x - 10} y={layout.centerY - 20} width={20 + String(m.day.count).length * 3} height={15} rx={7.5} className="fill-muted stroke-border" strokeWidth={1} />
-                    <text x={m.x} y={layout.centerY - 9} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">{m.day.count}</text>
-                  </>}
-                  <title>{m.day.count > 1 ? (isEs ? `${m.day.count} merges · ${fmtDay(m.day.start)} (clic)` : `${m.day.count} merges · ${fmtDay(m.day.start)} (click)`) : `PR #${m.day.prs[0]?.number} · ${m.day.prs[0]?.branch}`}</title>
-                </g>
-              ))}
+              {layout.merges.map((m, i) => {
+                const dk = m.day.start.slice(0, 10);
+                const collapsed = collapsedDays.has(dk);
+                const showBadge = m.day.count > 1 || collapsed;
+                return (
+                  <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => toggleDay(dk)}>
+                    <circle cx={m.x} cy={layout.centerY} r={collapsed ? 5 : 3.5} className="fill-current" opacity={collapsed ? 1 : 0.55} />
+                    {showBadge && <>
+                      <rect x={m.x - 10} y={layout.centerY - 20} width={20 + String(m.day.count).length * 3} height={15} rx={7.5}
+                        className={collapsed ? "fill-foreground/85 stroke-transparent" : "fill-muted stroke-border"} strokeWidth={1} />
+                      <text x={m.x} y={layout.centerY - 9} textAnchor="middle" className={`text-[9px] font-semibold ${collapsed ? "fill-background" : "fill-foreground"}`}>{m.day.count}</text>
+                    </>}
+                    <title>{collapsed
+                      ? (isEs ? `${m.day.count} ramas ocultas · ${fmtDay(m.day.start)} — clic para mostrar` : `${m.day.count} branches hidden · ${fmtDay(m.day.start)} — click to show`)
+                      : (isEs ? `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — clic para ocultar` : `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — click to hide`)}</title>
+                  </g>
+                );
+              })}
 
               {layout.tags.map((t, i) => (
                 <g key={`${t.label}-${i}`} className="text-purple-500" pointerEvents="none">
@@ -222,7 +255,7 @@ function BranchBump({ b, centerY, isEs }: { b: LaidBranch; centerY: number; isEs
   const leave = enterLeft ? "" : `M ${startX} ${centerY} C ${startX + CURVE} ${centerY}, ${startX} ${laneY}, ${startX + CURVE} ${laneY}`;
   const lane = `M ${laneStart} ${laneY} L ${endX - (merged ? CURVE : 0)} ${laneY}`;
   const rejoin = merged ? `M ${endX - CURVE} ${laneY} C ${endX} ${laneY}, ${endX - CURVE} ${centerY}, ${endX} ${centerY}` : "";
-  const pillW = Math.min(210, b.name.length * 6.6 + 44);
+  const pillW = Math.min(150, b.name.length * 6.2 + 34);
   return (
     <g className={color}>
       {enterLeft && <path d={`M ${startX - 20} ${laneY} L ${startX + 18} ${laneY}`} fill="none" stroke="currentColor" strokeWidth={2.25} strokeDasharray="3 3" opacity={0.5} />}
@@ -232,7 +265,7 @@ function BranchBump({ b, centerY, isEs }: { b: LaidBranch; centerY: number; isEs
       {merged && <circle cx={endX} cy={centerY} r={4} className="fill-current" />}
       <g>
         <rect x={endX - pillW} y={b.above ? laneY - 26 : laneY + 8} width={pillW} height={17} rx={8.5} className="fill-current" opacity={0.12} />
-        <text x={endX - pillW + 8} y={b.above ? laneY - 14 : laneY + 20} className="fill-current text-[11px] font-medium">{b.name.length > 26 ? `${b.name.slice(0, 25)}…` : b.name}{b.openPrNumber ? ` · PR #${b.openPrNumber}` : ""}</text>
+        <text x={endX - pillW + 8} y={b.above ? laneY - 14 : laneY + 20} className="fill-current text-[10px] font-medium">{b.name.length > 18 ? `${b.name.slice(0, 17)}…` : b.name}{b.openPrNumber ? ` · #${b.openPrNumber}` : ""}</text>
       </g>
       {b.nodes.map((n, i) => (
         <g key={i}>
@@ -261,7 +294,7 @@ function Legend({ isEs }: { isEs: boolean }) {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolean) {
+function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolean, hidden: Set<string>) {
   const startMs = domain.start;
   const endMs = Math.max(startMs + 60 * 60 * 1000, domain.end);
   const nowMs = ms(data.fullEndAt);
@@ -273,18 +306,34 @@ function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolea
   const clampX = (x: number) => Math.max(PLOT_LEFT, Math.min(PLOT_LEFT + plotW, x));
   const xAt = (iso?: string, fb = endMs) => clampX(scale(iso ? new Date(iso).getTime() || fb : fb));
 
-  const above = data.liveBranches.filter((b) => b.type === "feature" || b.type === "other");
-  const below = data.liveBranches.filter((b) => b.type === "hotfix" || b.type === "release");
-  function assign(list: GitHubGraphBranch[]) {
-    return list.slice().sort((a, b) => xAt(b.startAt) - xAt(a.startAt)).map((b, lane) => {
-      const sMs = b.startAt ? new Date(b.startAt).getTime() : startMs;
-      const enterLeft = sMs - startMs < (endMs - startMs) * 0.02;
-      const startX = enterLeft ? PLOT_LEFT + 20 : xAt(b.startAt);
+  const branchStart = (b: GitHubGraphBranch) => ms(b.startAt ?? b.lastCommitAt ?? b.mergedAt ?? "") || startMs;
+  const branchEnd = (b: GitHubGraphBranch) => ms(b.mergedAt ?? b.lastCommitAt ?? b.startAt ?? "") || nowMs;
+  // Draw every branch that intersects the visible domain and isn't collapsed.
+  const visible = data.branches.filter((b) => !hidden.has(b.name) && branchEnd(b) >= startMs && branchStart(b) <= endMs);
+  const above = visible.filter((b) => b.type === "feature" || b.type === "other");
+  const below = visible.filter((b) => b.type === "hotfix" || b.type === "release");
+
+  // Interval packing: a branch reuses the first row whose previous branch ended
+  // (+gap) before this one starts — so N non-overlapping branches share a row.
+  function pack(list: GitHubGraphBranch[]) {
+    const items = list.map((b) => {
+      const enterLeft = branchStart(b) - startMs < (endMs - startMs) * 0.02;
+      const startX = enterLeft ? PLOT_LEFT + 20 : xAt(b.startAt ?? b.lastCommitAt ?? b.mergedAt);
       const endX = Math.max(startX + CURVE * 2 + 8, xAt(b.mergedAt ?? b.lastCommitAt));
-      return { b, startX, endX, lane, enterLeft };
-    });
+      return { b, startX, endX, enterLeft, lane: 0 };
+    }).sort((a, z) => a.startX - z.startX || a.endX - z.endX);
+    const rowEnd: number[] = [];
+    for (const it of items) {
+      let lane = rowEnd.findIndex((e) => e + LANE_MIN_GAP <= it.startX);
+      if (lane === -1) {
+        if (rowEnd.length < MAX_LANES) { lane = rowEnd.length; rowEnd.push(it.endX); }
+        else { lane = MAX_LANES - 1; rowEnd[lane] = Math.max(rowEnd[lane], it.endX); }
+      } else rowEnd[lane] = it.endX;
+      it.lane = lane;
+    }
+    return items;
   }
-  const la = assign(above), lb = assign(below);
+  const la = pack(above), lb = pack(below);
   const aLanes = la.reduce((m, x) => Math.max(m, x.lane + 1), 0);
   const bLanes = lb.reduce((m, x) => Math.max(m, x.lane + 1), 0);
   const centerY = TOP_PAD + aLanes * LANE_GAP;
@@ -293,6 +342,10 @@ function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolea
 
   const layNodes = (b: GitHubGraphBranch, sx: number, ex: number, el: boolean): LaidNode[] => {
     const lo = (el ? sx : sx + CURVE) + 4, hi = Math.max(lo + 1, ex - CURVE - 4);
+    // No per-branch commits ingested yet: show the count as a single marker.
+    if (b.nodes.length === 0 && (b.hiddenCommitCount ?? 0) > 0) {
+      return [{ x: (lo + hi) / 2, label: `+${b.hiddenCommitCount}`, occurredAt: b.mergedAt ?? b.lastCommitAt ?? "", collapsed: b.hiddenCommitCount }];
+    }
     return b.nodes.map((n) => ({ x: Math.max(lo, Math.min(hi, xAt(n.occurredAt))), label: n.label, sha: n.sha, occurredAt: n.occurredAt, collapsed: n.collapsedCount }));
   };
   const branches: LaidBranch[] = [

@@ -180,9 +180,13 @@ export interface GitHubLivingGraphData {
   /** Raw merged PRs — bucketed client-side by zoom. */
   merges: MergeItem[];
 
-  /** Branches drawn as individual lanes (open PR ∪ commits < 72h, ≤ 8). */
-  liveBranches: GitHubGraphBranch[];
-  /** Everything else — aggregated, shown in the side panel. */
+  /** ALL side branches with a temporal anchor, drawn as packed lanes across the
+   *  timeline (rows are reused when spans don't overlap). Each carries its own
+   *  commits (`nodes`). The component filters to the visible domain and can
+   *  collapse a day's branches on click. */
+  branches: GitHubGraphBranch[];
+  /** Branches with no drawable anchor (no commit/merge in the loaded data) —
+   *  aggregated into the side panel so nothing is silently hidden. */
   inactiveBranches: InactiveBranch[];
 
   tags: Array<{ label: string; sha?: string; occurredAt?: string }>;

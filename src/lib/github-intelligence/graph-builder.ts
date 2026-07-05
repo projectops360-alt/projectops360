@@ -22,7 +22,9 @@ import type {
 } from "./types";
 import { classifyBranch } from "./branch-classification";
 
-export const MAX_LIVE_LANES = 8;
+/** Safety cap: at most this many drawn lanes per side (packing keeps rows low;
+ *  this only guards pathological repos). Kept exported for the renderer. */
+export const MAX_LANES = 60;
 export const MAX_NODES_PER_BRANCH = 16;
 export const LIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
 const DAY_MS = 86_400_000;
@@ -87,22 +89,16 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     .map((p) => ({ number: p.pr_number, title: p.title ?? "", branch: p.source_branch ?? "", mergedAt: p.merged_at! }))
     .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt));
 
-  // ── Live branches: open PR ∪ commits < 72h (≤8 lanes) ───────────────────────
+  // ── Every side branch becomes a lane (packed client-side). A branch is drawn
+  //    when it has a temporal anchor (a commit or a merge). Anchorless branches
+  //    (nothing in the loaded data) go to the inactive side panel. ────────────
   const openPrBranch = new Set(
     input.pullRequests.filter((p) => p.state === "open" && p.source_branch).map((p) => p.source_branch!),
   );
   const sideBranches = input.branches.filter((b) => classifyBranch(b.branch_name, def) !== "main" && b.branch_name !== def);
 
-  const isLive = (b: BranchSnapshot): boolean => {
-    const hasOpenPr = b.open_pr_number != null || openPrBranch.has(b.branch_name);
-    const recent = b.last_commit_at != null && now - ms(b.last_commit_at) < LIVE_WINDOW_MS;
-    return hasOpenPr || recent;
-  };
   const recency = (b: BranchSnapshot) => Math.max(ms(b.last_commit_at), ms(b.merged_at));
-
-  const liveCandidates = sideBranches.filter(isLive).sort((a, b) => recency(b) - recency(a));
-  const live = liveCandidates.slice(0, MAX_LIVE_LANES);
-  const liveNames = new Set(live.map((b) => b.branch_name));
+  const hasAnchor = (b: BranchSnapshot) => b.last_commit_at != null || b.merged_at != null;
 
   const eventsByBranch = new Map<string, ActivityEventSnapshot[]>();
   for (const e of pushEvents) {
@@ -112,11 +108,15 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     eventsByBranch.set(e.branch_name, arr);
   }
 
-  const liveBranches: GitHubGraphBranch[] = live.map((b) => {
+  const drawable = sideBranches.filter(hasAnchor).sort((a, b) => recency(b) - recency(a));
+
+  const branches: GitHubGraphBranch[] = drawable.map((b) => {
     const evs = (eventsByBranch.get(b.branch_name) ?? []).sort((x, y) => ms(x.occurred_at) - ms(y.occurred_at));
     const nodes = collapseCommits(evs, b);
     const nodeTimes = evs.map((e) => ms(e.occurred_at)).filter((t) => t > 0);
     const openPr = b.open_pr_number ?? input.pullRequests.find((p) => p.state === "open" && p.source_branch === b.branch_name)?.pr_number;
+    // When per-branch commits weren't ingested, still show how many there were.
+    const hiddenCommitCount = Math.max(0, (b.commit_count_window || 0) - nodes.length);
     return {
       id: b.branch_name,
       name: b.branch_name,
@@ -125,16 +125,16 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
       openPrNumber: openPr ?? undefined,
       mergeSha: b.merged_at ? b.head_sha ?? undefined : undefined,
       nodes,
-      hiddenCommitCount: Math.max(0, b.commit_count_window - nodes.length),
-      startAt: nodeTimes.length ? new Date(Math.min(...nodeTimes)).toISOString() : b.last_commit_at ?? undefined,
+      hiddenCommitCount,
+      startAt: nodeTimes.length ? new Date(Math.min(...nodeTimes)).toISOString() : b.last_commit_at ?? b.merged_at ?? undefined,
       mergedAt: b.merged_at ?? undefined,
       lastCommitAt: b.last_commit_at ?? (nodeTimes.length ? new Date(Math.max(...nodeTimes)).toISOString() : undefined),
     };
   });
 
-  // ── Inactive: everything else (aggregated for the side panel) ───────────────
+  // ── Inactive: anchorless branches (aggregated for the side panel) ───────────
   const inactiveBranches: InactiveBranch[] = sideBranches
-    .filter((b) => !liveNames.has(b.branch_name))
+    .filter((b) => !hasAnchor(b))
     .map((b) => ({
       name: b.branch_name,
       type: classifyBranch(b.branch_name, def),
@@ -164,7 +164,7 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     masterCommitTimes,
     totalMasterCommits,
     merges,
-    liveBranches,
+    branches,
     inactiveBranches,
     tags,
   };
