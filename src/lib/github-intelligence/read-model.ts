@@ -133,6 +133,10 @@ export async function loadDashboardData(
   const isEs = options.isEs ?? false;
   const supabase = await createClient();
 
+  // Time-ruler domain: [now − windowDays, now]. Used by the graph timeline.
+  const rangeEndAt = new Date().toISOString();
+  const rangeStartAt = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+
   const repos = await listProjectRepositories(org, projectId);
   const repository = options.repositoryId
     ? repos.find((r) => r.id === options.repositoryId) ?? repos[0] ?? null
@@ -145,6 +149,9 @@ export async function loadDashboardData(
     branches: [],
     tags: [],
     hiddenBranchCount: 0,
+    windowDays,
+    rangeStartAt,
+    rangeEndAt,
   };
 
   if (!repository) {
@@ -162,7 +169,7 @@ export async function loadDashboardData(
     };
   }
 
-  const sinceIso = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  const sinceIso = rangeStartAt;
   const scope = { org: org.organizationId, project: projectId, repo: repository.id };
 
   const [branches, pulls, workflows, releases, deployments, events] = await Promise.all([
@@ -190,6 +197,9 @@ export async function loadDashboardData(
     pullRequests: pulls,
     releases,
     events,
+    windowDays,
+    rangeStartAt,
+    rangeEndAt,
   });
 
   const summary = buildGitHubSummary({

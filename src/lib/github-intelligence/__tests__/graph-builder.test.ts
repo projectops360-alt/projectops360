@@ -10,7 +10,11 @@ function branch(name: string, type: BranchSnapshot["branch_type"], p: Partial<Br
 }
 
 function baseInput(branches: BranchSnapshot[], events: ActivityEventSnapshot[] = []): GraphBuildInput {
-  return { repositoryName: "acme/app", windowLabel: "Last 14 days", defaultBranch: "main", branches, pullRequests: [], releases: [], events };
+  return {
+    repositoryName: "acme/app", windowLabel: "Last 14 days", defaultBranch: "main",
+    branches, pullRequests: [], releases: [], events,
+    windowDays: 14, rangeStartAt: "2026-01-01T00:00:00Z", rangeEndAt: "2026-01-15T00:00:00Z",
+  };
 }
 
 describe("buildGitHubLivingGraph", () => {

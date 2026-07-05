@@ -31,6 +31,11 @@ export interface GraphBuildInput {
   releases: ReleaseSnapshot[];
   /** Recent activity events used to place commit nodes on each branch lane. */
   events: ActivityEventSnapshot[];
+  /** Selected window in days (7/14/30) — for the time ruler. */
+  windowDays: number;
+  /** ISO window start (domain start) and end (≈ now). */
+  rangeStartAt: string;
+  rangeEndAt: string;
 }
 
 /** Relevance rank — lower sorts first. Priority order per product spec:
@@ -135,6 +140,9 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     branches,
     tags,
     hiddenBranchCount,
+    windowDays: input.windowDays,
+    rangeStartAt: input.rangeStartAt,
+    rangeEndAt: input.rangeEndAt,
   };
 }
 
