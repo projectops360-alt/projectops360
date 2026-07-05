@@ -19,6 +19,7 @@ import { Maximize2, Minimize2, Layers, ZoomIn, ZoomOut, RotateCcw } from "lucide
 import type { BranchType, GitHubLivingGraphData, GitHubGraphBranch } from "@/lib/github-intelligence/types";
 import { createTimeScale, generateTicks, applyLabelCollision, densityGranularity, bucketDensity, bucketMerges, DAY_MS } from "@/lib/github-intelligence/time-axis";
 import { pointerXToTime, zoomAround, brushToDomain, isValidSelection, clampDomain, type Domain } from "@/lib/github-intelligence/graph-zoom";
+import { packLanes, type LaneInterval } from "@/lib/github-intelligence/lane-packing";
 import { BranchPanel, type PanelState, type DayBranchItem } from "./branch-panel";
 import type { DailyMerge } from "@/lib/github-intelligence/types";
 
@@ -28,20 +29,33 @@ const LANE_COLORS: Record<BranchType, string> = {
   main: "text-muted-foreground", feature: "text-brand-500", hotfix: "text-orange-500", release: "text-purple-500", other: "text-sky-500",
 };
 const DENSITY_OPACITY = [0.08, 0.3, 0.55, 0.85];
-const STICKY_W = 66, PLOT_LEFT = STICKY_W + 12, MARGIN_RIGHT = 44, LANE_GAP = 54, NODE_R = 5, CURVE = 22;
+const STICKY_W = 66, PLOT_LEFT = STICKY_W + 12, MARGIN_RIGHT = 44, LANE_GAP = 30, NODE_R = 4, ELBOW = 14;
 const TOP_PAD = 46, AXIS_H = 36, DENSITY_H = 12, MIN_PLOT = 680, MAX_PLOT = 6400, LABEL_MIN_SPACING = 54;
-// Interval packing: min horizontal gap to reuse a row; safety cap on rows/side.
-const LANE_MIN_GAP = 36, MAX_LANES = 40;
+// Horizontal lane budget (packing reuses lanes; overflow → spine badges).
+const LANE_BUDGET_UP = 6, LANE_BUDGET_DOWN = 4, PILL_MARGIN = 12, DASH_TAIL = 34;
 
 const ms = (iso: string) => new Date(iso).getTime();
 
 interface LaidNode { x: number; label: string; sha?: string; occurredAt: string; collapsed?: number }
-interface LaidBranch { id: string; name: string; type: BranchType; color: string; laneY: number; startX: number; endX: number; merged: boolean; enterLeft: boolean; openPrNumber?: number; nodes: LaidNode[]; above: boolean }
+interface LaidBranch {
+  id: string; name: string; type: BranchType; color: string;
+  laneY: number; above: boolean; open: boolean; openPrNumber?: number;
+  // flat geometry: rounded elbow → horizontal segment → rounded elbow
+  elbowOut: string | null; // master → lane at startX (null when enterLeft)
+  leadIn: string | null;   // dashed off-screen entry (enterLeft)
+  segSolid: string;        // solid horizontal segment
+  segDash: string | null;  // dashed right tail (open branch)
+  elbowIn: string | null;  // lane → master at endX (merged only)
+  mergeDotX: number | null;
+  pillX: number; pillY: number; pillW: number; pillText: string; pillShort: boolean;
+  nodes: LaidNode[];
+}
 
 export function GitHubLivingGraph({ data, isEs = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [overflow, setOverflow] = useState(false);
   const [panel, setPanel] = useState<PanelState>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   // Overview stays compact (density band + daily merge badges + only OPEN
   // branches as lanes). Clicking a day badge opens a filterable detail panel of
@@ -206,7 +220,55 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
                 </g>
               )}
 
-              {layout.branches.map((b) => <BranchBump key={b.id} b={b} centerY={layout.centerY} isEs={isEs} />)}
+              {/* pass 1 — connectors (behind, so crossings pass under segments) */}
+              {layout.branches.map((b) => {
+                const dim = hovered !== null && hovered !== b.id;
+                return (
+                  <g key={`c-${b.id}`} className={b.color} pointerEvents="none" opacity={dim ? 0.22 : 1}>
+                    {b.leadIn && <path d={b.leadIn} fill="none" stroke="currentColor" strokeWidth={2.25} strokeDasharray="3 3" opacity={0.55} />}
+                    {b.elbowOut && <path d={b.elbowOut} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.9} />}
+                    {b.elbowIn && <path d={b.elbowIn} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.9} />}
+                  </g>
+                );
+              })}
+              {/* pass 2 — horizontal segments (hover target) */}
+              {layout.branches.map((b) => {
+                const dim = hovered !== null && hovered !== b.id;
+                return (
+                  <g key={`s-${b.id}`} className={b.color} opacity={dim ? 0.22 : 1}
+                    onMouseEnter={() => setHovered(b.id)} onMouseLeave={() => setHovered(null)} style={{ cursor: "pointer" }}>
+                    <path d={b.segSolid} fill="none" stroke="currentColor" strokeWidth={2.5} opacity={0.95} />
+                    {b.segDash && <path d={b.segDash} fill="none" stroke="currentColor" strokeWidth={2.5} strokeDasharray="4 4" opacity={0.8} />}
+                    <path d={b.segSolid} fill="none" stroke="transparent" strokeWidth={16} />
+                    <title>{branchTooltip(b, isEs)}</title>
+                  </g>
+                );
+              })}
+              {/* pass 3 — commit dots, merge dots, pills (front) */}
+              {layout.branches.map((b) => {
+                const dim = hovered !== null && hovered !== b.id;
+                const showPill = !b.pillShort || hovered === b.id;
+                return (
+                  <g key={`d-${b.id}`} className={b.color} opacity={dim ? 0.22 : 1}>
+                    {b.mergeDotX !== null && <circle cx={b.mergeDotX} cy={layout.centerY} r={4} className="fill-current" />}
+                    {b.nodes.map((n, i) => (
+                      <g key={i}>
+                        {n.collapsed ? <>
+                          <rect x={n.x - 12} y={b.laneY - 8} width={24} height={16} rx={8} className="fill-current" opacity={0.2} />
+                          <text x={n.x} y={b.laneY + 4} textAnchor="middle" className="fill-current text-[9px] font-semibold">{n.label}</text>
+                        </> : <circle cx={n.x} cy={b.laneY} r={NODE_R} className="fill-current" />}
+                        <title>{n.collapsed ? `${n.collapsed} commits` : `${n.sha ? n.sha.slice(0, 7) : n.label} · ${b.name} · ${fmtTime(n.occurredAt)}`}</title>
+                      </g>
+                    ))}
+                    {showPill && (
+                      <g onMouseEnter={() => setHovered(b.id)} onMouseLeave={() => setHovered(null)} style={{ cursor: "pointer" }}>
+                        <rect x={b.pillX} y={b.pillY} width={b.pillW} height={15} rx={7.5} className="fill-current" opacity={0.14} />
+                        <text x={b.pillX + 8} y={b.pillY + 11} className="fill-current text-[10px] font-medium">{b.pillText}</text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
 
               {layout.merges.map((m, i) => (
                 <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => openDayPanel(m.day)}>
@@ -253,35 +315,11 @@ function localX(e: React.PointerEvent | React.MouseEvent, scroll: HTMLDivElement
   return (e.clientX - left) + (scroll?.scrollLeft ?? 0);
 }
 
-function BranchBump({ b, centerY, isEs }: { b: LaidBranch; centerY: number; isEs: boolean }) {
-  const { laneY, startX, endX, merged, color, enterLeft } = b;
-  const laneStart = enterLeft ? startX : startX + CURVE;
-  const leave = enterLeft ? "" : `M ${startX} ${centerY} C ${startX + CURVE} ${centerY}, ${startX} ${laneY}, ${startX + CURVE} ${laneY}`;
-  const lane = `M ${laneStart} ${laneY} L ${endX - (merged ? CURVE : 0)} ${laneY}`;
-  const rejoin = merged ? `M ${endX - CURVE} ${laneY} C ${endX} ${laneY}, ${endX - CURVE} ${centerY}, ${endX} ${centerY}` : "";
-  const pillW = Math.min(150, b.name.length * 6.2 + 34);
-  return (
-    <g className={color}>
-      {enterLeft && <path d={`M ${startX - 20} ${laneY} L ${startX + 18} ${laneY}`} fill="none" stroke="currentColor" strokeWidth={2.25} strokeDasharray="3 3" opacity={0.5} />}
-      {!enterLeft && <path d={leave} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />}
-      <path d={lane} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />
-      {merged && <path d={rejoin} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />}
-      {merged && <circle cx={endX} cy={centerY} r={4} className="fill-current" />}
-      <g>
-        <rect x={endX - pillW} y={b.above ? laneY - 26 : laneY + 8} width={pillW} height={17} rx={8.5} className="fill-current" opacity={0.12} />
-        <text x={endX - pillW + 8} y={b.above ? laneY - 14 : laneY + 20} className="fill-current text-[10px] font-medium">{b.name.length > 18 ? `${b.name.slice(0, 17)}…` : b.name}{b.openPrNumber ? ` · #${b.openPrNumber}` : ""}</text>
-      </g>
-      {b.nodes.map((n, i) => (
-        <g key={i}>
-          {n.collapsed ? <>
-            <rect x={n.x - 13} y={laneY - 8.5} width={26} height={17} rx={8.5} className="fill-current" opacity={0.2} />
-            <text x={n.x} y={laneY + 4} textAnchor="middle" className="fill-current text-[10px] font-semibold">{n.label}</text>
-          </> : <circle cx={n.x} cy={laneY} r={NODE_R} className="fill-current" />}
-          <title>{n.collapsed ? `${n.collapsed} ${isEs ? "commits anteriores" : "earlier commits"}` : `${n.sha ? n.sha.slice(0, 7) : n.label} · ${b.name} · ${fmtTime(n.occurredAt)}`}</title>
-        </g>
-      ))}
-    </g>
-  );
+function branchTooltip(b: LaidBranch, isEs: boolean): string {
+  const commits = b.nodes.reduce((s, n) => s + (n.collapsed ?? 1), 0);
+  const st = b.open ? (isEs ? "abierta" : "open") : (isEs ? "mergeada" : "merged");
+  const pr = b.openPrNumber ? ` · PR #${b.openPrNumber}` : "";
+  return `${b.name} · ${commits} commit${commits === 1 ? "" : "s"} · ${st}${pr}`;
 }
 
 function Legend({ isEs }: { isEs: boolean }) {
@@ -312,50 +350,61 @@ function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolea
 
   const branchStart = (b: GitHubGraphBranch) => ms(b.startAt ?? b.lastCommitAt ?? b.mergedAt ?? "") || startMs;
   const branchEnd = (b: GitHubGraphBranch) => ms(b.mergedAt ?? b.lastCommitAt ?? b.startAt ?? "") || nowMs;
-  // Overview draws ONLY open/active branches as lanes (bounded). Merged history
-  // lives in the compact daily badges → click a badge for the filterable panel.
-  const visible = data.branches.filter((b) => !b.mergedAt && branchEnd(b) >= startMs && branchStart(b) <= endMs);
-  const above = visible.filter((b) => b.type === "feature" || b.type === "other");
-  const below = visible.filter((b) => b.type === "hotfix" || b.type === "release");
+  const plotRight = PLOT_LEFT + plotW;
+  // Draw ALL branches intersecting the domain (merged + open) as flat lanes.
+  // fix/* go below master; everything else above. Packing reuses lanes and the
+  // budget caps height — overflow branches stay in the spine's merge badges.
+  const visible = data.branches.filter((b) => branchEnd(b) >= startMs && branchStart(b) <= endMs);
+  const isUp = (b: GitHubGraphBranch) => b.type !== "hotfix";
+  const toInterval = (b: GitHubGraphBranch): LaneInterval => {
+    const enterLeft = branchStart(b) - startMs < (endMs - startMs) * 0.02;
+    const open = !b.mergedAt;
+    const startX = enterLeft ? PLOT_LEFT : xAt(b.startAt ?? b.lastCommitAt ?? b.mergedAt);
+    const endX = open ? plotRight : Math.max(startX + ELBOW * 2 + 8, xAt(b.mergedAt ?? b.lastCommitAt));
+    return { id: b.id, startX, endX, open, enterLeft };
+  };
+  const upPack = packLanes(visible.filter(isUp).map(toInterval), LANE_BUDGET_UP, PILL_MARGIN);
+  const downPack = packLanes(visible.filter((b) => !isUp(b)).map(toInterval), LANE_BUDGET_DOWN, PILL_MARGIN);
+  const byId = new Map(visible.map((b) => [b.id, b]));
 
-  // Interval packing: a branch reuses the first row whose previous branch ended
-  // (+gap) before this one starts — so N non-overlapping branches share a row.
-  function pack(list: GitHubGraphBranch[]) {
-    const items = list.map((b) => {
-      const enterLeft = branchStart(b) - startMs < (endMs - startMs) * 0.02;
-      const startX = enterLeft ? PLOT_LEFT + 20 : xAt(b.startAt ?? b.lastCommitAt ?? b.mergedAt);
-      const endX = Math.max(startX + CURVE * 2 + 8, xAt(b.mergedAt ?? b.lastCommitAt));
-      return { b, startX, endX, enterLeft, lane: 0 };
-    }).sort((a, z) => a.startX - z.startX || a.endX - z.endX);
-    const rowEnd: number[] = [];
-    for (const it of items) {
-      let lane = rowEnd.findIndex((e) => e + LANE_MIN_GAP <= it.startX);
-      if (lane === -1) {
-        if (rowEnd.length < MAX_LANES) { lane = rowEnd.length; rowEnd.push(it.endX); }
-        else { lane = MAX_LANES - 1; rowEnd[lane] = Math.max(rowEnd[lane], it.endX); }
-      } else rowEnd[lane] = it.endX;
-      it.lane = lane;
-    }
-    return items;
-  }
-  const la = pack(above), lb = pack(below);
-  const aLanes = la.reduce((m, x) => Math.max(m, x.lane + 1), 0);
-  const bLanes = lb.reduce((m, x) => Math.max(m, x.lane + 1), 0);
+  const aLanes = upPack.placed.reduce((m, p) => Math.max(m, p.lane + 1), 0);
+  const bLanes = downPack.placed.reduce((m, p) => Math.max(m, p.lane + 1), 0);
   const centerY = TOP_PAD + aLanes * LANE_GAP;
   const height = centerY + Math.max(1, bLanes) * LANE_GAP + AXIS_H + 26;
   const axisY = height - AXIS_H + 6;
 
-  const layNodes = (b: GitHubGraphBranch, sx: number, ex: number, el: boolean): LaidNode[] => {
-    const lo = (el ? sx : sx + CURVE) + 4, hi = Math.max(lo + 1, ex - CURVE - 4);
-    // No per-branch commits ingested yet: show the count as a single marker.
+  const layNodes = (b: GitHubGraphBranch, segStart: number, segEnd: number): LaidNode[] => {
+    const lo = segStart + 4, hi = Math.max(lo + 1, segEnd - 4);
     if (b.nodes.length === 0 && (b.hiddenCommitCount ?? 0) > 0) {
       return [{ x: (lo + hi) / 2, label: `+${b.hiddenCommitCount}`, occurredAt: b.mergedAt ?? b.lastCommitAt ?? "", collapsed: b.hiddenCommitCount }];
     }
     return b.nodes.map((n) => ({ x: Math.max(lo, Math.min(hi, xAt(n.occurredAt))), label: n.label, sha: n.sha, occurredAt: n.occurredAt, collapsed: n.collapsedCount }));
   };
+
+  const buildLaid = (placed: (typeof upPack.placed)[number], above: boolean): LaidBranch => {
+    const b = byId.get(placed.id)!;
+    const { startX, endX, open, enterLeft, lane } = placed;
+    const laneY = above ? centerY - (lane + 1) * LANE_GAP : centerY + (lane + 1) * LANE_GAP;
+    const segStart = enterLeft ? PLOT_LEFT + 20 : startX + ELBOW;
+    const elbowOut = enterLeft ? null : `M ${startX} ${centerY} Q ${startX} ${laneY} ${startX + ELBOW} ${laneY}`;
+    const leadIn = enterLeft ? `M ${PLOT_LEFT} ${laneY} L ${segStart} ${laneY}` : null;
+    const solidRight = open ? Math.max(segStart, endX - DASH_TAIL) : Math.max(segStart, endX - ELBOW);
+    const segSolid = `M ${segStart} ${laneY} L ${solidRight} ${laneY}`;
+    const segDash = open ? `M ${solidRight} ${laneY} L ${endX} ${laneY}` : null;
+    const elbowIn = open ? null : `M ${endX - ELBOW} ${laneY} Q ${endX} ${laneY} ${endX} ${centerY}`;
+    const nodes = layNodes(b, segStart, open ? endX - 6 : endX - ELBOW);
+    const label = `${b.name}${b.openPrNumber ? ` · #${b.openPrNumber}` : ""}`;
+    const pillText = label.length > 18 ? `${label.slice(0, 17)}…` : label;
+    const pillW = Math.min(150, pillText.length * 6.2 + 20);
+    return {
+      id: b.id, name: b.name, type: b.type, color: LANE_COLORS[b.type], laneY, above, open, openPrNumber: b.openPrNumber,
+      elbowOut, leadIn, segSolid, segDash, elbowIn, mergeDotX: open ? null : endX,
+      pillX: segStart, pillY: above ? laneY - 18 : laneY + 5, pillW, pillText, pillShort: pillW > endX - segStart, nodes,
+    };
+  };
   const branches: LaidBranch[] = [
-    ...la.map(({ b, startX, endX, lane, enterLeft }) => ({ id: b.id, name: b.name, type: b.type, color: LANE_COLORS[b.type], laneY: centerY - (lane + 1) * LANE_GAP, startX, endX, enterLeft, merged: b.status === "merged" || Boolean(b.mergedAt), openPrNumber: b.openPrNumber, nodes: layNodes(b, startX, endX, enterLeft), above: true })),
-    ...lb.map(({ b, startX, endX, lane, enterLeft }) => ({ id: b.id, name: b.name, type: b.type, color: LANE_COLORS[b.type], laneY: centerY + (lane + 1) * LANE_GAP, startX, endX, enterLeft, merged: b.status === "merged" || Boolean(b.mergedAt), openPrNumber: b.openPrNumber, nodes: layNodes(b, startX, endX, enterLeft), above: false })),
+    ...upPack.placed.map((p) => buildLaid(p, true)),
+    ...downPack.placed.map((p) => buildLaid(p, false)),
   ];
 
   const g = densityGranularity(endMs - startMs);
