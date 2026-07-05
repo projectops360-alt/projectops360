@@ -124,20 +124,21 @@ export async function syncRepository(repositoryId: string): Promise<SyncResult> 
     const token = (await getInstallationToken(installation.installation_id)).token;
     const gh = createGitHubReadClient(token);
 
-    // 1) master history (paginated, since cursor)
+    // 1) master history — FULL on the first backfill (no `since`), else since cursor.
     ensureBranch(def, "main");
-    const masterCommits = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(def)}&since=${sinceIso}&per_page=100`, MASTER_MAX_PAGES);
+    const sinceParam = incremental ? `&since=${sinceIso}` : "";
+    const masterCommits = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(def)}${sinceParam}&per_page=100`, MASTER_MAX_PAGES);
     for (const c of masterCommits) addCommit(def, c);
 
-    // 2) closed PRs (paginated, stop past the window) → merged in window
+    // 2) closed PRs — full history on backfill; incremental stops at the cursor.
     const closed: GhPull[] = [];
     for (let page = 1; page <= PR_MAX_PAGES; page++) {
       const { ok, data } = await ghGet<GhPull[]>(token, `/repos/${owner}/${name}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`);
       if (!ok || !Array.isArray(data) || data.length === 0) break;
       closed.push(...data);
-      if (data[data.length - 1].updated_at < windowStartIso) break;
+      if (incremental && data[data.length - 1].updated_at < sinceIso) break;
     }
-    const mergedPRs = closed.filter((p) => p.merged_at && p.merged_at >= windowStartIso);
+    const mergedPRs = closed.filter((p) => p.merged_at);
     const openPRs = await ghPaginate<GhPull>(token, `/repos/${owner}/${name}/pulls?state=open&sort=updated&direction=desc&per_page=100`, 1);
 
     // branch lines from merged PRs (robust to deleted branches)
@@ -165,7 +166,8 @@ export async function syncRepository(repositoryId: string): Promise<SyncResult> 
     await Promise.all(activeNoPr.map(async (b) => {
       ensureBranch(b.name).head_sha = b.commit.sha;
       try {
-        const cs = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(b.name)}&since=${windowStartIso}&per_page=100`, 1);
+        const brSince = incremental ? `&since=${sinceIso}` : `&since=${windowStartIso}`;
+        const cs = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(b.name)}${brSince}&per_page=100`, 1);
         for (const c of cs) addCommit(b.name, c);
       } catch { /* skip */ }
     }));

@@ -13,8 +13,6 @@
 import type {
   ActivityEventSnapshot,
   BranchSnapshot,
-  DailyMerge,
-  DensityCell,
   GitHubGraphBranch,
   GitHubGraphNode,
   GitHubLivingGraphData,
@@ -48,9 +46,6 @@ function ms(iso?: string | null): number {
   const t = new Date(iso).getTime();
   return Number.isFinite(t) ? t : 0;
 }
-function dayStartMs(t: number): number {
-  return Math.floor(t / DAY_MS) * DAY_MS; // UTC day boundary (deterministic)
-}
 function percentile(sortedAsc: number[], p: number): number {
   if (sortedAsc.length === 0) return 0;
   const idx = Math.min(sortedAsc.length - 1, Math.max(0, Math.floor((p / 100) * sortedAsc.length)));
@@ -73,38 +68,24 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     autoStart = Math.max(fullStart, autoEnd - MIN_AUTO_DAYS * DAY_MS);
   }
 
-  // ── Density band: master commits per day across the full window ─────────────
-  const perDay = new Map<number, Set<string>>();
+  // ── Raw master commit times (distinct by sha) — bucketed client-side ────────
+  const seenSha = new Set<string>();
+  const masterCommitTimes: string[] = [];
   for (const e of masterEvents) {
-    const d = dayStartMs(ms(e.occurred_at));
-    if (!perDay.has(d)) perDay.set(d, new Set());
-    perDay.get(d)!.add(e.sha!);
+    if (e.sha && !seenSha.has(e.sha)) { seenSha.add(e.sha); masterCommitTimes.push(e.occurred_at); }
   }
-  const densityCells: DensityCell[] = [];
-  let maxDaily = 0;
-  for (const set of perDay.values()) maxDaily = Math.max(maxDaily, set.size);
-  for (let d = dayStartMs(fullStart); d <= dayStartMs(now); d += DAY_MS) {
-    const count = perDay.get(d)?.size ?? 0;
-    const level: DensityCell["level"] =
-      count === 0 ? 0 : maxDaily <= 0 ? 1 : count <= maxDaily / 3 ? 1 : count <= (2 * maxDaily) / 3 ? 2 : 3;
-    densityCells.push({ dayStart: new Date(d).toISOString(), count, level });
-  }
-  const totalMasterCommits = new Set(masterEvents.map((e) => e.sha!)).size;
+  masterCommitTimes.sort();
+  const totalMasterCommits = seenSha.size;
 
-  // ── Daily merges: merged PRs grouped by day ─────────────────────────────────
+  // First commit of the repo in the loaded data (oldest push overall).
+  const allCommitTimes = pushEvents.map((e) => ms(e.occurred_at)).filter((t) => t > 0);
+  const firstCommitAt = allCommitTimes.length ? new Date(Math.min(...allCommitTimes)).toISOString() : new Date(fullStart).toISOString();
+
+  // ── Raw merged PRs — bucketed client-side by zoom ───────────────────────────
   const mergedPRs = input.pullRequests.filter((p) => p.merged_at);
-  const mergeByDay = new Map<number, DailyMerge>();
-  for (const p of mergedPRs) {
-    const d = dayStartMs(ms(p.merged_at));
-    if (!mergeByDay.has(d)) mergeByDay.set(d, { dayStart: new Date(d).toISOString(), count: 0, prs: [] });
-    const dm = mergeByDay.get(d)!;
-    dm.count += 1;
-    dm.prs.push({ number: p.pr_number, title: p.title ?? "", branch: p.source_branch ?? "", mergedAt: p.merged_at! });
-  }
-  const dailyMerges = [...mergeByDay.values()].map((dm) => ({
-    ...dm,
-    prs: dm.prs.sort((a, b) => b.mergedAt.localeCompare(a.mergedAt)),
-  }));
+  const merges = mergedPRs
+    .map((p) => ({ number: p.pr_number, title: p.title ?? "", branch: p.source_branch ?? "", mergedAt: p.merged_at! }))
+    .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt));
 
   // ── Live branches: open PR ∪ commits < 72h (≤8 lanes) ───────────────────────
   const openPrBranch = new Set(
@@ -179,9 +160,10 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     autoEndAt: new Date(autoEnd).toISOString(),
     fullStartAt: new Date(fullStart).toISOString(),
     fullEndAt: new Date(now).toISOString(),
-    densityCells,
+    firstCommitAt,
+    masterCommitTimes,
     totalMasterCommits,
-    dailyMerges,
+    merges,
     liveBranches,
     inactiveBranches,
     tags,

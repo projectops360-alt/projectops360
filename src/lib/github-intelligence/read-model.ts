@@ -26,7 +26,7 @@ import type {
   WorkflowRunSnapshot,
 } from "./types";
 
-export type DateWindow = 7 | 14 | 30;
+export type DateWindow = 7 | 14 | 30 | "all";
 
 export interface RepositoryRef {
   id: string;
@@ -118,6 +118,7 @@ const WINDOW_LABELS: Record<DateWindow, { en: string; es: string }> = {
   7: { en: "Last 7 days", es: "Últimos 7 días" },
   14: { en: "Last 14 days", es: "Últimos 14 días" },
   30: { en: "Last 30 days", es: "Últimos 30 días" },
+  all: { en: "All history", es: "Todo el historial" },
 };
 
 /**
@@ -133,9 +134,10 @@ export async function loadDashboardData(
   const isEs = options.isEs ?? false;
   const supabase = await createClient();
 
-  // Time-ruler domain: [now − windowDays, now]. Used by the graph timeline.
+  // Data window. "all" loads full history (bounded by what was backfilled).
   const rangeEndAt = new Date().toISOString();
-  const rangeStartAt = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
+  const effectiveDays = windowDays === "all" ? 400 : windowDays;
+  let rangeStartAt = new Date(Date.now() - effectiveDays * 24 * 60 * 60 * 1000).toISOString();
 
   const repos = await listProjectRepositories(org, projectId);
   const repository = options.repositoryId
@@ -146,14 +148,15 @@ export async function loadDashboardData(
     repositoryName: repository?.fullName ?? "",
     windowLabel: isEs ? WINDOW_LABELS[windowDays].es : WINDOW_LABELS[windowDays].en,
     mainBranch: repository?.defaultBranch ?? "main",
-    windowDays,
+    windowDays: effectiveDays,
     autoStartAt: rangeStartAt,
     autoEndAt: rangeEndAt,
     fullStartAt: rangeStartAt,
     fullEndAt: rangeEndAt,
-    densityCells: [],
+    firstCommitAt: rangeStartAt,
+    masterCommitTimes: [],
     totalMasterCommits: 0,
-    dailyMerges: [],
+    merges: [],
     liveBranches: [],
     inactiveBranches: [],
     tags: [],
@@ -191,6 +194,15 @@ export async function loadDashboardData(
     fetchEventsSince(supabase, scope, sinceIso),
   ]);
 
+  // "All": the domain starts at the oldest ingested commit, not now−400d.
+  if (windowDays === "all" && events.length > 0) {
+    const oldest = events.reduce((min, e) => (e.occurred_at < min ? e.occurred_at : min), events[0].occurred_at);
+    rangeStartAt = oldest;
+  }
+  const windowDaysNum = typeof windowDays === "number"
+    ? windowDays
+    : Math.max(1, Math.ceil((Date.parse(rangeEndAt) - Date.parse(rangeStartAt)) / 86_400_000));
+
   const metrics = computeMetrics(branches, pulls, workflows, releases, deployments, events, repository.defaultBranch);
   const readiness = computeReadiness({ branches, pullRequests: pulls, workflowRuns: workflows, deployments });
 
@@ -202,7 +214,7 @@ export async function loadDashboardData(
     pullRequests: pulls,
     releases,
     events,
-    windowDays,
+    windowDays: windowDaysNum,
     rangeStartAt,
     rangeEndAt,
   });
@@ -246,7 +258,7 @@ async function fetchEventsSince(
     .eq("repository_id", scope.repo)
     .gte("occurred_at", sinceIso)
     .order("occurred_at", { ascending: false })
-    .limit(500);
+    .limit(3000);
   return (data ?? []) as unknown as ActivityEventSnapshot[];
 }
 
