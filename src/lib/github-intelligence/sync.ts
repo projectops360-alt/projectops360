@@ -1,20 +1,31 @@
 // ============================================================================
-// GitHub Intelligence — manual sync orchestration (SERVER ONLY)
+// GitHub Intelligence — repository sync (PR-centric + paginated history)
 // ============================================================================
-// Pulls current repository data via the READ-ONLY client and upserts snapshot
-// rows using the service-role client. Scoped by org/project/repository. Caller
-// MUST pass the software-project guard first (with requireManage as needed).
-// Fails gracefully; records last_sync_status on the repository row.
-//
-// Read-only against GitHub. Never writes to GitHub. Never mutates canonical
-// ProjectOps360° task/milestone/risk/decision data.
+// Read-only. Builds an accurate execution picture:
+//  • FULL master history over the window (paginated) → real commit KPI + spine.
+//  • Merged PRs (paginated) → branch lines with merged_at, even if the branch was
+//    deleted; per-PR commits give real dots + divergence.
+//  • Active branches WITHOUT a PR → fallback commits?sha=branch&since (so
+//    in-progress work still shows dots).
+//  • Incremental: full backfill once (last_backfill_at), then only fetch commits
+//    since the last sync to preserve API rate limit.
+// Never writes to GitHub; never mutates canonical ProjectOps360° data.
 // ============================================================================
 
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getInstallationToken } from "./auth";
-import { createGitHubReadClient, type GitHubCommit } from "./client";
+import { createGitHubReadClient } from "./client";
 import { classifyBranch } from "./branch-classification";
+
+const GITHUB_API = "https://api.github.com";
+const DAY = 86_400_000;
+const BACKFILL_WINDOW_DAYS = 30;
+const MASTER_MAX_PAGES = 6; // up to ~600 commits
+const PR_MAX_PAGES = 4; // up to ~400 closed PRs
+const MAX_DISPLAY_PRS = 30; // per-PR commit fetches (bounded API cost)
+const MAX_ACTIVE_FALLBACK = 12; // active branches without PR to backfill
+const OVERLAP_MS = 10 * 60 * 1000;
 
 export interface SyncResult {
   ok: boolean;
@@ -23,18 +34,43 @@ export interface SyncResult {
   workflowRuns: number;
   releases: number;
   deployments: number;
+  commits?: number;
+  mode?: "backfill" | "incremental";
   errorCode?: string;
 }
 
 interface RepoRow {
-  id: string;
-  organization_id: string;
-  project_id: string;
-  owner: string;
-  name: string;
-  default_branch: string;
-  github_installation_id: string | null;
+  id: string; organization_id: string; project_id: string;
+  owner: string; name: string; default_branch: string;
+  github_installation_id: string | null; last_synced_at: string | null; last_backfill_at: string | null;
 }
+
+// ── Read-only GitHub fetch helpers (GET-only, Link pagination) ────────────────
+async function ghGet<T>(token: string, path: string): Promise<{ ok: boolean; status: number; data: T; link: string | null }> {
+  const res = await fetch(`${GITHUB_API}${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    next: { revalidate: 0 },
+  });
+  const data = res.ok ? ((await res.json()) as T) : ([] as unknown as T);
+  return { ok: res.ok, status: res.status, data, link: res.headers.get("link") };
+}
+
+async function ghPaginate<T>(token: string, path: string, maxPages: number): Promise<T[]> {
+  const out: T[] = [];
+  const sep = path.includes("?") ? "&" : "?";
+  for (let page = 1; page <= maxPages; page++) {
+    const { ok, data, link } = await ghGet<T[]>(token, `${path}${sep}page=${page}`);
+    if (!ok || !Array.isArray(data) || data.length === 0) break;
+    out.push(...data);
+    if (!link || !link.includes('rel="next"')) break;
+  }
+  return out;
+}
+
+// GitHub payload shapes (subset)
+interface GhCommit { sha: string; html_url: string; commit: { message: string; author?: { date?: string } }; author?: { login?: string } | null }
+interface GhBranch { name: string; commit: { sha: string } }
+interface GhPull { number: number; title: string; draft: boolean; merged_at: string | null; created_at: string; updated_at: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string } }
 
 export async function syncRepository(repositoryId: string): Promise<SyncResult> {
   const admin = createAdminClient();
@@ -42,187 +78,154 @@ export async function syncRepository(repositoryId: string): Promise<SyncResult> 
 
   const { data: repo } = await admin
     .from("github_repositories")
-    .select("id, organization_id, project_id, owner, name, default_branch, github_installation_id")
-    .eq("id", repositoryId)
-    .eq("is_active", true)
-    .maybeSingle<RepoRow>();
-
+    .select("id, organization_id, project_id, owner, name, default_branch, github_installation_id, last_synced_at, last_backfill_at")
+    .eq("id", repositoryId).eq("is_active", true).maybeSingle<RepoRow>();
   if (!repo) return { ...empty, errorCode: "repository_not_found" };
 
   const { data: installation } = await admin
-    .from("github_installations")
-    .select("installation_id")
-    .eq("id", repo.github_installation_id ?? "")
-    .eq("is_active", true)
+    .from("github_installations").select("installation_id")
+    .eq("id", repo.github_installation_id ?? "").eq("is_active", true)
     .maybeSingle<{ installation_id: number }>();
+  if (!installation) { await markSync(admin, repo.id, "error", "no_installation"); return { ...empty, errorCode: "no_installation" }; }
 
-  if (!installation) {
-    await markSync(admin, repo.id, "error", "no_installation");
-    return { ...empty, errorCode: "no_installation" };
-  }
+  const nowIso = new Date().toISOString();
+  const windowStartIso = new Date(Date.now() - BACKFILL_WINDOW_DAYS * DAY).toISOString();
+  const incremental = Boolean(repo.last_backfill_at);
+  // Commit cursor: full window on first backfill, else since the last sync (with overlap).
+  const sinceIso = incremental
+    ? new Date(Math.max(new Date(repo.last_synced_at ?? windowStartIso).getTime() - OVERLAP_MS, new Date(windowStartIso).getTime())).toISOString()
+    : windowStartIso;
+
+  const scope = { organization_id: repo.organization_id, project_id: repo.project_id, repository_id: repo.id };
+  const { owner, name } = repo;
+  const def = repo.default_branch || "main";
+
+  // event dedup by delivery id; branch aggregation
+  const eventMap = new Map<string, Record<string, unknown>>();
+  interface BR { branch_name: string; branch_type: string; base_branch: string; status: string; head_sha?: string | null; last_commit_at: string | null; commit_count_window: number; merged_at: string | null; open_pr_number: number | null }
+  const branchRows = new Map<string, BR>();
+  const ensureBranch = (n: string, type?: string): BR => {
+    let b = branchRows.get(n);
+    if (!b) { b = { branch_name: n, branch_type: type ?? classifyBranch(n, def), base_branch: def, status: n === def ? "active" : "active", last_commit_at: null, commit_count_window: 0, merged_at: null, open_pr_number: null }; branchRows.set(n, b); }
+    return b;
+  };
+  const addCommit = (branch: string, c: GhCommit) => {
+    const date = c.commit?.author?.date ?? nowIso;
+    const key = `commit:${branch}:${c.sha}`;
+    if (!eventMap.has(key)) {
+      eventMap.set(key, { ...scope, github_event_type: "push", github_delivery_id: key, actor_login: c.author?.login ?? null, branch_name: branch, sha: c.sha, title: (c.commit?.message ?? "").split("\n")[0].slice(0, 200), url: c.html_url ?? null, occurred_at: date, payload_summary: { commitCount: 1 } });
+    }
+    const b = ensureBranch(branch);
+    b.commit_count_window += 1;
+    if (!b.last_commit_at || date > b.last_commit_at) b.last_commit_at = date;
+  };
 
   try {
-    const { token } = await getInstallationToken(installation.installation_id);
+    const token = (await getInstallationToken(installation.installation_id)).token;
     const gh = createGitHubReadClient(token);
-    const scope = { organization_id: repo.organization_id, project_id: repo.project_id, repository_id: repo.id };
 
-    const [branches, pulls, runs, releases, deployments] = await Promise.all([
-      gh.listBranches(repo.owner, repo.name),
-      gh.listPullRequests(repo.owner, repo.name),
-      gh.listWorkflowRuns(repo.owner, repo.name),
-      gh.listReleases(repo.owner, repo.name),
-      gh.listDeployments(repo.owner, repo.name).catch(() => []),
+    // 1) master history (paginated, since cursor)
+    ensureBranch(def, "main");
+    const masterCommits = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(def)}&since=${sinceIso}&per_page=100`, MASTER_MAX_PAGES);
+    for (const c of masterCommits) addCommit(def, c);
+
+    // 2) closed PRs (paginated, stop past the window) → merged in window
+    const closed: GhPull[] = [];
+    for (let page = 1; page <= PR_MAX_PAGES; page++) {
+      const { ok, data } = await ghGet<GhPull[]>(token, `/repos/${owner}/${name}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`);
+      if (!ok || !Array.isArray(data) || data.length === 0) break;
+      closed.push(...data);
+      if (data[data.length - 1].updated_at < windowStartIso) break;
+    }
+    const mergedPRs = closed.filter((p) => p.merged_at && p.merged_at >= windowStartIso);
+    const openPRs = await ghPaginate<GhPull>(token, `/repos/${owner}/${name}/pulls?state=open&sort=updated&direction=desc&per_page=100`, 1);
+
+    // branch lines from merged PRs (robust to deleted branches)
+    for (const p of mergedPRs) {
+      const br = p.head?.ref; if (!br) continue;
+      const b = ensureBranch(br);
+      b.status = "merged"; b.merged_at = p.merged_at; b.base_branch = p.base?.ref ?? def;
+    }
+    for (const p of openPRs) { const br = p.head?.ref; if (br) ensureBranch(br).open_pr_number = p.number; }
+
+    // 3a) per-PR commits for the most recent merged PRs (real dots + divergence)
+    const displayMerged = [...mergedPRs].sort((a, b) => (b.merged_at ?? "").localeCompare(a.merged_at ?? "")).slice(0, MAX_DISPLAY_PRS);
+    await Promise.all(displayMerged.map(async (p) => {
+      const br = p.head?.ref; if (!br) return;
+      try {
+        const cs = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/pulls/${p.number}/commits?per_page=100`, 1);
+        for (const c of cs) addCommit(br, c);
+      } catch { /* branch/PR commits unavailable — skip */ }
+    }));
+
+    // 3b) active branches WITHOUT a PR → fallback commits?sha=branch&since (in-progress work)
+    const listBranches = await ghPaginate<GhBranch>(token, `/repos/${owner}/${name}/branches?per_page=100`, 2);
+    const prBranchSet = new Set([...mergedPRs, ...openPRs].map((p) => p.head?.ref).filter(Boolean) as string[]);
+    const activeNoPr = listBranches.filter((b) => b.name !== def && !prBranchSet.has(b.name)).slice(0, MAX_ACTIVE_FALLBACK);
+    await Promise.all(activeNoPr.map(async (b) => {
+      ensureBranch(b.name).head_sha = b.commit.sha;
+      try {
+        const cs = await ghPaginate<GhCommit>(token, `/repos/${owner}/${name}/commits?sha=${encodeURIComponent(b.name)}&since=${windowStartIso}&per_page=100`, 1);
+        for (const c of cs) addCommit(b.name, c);
+      } catch { /* skip */ }
+    }));
+    // register remaining existing branches (0 commits) so counts + "+N hidden" are correct
+    for (const b of listBranches) { const r = ensureBranch(b.name); if (!r.head_sha) r.head_sha = b.commit.sha; }
+
+    // 4) workflows / releases / deployments (snapshot tables, unchanged shape)
+    const [runs, releases, deployments] = await Promise.all([
+      gh.listWorkflowRuns(owner, name).catch(() => []),
+      gh.listReleases(owner, name).catch(() => []),
+      gh.listDeployments(owner, name).catch(() => []),
     ]);
 
-    // Merge time per source branch (from merged PRs) → powers merge-back curves.
-    const mergedAtByBranch = new Map<string, string>();
-    for (const p of pulls) {
-      if (p.merged_at && p.head?.ref) mergedAtByBranch.set(p.head.ref, p.merged_at);
-    }
-
-    // Fetch recent commits for the default branch + most relevant branches so the
-    // timeline has real, time-positioned commit nodes. Bounded API calls.
-    const branchesForCommits = [...branches]
-      .sort((a, b) => (a.name === repo.default_branch ? 0 : 1) - (b.name === repo.default_branch ? 0 : 1))
-      .slice(0, 8);
-    const commitLists = await Promise.all(
-      branchesForCommits.map(async (b): Promise<{ branch: string; commits: GitHubCommit[] }> => {
-        try {
-          const cs = await gh.listCommits(repo.owner, repo.name, b.name);
-          return { branch: b.name, commits: cs.slice(0, 20) };
-        } catch {
-          return { branch: b.name, commits: [] };
-        }
-      }),
-    );
-
-    const commitEvents: Record<string, unknown>[] = [];
-    const lastCommitAtByBranch = new Map<string, string>();
-    const commitCountByBranch = new Map<string, number>();
-    for (const { branch, commits } of commitLists) {
-      commitCountByBranch.set(branch, commits.length);
-      for (const c of commits) {
-        const date = c.commit?.author?.date ?? null;
-        commitEvents.push({
-          ...scope,
-          github_event_type: "push",
-          github_delivery_id: `commit:${branch}:${c.sha}`,
-          actor_login: c.author?.login ?? null,
-          branch_name: branch,
-          sha: c.sha,
-          title: (c.commit?.message ?? "").split("\n")[0].slice(0, 200),
-          url: c.html_url ?? null,
-          occurred_at: date ?? new Date().toISOString(),
-          payload_summary: { commitCount: 1 },
-        });
-        if (date && (!lastCommitAtByBranch.has(branch) || date > lastCommitAtByBranch.get(branch)!)) {
-          lastCommitAtByBranch.set(branch, date);
-        }
-      }
-    }
-
+    // ── upserts ──
     await Promise.all([
       upsert(admin, "github_branch_snapshots", "repository_id,branch_name",
-        branches.map((b) => {
-          const mergedAt = mergedAtByBranch.get(b.name) ?? null;
-          return {
-            ...scope,
-            branch_name: b.name,
-            branch_type: classifyBranch(b.name, repo.default_branch),
-            head_sha: b.commit.sha,
-            base_branch: repo.default_branch,
-            last_commit_at: lastCommitAtByBranch.get(b.name) ?? null,
-            commit_count_window: commitCountByBranch.get(b.name) ?? 0,
-            merged_at: mergedAt,
-            status: mergedAt ? "merged" : "active",
-          };
-        })),
-      upsert(admin, "github_activity_events", "repository_id,github_delivery_id", commitEvents),
+        [...branchRows.values()].map((b) => ({ ...scope, ...b }))),
       upsert(admin, "github_pull_request_snapshots", "repository_id,pr_number",
-        pulls.map((p) => ({
-          ...scope,
-          pr_number: p.number,
-          title: p.title,
-          state: p.merged_at ? "merged" : p.state === "closed" ? "closed" : "open",
-          draft: p.draft,
-          author_login: p.user?.login ?? null,
-          source_branch: p.head.ref,
-          target_branch: p.base.ref,
-          opened_at: p.created_at,
-          updated_at_gh: p.updated_at,
-          merged_at: p.merged_at,
-          html_url: p.html_url,
+        [...mergedPRs, ...openPRs].map((p) => ({
+          ...scope, pr_number: p.number, title: p.title, state: p.merged_at ? "merged" : "open",
+          draft: p.draft, author_login: p.user?.login ?? null, source_branch: p.head?.ref ?? null,
+          target_branch: p.base?.ref ?? def, opened_at: p.created_at, updated_at_gh: p.updated_at,
+          merged_at: p.merged_at, html_url: p.html_url,
         }))),
+      upsert(admin, "github_activity_events", "repository_id,github_delivery_id", [...eventMap.values()]),
       upsert(admin, "github_workflow_run_snapshots", "repository_id,workflow_run_id",
-        runs.map((r) => ({
-          ...scope,
-          workflow_run_id: r.id,
-          workflow_name: r.name,
-          branch_name: r.head_branch,
-          head_sha: r.head_sha,
-          status: r.status,
-          conclusion: r.conclusion,
-          run_started_at: r.run_started_at,
-          completed_at: r.updated_at,
-          html_url: r.html_url,
-        }))),
+        runs.map((r) => ({ ...scope, workflow_run_id: r.id, workflow_name: r.name, branch_name: r.head_branch, head_sha: r.head_sha, status: r.status, conclusion: r.conclusion, run_started_at: r.run_started_at, completed_at: r.updated_at, html_url: r.html_url }))),
       upsert(admin, "github_release_snapshots", "repository_id,tag_name",
-        releases.map((r) => ({
-          ...scope,
-          tag_name: r.tag_name,
-          name: r.name,
-          target_commitish: r.target_commitish,
-          published_at: r.published_at,
-          prerelease: r.prerelease,
-          draft: r.draft,
-          html_url: r.html_url,
-        }))),
+        releases.map((r) => ({ ...scope, tag_name: r.tag_name, name: r.name, target_commitish: r.target_commitish, published_at: r.published_at, prerelease: r.prerelease, draft: r.draft, html_url: r.html_url }))),
       upsert(admin, "github_deployment_snapshots", "repository_id,deployment_id",
-        deployments.map((d) => ({
-          ...scope,
-          deployment_id: d.id,
-          environment: d.environment,
-          ref: d.ref,
-          sha: d.sha,
-          occurred_at: d.created_at,
-        }))),
+        deployments.map((d) => ({ ...scope, deployment_id: d.id, environment: d.environment, ref: d.ref, sha: d.sha, occurred_at: d.created_at }))),
     ]);
 
-    await markSync(admin, repo.id, "success", null);
+    await admin.from("github_repositories").update({
+      last_synced_at: nowIso, last_sync_status: "success", last_sync_error_code: null,
+      ...(incremental ? {} : { last_backfill_at: nowIso }),
+    }).eq("id", repo.id);
+
     return {
-      ok: true,
-      branches: branches.length,
-      pullRequests: pulls.length,
-      workflowRuns: runs.length,
-      releases: releases.length,
-      deployments: deployments.length,
+      ok: true, branches: branchRows.size, pullRequests: mergedPRs.length + openPRs.length,
+      workflowRuns: runs.length, releases: releases.length, deployments: deployments.length,
+      commits: eventMap.size, mode: incremental ? "incremental" : "backfill",
     };
   } catch (err) {
-    // Never leak tokens/secrets — record a coarse code only.
     console.error("[github-sync] failed for repository", repo.id, (err as Error)?.message);
     await markSync(admin, repo.id, "error", "sync_failed");
     return { ...empty, errorCode: "sync_failed" };
   }
 }
 
-async function upsert(
-  admin: ReturnType<typeof createAdminClient>,
-  table: string,
-  conflict: string,
-  rows: Record<string, unknown>[],
-): Promise<void> {
+async function upsert(admin: ReturnType<typeof createAdminClient>, table: string, conflict: string, rows: Record<string, unknown>[]): Promise<void> {
   if (rows.length === 0) return;
-  await admin.from(table).upsert(rows, { onConflict: conflict });
+  // chunk to avoid oversized payloads on large backfills
+  for (let i = 0; i < rows.length; i += 500) {
+    await admin.from(table).upsert(rows.slice(i, i + 500), { onConflict: conflict });
+  }
 }
 
-async function markSync(
-  admin: ReturnType<typeof createAdminClient>,
-  repositoryId: string,
-  status: "success" | "error",
-  errorCode: string | null,
-): Promise<void> {
-  await admin
-    .from("github_repositories")
+async function markSync(admin: ReturnType<typeof createAdminClient>, repositoryId: string, status: "success" | "error", errorCode: string | null): Promise<void> {
+  await admin.from("github_repositories")
     .update({ last_synced_at: new Date().toISOString(), last_sync_status: status, last_sync_error_code: errorCode })
     .eq("id", repositoryId);
 }
