@@ -157,7 +157,7 @@ export async function loadDashboardData(
     masterCommitTimes: [],
     totalMasterCommits: 0,
     merges: [],
-    liveBranches: [],
+    branches: [],
     inactiveBranches: [],
     tags: [],
   };

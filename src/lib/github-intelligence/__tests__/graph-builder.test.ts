@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGitHubLivingGraph, MAX_LIVE_LANES, type GraphBuildInput } from "../graph-builder";
+import { buildGitHubLivingGraph, type GraphBuildInput } from "../graph-builder";
 import type { BranchSnapshot, ActivityEventSnapshot, PullRequestSnapshot } from "../types";
 
 const NOW = Date.parse("2026-07-05T12:00:00Z");
@@ -26,7 +26,7 @@ function input(over: Partial<GraphBuildInput> = {}): GraphBuildInput {
 describe("buildGitHubLivingGraph — density + focus", () => {
   it("handles empty data", () => {
     const g = buildGitHubLivingGraph(input());
-    expect(g.liveBranches).toEqual([]);
+    expect(g.branches).toEqual([]);
     expect(g.inactiveBranches).toEqual([]);
     expect(g.masterCommitTimes).toEqual([]);
     expect(g.totalMasterCommits).toBe(0);
@@ -50,27 +50,33 @@ describe("buildGitHubLivingGraph — density + focus", () => {
     expect(autoSpanDays).toBeGreaterThanOrEqual(3); // min 3 days
   });
 
-  it("only LIVE branches get lanes; the rest are aggregated inactive", () => {
+  it("draws EVERY branch with a temporal anchor as a lane (recent, open, merged, stale)", () => {
     const branches: BranchSnapshot[] = [
-      branch("feature/live-recent", "feature", { last_commit_at: iso(1) }), // < 72h → live
-      branch("feature/open-pr", "feature", { last_commit_at: iso(10), open_pr_number: 7 }), // open PR → live
-      branch("feature/old-merged", "feature", { last_commit_at: iso(20), merged_at: iso(19), status: "merged" }), // inactive
-      branch("feat/stale", "feature", { last_commit_at: iso(25) }), // inactive (no PR, old)
+      branch("feature/live-recent", "feature", { last_commit_at: iso(1) }),
+      branch("feature/open-pr", "feature", { last_commit_at: iso(10), open_pr_number: 7 }),
+      branch("feature/old-merged", "feature", { last_commit_at: iso(20), merged_at: iso(19), status: "merged" }),
+      branch("feat/stale", "feature", { last_commit_at: iso(25) }),
     ];
     const g = buildGitHubLivingGraph(input({ branches: [branch("main", "main"), ...branches] }));
-    const liveNames = g.liveBranches.map((b) => b.name);
-    expect(liveNames).toContain("feature/live-recent");
-    expect(liveNames).toContain("feature/open-pr");
-    expect(g.inactiveBranches.map((b) => b.name)).toEqual(expect.arrayContaining(["feature/old-merged", "feat/stale"]));
-    expect(g.liveBranches.length).toBeLessThanOrEqual(MAX_LIVE_LANES);
+    const names = g.branches.map((b) => b.name);
+    expect(names).toEqual(expect.arrayContaining(["feature/live-recent", "feature/open-pr", "feature/old-merged", "feat/stale"]));
+    expect(g.inactiveBranches).toEqual([]); // all anchored → nothing hidden
   });
 
-  it("caps live lanes at 8", () => {
+  it("sends anchorless branches (no commit, no merge) to the inactive panel", () => {
+    const g = buildGitHubLivingGraph(input({ branches: [
+      branch("main", "main"),
+      branch("feature/ghost", "feature", { last_commit_at: null, merged_at: null }),
+    ] }));
+    expect(g.branches.map((b) => b.name)).not.toContain("feature/ghost");
+    expect(g.inactiveBranches.map((b) => b.name)).toContain("feature/ghost");
+  });
+
+  it("draws all branches with no ≤8 cap (high-volume repos included)", () => {
     const many: BranchSnapshot[] = [branch("main", "main")];
     for (let i = 0; i < 14; i++) many.push(branch(`feature/f${i}`, "feature", { last_commit_at: iso(1), open_pr_number: i }));
     const g = buildGitHubLivingGraph(input({ branches: many }));
-    expect(g.liveBranches.length).toBe(MAX_LIVE_LANES);
-    expect(g.inactiveBranches.length).toBeGreaterThan(0);
+    expect(g.branches.length).toBe(14);
   });
 
   it("groups merges by day with the PR list", () => {
