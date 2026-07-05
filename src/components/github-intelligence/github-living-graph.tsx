@@ -19,7 +19,8 @@ import { Maximize2, Minimize2, Layers, ZoomIn, ZoomOut, RotateCcw } from "lucide
 import type { BranchType, GitHubLivingGraphData, GitHubGraphBranch } from "@/lib/github-intelligence/types";
 import { createTimeScale, generateTicks, applyLabelCollision, densityGranularity, bucketDensity, bucketMerges, DAY_MS } from "@/lib/github-intelligence/time-axis";
 import { pointerXToTime, zoomAround, brushToDomain, isValidSelection, clampDomain, type Domain } from "@/lib/github-intelligence/graph-zoom";
-import { BranchPanel, type PanelState } from "./branch-panel";
+import { BranchPanel, type PanelState, type DayBranchItem } from "./branch-panel";
+import type { DailyMerge } from "@/lib/github-intelligence/types";
 
 interface Props { data: GitHubLivingGraphData; isEs?: boolean }
 
@@ -42,20 +43,36 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   const [overflow, setOverflow] = useState(false);
   const [panel, setPanel] = useState<PanelState>(null);
 
-  // Per-day collapse: clicking a day on master folds that day's branches back
-  // into a count badge. Default = everything expanded (all lanes visible).
-  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(() => new Set());
-  const toggleDay = useCallback((k: string) => setCollapsedDays((s) => {
-    const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n;
-  }), []);
-  const allMergeDays = useMemo(() => new Set(data.merges.map((m) => m.mergedAt.slice(0, 10))), [data.merges]);
-  const allCollapsed = allMergeDays.size > 0 && collapsedDays.size >= allMergeDays.size;
-  const collapseAll = () => setCollapsedDays(allCollapsed ? new Set() : new Set(allMergeDays));
-  const hiddenBranchNames = useMemo(() => {
-    const set = new Set<string>();
-    for (const b of data.branches) if (b.mergedAt && collapsedDays.has(b.mergedAt.slice(0, 10))) set.add(b.name);
-    return set;
-  }, [data.branches, collapsedDays]);
+  // Overview stays compact (density band + daily merge badges + only OPEN
+  // branches as lanes). Clicking a day badge opens a filterable detail panel of
+  // everything that happened that day.
+  const branchByName = useMemo(() => {
+    const m = new Map<string, GitHubGraphBranch>();
+    for (const b of data.branches) m.set(b.name, b);
+    return m;
+  }, [data.branches]);
+  const commitCountOf = useCallback((b?: GitHubGraphBranch) => (b ? b.nodes.length || b.hiddenCommitCount || 0 : 0), []);
+  // Open branches grouped by their last-commit calendar day (so a day panel can
+  // show open work alongside that day's merges).
+  const openByDay = useMemo(() => {
+    const m = new Map<string, DayBranchItem[]>();
+    for (const b of data.branches) {
+      if (b.mergedAt || !b.lastCommitAt) continue;
+      const day = b.lastCommitAt.slice(0, 10);
+      const arr = m.get(day) ?? [];
+      arr.push({ name: b.name, type: b.type, status: "open", commitCount: commitCountOf(b), prNumber: b.openPrNumber, time: b.lastCommitAt });
+      m.set(day, arr);
+    }
+    return m;
+  }, [data.branches, commitCountOf]);
+  const openDayPanel = useCallback((m: DailyMerge) => {
+    const merged: DayBranchItem[] = m.prs.map((p) => ({
+      name: p.branch, type: branchByName.get(p.branch)?.type ?? "other", status: "merged",
+      commitCount: commitCountOf(branchByName.get(p.branch)), prNumber: p.number, time: p.mergedAt,
+    }));
+    const open = openByDay.get(m.start.slice(0, 10)) ?? [];
+    setPanel({ kind: "day", dayStart: m.start, items: [...merged, ...open] });
+  }, [branchByName, commitCountOf, openByDay]);
 
   const bounds = useMemo<Domain>(() => ({ start: ms(data.fullStartAt), end: ms(data.fullEndAt) }), [data.fullStartAt, data.fullEndAt]);
   const autoDomain = useMemo<Domain>(() => ({ start: ms(data.autoStartAt), end: ms(data.autoEndAt) }), [data.autoStartAt, data.autoEndAt]);
@@ -80,7 +97,7 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [domain]);
 
-  const layout = useMemo(() => computeLayout(data, view, isEs, hiddenBranchNames), [data, view, isEs, hiddenBranchNames]);
+  const layout = useMemo(() => computeLayout(data, view, isEs), [data, view, isEs]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return;
@@ -149,11 +166,6 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
           <button type="button" onClick={seeFull} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
             {mode === "full" ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}{mode === "full" ? (isEs ? "auto-zoom" : "auto-zoom") : (isEs ? "ver rango completo" : "see full range")}
           </button>
-          {allMergeDays.size > 0 && (
-            <button type="button" onClick={collapseAll} title={isEs ? "colapsar/expandir todos los días" : "collapse/expand all days"} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
-              <Layers className="h-3 w-3" />{allCollapsed ? (isEs ? "expandir ramas" : "expand branches") : (isEs ? "colapsar ramas" : "collapse branches")}
-            </button>
-          )}
           {overflow && <span className="text-[11px] font-medium text-muted-foreground">{isEs ? "desliza →" : "scroll →"}</span>}
           <Legend isEs={isEs} />
         </div>
@@ -196,24 +208,16 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
 
               {layout.branches.map((b) => <BranchBump key={b.id} b={b} centerY={layout.centerY} isEs={isEs} />)}
 
-              {layout.merges.map((m, i) => {
-                const dk = m.day.start.slice(0, 10);
-                const collapsed = collapsedDays.has(dk);
-                const showBadge = m.day.count > 1 || collapsed;
-                return (
-                  <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => toggleDay(dk)}>
-                    <circle cx={m.x} cy={layout.centerY} r={collapsed ? 5 : 3.5} className="fill-current" opacity={collapsed ? 1 : 0.55} />
-                    {showBadge && <>
-                      <rect x={m.x - 10} y={layout.centerY - 20} width={20 + String(m.day.count).length * 3} height={15} rx={7.5}
-                        className={collapsed ? "fill-foreground/85 stroke-transparent" : "fill-muted stroke-border"} strokeWidth={1} />
-                      <text x={m.x} y={layout.centerY - 9} textAnchor="middle" className={`text-[9px] font-semibold ${collapsed ? "fill-background" : "fill-foreground"}`}>{m.day.count}</text>
-                    </>}
-                    <title>{collapsed
-                      ? (isEs ? `${m.day.count} ramas ocultas · ${fmtDay(m.day.start)} — clic para mostrar` : `${m.day.count} branches hidden · ${fmtDay(m.day.start)} — click to show`)
-                      : (isEs ? `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — clic para ocultar` : `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — click to hide`)}</title>
-                  </g>
-                );
-              })}
+              {layout.merges.map((m, i) => (
+                <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => openDayPanel(m.day)}>
+                  <circle cx={m.x} cy={layout.centerY} r={5} className="fill-current" />
+                  {m.day.count > 1 && <>
+                    <rect x={m.x - 10} y={layout.centerY - 20} width={20 + String(m.day.count).length * 3} height={15} rx={7.5} className="fill-muted stroke-border" strokeWidth={1} />
+                    <text x={m.x} y={layout.centerY - 9} textAnchor="middle" className="fill-foreground text-[9px] font-semibold">{m.day.count}</text>
+                  </>}
+                  <title>{isEs ? `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — clic para ver` : `${m.day.count} merge${m.day.count === 1 ? "" : "s"} · ${fmtDay(m.day.start)} — click to explore`}</title>
+                </g>
+              ))}
 
               {layout.tags.map((t, i) => (
                 <g key={`${t.label}-${i}`} className="text-purple-500" pointerEvents="none">
@@ -294,7 +298,7 @@ function Legend({ isEs }: { isEs: boolean }) {
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 
-function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolean, hidden: Set<string>) {
+function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolean) {
   const startMs = domain.start;
   const endMs = Math.max(startMs + 60 * 60 * 1000, domain.end);
   const nowMs = ms(data.fullEndAt);
@@ -308,8 +312,9 @@ function computeLayout(data: GitHubLivingGraphData, domain: Domain, isEs: boolea
 
   const branchStart = (b: GitHubGraphBranch) => ms(b.startAt ?? b.lastCommitAt ?? b.mergedAt ?? "") || startMs;
   const branchEnd = (b: GitHubGraphBranch) => ms(b.mergedAt ?? b.lastCommitAt ?? b.startAt ?? "") || nowMs;
-  // Draw every branch that intersects the visible domain and isn't collapsed.
-  const visible = data.branches.filter((b) => !hidden.has(b.name) && branchEnd(b) >= startMs && branchStart(b) <= endMs);
+  // Overview draws ONLY open/active branches as lanes (bounded). Merged history
+  // lives in the compact daily badges → click a badge for the filterable panel.
+  const visible = data.branches.filter((b) => !b.mergedAt && branchEnd(b) >= startMs && branchStart(b) <= endMs);
   const above = visible.filter((b) => b.type === "feature" || b.type === "other");
   const below = visible.filter((b) => b.type === "hotfix" || b.type === "release");
 
