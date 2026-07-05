@@ -65,7 +65,7 @@ describe("computeReadiness", () => {
         branch({ branch_type: "feature", status: "active", commit_count_window: 3, open_pr_number: null }),
         branch({ branch_type: "release", branch_name: "release/1", status: "active" }),
       ],
-      pullRequests: [{ pr_number: 1, title: "x", state: "open", draft: false, author_login: null, source_branch: "f", target_branch: "main", review_state: "changes_requested", checks_state: null, merged_at: null, html_url: null }],
+      pullRequests: [{ pr_number: 1, title: "x", state: "open", draft: false, author_login: null, source_branch: "f", target_branch: "main", review_state: "changes_requested", checks_state: null, opened_at: null, merged_at: null, html_url: null }],
       workflowRuns: [run({ conclusion: "failure" })],
       deployments: noDeploys,
     });

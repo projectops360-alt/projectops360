@@ -1,26 +1,34 @@
 // ============================================================================
-// GitHub Intelligence — fishbone / Git Living Graph data builder
+// GitHub Living Graph — density + focus builder (scales to high-volume repos)
 // ============================================================================
-// Turns branch/PR/release/activity snapshots into a bounded graph model. The
-// point is a POLISHED, READABLE fishbone timeline — never a crowded hairball.
-// Overcrowding guardrails are enforced HERE (tested), not in the SVG.
-//
+// A literal git-graph (one line per branch) breaks past ~10 branches. This
+// builder switches to DENSITY + FOCUS:
+//  • master = a per-day commit density band + daily merge badges (not N dots).
+//  • only LIVE branches (open PR ∪ commits < 72h, ≤8) get individual lanes.
+//  • everything else is AGGREGATED (inactive list) — nothing is silently hidden.
+//  • an auto-zoom domain (≈P5 of activity → now) kills the empty canvas.
 // Pure + framework-free.
 // ============================================================================
 
 import type {
   ActivityEventSnapshot,
   BranchSnapshot,
+  DailyMerge,
+  DensityCell,
   GitHubGraphBranch,
   GitHubGraphNode,
   GitHubLivingGraphData,
+  InactiveBranch,
   PullRequestSnapshot,
   ReleaseSnapshot,
 } from "./types";
 import { classifyBranch } from "./branch-classification";
 
-export const MAX_BRANCHES = 6;
+export const MAX_LIVE_LANES = 8;
 export const MAX_NODES_PER_BRANCH = 16;
+export const LIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
+const DAY_MS = 86_400_000;
+const MIN_AUTO_DAYS = 3;
 
 export interface GraphBuildInput {
   repositoryName: string;
@@ -29,162 +37,183 @@ export interface GraphBuildInput {
   branches: BranchSnapshot[];
   pullRequests: PullRequestSnapshot[];
   releases: ReleaseSnapshot[];
-  /** Recent activity events used to place commit nodes on each branch lane. */
   events: ActivityEventSnapshot[];
-  /** Selected window in days (7/14/30) — for the time ruler. */
   windowDays: number;
-  /** ISO window start (domain start) and end (≈ now). */
   rangeStartAt: string;
   rangeEndAt: string;
 }
 
-/** Relevance rank — lower sorts first. Priority order per product spec:
- *  active hotfix → open-PR branch → release → recent feature → main. */
-function branchPriority(b: BranchSnapshot): number {
-  if (b.branch_type === "hotfix" && b.status === "active") return 0;
-  if (b.open_pr_number != null && b.status === "active") return 1;
-  if (b.branch_type === "release") return 2;
-  if (b.branch_type === "feature") return 3;
-  if (b.branch_type === "main") return 5; // main is the spine — always kept, ranked late
-  return 4;
+function ms(iso?: string | null): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
 }
-
-/** Real recency = most recent of last commit / merge (adjustment: merged
- *  branches with no in-window last_commit_at still rank by their merge time). */
-function recencyTime(b: BranchSnapshot): number {
-  const lc = b.last_commit_at ? new Date(b.last_commit_at).getTime() : 0;
-  const mg = b.merged_at ? new Date(b.merged_at).getTime() : 0;
-  return Math.max(lc, mg);
+function dayStartMs(t: number): number {
+  return Math.floor(t / DAY_MS) * DAY_MS; // UTC day boundary (deterministic)
+}
+function percentile(sortedAsc: number[], p: number): number {
+  if (sortedAsc.length === 0) return 0;
+  const idx = Math.min(sortedAsc.length - 1, Math.max(0, Math.floor((p / 100) * sortedAsc.length)));
+  return sortedAsc[idx];
 }
 
 export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGraphData {
-  const { defaultBranch } = input;
+  const def = input.defaultBranch;
+  const now = ms(input.rangeEndAt) || Date.now();
+  const fullStart = ms(input.rangeStartAt) || now - input.windowDays * DAY_MS;
 
-  // Normalize branch_type against the actual default branch (defensive: old
-  // snapshots may predate a default-branch rename).
-  const normalized = input.branches.map((b) => ({
-    ...b,
-    branch_type: b.branch_type === "main" ? "main" : classifyBranch(b.branch_name, defaultBranch),
-  }));
+  const pushEvents = input.events.filter((e) => e.github_event_type === "push" && e.sha);
+  const masterEvents = pushEvents.filter((e) => e.branch_name === def);
 
-  const mainBranch =
-    normalized.find((b) => b.branch_type === "main") ??
-    normalized.find((b) => b.branch_name === defaultBranch);
-
-  const others = normalized.filter((b) => b !== mainBranch);
-
-  // Rank non-main branches, keep the most relevant up to the budget.
-  const ranked = [...others].sort((a, b) => {
-    const pa = branchPriority(a);
-    const pb = branchPriority(b);
-    if (pa !== pb) return pa - pb;
-    return recencyTime(b) - recencyTime(a); // most recent activity first
-  });
-
-  const budgetForOthers = mainBranch ? MAX_BRANCHES - 1 : MAX_BRANCHES;
-  const kept = ranked.slice(0, budgetForOthers);
-  const hiddenBranchCount = Math.max(0, ranked.length - kept.length);
-
-  const selected = mainBranch ? [mainBranch, ...kept] : kept;
-
-  // Index events by branch for commit-node placement.
-  const eventsByBranch = new Map<string, ActivityEventSnapshot[]>();
-  for (const ev of input.events) {
-    if (!ev.branch_name) continue;
-    const arr = eventsByBranch.get(ev.branch_name) ?? [];
-    arr.push(ev);
-    eventsByBranch.set(ev.branch_name, arr);
+  // ── Auto-zoom domain: ~P5 of all activity → now (min 3 days) ────────────────
+  const allTimes = pushEvents.map((e) => ms(e.occurred_at)).filter((t) => t > 0).sort((a, b) => a - b);
+  let autoStart = allTimes.length ? Math.max(fullStart, percentile(allTimes, 5)) : now - MIN_AUTO_DAYS * DAY_MS;
+  const autoEnd = now;
+  if (autoEnd - autoStart < MIN_AUTO_DAYS * DAY_MS) {
+    autoStart = Math.max(fullStart, autoEnd - MIN_AUTO_DAYS * DAY_MS);
   }
 
-  const branches: GitHubGraphBranch[] = selected.map((b) => {
-    const branchEvents = (eventsByBranch.get(b.branch_name) ?? [])
-      .filter((e) => e.github_event_type === "push" || e.sha)
-      .sort((a, b2) => new Date(a.occurred_at).getTime() - new Date(b2.occurred_at).getTime());
+  // ── Density band: master commits per day across the full window ─────────────
+  const perDay = new Map<number, Set<string>>();
+  for (const e of masterEvents) {
+    const d = dayStartMs(ms(e.occurred_at));
+    if (!perDay.has(d)) perDay.set(d, new Set());
+    perDay.get(d)!.add(e.sha!);
+  }
+  const densityCells: DensityCell[] = [];
+  let maxDaily = 0;
+  for (const set of perDay.values()) maxDaily = Math.max(maxDaily, set.size);
+  for (let d = dayStartMs(fullStart); d <= dayStartMs(now); d += DAY_MS) {
+    const count = perDay.get(d)?.size ?? 0;
+    const level: DensityCell["level"] =
+      count === 0 ? 0 : maxDaily <= 0 ? 1 : count <= maxDaily / 3 ? 1 : count <= (2 * maxDaily) / 3 ? 2 : 3;
+    densityCells.push({ dayStart: new Date(d).toISOString(), count, level });
+  }
+  const totalMasterCommits = new Set(masterEvents.map((e) => e.sha!)).size;
 
-    const nodes: GitHubGraphNode[] = collapseCommits(branchEvents, b);
+  // ── Daily merges: merged PRs grouped by day ─────────────────────────────────
+  const mergedPRs = input.pullRequests.filter((p) => p.merged_at);
+  const mergeByDay = new Map<number, DailyMerge>();
+  for (const p of mergedPRs) {
+    const d = dayStartMs(ms(p.merged_at));
+    if (!mergeByDay.has(d)) mergeByDay.set(d, { dayStart: new Date(d).toISOString(), count: 0, prs: [] });
+    const dm = mergeByDay.get(d)!;
+    dm.count += 1;
+    dm.prs.push({ number: p.pr_number, title: p.title ?? "", branch: p.source_branch ?? "", mergedAt: p.merged_at! });
+  }
+  const dailyMerges = [...mergeByDay.values()].map((dm) => ({
+    ...dm,
+    prs: dm.prs.sort((a, b) => b.mergedAt.localeCompare(a.mergedAt)),
+  }));
 
-    const openPr =
-      b.open_pr_number ??
-      input.pullRequests.find(
-        (p) => p.state === "open" && p.source_branch === b.branch_name,
-      )?.pr_number;
+  // ── Live branches: open PR ∪ commits < 72h (≤8 lanes) ───────────────────────
+  const openPrBranch = new Set(
+    input.pullRequests.filter((p) => p.state === "open" && p.source_branch).map((p) => p.source_branch!),
+  );
+  const sideBranches = input.branches.filter((b) => classifyBranch(b.branch_name, def) !== "main" && b.branch_name !== def);
 
-    const nodeTimes = branchEvents.map((e) => new Date(e.occurred_at).getTime()).filter((t) => t > 0);
-    const startAt = nodeTimes.length ? new Date(Math.min(...nodeTimes)).toISOString() : b.last_commit_at ?? undefined;
-    const lastCommitAt = b.last_commit_at ?? (nodeTimes.length ? new Date(Math.max(...nodeTimes)).toISOString() : undefined);
+  const isLive = (b: BranchSnapshot): boolean => {
+    const hasOpenPr = b.open_pr_number != null || openPrBranch.has(b.branch_name);
+    const recent = b.last_commit_at != null && now - ms(b.last_commit_at) < LIVE_WINDOW_MS;
+    return hasOpenPr || recent;
+  };
+  const recency = (b: BranchSnapshot) => Math.max(ms(b.last_commit_at), ms(b.merged_at));
 
+  const liveCandidates = sideBranches.filter(isLive).sort((a, b) => recency(b) - recency(a));
+  const live = liveCandidates.slice(0, MAX_LIVE_LANES);
+  const liveNames = new Set(live.map((b) => b.branch_name));
+
+  const eventsByBranch = new Map<string, ActivityEventSnapshot[]>();
+  for (const e of pushEvents) {
+    if (!e.branch_name) continue;
+    const arr = eventsByBranch.get(e.branch_name) ?? [];
+    arr.push(e);
+    eventsByBranch.set(e.branch_name, arr);
+  }
+
+  const liveBranches: GitHubGraphBranch[] = live.map((b) => {
+    const evs = (eventsByBranch.get(b.branch_name) ?? []).sort((x, y) => ms(x.occurred_at) - ms(y.occurred_at));
+    const nodes = collapseCommits(evs, b);
+    const nodeTimes = evs.map((e) => ms(e.occurred_at)).filter((t) => t > 0);
+    const openPr = b.open_pr_number ?? input.pullRequests.find((p) => p.state === "open" && p.source_branch === b.branch_name)?.pr_number;
     return {
       id: b.branch_name,
       name: b.branch_name,
-      type: b.branch_type,
+      type: classifyBranch(b.branch_name, def),
       status: b.status,
       openPrNumber: openPr ?? undefined,
       mergeSha: b.merged_at ? b.head_sha ?? undefined : undefined,
       nodes,
       hiddenCommitCount: Math.max(0, b.commit_count_window - nodes.length),
-      startAt: startAt ?? undefined,
+      startAt: nodeTimes.length ? new Date(Math.min(...nodeTimes)).toISOString() : b.last_commit_at ?? undefined,
       mergedAt: b.merged_at ?? undefined,
-      lastCommitAt: lastCommitAt ?? undefined,
+      lastCommitAt: b.last_commit_at ?? (nodeTimes.length ? new Date(Math.max(...nodeTimes)).toISOString() : undefined),
     };
   });
 
+  // ── Inactive: everything else (aggregated for the side panel) ───────────────
+  const inactiveBranches: InactiveBranch[] = sideBranches
+    .filter((b) => !liveNames.has(b.branch_name))
+    .map((b) => ({
+      name: b.branch_name,
+      type: classifyBranch(b.branch_name, def),
+      status: b.status,
+      mergedAt: b.merged_at ?? undefined,
+      lastActivityAt: b.last_commit_at ?? b.merged_at ?? undefined,
+      prNumber: b.open_pr_number ?? undefined,
+    }))
+    .sort((a, b) => ms(b.lastActivityAt) - ms(a.lastActivityAt));
+
   const tags = input.releases
-    .filter((r) => !r.draft)
-    .slice(0, 8)
-    .map((r) => ({
-      label: r.tag_name,
-      sha: r.target_commitish ?? undefined,
-      occurredAt: r.published_at ?? undefined,
-    }));
+    .filter((r) => !r.draft && r.published_at)
+    .sort((a, b) => (a.published_at! < b.published_at! ? 1 : -1))
+    .slice(0, 12)
+    .map((r) => ({ label: r.tag_name, sha: r.target_commitish ?? undefined, occurredAt: r.published_at ?? undefined }));
 
   return {
     repositoryName: input.repositoryName,
     windowLabel: input.windowLabel,
-    mainBranch: mainBranch?.branch_name ?? defaultBranch,
-    branches,
-    tags,
-    hiddenBranchCount,
+    mainBranch: def,
     windowDays: input.windowDays,
-    rangeStartAt: input.rangeStartAt,
-    rangeEndAt: input.rangeEndAt,
+    autoStartAt: new Date(autoStart).toISOString(),
+    autoEndAt: new Date(autoEnd).toISOString(),
+    fullStartAt: new Date(fullStart).toISOString(),
+    fullEndAt: new Date(now).toISOString(),
+    densityCells,
+    totalMasterCommits,
+    dailyMerges,
+    liveBranches,
+    inactiveBranches,
+    tags,
   };
 }
 
-/**
- * Collapse a chronological commit list into at most MAX_NODES_PER_BRANCH nodes.
- * When there are more commits than the budget, the OLDEST are folded into a
- * single leading "+N commits" marker so the newest commits stay individually
- * visible (progressive disclosure).
- */
 function collapseCommits(events: ActivityEventSnapshot[], b: BranchSnapshot): GitHubGraphNode[] {
+  const type = classifyBranch(b.branch_name, b.base_branch ?? "main");
   const toNode = (e: ActivityEventSnapshot, i: number): GitHubGraphNode => ({
     id: `${b.branch_name}:${e.sha ?? i}`,
     label: e.sha ? e.sha.slice(0, 7) : e.title ?? "commit",
     type: "commit",
     branchName: b.branch_name,
-    branchType: b.branch_type,
+    branchType: type,
     occurredAt: e.occurred_at,
     sha: e.sha ?? undefined,
     url: e.url ?? undefined,
   });
 
-  if (events.length <= MAX_NODES_PER_BRANCH) {
-    return events.map(toNode);
-  }
+  if (events.length <= MAX_NODES_PER_BRANCH) return events.map(toNode);
 
-  const visibleCount = MAX_NODES_PER_BRANCH - 1; // reserve one lane for the marker
+  const visibleCount = MAX_NODES_PER_BRANCH - 1;
   const hidden = events.slice(0, events.length - visibleCount);
   const visible = events.slice(events.length - visibleCount);
-
   const marker: GitHubGraphNode = {
     id: `${b.branch_name}:collapsed`,
     label: `+${hidden.length}`,
     type: "commit",
     branchName: b.branch_name,
-    branchType: b.branch_type,
+    branchType: type,
     occurredAt: hidden[hidden.length - 1]?.occurred_at ?? b.last_commit_at ?? new Date(0).toISOString(),
     collapsedCount: hidden.length,
   };
-
   return [marker, ...visible.map(toNode)];
 }

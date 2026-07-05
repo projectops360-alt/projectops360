@@ -56,6 +56,17 @@ describe("generateTicks", () => {
     expect(startOfWeek(ticks[0].t)).toBe(ticks[0].t);
   });
 
+  it("uses hourly ticks when the domain span is < 3 days (auto-zoom)", () => {
+    const domainEnd = BASE + 2 * DAY_MS; // 2-day span
+    const scale = createTimeScale(BASE, domainEnd, 0, 2 * 200);
+    const ticks = generateTicks(BASE, domainEnd, 30, scale, "en");
+    // 6-hour steps over 2 days ≈ 8 ticks (hourly granularity, not daily)
+    expect(ticks.length).toBeGreaterThanOrEqual(7);
+    // labels contain a time (":") rather than a "month day"
+    const labeled = ticks.filter((t) => t.showLabel);
+    expect(labeled.some((t) => /\d/.test(t.label))).toBe(true);
+  });
+
   it("labels every 2nd day for a 14-day window", () => {
     const domainEnd = BASE + 14 * DAY_MS;
     const scale = createTimeScale(BASE, domainEnd, 0, 14 * pxPerDay(14));

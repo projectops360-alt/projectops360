@@ -7,6 +7,7 @@
 // ============================================================================
 
 export const DAY_MS = 86_400_000;
+export const HOUR_MS = 3_600_000;
 
 /** Horizontal pixels per day for each selected window. Wider for short ranges. */
 export function pxPerDay(windowDays: number): number {
@@ -49,6 +50,14 @@ export function startOfDay(ms: number): number {
   return d.getTime();
 }
 
+export function startOfHour(ms: number): number {
+  return Math.floor(ms / HOUR_MS) * HOUR_MS;
+}
+
+export function formatTickTime(ms: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale === "es" ? "es" : "en", { hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+}
+
 /** Monday-based start of week. */
 export function startOfWeek(ms: number): number {
   const d = new Date(ms);
@@ -80,14 +89,17 @@ export interface AxisTick {
 export function generateTicks(
   domainStart: number,
   domainEnd: number,
-  windowDays: number,
+  windowDays: number, // retained for API compatibility; granularity uses the span
   scale: TimeScale,
   locale: string,
 ): AxisTick[] {
-  const weekly = windowDays > 14;
-  const step = weekly ? 7 * DAY_MS : DAY_MS;
-  const first = weekly ? startOfWeek(domainStart) : startOfDay(domainStart);
-  const majorEvery = windowDays <= 7 ? 1 : windowDays <= 14 ? 2 : 1;
+  const span = domainEnd - domainStart;
+  // Granularity from the ACTUAL domain span (auto-zoom can be < 3 days → hourly).
+  const hourly = span < 3 * DAY_MS;
+  const weekly = !hourly && span > 16 * DAY_MS;
+  const step = hourly ? 6 * HOUR_MS : weekly ? 7 * DAY_MS : DAY_MS;
+  const first = hourly ? startOfHour(domainStart) : weekly ? startOfWeek(domainStart) : startOfDay(domainStart);
+  const majorEvery = hourly ? 2 : weekly ? 1 : span <= 8 * DAY_MS ? 1 : 2;
 
   const ticks: AxisTick[] = [];
   let i = 0;
@@ -98,7 +110,7 @@ export function generateTicks(
       t,
       x: scale(t),
       major,
-      label: major ? formatTickDate(t, locale) : "",
+      label: major ? (hourly ? formatTickTime(t, locale) : formatTickDate(t, locale)) : "",
       showLabel: major,
     });
   }
