@@ -49,6 +49,10 @@ export type ProjectModule =
   | "living_graph"
   | "labor_capacity"
   | "ai_recommendations"
+  // Software-project execution evidence from a connected GitHub repository.
+  // Gated by both project_type='software_development' AND the
+  // GITHUB_INTELLIGENCE_ENABLED flag (stripped from nav when either is false).
+  | "github_intelligence"
   | "reports";
 
 // ── Universal statuses ──────────────────────────────────────────────────────

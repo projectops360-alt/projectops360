@@ -37,6 +37,7 @@ import {
   Compass,
   Sparkles,
   Wrench,
+  GitGraph,
   MoreHorizontal,
 } from "lucide-react";
 
@@ -124,6 +125,18 @@ export const TAB_GROUPS: TabGroup[] = [
         href: "/projects/[projectId]/execution-map",
         icon: Map,
         matchPattern: "/projects/[projectId]/execution-map",
+      },
+      {
+        // GitHub Intelligence — software-project execution evidence. Conceptually
+        // a software-specific Living Graph extension, so it lives beside the
+        // Execution Map. Gated by the `github_intelligence` module, which the
+        // project layout injects ONLY when project_type='software_development'
+        // AND GITHUB_INTELLIGENCE_ENABLED=true. Hidden everywhere else.
+        titleKey: "githubIntelligence",
+        href: "/projects/[projectId]/github",
+        icon: GitGraph,
+        matchPattern: "/projects/[projectId]/github",
+        module: "github_intelligence",
       },
     ],
   },
