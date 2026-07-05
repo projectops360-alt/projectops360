@@ -51,6 +51,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── API routes: not localized, not auth-guarded at the edge ──
+  // Must run BEFORE next-intl — otherwise the i18n middleware rewrites
+  // /api/* → /<locale>/api/* which does not exist, returning 404 for every API
+  // route (including webhook endpoints that must be reachable unauthenticated).
+  // Route handlers perform their own auth/verification. Fixes both the GitHub
+  // Intelligence webhook and the pre-existing /api/webhooks/drawings endpoint.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   // ── Step 1: Handle internationalization routing ──
   const intlResponse = intlMiddleware(request);
 
@@ -82,8 +92,9 @@ export async function middleware(request: NextRequest) {
 
   // ── Step 3: Auth guard ──
 
-  // Skip auth checks for API routes, static files, and Next.js internals
-  if (pathname.startsWith("/api/") || pathname.startsWith("/_next/")) {
+  // Skip auth checks for Next.js internals (API routes already returned early
+  // above, before next-intl).
+  if (pathname.startsWith("/_next/")) {
     return finalResponse;
   }
 
