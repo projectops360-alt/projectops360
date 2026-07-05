@@ -49,7 +49,35 @@ export const env = {
    * runtime routing flag. Rollback = unset this flag (no migration).
    */
   ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED: process.env.ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED ?? "",
+  /**
+   * Feature flag — GitHub Intelligence Layer (server-side only). Default OFF.
+   * When off, the module is fully dark: no navigation entry, no dashboard/API
+   * access, no webhook processing, no Isabella GitHub context. Requires BOTH
+   * this flag AND project_type='software_development'. Rollback = unset this
+   * flag (no migration needed; github_* data stays inert). See
+   * docs/product-brain/github-intelligence-layer.md.
+   */
+  GITHUB_INTELLIGENCE_ENABLED: process.env.GITHUB_INTELLIGENCE_ENABLED ?? "",
+
+  // ── GitHub App (Platform install flow — Mode A). All server-side only.
+  // Absent in dev/tests; the config layer reports a safe "not configured"
+  // status instead of throwing. NEVER expose these to the browser.
+  GITHUB_APP_ID: process.env.GITHUB_APP_ID ?? "",
+  GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG ?? "",
+  GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY ?? "",
+  GITHUB_APP_WEBHOOK_SECRET: process.env.GITHUB_APP_WEBHOOK_SECRET ?? "",
+  GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID ?? "",
+  GITHUB_APP_CLIENT_SECRET: process.env.GITHUB_APP_CLIENT_SECRET ?? "",
+  /** Base URL used to build manifest redirect / callback / webhook URLs. */
+  GITHUB_APP_BASE_URL: process.env.GITHUB_APP_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "",
+  /** Optional secret used to envelope-encrypt manifest-created credentials. */
+  GITHUB_INTELLIGENCE_ENCRYPTION_KEY: process.env.GITHUB_INTELLIGENCE_ENCRYPTION_KEY ?? "",
 } as const;
+
+/** True when the GitHub Intelligence feature flag is explicitly enabled. */
+export function isGitHubIntelligenceFlagEnabled(): boolean {
+  return process.env.GITHUB_INTELLIGENCE_ENABLED === "true";
+}
 
 /**
  * Validates that required public env vars exist and are not placeholders.

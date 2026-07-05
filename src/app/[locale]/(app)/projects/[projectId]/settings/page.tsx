@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
-import { Settings, Users, Shield, Calendar, Clock, Globe, UploadCloud } from "lucide-react";
+import { Settings, Users, Shield, Calendar, Clock, Globe, UploadCloud, GitGraph } from "lucide-react";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
+import { isGitHubIntelligenceFlagEnabled } from "@/lib/env";
 
 export default async function ProjectSettingsPage({
   params,
@@ -22,7 +23,7 @@ export default async function ProjectSettingsPage({
   // Fetch the project with metadata
   const { data: project } = await supabase
     .from("projects")
-    .select("id, slug, title_i18n, status, start_date, target_end_date, created_at")
+    .select("id, slug, title_i18n, status, start_date, target_end_date, created_at, project_type")
     .eq("id", projectId)
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
@@ -119,6 +120,31 @@ export default async function ProjectSettingsPage({
             </div>
           </div>
         </Link>
+
+        {/* GitHub Intelligence — software projects only, feature-flag gated.
+            Hidden entirely otherwise (never shown for non-software projects). */}
+        {isGitHubIntelligenceFlagEnabled() && project.project_type === "software_development" && (
+          <Link
+            href={`${base}/settings/integrations/github`}
+            className="group rounded-xl border border-border bg-card p-6 transition-all hover:border-brand-500/40 hover:shadow-md"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-500/10">
+                <GitGraph className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                  {isEs ? "GitHub Intelligence" : "GitHub Intelligence"}
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {isEs
+                    ? "Conecta un repositorio (solo lectura) para ver evidencia de ejecución"
+                    : "Connect a repository (read-only) to see execution evidence"}
+                </p>
+              </div>
+            </div>
+          </Link>
+        )}
       </div>
 
       {/* Project metadata */}
