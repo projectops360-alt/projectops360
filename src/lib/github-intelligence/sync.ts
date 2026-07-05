@@ -13,7 +13,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getInstallationToken } from "./auth";
-import { createGitHubReadClient } from "./client";
+import { createGitHubReadClient, type GitHubCommit } from "./client";
 import { classifyBranch } from "./branch-classification";
 
 export interface SyncResult {
@@ -74,16 +74,70 @@ export async function syncRepository(repositoryId: string): Promise<SyncResult> 
       gh.listDeployments(repo.owner, repo.name).catch(() => []),
     ]);
 
+    // Merge time per source branch (from merged PRs) → powers merge-back curves.
+    const mergedAtByBranch = new Map<string, string>();
+    for (const p of pulls) {
+      if (p.merged_at && p.head?.ref) mergedAtByBranch.set(p.head.ref, p.merged_at);
+    }
+
+    // Fetch recent commits for the default branch + most relevant branches so the
+    // timeline has real, time-positioned commit nodes. Bounded API calls.
+    const branchesForCommits = [...branches]
+      .sort((a, b) => (a.name === repo.default_branch ? 0 : 1) - (b.name === repo.default_branch ? 0 : 1))
+      .slice(0, 8);
+    const commitLists = await Promise.all(
+      branchesForCommits.map(async (b): Promise<{ branch: string; commits: GitHubCommit[] }> => {
+        try {
+          const cs = await gh.listCommits(repo.owner, repo.name, b.name);
+          return { branch: b.name, commits: cs.slice(0, 20) };
+        } catch {
+          return { branch: b.name, commits: [] };
+        }
+      }),
+    );
+
+    const commitEvents: Record<string, unknown>[] = [];
+    const lastCommitAtByBranch = new Map<string, string>();
+    const commitCountByBranch = new Map<string, number>();
+    for (const { branch, commits } of commitLists) {
+      commitCountByBranch.set(branch, commits.length);
+      for (const c of commits) {
+        const date = c.commit?.author?.date ?? null;
+        commitEvents.push({
+          ...scope,
+          github_event_type: "push",
+          github_delivery_id: `commit:${branch}:${c.sha}`,
+          actor_login: c.author?.login ?? null,
+          branch_name: branch,
+          sha: c.sha,
+          title: (c.commit?.message ?? "").split("\n")[0].slice(0, 200),
+          url: c.html_url ?? null,
+          occurred_at: date ?? new Date().toISOString(),
+          payload_summary: { commitCount: 1 },
+        });
+        if (date && (!lastCommitAtByBranch.has(branch) || date > lastCommitAtByBranch.get(branch)!)) {
+          lastCommitAtByBranch.set(branch, date);
+        }
+      }
+    }
+
     await Promise.all([
       upsert(admin, "github_branch_snapshots", "repository_id,branch_name",
-        branches.map((b) => ({
-          ...scope,
-          branch_name: b.name,
-          branch_type: classifyBranch(b.name, repo.default_branch),
-          head_sha: b.commit.sha,
-          base_branch: repo.default_branch,
-          status: "active",
-        }))),
+        branches.map((b) => {
+          const mergedAt = mergedAtByBranch.get(b.name) ?? null;
+          return {
+            ...scope,
+            branch_name: b.name,
+            branch_type: classifyBranch(b.name, repo.default_branch),
+            head_sha: b.commit.sha,
+            base_branch: repo.default_branch,
+            last_commit_at: lastCommitAtByBranch.get(b.name) ?? null,
+            commit_count_window: commitCountByBranch.get(b.name) ?? 0,
+            merged_at: mergedAt,
+            status: mergedAt ? "merged" : "active",
+          };
+        })),
+      upsert(admin, "github_activity_events", "repository_id,github_delivery_id", commitEvents),
       upsert(admin, "github_pull_request_snapshots", "repository_id,pr_number",
         pulls.map((p) => ({
           ...scope,

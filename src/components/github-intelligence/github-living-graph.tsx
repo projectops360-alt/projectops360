@@ -1,14 +1,14 @@
 "use client";
 
 // ============================================================================
-// GitHub Living Graph — fishbone / Git-style timeline (custom SVG)
+// GitHub Living Graph — time-based Git timeline (bump-and-merge, scrollable)
 // ============================================================================
-// A polished, READABLE Git fishbone: a horizontal "main" spine, feature
-// branches above (ProjectOps green), hotfix (orange) / release (purple) below,
-// commits as small circles, release tags as pills on the spine. Bounded by the
-// graph-builder (max branches / collapsed commits) so it never becomes a
-// crowded network graph. Accessible: aria-label + a text summary + native
-// <title> tooltips; never relies on color alone.
+// A polished Git-style timeline: a horizontal "main" spine that runs left→right
+// through TIME, with commit dots at their real timestamps. Feature branches bump
+// ABOVE the spine, hotfix/release bump BELOW, each with commit dots and a curve
+// that returns (merges) to the spine at the merge time. Release tags render as
+// pills on the spine. The chart is wider than the viewport and scrolls
+// horizontally so you can travel through the project's history.
 // ============================================================================
 
 import { useMemo } from "react";
@@ -27,31 +27,40 @@ const LANE_COLORS: Record<BranchType, string> = {
   other: "text-sky-500",
 };
 
-const BLOCKED_COLOR = "text-red-500";
+// Geometry (pixels — the SVG uses its natural width and scrolls).
+const MARGIN_LEFT = 96;
+const MARGIN_RIGHT = 56;
+const LANE_GAP = 58;
+const NODE_R = 5;
+const CURVE = 26;
+const TOP_PAD = 44;
+const BOTTOM_PAD = 48;
+const PX_PER_NODE = 46;
+const MIN_PLOT = 760;
+const MAX_PLOT = 4200;
 
-// Geometry (viewBox units; scales responsively via width=100%).
-const VB_W = 1000;
-const LANE_H = 62;
-const NODE_R = 6;
-const MARGIN_X = 120;
+interface LaidNode { x: number; label: string; sha?: string; occurredAt: string; collapsed?: number }
+interface LaidBranch {
+  id: string; name: string; type: BranchType; color: string; blocked: boolean;
+  laneY: number; startX: number; endX: number; merged: boolean; openPrNumber?: number;
+  nodes: LaidNode[]; above: boolean;
+}
 
 export function GitHubLivingGraph({ data, isEs = false }: Props) {
-  const layout = useMemo(() => computeLayout(data), [data]);
+  const layout = useMemo(() => computeTimeline(data), [data]);
 
   const totalBranches = data.branches.length;
   const summaryText = isEs
-    ? `Grafo de ${data.repositoryName || "repositorio"} — rama principal ${data.mainBranch}, ${totalBranches} rama(s) mostradas${data.hiddenBranchCount ? `, ${data.hiddenBranchCount} ocultas` : ""}.`
-    : `Graph of ${data.repositoryName || "repository"} — main branch ${data.mainBranch}, ${totalBranches} branch(es) shown${data.hiddenBranchCount ? `, ${data.hiddenBranchCount} hidden` : ""}.`;
+    ? `Línea de tiempo de ${data.repositoryName || "repositorio"} — rama principal ${data.mainBranch}, ${totalBranches} rama(s) mostradas${data.hiddenBranchCount ? `, ${data.hiddenBranchCount} ocultas` : ""}.`
+    : `Timeline of ${data.repositoryName || "repository"} — main branch ${data.mainBranch}, ${totalBranches} branch(es) shown${data.hiddenBranchCount ? `, ${data.hiddenBranchCount} hidden` : ""}.`;
 
   const isEmpty = data.branches.length === 0;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">
-            {isEs ? "GitHub Living Graph" : "GitHub Living Graph"}
-          </h2>
+          <h2 className="text-sm font-semibold text-foreground">GitHub Living Graph</h2>
           <p className="text-xs text-muted-foreground">
             {data.repositoryName || (isEs ? "Sin repositorio" : "No repository")} · {data.windowLabel}
           </p>
@@ -61,60 +70,47 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
 
       {isEmpty ? (
         <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
-          {isEs
-            ? "Sin actividad de ramas en esta ventana."
-            : "No branch activity in this window."}
+          {isEs ? "Sin actividad de ramas en esta ventana." : "No branch activity in this window."}
         </div>
       ) : (
-        <svg
-          viewBox={`0 0 ${VB_W} ${layout.height}`}
-          className="w-full"
-          role="img"
-          aria-label={summaryText}
-          style={{ maxHeight: 420 }}
-        >
-          {/* Spine (main) */}
-          <line
-            x1={MARGIN_X}
-            y1={layout.centerY}
-            x2={VB_W - 24}
-            y2={layout.centerY}
-            className="text-muted-foreground/60"
-            stroke="currentColor"
-            strokeWidth={2}
-          />
-          <text x={24} y={layout.centerY + 4} className="fill-muted-foreground text-[13px] font-semibold">
-            {data.mainBranch}
-          </text>
+        <div className="overflow-x-auto overflow-y-hidden rounded-xl" role="group" aria-label={summaryText}>
+          <svg width={layout.width} height={layout.height} className="block" style={{ minWidth: "100%" }}>
+            {/* Spine (main) */}
+            <line x1={MARGIN_LEFT - 8} y1={layout.centerY} x2={layout.width - 12} y2={layout.centerY} className="text-muted-foreground/50" stroke="currentColor" strokeWidth={2.5} />
+            <text x={12} y={layout.centerY + 4} className="fill-foreground text-[13px] font-semibold">{data.mainBranch}</text>
 
-          {/* Branch lanes */}
-          {layout.branches.map((b) => (
-            <BranchLane key={b.id} b={b} centerY={layout.centerY} />
-          ))}
+            {/* main commit dots on the spine */}
+            {layout.mainNodes.map((n) => (
+              <g key={n.x + n.occurredAt} className="text-muted-foreground">
+                <circle cx={n.x} cy={layout.centerY} r={NODE_R} className="fill-current" />
+                <title>{`${n.sha ? n.sha.slice(0, 7) : n.label} · ${data.mainBranch} · ${fmt(n.occurredAt)}`}</title>
+              </g>
+            ))}
 
-          {/* Release tags on the spine */}
-          {layout.tags.map((t, i) => (
-            <g key={`${t.label}-${i}`}>
-              <rect
-                x={t.x - 22}
-                y={layout.centerY - 30}
-                width={44}
-                height={18}
-                rx={9}
-                className="fill-purple-500/15 stroke-purple-500/50"
-                strokeWidth={1}
-              />
-              <text x={t.x} y={layout.centerY - 17} textAnchor="middle" className="fill-purple-600 dark:fill-purple-300 text-[10px] font-medium">
-                {t.label.length > 8 ? `${t.label.slice(0, 7)}…` : t.label}
-              </text>
-              <line x1={t.x} y1={layout.centerY - 12} x2={t.x} y2={layout.centerY} className="text-purple-500/50" stroke="currentColor" strokeDasharray="2 2" />
-              <title>{t.label}{t.occurredAt ? ` · ${new Date(t.occurredAt).toLocaleDateString()}` : ""}</title>
-            </g>
-          ))}
-        </svg>
+            {/* branch bumps */}
+            {layout.branches.map((b) => <BranchBump key={b.id} b={b} centerY={layout.centerY} isEs={isEs} />)}
+
+            {/* release tags on the spine */}
+            {layout.tags.map((t, i) => (
+              <g key={`${t.label}-${i}`} className="text-purple-500">
+                <line x1={t.x} y1={layout.centerY} x2={t.x} y2={layout.centerY + 16} stroke="currentColor" strokeDasharray="2 2" opacity={0.6} />
+                <circle cx={t.x} cy={layout.centerY} r={4} className="fill-current" />
+                <rect x={t.x - 24} y={layout.centerY + 16} width={48} height={17} rx={8.5} className="fill-purple-500/15 stroke-purple-500/50" strokeWidth={1} />
+                <text x={t.x} y={layout.centerY + 28} textAnchor="middle" className="fill-purple-600 dark:fill-purple-300 text-[10px] font-semibold">
+                  {t.label.length > 8 ? `${t.label.slice(0, 7)}…` : t.label}
+                </text>
+                <title>{`${t.label}${t.occurredAt ? ` · ${fmt(t.occurredAt)}` : ""}`}</title>
+              </g>
+            ))}
+
+            {/* time axis hint */}
+            <text x={MARGIN_LEFT} y={layout.height - 14} className="fill-muted-foreground text-[11px]">
+              {isEs ? "tiempo →" : "time →"}
+            </text>
+          </svg>
+        </div>
       )}
 
-      {/* Overcrowding disclosure + text fallback (accessibility). */}
       {data.hiddenBranchCount > 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
           {isEs
@@ -127,78 +123,54 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── Branch bump (leave spine → commits → merge back) ──────────────────────────
 
-interface LaidOutBranch {
-  id: string;
-  name: string;
-  type: BranchType;
-  blocked: boolean;
-  laneY: number;
-  startX: number;
-  endX: number;
-  merged: boolean;
-  openPrNumber?: number;
-  nodes: Array<{ id: string; x: number; label: string; sha?: string; collapsedCount?: number; occurredAt: string }>;
-}
+function BranchBump({ b, centerY, isEs }: { b: LaidBranch; centerY: number; isEs: boolean }) {
+  const { laneY, startX, endX, merged, color } = b;
+  const leave = `M ${startX} ${centerY} C ${startX + CURVE} ${centerY}, ${startX} ${laneY}, ${startX + CURVE} ${laneY}`;
+  const lane = `M ${startX + CURVE} ${laneY} L ${endX - (merged ? CURVE : 0)} ${laneY}`;
+  const rejoin = merged ? `M ${endX - CURVE} ${laneY} C ${endX} ${laneY}, ${endX - CURVE} ${centerY}, ${endX} ${centerY}` : "";
+  const labelAbove = b.above;
 
-function BranchLane({ b, centerY }: { b: LaidOutBranch; centerY: number }) {
-  const color = b.blocked ? BLOCKED_COLOR : LANE_COLORS[b.type];
   return (
     <g className={color}>
-      {/* leave the spine → lane */}
-      <path
-        d={`M ${b.startX} ${centerY} C ${b.startX + 20} ${centerY}, ${b.startX} ${b.laneY}, ${b.startX + 28} ${b.laneY}`}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        opacity={0.75}
-      />
-      {/* lane line */}
-      <line x1={b.startX + 28} y1={b.laneY} x2={b.endX} y2={b.laneY} stroke="currentColor" strokeWidth={2} opacity={0.75} />
-      {/* return to spine when merged */}
-      {b.merged && (
-        <path
-          d={`M ${b.endX} ${b.laneY} C ${b.endX + 20} ${b.laneY}, ${b.endX} ${centerY}, ${b.endX + 28} ${centerY}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          opacity={0.75}
-        />
-      )}
-      {/* branch label pill */}
+      <path d={leave} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />
+      <path d={lane} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />
+      {merged && <path d={rejoin} fill="none" stroke="currentColor" strokeWidth={2.25} opacity={0.85} />}
+      {merged && <circle cx={endX} cy={centerY} r={4} className="fill-current" />}
+
+      {/* label pill */}
       <g>
         <rect
-          x={b.startX + 20}
-          y={b.laneY - 26}
-          width={Math.min(190, b.name.length * 7 + 20)}
-          height={18}
-          rx={9}
+          x={startX + CURVE}
+          y={labelAbove ? laneY - 26 : laneY + 8}
+          width={Math.min(210, b.name.length * 6.6 + 40)}
+          height={17}
+          rx={8.5}
           className="fill-current"
           opacity={0.12}
         />
-        <text x={b.startX + 30} y={b.laneY - 13} className="fill-current text-[11px] font-medium">
-          {b.name.length > 24 ? `${b.name.slice(0, 23)}…` : b.name}
+        <text x={startX + CURVE + 8} y={labelAbove ? laneY - 14 : laneY + 20} className="fill-current text-[11px] font-medium">
+          {b.name.length > 26 ? `${b.name.slice(0, 25)}…` : b.name}
           {b.openPrNumber ? ` · PR #${b.openPrNumber}` : ""}
         </text>
       </g>
-      {/* commit nodes */}
-      {b.nodes.map((n) => (
-        <g key={n.id}>
-          {n.collapsedCount ? (
+
+      {/* commit dots */}
+      {b.nodes.map((n, i) => (
+        <g key={i}>
+          {n.collapsed ? (
             <>
-              <rect x={n.x - 14} y={b.laneY - 9} width={28} height={18} rx={9} className="fill-current" opacity={0.18} />
-              <text x={n.x} y={b.laneY + 4} textAnchor="middle" className="fill-current text-[10px] font-semibold">
-                {n.label}
-              </text>
+              <rect x={n.x - 13} y={laneY - 8.5} width={26} height={17} rx={8.5} className="fill-current" opacity={0.2} />
+              <text x={n.x} y={laneY + 4} textAnchor="middle" className="fill-current text-[10px] font-semibold">{n.label}</text>
             </>
           ) : (
-            <circle cx={n.x} cy={b.laneY} r={NODE_R} className="fill-current" />
+            <circle cx={n.x} cy={laneY} r={NODE_R} className="fill-current" />
           )}
           <title>
-            {n.collapsedCount
-              ? `${n.collapsedCount} earlier commits`
-              : `${n.sha ? n.sha.slice(0, 7) : n.label} · ${b.name} · ${new Date(n.occurredAt).toLocaleString()}`}
+            {n.collapsed
+              ? `${n.collapsed} ${isEs ? "commits anteriores" : "earlier commits"}`
+              : `${n.sha ? n.sha.slice(0, 7) : n.label} · ${b.name} · ${fmt(n.occurredAt)}`}
           </title>
         </g>
       ))}
@@ -208,10 +180,10 @@ function BranchLane({ b, centerY }: { b: LaidOutBranch; centerY: number }) {
 
 function Legend({ isEs }: { isEs: boolean }) {
   const items: Array<{ t: BranchType; label: string }> = [
-    { t: "feature", label: isEs ? "Feature" : "Feature" },
+    { t: "feature", label: "Feature" },
     { t: "hotfix", label: "Hotfix" },
     { t: "release", label: "Release" },
-    { t: "main", label: "Main" },
+    { t: "main", label: isEs ? "Main / release" : "Main / release" },
   ];
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -225,58 +197,97 @@ function Legend({ isEs }: { isEs: boolean }) {
   );
 }
 
-// ── Layout computation ─────────────────────────────────────────────────────────
+// ── Timeline layout computation ───────────────────────────────────────────────
 
-function computeLayout(data: GitHubLivingGraphData) {
+function computeTimeline(data: GitHubLivingGraphData) {
   const above = data.branches.filter((b) => b.type === "feature" || b.type === "other");
   const below = data.branches.filter((b) => b.type === "hotfix" || b.type === "release");
+  const mainBranch = data.branches.find((b) => b.type === "main");
 
-  const aboveLanes = above.length;
-  const belowLanes = below.length;
-  const centerY = 40 + aboveLanes * LANE_H;
-  const height = centerY + Math.max(1, belowLanes) * LANE_H + 40;
+  // Collect all timestamps to build the time axis.
+  const times: number[] = [];
+  const push = (s?: string) => { if (s) { const t = new Date(s).getTime(); if (t > 0) times.push(t); } };
+  for (const b of data.branches) {
+    push(b.startAt); push(b.mergedAt); push(b.lastCommitAt);
+    for (const n of b.nodes) push(n.occurredAt);
+  }
+  for (const t of data.tags) push(t.occurredAt);
 
-  const usableW = VB_W - MARGIN_X - 60;
+  let minT = times.length ? Math.min(...times) : 0;
+  let maxT = times.length ? Math.max(...times) : 1;
+  if (maxT <= minT) { maxT = minT + 1; }
+  // pad the range a touch so start/end curves have room
+  const pad = (maxT - minT) * 0.04 || 1;
+  minT -= pad; maxT += pad;
 
-  function layoutBranch(b: GitHubLivingGraphData["branches"][number], laneY: number): LaidOutBranch {
-    const count = Math.max(1, b.nodes.length);
-    // Spread nodes across ~70% of usable width, offset by lane so branches
-    // don't perfectly overlap horizontally.
-    const spanStart = MARGIN_X + 40;
-    const spanEnd = MARGIN_X + usableW * 0.92;
-    const step = (spanEnd - spanStart) / count;
-    const nodes = b.nodes.map((n, i) => ({
-      id: n.id,
-      x: spanStart + step * (i + 0.5),
-      label: n.label,
-      sha: n.sha,
-      collapsedCount: n.collapsedCount,
-      occurredAt: n.occurredAt,
-    }));
-    const startX = nodes.length ? Math.max(MARGIN_X + 10, nodes[0].x - step * 0.8) : MARGIN_X + 40;
-    const endX = nodes.length ? nodes[nodes.length - 1].x + step * 0.4 : spanEnd;
-    return {
-      id: b.id,
-      name: b.name,
-      type: b.type,
-      blocked: b.status === "blocked",
-      laneY,
-      startX,
-      endX,
-      merged: b.status === "merged" || Boolean(b.mergeSha),
-      openPrNumber: b.openPrNumber,
-      nodes,
-    };
+  const totalNodes = data.branches.reduce((s, b) => s + b.nodes.length, 0) + data.tags.length;
+  const plotW = Math.max(MIN_PLOT, Math.min(MAX_PLOT, totalNodes * PX_PER_NODE));
+  const width = MARGIN_LEFT + plotW + MARGIN_RIGHT;
+
+  const xForTime = (iso?: string, fallback = maxT): number => {
+    const t = iso ? new Date(iso).getTime() : NaN;
+    const tt = Number.isFinite(t) && t > 0 ? t : fallback;
+    return MARGIN_LEFT + ((tt - minT) / (maxT - minT)) * plotW;
+  };
+
+  // Lane assignment (greedy interval packing so bumps don't overlap in time).
+  function assignLanes(branches: GitHubLivingGraphData["branches"]) {
+    const laneEnds: number[] = [];
+    return branches
+      .slice()
+      .sort((a, b) => xForTime(a.startAt) - xForTime(b.startAt))
+      .map((b) => {
+        const startX = xForTime(b.startAt);
+        const endX = Math.max(startX + CURVE * 2 + 8, xForTime(b.mergedAt ?? b.lastCommitAt));
+        let lane = laneEnds.findIndex((end) => end < startX - 12);
+        if (lane === -1) { lane = laneEnds.length; laneEnds.push(endX); }
+        else laneEnds[lane] = endX;
+        return { b, startX, endX, lane };
+      });
   }
 
-  const laidAbove = above.map((b, idx) => layoutBranch(b, 40 + idx * LANE_H));
-  const laidBelow = below.map((b, idx) => layoutBranch(b, centerY + (idx + 1) * LANE_H));
+  const laidAbove = assignLanes(above);
+  const laidBelow = assignLanes(below);
+  const aboveLanes = laidAbove.reduce((m, x) => Math.max(m, x.lane + 1), 0);
+  const belowLanes = laidBelow.reduce((m, x) => Math.max(m, x.lane + 1), 0);
 
-  const tags = data.tags.map((t, i) => ({
-    label: t.label,
-    occurredAt: t.occurredAt,
-    x: MARGIN_X + 80 + ((i + 1) / (data.tags.length + 1)) * (usableW - 80),
-  }));
+  const centerY = TOP_PAD + aboveLanes * LANE_GAP;
+  const height = centerY + Math.max(1, belowLanes) * LANE_GAP + BOTTOM_PAD;
 
-  return { centerY, height, branches: [...laidAbove, ...laidBelow], tags };
+  const layNodes = (b: GitHubLivingGraphData["branches"][number], startX: number, endX: number): LaidNode[] => {
+    const lo = startX + CURVE + 4;
+    const hi = Math.max(lo + 1, endX - CURVE - 4);
+    return b.nodes.map((n) => {
+      let x = xForTime(n.occurredAt);
+      if (x < lo) x = lo; if (x > hi) x = hi;
+      return { x, label: n.label, sha: n.sha, occurredAt: n.occurredAt, collapsed: n.collapsedCount };
+    });
+  };
+
+  const branches: LaidBranch[] = [
+    ...laidAbove.map(({ b, startX, endX, lane }) => ({
+      id: b.id, name: b.name, type: b.type, color: b.status === "blocked" ? "text-red-500" : LANE_COLORS[b.type],
+      blocked: b.status === "blocked", laneY: centerY - (lane + 1) * LANE_GAP, startX, endX,
+      merged: b.status === "merged" || Boolean(b.mergedAt), openPrNumber: b.openPrNumber,
+      nodes: layNodes(b, startX, endX), above: true,
+    })),
+    ...laidBelow.map(({ b, startX, endX, lane }) => ({
+      id: b.id, name: b.name, type: b.type, color: b.status === "blocked" ? "text-red-500" : LANE_COLORS[b.type],
+      blocked: b.status === "blocked", laneY: centerY + (lane + 1) * LANE_GAP, startX, endX,
+      merged: b.status === "merged" || Boolean(b.mergedAt), openPrNumber: b.openPrNumber,
+      nodes: layNodes(b, startX, endX), above: false,
+    })),
+  ];
+
+  const mainNodes: LaidNode[] = mainBranch
+    ? mainBranch.nodes.map((n) => ({ x: xForTime(n.occurredAt), label: n.label, sha: n.sha, occurredAt: n.occurredAt, collapsed: n.collapsedCount }))
+    : [];
+
+  const tags = data.tags.map((t) => ({ label: t.label, occurredAt: t.occurredAt, x: xForTime(t.occurredAt) }));
+
+  return { width, height, centerY, branches, mainNodes, tags };
+}
+
+function fmt(iso: string): string {
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
 }

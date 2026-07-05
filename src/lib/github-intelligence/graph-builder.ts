@@ -100,6 +100,10 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
         (p) => p.state === "open" && p.source_branch === b.branch_name,
       )?.pr_number;
 
+    const nodeTimes = branchEvents.map((e) => new Date(e.occurred_at).getTime()).filter((t) => t > 0);
+    const startAt = nodeTimes.length ? new Date(Math.min(...nodeTimes)).toISOString() : b.last_commit_at ?? undefined;
+    const lastCommitAt = b.last_commit_at ?? (nodeTimes.length ? new Date(Math.max(...nodeTimes)).toISOString() : undefined);
+
     return {
       id: b.branch_name,
       name: b.branch_name,
@@ -109,6 +113,9 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
       mergeSha: b.merged_at ? b.head_sha ?? undefined : undefined,
       nodes,
       hiddenCommitCount: Math.max(0, b.commit_count_window - nodes.length),
+      startAt: startAt ?? undefined,
+      mergedAt: b.merged_at ?? undefined,
+      lastCommitAt: lastCommitAt ?? undefined,
     };
   });
 

@@ -113,6 +113,12 @@ export interface GitHubGraphBranch {
   openPrNumber?: number;
   /** Commits that existed in the window but were collapsed out of `nodes`. */
   hiddenCommitCount?: number;
+  /** ISO time the branch's earliest visible commit occurred (timeline x-start). */
+  startAt?: string;
+  /** ISO time the branch merged back to main (draws the merge-back curve). */
+  mergedAt?: string;
+  /** ISO time of the branch's latest commit (timeline x-end when unmerged). */
+  lastCommitAt?: string;
 }
 
 export interface GitHubLivingGraphData {
