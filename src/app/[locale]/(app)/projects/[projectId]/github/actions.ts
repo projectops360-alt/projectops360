@@ -14,6 +14,7 @@ import { logAudit } from "@/lib/audit";
 import { assertGitHubIntelligenceAvailable } from "@/lib/github-intelligence/software-project-guard";
 import { hasEnvAppConfig, loadEnvAppConfig } from "@/lib/github-intelligence/config";
 import { syncRepository } from "@/lib/github-intelligence/sync";
+import { listInstallationRepositories } from "@/lib/github-intelligence/installation";
 import { buildSampleSnapshots } from "@/lib/github-intelligence/mock-data";
 
 export interface ActionResult {
@@ -111,6 +112,78 @@ export async function startInstallationAction(
 
   const installUrl = `https://github.com/apps/${config.slug}/installations/new?state=${state}`;
   return { ok: true, installUrl };
+}
+
+// ── Repository selection after installation (Mode A) ──────────────────────────
+// Re-fetches the installation's repositories server-side (never trusts the
+// client's list), stores the selected ones, and runs an initial sync.
+export async function selectRepositoriesAction(
+  projectId: string,
+  installationId: number,
+  selectedGithubRepoIds: number[],
+): Promise<ActionResult & { connected?: number }> {
+  const guard = await assertGitHubIntelligenceAvailable(projectId, { requireManage: true });
+  if (!guard.ok) return { ok: false, error: guard.reason };
+  if (selectedGithubRepoIds.length === 0) return { ok: false, error: "no_repositories_selected" };
+
+  const admin = createAdminClient();
+  const { data: installation } = await admin
+    .from("github_installations")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("organization_id", guard.org.organizationId)
+    .eq("installation_id", installationId)
+    .eq("is_active", true)
+    .maybeSingle<{ id: string }>();
+  if (!installation) return { ok: false, error: "installation_not_found" };
+
+  let available;
+  try {
+    available = await listInstallationRepositories(installationId);
+  } catch {
+    return { ok: false, error: "repo_list_failed" };
+  }
+
+  const selected = available.filter((r) => selectedGithubRepoIds.includes(r.githubRepositoryId));
+  if (selected.length === 0) return { ok: false, error: "no_matching_repositories" };
+
+  const rows = selected.map((r) => ({
+    organization_id: guard.org.organizationId,
+    project_id: projectId,
+    github_installation_id: installation.id,
+    github_repository_id: r.githubRepositoryId,
+    owner: r.owner,
+    name: r.name,
+    full_name: r.fullName,
+    default_branch: r.defaultBranch,
+    private: r.private,
+    html_url: r.htmlUrl,
+    is_active: true,
+  }));
+
+  const { data: inserted, error } = await admin
+    .from("github_repositories")
+    .upsert(rows, { onConflict: "project_id,github_repository_id" })
+    .select("id");
+  if (error) return { ok: false, error: "repo_store_failed" };
+
+  // Initial sync for each connected repo (best-effort).
+  for (const repo of inserted ?? []) {
+    await syncRepository(repo.id).catch(() => {});
+  }
+
+  await logAudit({
+    org: { organizationId: guard.org.organizationId, userId: guard.org.userId },
+    projectId,
+    action: "create",
+    entityType: "github_repository:connected",
+    entityId: installation.id,
+    metadata: { count: selected.length },
+  });
+
+  revalidatePath(dashboardPath(projectId));
+  revalidatePath(`/projects/${projectId}/settings/integrations/github`);
+  return { ok: true, connected: selected.length };
 }
 
 // ── DEV-SAFE connect (no live GitHub App required) ────────────────────────────
