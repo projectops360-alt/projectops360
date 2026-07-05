@@ -1,6 +1,6 @@
 -- ============================================================================
 -- ProjectOps360° — GitHub Intelligence Layer (software projects only)
--- Migration: 20260840000000_github_intelligence.sql
+-- Migration: 20260837000000_github_intelligence.sql
 --
 -- Read-only execution-evidence layer for SOFTWARE projects. GitHub activity
 -- (commits, branches, PRs, workflow runs, deployments, releases) is normalized

@@ -1,7 +1,14 @@
-# GitHub Intelligence Layer
+# GitHub Intelligence Foundation
 
-> Status: **PR-ready (behind a default-OFF feature flag). Not merged. Not deployed.**
+> Status: **PR-ready foundation (behind a default-OFF feature flag). Not merged. Not deployed.**
 > Scope: **software projects only** (`project_type = 'software_development'`).
+>
+> **This PR is the GitHub Intelligence _Foundation_, not a complete production
+> GitHub integration.** It ships the full data model, read-only sync/webhook
+> layer, guards, dashboard + GitHub Living Graph, and a dev-safe synthetic connect
+> path. The production connect flow (Mode A install callback + repository picker)
+> and the full in-app manifest code-exchange (Mode B) are **explicit follow-ups**
+> (see §17). Do not describe this as "GitHub production integration complete".
 
 ## 1. Purpose
 
@@ -91,7 +98,7 @@ No write scopes are ever requested. The GitHub REST client
 (`src/lib/github-intelligence/client.ts`) exposes only `list*`/`get*` methods and
 issues only `GET` requests (enforced by `readonly-guardrail.test.ts`).
 
-## 7. Data model (migration `20260840000000_github_intelligence.sql`)
+## 7. Data model (migration `20260837000000_github_intelligence.sql`)
 
 `github_app_configs`, `github_connection_states`, `github_installations`,
 `github_repositories`, `github_activity_events`, `github_branch_snapshots`,
