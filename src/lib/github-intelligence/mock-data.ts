@@ -89,7 +89,7 @@ export function buildSampleGraphInput(): GraphBuildInput {
       { branch_name: "release/1.4.0", branch_type: "release", head_sha: "0f9e8d7", base_branch: "main", last_commit_at: daysAgo(2), commit_count_window: 1, open_pr_number: null, merged_at: null, status: "active" },
     ],
     pullRequests: [
-      { pr_number: 42, title: "Checkout v2", state: "open", draft: false, author_login: "dev-a", source_branch: "feature/checkout-v2", target_branch: "main", review_state: "approved", checks_state: null, merged_at: null, html_url: "#" },
+      { pr_number: 42, title: "Checkout v2", state: "open", draft: false, author_login: "dev-a", source_branch: "feature/checkout-v2", target_branch: "main", review_state: "approved", checks_state: null, opened_at: daysAgo(3), merged_at: null, html_url: "#" },
     ],
     releases: [
       { tag_name: "v1.3.2", name: "v1.3.2", target_commitish: "main", published_at: daysAgo(6), prerelease: false, draft: false, html_url: "#" },

@@ -44,6 +44,7 @@ export interface PullRequestSnapshot {
   target_branch: string | null;
   review_state: string | null;
   checks_state: string | null;
+  opened_at: string | null;
   merged_at: string | null;
   html_url: string | null;
 }
@@ -121,20 +122,58 @@ export interface GitHubGraphBranch {
   lastCommitAt?: string;
 }
 
+// ── Density + focus model (high-volume repos) ────────────────────────────────
+
+/** One day of master activity, quantized to a heatmap level (0 = none). */
+export interface DensityCell {
+  dayStart: string; // ISO day boundary
+  count: number;
+  level: 0 | 1 | 2 | 3;
+}
+
+/** Merges to main grouped by day (spine badges + PR list on interaction). */
+export interface DailyMerge {
+  dayStart: string;
+  count: number;
+  prs: Array<{ number: number; title: string; branch: string; mergedAt: string }>;
+}
+
+/** A branch that is NOT drawn as a lane — aggregated into the side panel. */
+export interface InactiveBranch {
+  name: string;
+  type: BranchType;
+  status: "active" | "merged" | "stale" | "blocked";
+  mergedAt?: string;
+  lastActivityAt?: string;
+  prNumber?: number;
+}
+
 export interface GitHubLivingGraphData {
   repositoryName: string;
   windowLabel: string;
   mainBranch: string;
-  branches: GitHubGraphBranch[];
-  tags: Array<{ label: string; sha?: string; occurredAt?: string }>;
-  /** Branches present in the window but not rendered (overcrowding guardrail). */
-  hiddenBranchCount: number;
-  /** Selected window in days (7/14/30) — drives px-per-day + tick density. */
+  /** Selected window in days (7/14/30) — the MAX range, not the default domain. */
   windowDays: number;
-  /** ISO start of the selected window (domain start for the time ruler). */
-  rangeStartAt: string;
-  /** ISO end of the window (≈ now) — domain end / "today" marker. */
-  rangeEndAt: string;
+
+  /** Auto-zoom domain: ~P5 of activity → now (min 3 days). Default view. */
+  autoStartAt: string;
+  autoEndAt: string;
+  /** Full literal window domain (for the "see full range" toggle). */
+  fullStartAt: string;
+  fullEndAt: string;
+
+  /** Master commit density per day (covers the full window). */
+  densityCells: DensityCell[];
+  totalMasterCommits: number;
+  /** Merges to main grouped by day. */
+  dailyMerges: DailyMerge[];
+
+  /** Branches drawn as individual lanes (open PR ∪ commits < 72h, ≤ 8). */
+  liveBranches: GitHubGraphBranch[];
+  /** Everything else — aggregated, shown in the side panel. */
+  inactiveBranches: InactiveBranch[];
+
+  tags: Array<{ label: string; sha?: string; occurredAt?: string }>;
 }
 
 // ── Readiness ────────────────────────────────────────────────────────────────
