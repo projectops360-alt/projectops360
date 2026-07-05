@@ -15,7 +15,7 @@
 // ============================================================================
 
 import { useMemo, useRef, useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { Maximize2, Minimize2, Layers, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Maximize2, Minimize2, Layers, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import type { BranchType, GitHubLivingGraphData, GitHubGraphBranch } from "@/lib/github-intelligence/types";
 import { createTimeScale, generateTicks, applyLabelCollision, densityGranularity, bucketDensity, bucketMerges, DAY_MS } from "@/lib/github-intelligence/time-axis";
 import { pointerXToTime, zoomAround, brushToDomain, isValidSelection, clampDomain, type Domain } from "@/lib/github-intelligence/graph-zoom";
@@ -53,7 +53,6 @@ interface LaidBranch {
 
 export function GitHubLivingGraph({ data, isEs = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [overflow, setOverflow] = useState(false);
   const [panel, setPanel] = useState<PanelState>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -96,10 +95,12 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   const [view, setView] = useState<Domain>(autoDomain);
   const viewRef = useRef(view); viewRef.current = view;
   const [mode, setMode] = useState<"auto" | "full" | "manual">("auto");
+  const instantRef = useRef(false); // skip the ease when panning (1:1 drag feel)
   useEffect(() => { setDomain(autoDomain); setMode("auto"); }, [autoDomain]);
 
-  // animate view → domain (~250ms ease-out)
+  // animate view → domain (~250ms ease-out), or jump instantly while panning
   useEffect(() => {
+    if (instantRef.current) { instantRef.current = false; setView(domain); return; }
     const from = viewRef.current, to = domain, t0 = performance.now();
     let raf = 0;
     const tick = (t: number) => {
@@ -113,16 +114,11 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
 
   const layout = useMemo(() => computeLayout(data, view, isEs), [data, view, isEs]);
 
+  const didInit = useRef(false);
   useLayoutEffect(() => {
-    const el = scrollRef.current; if (!el) return;
-    el.scrollLeft = el.scrollWidth; // start at the most recent activity
-    setOverflow(el.scrollWidth > el.clientWidth + 4);
+    const el = scrollRef.current; if (!el || didInit.current) return;
+    el.scrollLeft = el.scrollWidth; didInit.current = true; // start at recent
   }, [layout.width]);
-  useEffect(() => {
-    const el = scrollRef.current; if (!el) return;
-    const onResize = () => setOverflow(el.scrollWidth > el.clientWidth + 4);
-    window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   // ── brush on the ruler band ─────────────────────────────────────────────────
   const [brush, setBrush] = useState<{ x0: number; x1: number } | null>(null);
@@ -149,11 +145,57 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
   };
   const zoomBy = (factor: number, centerT?: number) => applyDomain(zoomAround(view, centerT ?? (view.start + view.end) / 2, factor, bounds.start, bounds.end));
 
+  // ── pan the time window (drag / horizontal wheel / ◀ ▶) ──────────────────────
+  const plotInnerW = () => layout.width - PLOT_LEFT - MARGIN_RIGHT;
+  const shiftTo = (start: number, end: number, instant: boolean) => {
+    let s = start, e = end;
+    if (s < bounds.start) { e += bounds.start - s; s = bounds.start; }
+    if (e > bounds.end) { s -= e - bounds.end; e = bounds.end; }
+    const d = clampDomain({ start: Math.max(bounds.start, s), end: Math.min(bounds.end, e) }, bounds.start, bounds.end);
+    setMode("manual"); instantRef.current = instant; setDomain(d);
+  };
+  const panBy = (dtMs: number, instant = false) => shiftTo(view.start + dtMs, view.end + dtMs, instant);
+  const atStart = view.start <= bounds.start + 1000;
+  const atEnd = view.end >= bounds.end - 1000;
+
+  // Set an absolute edge (from the date inputs) without shifting the other edge.
+  const setAbs = (s: number, e: number, instant = false) => {
+    const d = clampDomain({ start: Math.max(bounds.start, Math.min(s, e - 1000)), end: Math.min(bounds.end, Math.max(e, s + 1000)) }, bounds.start, bounds.end);
+    setMode("manual"); instantRef.current = instant; setDomain(d);
+  };
+  const dateVal = (v: number) => { const d = new Date(v); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const onDateEdge = (which: "start" | "end", v: string) => {
+    if (!v) return;
+    const [y, mo, da] = v.split("-").map(Number);
+    const t = new Date(y, mo - 1, da, which === "end" ? 23 : 0, which === "end" ? 59 : 0, which === "end" ? 59 : 0).getTime();
+    if (which === "start") setAbs(t, view.end); else setAbs(view.start, t);
+  };
+
+  const panRef = useRef<{ x: number; dom: Domain } | null>(null);
+  const onPanDown = (e: React.PointerEvent) => {
+    if ((e.target as Element).closest?.("[data-nopan]")) return; // ruler / badges keep their own gestures
+    panRef.current = { x: e.clientX, dom: view };
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+  };
+  const onPanMove = (e: React.PointerEvent) => {
+    if (!panRef.current) return;
+    const span = panRef.current.dom.end - panRef.current.dom.start;
+    const dt = -(e.clientX - panRef.current.x) * span / plotInnerW();
+    shiftTo(panRef.current.dom.start + dt, panRef.current.dom.end + dt, true);
+  };
+  const onPanUp = () => { panRef.current = null; };
+
   const onWheel = (e: React.WheelEvent) => {
-    if (!e.ctrlKey) return;
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const x = localX(e as unknown as React.PointerEvent, scrollRef.current);
+      zoomBy(e.deltaY > 0 ? 1.2 : 0.8, timeAt(x));
+      return;
+    }
+    const dx = e.shiftKey ? e.deltaY : e.deltaX;
+    if (Math.abs(dx) < 1) return; // vertical intent → let the page scroll
     e.preventDefault();
-    const x = localX(e as unknown as React.PointerEvent, scrollRef.current);
-    zoomBy(e.deltaY > 0 ? 1.2 : 0.8, timeAt(x));
+    panBy(dx * (view.end - view.start) / plotInnerW(), true);
   };
   const onDblClick = (e: React.MouseEvent) => { const x = localX(e as unknown as React.PointerEvent, scrollRef.current); zoomBy(0.5, timeAt(x)); };
 
@@ -172,15 +214,22 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
           <p className="text-xs text-muted-foreground">{data.repositoryName || (isEs ? "Sin repositorio" : "No repository")} · {domainLabel}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* explicit date range — jump anywhere in the loaded history */}
+          <div className="flex items-center gap-1 rounded-md border border-border p-0.5 text-[11px] text-foreground">
+            <input type="date" aria-label={isEs ? "Desde" : "From"} value={dateVal(view.start)} min={dateVal(bounds.start)} max={dateVal(view.end)} onChange={(e) => onDateEdge("start", e.target.value)} className="rounded bg-transparent px-1 py-0.5 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+            <span className="text-muted-foreground">→</span>
+            <input type="date" aria-label={isEs ? "Hasta" : "To"} value={dateVal(view.end)} min={dateVal(view.start)} max={dateVal(bounds.end)} onChange={(e) => onDateEdge("end", e.target.value)} className="rounded bg-transparent px-1 py-0.5 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+          </div>
           <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+            <button type="button" onClick={() => panBy(-(view.end - view.start) * 0.6)} disabled={atStart} title={isEs ? "más atrás" : "earlier"} className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronLeft className="h-3.5 w-3.5" /></button>
             <button type="button" onClick={() => zoomBy(0.6)} title={isEs ? "acercar" : "zoom in"} className="rounded p-1 text-muted-foreground hover:text-foreground"><ZoomIn className="h-3.5 w-3.5" /></button>
             <button type="button" onClick={() => zoomBy(1.6)} title={isEs ? "alejar" : "zoom out"} className="rounded p-1 text-muted-foreground hover:text-foreground"><ZoomOut className="h-3.5 w-3.5" /></button>
             <button type="button" onClick={reset} title={isEs ? "restablecer" : "reset"} className="rounded p-1 text-muted-foreground hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => panBy((view.end - view.start) * 0.6)} disabled={atEnd} title={isEs ? "más adelante" : "later"} className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronRight className="h-3.5 w-3.5" /></button>
           </div>
           <button type="button" onClick={seeFull} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
             {mode === "full" ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}{mode === "full" ? (isEs ? "auto-zoom" : "auto-zoom") : (isEs ? "ver rango completo" : "see full range")}
           </button>
-          {overflow && <span className="text-[11px] font-medium text-muted-foreground">{isEs ? "desliza →" : "scroll →"}</span>}
           <Legend isEs={isEs} />
         </div>
       </div>
@@ -190,7 +239,8 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
       ) : (
         <div className="relative">
           <div ref={scrollRef} className="overflow-x-auto overflow-y-hidden rounded-xl" role="group" aria-label={summaryText}>
-            <svg width={layout.width} height={layout.height} className="block select-none" style={{ minWidth: "100%" }} onWheel={onWheel} onDoubleClick={onDblClick}>
+            <svg width={layout.width} height={layout.height} className="block select-none" style={{ minWidth: "100%", cursor: panRef.current ? "grabbing" : "grab", touchAction: "pan-y" }}
+              onWheel={onWheel} onDoubleClick={onDblClick} onPointerDown={onPanDown} onPointerMove={onPanMove} onPointerUp={onPanUp} onPointerLeave={onPanUp}>
               <line x1={PLOT_LEFT - 10} y1={layout.centerY} x2={layout.width - 12} y2={layout.centerY} className="text-muted-foreground/50" stroke="currentColor" strokeWidth={2.5} />
 
               {layout.density.map((c, i) => (
@@ -201,7 +251,7 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
               ))}
 
               {/* ruler (also the brush surface) */}
-              <rect x={PLOT_LEFT - 10} y={layout.axisY - 12} width={layout.width - PLOT_LEFT - 2} height={AXIS_H} fill="transparent" style={{ cursor: "ew-resize" }} onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} />
+              <rect data-nopan x={PLOT_LEFT - 10} y={layout.axisY - 12} width={layout.width - PLOT_LEFT - 2} height={AXIS_H} fill="transparent" style={{ cursor: "ew-resize" }} onPointerDown={onRulerDown} onPointerMove={onRulerMove} onPointerUp={onRulerUp} onPointerCancel={onRulerUp} />
               <line x1={PLOT_LEFT - 10} y1={layout.axisY} x2={layout.width - 12} y2={layout.axisY} className="text-border" stroke="currentColor" strokeWidth={1} pointerEvents="none" />
               {layout.ticks.map((tk, i) => (
                 <g key={i} className="text-muted-foreground" pointerEvents="none">
@@ -271,7 +321,7 @@ export function GitHubLivingGraph({ data, isEs = false }: Props) {
               })}
 
               {layout.merges.map((m, i) => (
-                <g key={i} className="text-muted-foreground cursor-pointer" onClick={() => openDayPanel(m.day)}>
+                <g key={i} data-nopan className="text-muted-foreground cursor-pointer" onClick={() => openDayPanel(m.day)}>
                   <circle cx={m.x} cy={layout.centerY} r={5} className="fill-current" />
                   {m.day.count > 1 && <>
                     <rect x={m.x - 10} y={layout.centerY - 20} width={20 + String(m.day.count).length * 3} height={15} rx={7.5} className="fill-muted stroke-border" strokeWidth={1} />
