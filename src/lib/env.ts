@@ -35,6 +35,20 @@ export const env = {
    * unset this flag (no migration). See isabella-tool-use-runtime-gateway.md.
    */
   ISABELLA_TOOL_USE_ENABLED: process.env.ISABELLA_TOOL_USE_ENABLED ?? "",
+  /**
+   * Feature flag — Isabella Process Intelligence routing/integration (Phase 5 ·
+   * Task 6, server-side only). Default OFF. When off, Isabella's current pipeline
+   * (deterministic query engine + RAG) is unchanged; the diagnosis/root-cause/
+   * recommendation engines are never routed. Rollback = unset this flag (no
+   * migration). See isabella-process-intelligence-ui-realtime-integration.md.
+   */
+  ISABELLA_PROCESS_INTELLIGENCE_ENABLED: process.env.ISABELLA_PROCESS_INTELLIGENCE_ENABLED ?? "",
+  /**
+   * Feature flag — Isabella Process Intelligence UI entry points (quick-action
+   * chips). Default OFF. Controls only visible UI affordances; independent of the
+   * runtime routing flag. Rollback = unset this flag (no migration).
+   */
+  ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED: process.env.ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED ?? "",
 } as const;
 
 /**

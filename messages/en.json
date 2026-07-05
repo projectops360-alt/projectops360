@@ -2765,5 +2765,27 @@
         "description": "Something went wrong while building the flow projection. Try again — no data was changed."
       }
     }
+  },
+  "isabellaProcessIntelligence": {
+    "quickActions": {
+      "daily_diagnosis": "Daily diagnosis",
+      "attention": "What needs attention?",
+      "root_cause": "Analyze root cause",
+      "recommend": "Recommend next actions",
+      "explain_node": "Explain this node"
+    },
+    "labels": {
+      "verifiedProjectData": "Verified project data",
+      "confidence": "Confidence",
+      "evidence": "Evidence",
+      "limitations": "Limitations",
+      "recommendation": "Recommendation",
+      "requiresHumanApproval": "Requires human approval",
+      "notExecutedAutomatically": "Not executed automatically",
+      "refreshAnalysis": "Refresh analysis",
+      "snapshot": "Snapshot",
+      "partialContext": "Partial context",
+      "missingContext": "Missing context"
+    }
   }
 }

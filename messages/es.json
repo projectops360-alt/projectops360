@@ -2765,5 +2765,27 @@
         "description": "Algo falló al construir la proyección de flujo. Inténtalo de nuevo — no se modificó ningún dato."
       }
     }
+  },
+  "isabellaProcessIntelligence": {
+    "quickActions": {
+      "daily_diagnosis": "Diagnóstico diario",
+      "attention": "¿Qué necesita atención?",
+      "root_cause": "Analizar causa raíz",
+      "recommend": "Recomendar próximas acciones",
+      "explain_node": "Explicar este nodo"
+    },
+    "labels": {
+      "verifiedProjectData": "Datos verificados del proyecto",
+      "confidence": "Confianza",
+      "evidence": "Evidencia",
+      "limitations": "Limitaciones",
+      "recommendation": "Recomendación",
+      "requiresHumanApproval": "Requiere aprobación humana",
+      "notExecutedAutomatically": "No ejecutado automáticamente",
+      "refreshAnalysis": "Actualizar análisis",
+      "snapshot": "Snapshot",
+      "partialContext": "Contexto parcial",
+      "missingContext": "Contexto faltante"
+    }
   }
 }

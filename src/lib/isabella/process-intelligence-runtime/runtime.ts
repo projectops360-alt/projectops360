@@ -1,0 +1,185 @@
+// ============================================================================
+// ProjectOps360° — Isabella Process Intelligence Runtime · server orchestrator
+// ============================================================================
+// ISABELLA-PROCESS-INTELLIGENCE-UI-REALTIME-FINAL-INTEGRATION (Phase 5 · Task 6)
+//
+// `runIsabellaProcessIntelligence` routes a question and calls the accepted
+// Task 3/4/5 engines through the approved Task 2 context builder — read-only,
+// evidence-backed, RBAC-safe, node-scoped, bilingual. It NEVER queries raw data,
+// NEVER mutates, NEVER executes recommendations. When the route is RAG /
+// factual-data it returns `fallback` so the caller keeps the existing path.
+// ============================================================================
+
+import { buildIsabellaProcessContext } from "@/lib/isabella/process-context";
+import type { IsabellaProcessContext } from "@/lib/isabella/process-context/types";
+import { assembleDailyDiagnosis, formatDailyDiagnosisForIsabella } from "@/lib/isabella/daily-diagnosis";
+import { assembleRootCauseAnalysis, formatRootCauseAnalysisForIsabella } from "@/lib/isabella/root-cause";
+import { assembleRecommendationPlan, formatRecommendationPlanForIsabella } from "@/lib/isabella/recommendations";
+import { routeIsabellaQuestion } from "./router";
+import type {
+  IsabellaProcessIntelligenceAudit,
+  IsabellaProcessIntelligenceRequest,
+  IsabellaProcessIntelligenceResult,
+  IsabellaRoute,
+  IsabellaRuntimeStatus,
+  RuntimeLanguage,
+} from "./types";
+
+function runtimeStatusFromContext(status: string): IsabellaRuntimeStatus {
+  switch (status) {
+    case "ready":
+    case "partial":
+    case "empty":
+      return "answered";
+    case "unauthorized":
+      return "unauthorized";
+    case "missing_context":
+      return "missing_context";
+    default:
+      return "unavailable";
+  }
+}
+
+function scopeType(node: IsabellaProcessIntelligenceRequest["selectedNode"]): IsabellaProcessIntelligenceAudit["selectedScope"]["type"] {
+  if (!node) return "unknown";
+  if (node.type === "milestone") return "milestone";
+  if (node.type === "task") return "task";
+  if (node.type === "subtask") return "subtask";
+  return "project";
+}
+
+/** Orchestrate a process-intelligence answer. Read-only; never mutates/executes. */
+export async function runIsabellaProcessIntelligence(
+  request: IsabellaProcessIntelligenceRequest,
+  deps?: { buildContext?: typeof buildIsabellaProcessContext },
+): Promise<IsabellaProcessIntelligenceResult> {
+  const started = Date.now();
+  const language: RuntimeLanguage = request.locale === "es" ? "es" : "en";
+  const hasProject = !!request.projectId || !!request.selectedNode;
+  const decision = routeIsabellaQuestion(request.question, { hasProject, selectedNode: request.selectedNode });
+
+  const audit = (over: Partial<IsabellaProcessIntelligenceAudit>): IsabellaProcessIntelligenceAudit => ({
+    processIntelligenceEnabled: true,
+    route: decision.route,
+    enginesUsed: [],
+    resultStatus: "unavailable",
+    evidenceRefCount: 0,
+    citationCount: 0,
+    limitationsCount: 0,
+    selectedScope: { type: scopeType(request.selectedNode), id: request.selectedNode ? "selected" : hasProject ? "current_project" : "none" },
+    executionMs: Date.now() - started,
+    ...over,
+  });
+
+  // RAG / factual-data are handled by the existing pipeline — fall back cleanly.
+  if (decision.route === "product_help" || decision.route === "factual_project_data") {
+    return { status: "fallback", route: decision.route, answer: "", audit: audit({ resultStatus: "fallback" }) };
+  }
+
+  // Engine route with no inferable scope → clarify (never guess).
+  if (decision.needsClarification) {
+    return {
+      status: "needs_clarification",
+      route: decision.route,
+      answer: language === "es" ? "¿Sobre qué proyecto o elemento quieres el análisis?" : "Which project or item should I analyze?",
+      audit: audit({ resultStatus: "needs_clarification" }),
+    };
+  }
+
+  // Build the approved, RBAC-scoped context ONCE (never raw data).
+  const build = deps?.buildContext ?? buildIsabellaProcessContext;
+  let context: IsabellaProcessContext;
+  try {
+    context = await build({
+      projectId: request.projectId,
+      locale: language,
+      include: ["project", "tasks", "milestones", "blockers"],
+      focus: decision.scope.taskId ? { taskId: decision.scope.taskId } : decision.scope.milestoneId ? { milestoneId: decision.scope.milestoneId } : undefined,
+    });
+  } catch {
+    return { status: "unavailable", route: decision.route, answer: safeUnavailable(language), audit: audit({ resultStatus: "unavailable" }) };
+  }
+
+  const rtStatus = runtimeStatusFromContext(context.status);
+  if (rtStatus !== "answered") {
+    return {
+      status: rtStatus,
+      route: decision.route,
+      answer: context.message ?? safeUnavailable(language),
+      limitations: context.limitations,
+      audit: audit({ resultStatus: context.status, limitationsCount: context.limitations.length }),
+    };
+  }
+
+  return synthesize(decision.route, context, decision.scope, language, audit, started);
+}
+
+function synthesize(
+  route: IsabellaRoute,
+  context: IsabellaProcessContext,
+  scope: { milestoneId?: string; taskId?: string },
+  language: RuntimeLanguage,
+  audit: (over: Partial<IsabellaProcessIntelligenceAudit>) => IsabellaProcessIntelligenceAudit,
+  started: number,
+): IsabellaProcessIntelligenceResult {
+  const diagnosis = assembleDailyDiagnosis(context, language);
+
+  if (route === "daily_diagnosis") {
+    return {
+      status: "answered", route,
+      answer: formatDailyDiagnosisForIsabella(diagnosis, language),
+      structuredResult: diagnosis,
+      evidenceRefs: diagnosis.evidenceRefs, citations: diagnosis.citations, limitations: diagnosis.limitations,
+      audit: audit({ enginesUsed: ["daily_diagnosis"], resultStatus: diagnosis.status, confidence: diagnosis.overallHealth.confidence, evidenceRefCount: diagnosis.evidenceRefs.length, citationCount: diagnosis.citations.length, limitationsCount: diagnosis.limitations.length, executionMs: Date.now() - started }),
+    };
+  }
+
+  const analysis = assembleRootCauseAnalysis(context, diagnosis, scope, language);
+  if (route === "root_cause") {
+    return {
+      status: "answered", route,
+      answer: formatRootCauseAnalysisForIsabella(analysis, language),
+      structuredResult: analysis,
+      evidenceRefs: analysis.evidenceRefs, citations: analysis.citations, limitations: analysis.limitations,
+      audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause"], resultStatus: analysis.status, confidence: analysis.confidence, evidenceRefCount: analysis.evidenceRefs.length, citationCount: analysis.citations.length, limitationsCount: analysis.limitations.length, executionMs: Date.now() - started }),
+    };
+  }
+
+  const plan = assembleRecommendationPlan(context, analysis, diagnosis, language);
+  if (route === "recommendation") {
+    return {
+      status: "answered", route,
+      answer: formatRecommendationPlanForIsabella(plan, language),
+      structuredResult: plan,
+      evidenceRefs: plan.evidenceRefs, citations: plan.citations, limitations: plan.limitations,
+      audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: plan.recommendations[0]?.confidence ?? "unavailable", evidenceRefCount: plan.evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
+    };
+  }
+
+  // mixed → concise diagnosis + root cause + recommendation (no long duplication).
+  const es = language === "es";
+  const answer = [
+    `**${es ? "Qué está pasando" : "What is happening"}**`,
+    diagnosis.executiveSummary,
+    "",
+    `**${es ? "Por qué" : "Why"}**`,
+    analysis.summary,
+    "",
+    `**${es ? "Qué hacer ahora" : "What to do next"}**`,
+    formatRecommendationPlanForIsabella(plan, language),
+  ].join("\n");
+  const evidenceRefs = [...new Set([...diagnosis.evidenceRefs, ...analysis.evidenceRefs, ...plan.evidenceRefs])];
+  return {
+    status: "answered", route: "mixed",
+    answer,
+    structuredResult: { diagnosis, analysis, plan },
+    evidenceRefs, citations: plan.citations, limitations: plan.limitations,
+    audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: analysis.confidence, evidenceRefCount: evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
+  };
+}
+
+function safeUnavailable(language: RuntimeLanguage): string {
+  return language === "es"
+    ? "No puedo analizar el proyecto ahora mismo. Intenta de nuevo o selecciona un proyecto."
+    : "I can't analyze the project right now. Try again or select a project.";
+}

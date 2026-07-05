@@ -17,6 +17,7 @@ import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
 import { parseProjectDataQuery, answerTaskQuery } from "@/lib/isabella/query-engine";
 import { isIsabellaToolUseEnabled } from "@/lib/isabella/tools/flag";
 import { maybeAnswerWithTools } from "@/lib/isabella/tools/gateway";
+import { maybeAnswerWithProcessIntelligence } from "@/lib/isabella/process-intelligence-runtime/wiring";
 import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
 import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
@@ -82,6 +83,25 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       return await answerTaskQuery({ org, projectId, plan: queryPlan, expert: expertInfo });
     } catch {
       // Never break the answer flow — fall through to the knowledge corpus.
+    }
+  }
+
+  // ── Isabella Process Intelligence routing (Phase 5 · Task 6) ────────────────
+  // ISABELLA-PROCESS-INTELLIGENCE-UI-REALTIME-FINAL-INTEGRATION. Flag-gated,
+  // default OFF. When enabled, "what's happening / what needs attention / why is
+  // this blocked / what should I do next" route to the accepted Daily Diagnosis /
+  // Root Cause / Recommendation engines (read-only, evidence-backed). RAG/help &
+  // factual-data questions return null here → the existing pipeline is unchanged,
+  // so this is additive + rollback-safe.
+  {
+    const piLang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+    const piExpert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
+    const piExpertInfo = { key: piExpert.key, displayName: piExpert.displayName, title: piExpert.title[piLang] };
+    try {
+      const piAnswer = await maybeAnswerWithProcessIntelligence(org, safeInput, piExpertInfo);
+      if (piAnswer) return piAnswer;
+    } catch {
+      // Never break the answer flow — fall through to provenance/RAG.
     }
   }
 

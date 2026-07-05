@@ -79,3 +79,17 @@ export const getProjectSummaryArgsSchema = z
   .strict();
 
 export type GetProjectSummaryArgs = z.infer<typeof getProjectSummaryArgsSchema>;
+
+// ── process-intelligence tools (diagnosis / root cause / recommendation) ───────
+// Read-only wrappers over the accepted Task 3/4/5 engines. Optional scope narrows
+// the analysis to a milestone or task (never coordinates, never a raw id leak).
+
+export const processIntelligenceArgsSchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    milestone_id: z.string().uuid().optional(),
+    task_id: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type ProcessIntelligenceArgs = z.infer<typeof processIntelligenceArgsSchema>;
