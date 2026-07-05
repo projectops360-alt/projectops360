@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  DAY_MS, pxPerDay, createTimeScale, generateTicks, applyLabelCollision, startOfWeek,
+  DAY_MS, WEEK_MS, pxPerDay, createTimeScale, generateTicks, applyLabelCollision, startOfWeek,
+  densityGranularity, bucketDensity, bucketMerges,
 } from "../time-axis";
 
 const BASE = new Date("2026-05-01T00:00:00Z").getTime();
@@ -75,6 +76,45 @@ describe("generateTicks", () => {
     const minors = ticks.filter((t) => !t.major).length;
     expect(majors).toBeGreaterThan(0);
     expect(minors).toBeGreaterThan(0); // some unlabeled minor ticks exist
+  });
+});
+
+describe("monthly ticks for long domains (> 6 weeks)", () => {
+  it("labels the first tick of each month over an 8-week span", () => {
+    const domainEnd = BASE + 8 * WEEK_MS;
+    const scale = createTimeScale(BASE, domainEnd, 0, 8 * WEEK_MS / DAY_MS * 22);
+    const ticks = generateTicks(BASE, domainEnd, 60, scale, "en");
+    const labeled = ticks.filter((t) => t.showLabel);
+    expect(labeled.length).toBeGreaterThanOrEqual(2); // spans ~2 months
+    expect(ticks.filter((t) => !t.major).length).toBeGreaterThan(0); // weekly minors
+  });
+});
+
+describe("adaptive bucketing (density + merges)", () => {
+  it("granularity: hour < 2d, day <= 6w, week beyond", () => {
+    expect(densityGranularity(1.5 * DAY_MS)).toBe("hour");
+    expect(densityGranularity(20 * DAY_MS)).toBe("day");
+    expect(densityGranularity(60 * DAY_MS)).toBe("week");
+  });
+
+  it("bucketDensity sums to the number of commits in range", () => {
+    const times = [BASE, BASE + DAY_MS, BASE + DAY_MS, BASE + 3 * DAY_MS].map((t) => t);
+    const cells = bucketDensity(times, BASE, BASE + 5 * DAY_MS, "day");
+    expect(cells.reduce((s, c) => s + c.count, 0)).toBe(4);
+    expect(cells.every((c) => c.level >= 0 && c.level <= 3)).toBe(true);
+  });
+
+  it("bucketMerges groups by day, but is individual at hour granularity (< 2 days)", () => {
+    const merges = [
+      { number: 1, title: "a", branch: "x", mergedAt: new Date(BASE).toISOString() },
+      { number: 2, title: "b", branch: "y", mergedAt: new Date(BASE + 3600_000).toISOString() },
+    ];
+    const grouped = bucketMerges(merges, BASE, BASE + DAY_MS, "day");
+    expect(grouped.length).toBe(1);
+    expect(grouped[0].count).toBe(2);
+    const individual = bucketMerges(merges, BASE, BASE + DAY_MS, "hour");
+    expect(individual.length).toBe(2);
+    expect(individual.every((m) => m.count === 1)).toBe(true);
   });
 });
 

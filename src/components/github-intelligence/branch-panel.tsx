@@ -24,8 +24,8 @@ export function BranchPanel({ panel, onClose, isEs }: { panel: PanelState; onClo
   const title =
     panel.kind === "merges"
       ? isEs
-        ? `Merges del ${fmtDay(panel.day.dayStart)} (${panel.day.count})`
-        : `Merges on ${fmtDay(panel.day.dayStart)} (${panel.day.count})`
+        ? `Merges del ${fmtDay(panel.day.start)} (${panel.day.count})`
+        : `Merges on ${fmtDay(panel.day.start)} (${panel.day.count})`
       : isEs
         ? `Ramas inactivas (${panel.branches.length})`
         : `Inactive branches (${panel.branches.length})`;

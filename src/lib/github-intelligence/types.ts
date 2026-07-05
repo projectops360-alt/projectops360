@@ -124,18 +124,27 @@ export interface GitHubGraphBranch {
 
 // ── Density + focus model (high-volume repos) ────────────────────────────────
 
-/** One day of master activity, quantized to a heatmap level (0 = none). */
+/** A density cell (bucketed client-side by the current zoom granularity). */
 export interface DensityCell {
-  dayStart: string; // ISO day boundary
+  start: string; // ISO bucket start
+  end: string; // ISO bucket end
   count: number;
   level: 0 | 1 | 2 | 3;
 }
 
-/** Merges to main grouped by day (spine badges + PR list on interaction). */
+/** A merge group (bucketed client-side; single PR when granularity is fine). */
 export interface DailyMerge {
-  dayStart: string;
+  start: string;
   count: number;
   prs: Array<{ number: number; title: string; branch: string; mergedAt: string }>;
+}
+
+/** A single merged PR (raw — the component buckets these by zoom). */
+export interface MergeItem {
+  number: number;
+  title: string;
+  branch: string;
+  mergedAt: string;
 }
 
 /** A branch that is NOT drawn as a lane — aggregated into the side panel. */
@@ -161,12 +170,15 @@ export interface GitHubLivingGraphData {
   /** Full literal window domain (for the "see full range" toggle). */
   fullStartAt: string;
   fullEndAt: string;
+  /** Date of the repository's first commit in the loaded data (for "All"). */
+  firstCommitAt: string;
 
-  /** Master commit density per day (covers the full window). */
-  densityCells: DensityCell[];
+  /** Raw master commit times — the component buckets them by the current zoom
+   *  granularity (hour/day/week/month). */
+  masterCommitTimes: string[];
   totalMasterCommits: number;
-  /** Merges to main grouped by day. */
-  dailyMerges: DailyMerge[];
+  /** Raw merged PRs — bucketed client-side by zoom. */
+  merges: MergeItem[];
 
   /** Branches drawn as individual lanes (open PR ∪ commits < 72h, ≤ 8). */
   liveBranches: GitHubGraphBranch[];

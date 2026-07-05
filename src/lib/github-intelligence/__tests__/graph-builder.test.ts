@@ -28,18 +28,17 @@ describe("buildGitHubLivingGraph — density + focus", () => {
     const g = buildGitHubLivingGraph(input());
     expect(g.liveBranches).toEqual([]);
     expect(g.inactiveBranches).toEqual([]);
-    expect(g.densityCells.length).toBeGreaterThan(0); // one cell per window day
+    expect(g.masterCommitTimes).toEqual([]);
     expect(g.totalMasterCommits).toBe(0);
   });
 
-  it("density band + KPI count distinct master commits (adjustment 4)", () => {
+  it("emits distinct master commit times + KPI count (adjustment 4)", () => {
     const events = [
-      pushEvent("main", "m1", 2), pushEvent("main", "m2", 2), pushEvent("main", "m3", 1), pushEvent("main", "m3", 1), // dup sha same day
+      pushEvent("main", "m1", 2), pushEvent("main", "m2", 2), pushEvent("main", "m3", 1), pushEvent("main", "m3", 1), // dup sha
     ];
     const g = buildGitHubLivingGraph(input({ branches: [branch("main", "main")], events }));
     expect(g.totalMasterCommits).toBe(3); // distinct shas
-    const densTotal = g.densityCells.reduce((s, c) => s + c.count, 0);
-    expect(densTotal).toBe(3);
+    expect(g.masterCommitTimes.length).toBe(3);
   });
 
   it("auto-zoom domain focuses on the active window (not the full 30 days)", () => {
@@ -80,8 +79,7 @@ describe("buildGitHubLivingGraph — density + focus", () => {
       { pr_number: 11, title: "B", state: "merged", draft: false, author_login: null, source_branch: "feat/b", target_branch: "main", review_state: null, checks_state: null, opened_at: iso(3), merged_at: iso(1), html_url: null },
     ];
     const g = buildGitHubLivingGraph(input({ pullRequests: prs }));
-    const total = g.dailyMerges.reduce((s, d) => s + d.count, 0);
-    expect(total).toBe(2);
-    expect(g.dailyMerges[0].prs.map((p) => p.number)).toEqual(expect.arrayContaining([10, 11]));
+    expect(g.merges.length).toBe(2);
+    expect(g.merges.map((p) => p.number)).toEqual(expect.arrayContaining([10, 11]));
   });
 });

@@ -22,7 +22,7 @@ import { GitHubLivingGraph } from "@/components/github-intelligence/github-livin
 import { RefreshButton, ConnectSampleButton } from "@/components/github-intelligence/github-action-buttons";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const WINDOWS: DateWindow[] = [7, 14, 30];
+const WINDOWS: DateWindow[] = [7, 14, 30, "all"];
 
 const BAND_TONE: Record<string, string> = {
   good: "text-green-600 dark:text-green-400",
@@ -55,9 +55,11 @@ export default async function GitHubIntelligencePage({
     notFound();
   }
 
-  const windowDays = (WINDOWS.includes(Number(sp.window) as DateWindow)
-    ? (Number(sp.window) as DateWindow)
-    : 14) as DateWindow;
+  const windowDays: DateWindow = sp.window === "all"
+    ? "all"
+    : WINDOWS.includes(Number(sp.window) as DateWindow)
+      ? (Number(sp.window) as DateWindow)
+      : 14;
 
   const data = await loadDashboardData(guard.org, projectId, {
     windowDays,
@@ -129,7 +131,7 @@ export default async function GitHubIntelligencePage({
               href={`${base}?window=${w}${sp.repo ? `&repo=${sp.repo}` : ""}`}
               className={`rounded px-2.5 py-1 text-xs font-medium ${w === windowDays ? "bg-brand-500/10 text-brand-600 dark:text-brand-400" : "text-muted-foreground hover:text-foreground"}`}
             >
-              {isEs ? `${w} días` : `${w}d`}
+              {w === "all" ? (isEs ? "Todo" : "All") : isEs ? `${w} días` : `${w}d`}
             </Link>
           ))}
         </div>
