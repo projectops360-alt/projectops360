@@ -186,7 +186,7 @@ export async function loadDashboardData(
     fetchEventsSince(supabase, scope, sinceIso),
   ]);
 
-  const metrics = computeMetrics(branches, pulls, workflows, releases, deployments, events);
+  const metrics = computeMetrics(branches, pulls, workflows, releases, deployments, events, repository.defaultBranch);
   const readiness = computeReadiness({ branches, pullRequests: pulls, workflowRuns: workflows, deployments });
 
   const graph = buildGitHubLivingGraph({
@@ -259,13 +259,15 @@ function computeMetrics(
   releases: ReleaseSnapshot[],
   deployments: DeploymentSnapshot[],
   events: ActivityEventSnapshot[],
+  defaultBranch: string,
 ): DashboardMetrics {
-  const commitCount = events
-    .filter((e) => e.github_event_type === "push")
-    .reduce((sum, e) => {
-      const c = (e as unknown as { payload_summary?: { commitCount?: number } }).payload_summary?.commitCount;
-      return sum + (typeof c === "number" ? c : 1);
-    }, 0);
+  // Commits KPI = real commits on the default branch in the window (matches
+  // GitHub Insights "commits" for the range) — not raw push webhook events.
+  const commitCount = new Set(
+    events
+      .filter((e) => e.github_event_type === "push" && e.branch_name === defaultBranch && e.sha)
+      .map((e) => e.sha),
+  ).size;
 
   return {
     commitCount: commitCount || events.filter((e) => e.sha).length,

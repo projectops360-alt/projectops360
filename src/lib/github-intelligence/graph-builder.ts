@@ -20,7 +20,7 @@ import type {
 import { classifyBranch } from "./branch-classification";
 
 export const MAX_BRANCHES = 6;
-export const MAX_NODES_PER_BRANCH = 7;
+export const MAX_NODES_PER_BRANCH = 16;
 
 export interface GraphBuildInput {
   repositoryName: string;
@@ -49,8 +49,12 @@ function branchPriority(b: BranchSnapshot): number {
   return 4;
 }
 
-function lastCommitTime(b: BranchSnapshot): number {
-  return b.last_commit_at ? new Date(b.last_commit_at).getTime() : 0;
+/** Real recency = most recent of last commit / merge (adjustment: merged
+ *  branches with no in-window last_commit_at still rank by their merge time). */
+function recencyTime(b: BranchSnapshot): number {
+  const lc = b.last_commit_at ? new Date(b.last_commit_at).getTime() : 0;
+  const mg = b.merged_at ? new Date(b.merged_at).getTime() : 0;
+  return Math.max(lc, mg);
 }
 
 export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGraphData {
@@ -74,7 +78,7 @@ export function buildGitHubLivingGraph(input: GraphBuildInput): GitHubLivingGrap
     const pa = branchPriority(a);
     const pb = branchPriority(b);
     if (pa !== pb) return pa - pb;
-    return lastCommitTime(b) - lastCommitTime(a); // most recent first
+    return recencyTime(b) - recencyTime(a); // most recent activity first
   });
 
   const budgetForOthers = mainBranch ? MAX_BRANCHES - 1 : MAX_BRANCHES;
