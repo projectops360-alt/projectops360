@@ -2788,5 +2788,40 @@
       "partialContext": "Contexto parcial",
       "missingContext": "Contexto faltante"
     }
+  },
+  "attachments": {
+    "title": "Adjuntos",
+    "add": "Agregar adjunto",
+    "upload": "Subir archivo",
+    "dropzone": "Arrastra archivos aquí o haz clic para subir",
+    "empty": "Aún no hay adjuntos",
+    "download": "Descargar",
+    "open": "Abrir",
+    "remove": "Eliminar",
+    "uploading": "Subiendo…",
+    "removeConfirm": "¿Eliminar este adjunto?",
+    "uploadedBy": "Subido por {name}",
+    "unknownUploader": "Desconocido",
+    "allowedHint": "PDF, Word, Excel, PowerPoint, texto o imágenes",
+    "maxSizeHint": "Hasta 10 MB por archivo",
+    "successUpload": "Archivo subido correctamente",
+    "successRemove": "Archivo eliminado correctamente",
+    "errors": {
+      "errorUploadFailed": "Error al subir",
+      "errorTypeNotAllowed": "Tipo de archivo no permitido",
+      "errorTooLarge": "El archivo es demasiado grande",
+      "errorTooManyFiles": "Puedes subir hasta 5 archivos a la vez",
+      "errorEmptyFile": "El archivo está vacío",
+      "errorOneParent": "Un adjunto debe pertenecer exactamente a una tarea o subtarea",
+      "errorBothParents": "Un adjunto debe pertenecer exactamente a una tarea o subtarea",
+      "errorNoParent": "Un adjunto debe pertenecer a una tarea o subtarea",
+      "forbidden": "No tienes permiso para hacer esto",
+      "not_authenticated": "Inicia sesión para continuar",
+      "not_found": "Adjunto no encontrado",
+      "parent_not_found": "La tarea o subtarea ya no existe",
+      "invalid_path": "El archivo no se pudo almacenar de forma segura",
+      "sign_failed": "El archivo no se pudo abrir",
+      "unexpected": "Algo salió mal. Inténtalo de nuevo"
+    }
   }
 }

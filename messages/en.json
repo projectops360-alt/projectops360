@@ -2788,5 +2788,40 @@
       "partialContext": "Partial context",
       "missingContext": "Missing context"
     }
+  },
+  "attachments": {
+    "title": "Attachments",
+    "add": "Add attachment",
+    "upload": "Upload file",
+    "dropzone": "Drop files here or click to upload",
+    "empty": "No attachments yet",
+    "download": "Download",
+    "open": "Open",
+    "remove": "Remove",
+    "uploading": "Uploading…",
+    "removeConfirm": "Remove this attachment?",
+    "uploadedBy": "Uploaded by {name}",
+    "unknownUploader": "Unknown",
+    "allowedHint": "PDF, Word, Excel, PowerPoint, text or images",
+    "maxSizeHint": "Up to 10 MB per file",
+    "successUpload": "File uploaded successfully",
+    "successRemove": "File removed successfully",
+    "errors": {
+      "errorUploadFailed": "Upload failed",
+      "errorTypeNotAllowed": "File type not allowed",
+      "errorTooLarge": "File is too large",
+      "errorTooManyFiles": "You can upload up to 5 files at a time",
+      "errorEmptyFile": "The file is empty",
+      "errorOneParent": "An attachment must belong to exactly one task or subtask",
+      "errorBothParents": "An attachment must belong to exactly one task or subtask",
+      "errorNoParent": "An attachment must belong to a task or subtask",
+      "forbidden": "You don't have permission to do this",
+      "not_authenticated": "Please sign in to continue",
+      "not_found": "Attachment not found",
+      "parent_not_found": "The task or subtask no longer exists",
+      "invalid_path": "The file could not be stored securely",
+      "sign_failed": "The file could not be opened",
+      "unexpected": "Something went wrong. Please try again"
+    }
   }
 }

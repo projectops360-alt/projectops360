@@ -54,6 +54,8 @@ export interface ExecutionMapClientProps {
   ownerNames: Record<string, string>;
   owners: { id: string; name: string }[];
   canManage: boolean;
+  /** Whether the current role may upload attachments (viewers cannot). */
+  canUpload?: boolean;
 }
 
 export function ExecutionMapClient(props: ExecutionMapClientProps) {
@@ -508,6 +510,7 @@ export function ExecutionMapClient(props: ExecutionMapClientProps) {
             ownerNames={props.ownerNames}
             selection={selection}
             canManage={props.canManage}
+            canUpload={props.canUpload}
             onClose={() => setSelection(null)}
             onEdit={(s) => setEditing(s)}
             asOf={asOf}

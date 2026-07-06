@@ -26,6 +26,7 @@ import {
   deleteSubtaskAction,
   updateSubtaskAction,
 } from "@/lib/subtasks/actions";
+import { EntityAttachmentsSection } from "@/components/attachments/entity-attachments-section";
 import { STATUS_ICONS, STATUS_BADGE_CLASS } from "./map-nodes";
 
 export type PanelSelection =
@@ -40,6 +41,8 @@ export interface SubtaskDetailPanelProps {
   ownerNames: Record<string, string>;
   selection: PanelSelection;
   canManage: boolean;
+  /** Whether the current role may upload attachments (viewers cannot). */
+  canUpload?: boolean;
   onClose: () => void;
   onEdit: (subtask: Subtask) => void;
   asOf: Date;
@@ -284,6 +287,12 @@ export function SubtaskDetailPanel(props: SubtaskDetailPanelProps) {
           >
             <Bot className="h-4 w-4" /> {t("isabella.askAboutSubtask")}
           </button>
+
+          <EntityAttachmentsSection
+            projectId={props.projectId}
+            subtaskId={subtask.id}
+            canUpload={props.canUpload}
+          />
         </>
       ) : (
         <p className="text-xs text-muted-foreground">{t("panel.notFound")}</p>
@@ -381,6 +390,12 @@ function ParentPanel(props: SubtaskDetailPanelProps) {
       >
         <Bot className="h-4 w-4" /> {t("isabella.askAboutTask")}
       </button>
+
+      <EntityAttachmentsSection
+        projectId={props.projectId}
+        taskId={props.parent.id}
+        canUpload={props.canUpload}
+      />
     </div>
   );
 }

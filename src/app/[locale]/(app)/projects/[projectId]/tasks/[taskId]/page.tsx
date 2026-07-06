@@ -145,6 +145,7 @@ export default async function TaskExecutionMapPage({
           ownerNames={ownerNames}
           owners={owners}
           canManage={canManage}
+          canUpload={org.role !== "viewer"}
         />
       </div>
     </div>
