@@ -11,6 +11,7 @@ import { X } from "lucide-react";
 import type { Subtask, SubtaskStatus, SubtaskPriority } from "@/lib/subtasks/types";
 import { SUBTASK_STATUSES, SUBTASK_PRIORITIES } from "@/lib/subtasks/types";
 import { createSubtaskAction, updateSubtaskAction } from "@/lib/subtasks/actions";
+import { EntityAttachmentsSection } from "@/components/attachments/entity-attachments-section";
 
 export interface SubtaskFormDialogProps {
   projectId: string;
@@ -231,6 +232,15 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
           <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} />
           {t("form.isCritical")}
         </label>
+
+        {/* Attachments (TASK-SUBTASK-FILE-ATTACHMENTS) — edit mode only (needs a
+            persisted subtask id). Runs through its own server actions, so it is
+            independent of this form's submit. */}
+        {subtask && (
+          <div className="rounded-md border border-border px-3 py-2">
+            <EntityAttachmentsSection projectId={projectId} subtaskId={subtask.id} />
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button
