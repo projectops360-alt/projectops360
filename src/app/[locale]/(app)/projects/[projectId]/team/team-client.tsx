@@ -9,7 +9,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserPlus, Loader2, Trash2, Sparkles, ShieldCheck, Eye, Plus, X,
-  AlertTriangle, Building2, Mail, UserCog,
+  AlertTriangle, Building2, Mail, UserCog, GripVertical, LayoutGrid, List,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import {
@@ -151,12 +151,117 @@ function AssignPersonInline({ p, isEs, rowId, onAssigned }: { p: Props; isEs: bo
   );
 }
 
+// ── Role assignment board (drag a person from the Directory onto a Role) ────
+// Visual, drop-to-assign. A person chip is dragged onto a role bucket; the drop
+// FILLS that existing role row (updateProjectMemberAction identity patch) — no
+// duplicate row. People stay in the directory (a person can hold several roles).
+type BoardPerson = { kind: "user" | "ext"; id: string; name: string; sub?: string; contactType?: string };
+
+function initialsOf(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+function RoleAssignmentBoard({ p, isEs, onChange }: { p: Props; isEs: boolean; onChange: () => void }) {
+  const [busy, start] = useTransition();
+  const [dragging, setDragging] = useState<BoardPerson | null>(null);
+  const [overRow, setOverRow] = useState<string | null>(null);
+
+  const people: BoardPerson[] = [
+    ...p.directory.map((d) => ({ kind: "user" as const, id: d.userId, name: d.name, sub: d.email ?? undefined })),
+    ...p.externals.map((x) => ({
+      kind: "ext" as const, id: String(x.id), name: String(x.name),
+      sub: x.company_name ? String(x.company_name) : undefined, contactType: String(x.contact_type ?? ""),
+    })),
+  ];
+
+  const patchFor = (person: BoardPerson) =>
+    person.kind === "user"
+      ? { member_type: "internal_user", user_id: person.id, external_contact_id: null, display_name: person.name }
+      : { member_type: person.contactType === "vendor" ? "vendor" : "external_contact", user_id: null, external_contact_id: person.id, display_name: person.name };
+
+  const assign = (rowId: string, person: BoardPerson) =>
+    start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id: rowId, patch: patchFor(person) }); onChange(); });
+  const unassign = (rowId: string) =>
+    start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id: rowId, patch: { user_id: null, external_contact_id: null, display_name: null } }); onChange(); });
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+      {/* Directory */}
+      <div className="rounded-xl border border-border bg-card p-3">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Users className="h-4 w-4 text-brand-500" />{isEs ? "Directorio" : "Directory"}</h3>
+        <p className="mb-3 mt-1 text-[11px] text-muted-foreground">{isEs ? "Arrastra una persona a un rol →" : "Drag a person onto a role →"}</p>
+        <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1">
+          {people.length === 0 && <p className="text-xs text-muted-foreground">{isEs ? "No hay personas en el directorio." : "No people in the directory."}</p>}
+          {people.map((person) => (
+            <div
+              key={`${person.kind}:${person.id}`}
+              draggable
+              onDragStart={() => setDragging(person)}
+              onDragEnd={() => { setDragging(null); setOverRow(null); }}
+              className="group flex cursor-grab items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 hover:border-brand-400 hover:bg-brand-50/40 active:cursor-grabbing dark:hover:bg-brand-950/20"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300">{initialsOf(person.name)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium text-foreground">{person.name}</span>
+                {person.sub && <span className="block truncate text-[10px] text-muted-foreground">{person.sub}</span>}
+              </span>
+              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 group-hover:opacity-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Role buckets */}
+      <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {p.team.length === 0 && (
+          <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            {isEs ? "No hay roles todavía. Agrega roles en la vista Lista o con “Recomendar roles con IA”." : "No roles yet. Add roles in the List view or with “AI role recommendation”."}
+          </p>
+        )}
+        {p.team.map((m) => {
+          const rowId = String(m.id);
+          const assigned = !!m.display_name;
+          const over = overRow === rowId;
+          return (
+            <div
+              key={rowId}
+              onDragOver={(e) => { if (dragging) { e.preventDefault(); setOverRow(rowId); } }}
+              onDragLeave={() => setOverRow((r) => (r === rowId ? null : r))}
+              onDrop={(e) => { e.preventDefault(); if (dragging) { assign(rowId, dragging); setDragging(null); setOverRow(null); } }}
+              className={`rounded-xl border p-3 transition-all ${over ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/30 dark:bg-brand-950/30" : assigned ? "border-border bg-card" : "border-dashed border-border bg-muted/30"}`}
+            >
+              <div className="text-sm font-semibold text-foreground">{String(m.project_role ?? "—")}</div>
+              <div className="mb-2 mt-0.5 text-[11px] text-muted-foreground">
+                {[m.delivery_role, m.governance_role].filter(Boolean).join(" · ") || labelOf(PERMISSION_LEVELS, String(m.permission_level), isEs)}
+              </div>
+              {assigned ? (
+                <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{initialsOf(String(m.display_name))}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{String(m.display_name)}</span>
+                  <button onClick={() => unassign(rowId)} disabled={busy} aria-label={isEs ? "Quitar persona" : "Unassign person"} title={isEs ? "Quitar" : "Unassign"} className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-red-500 disabled:opacity-50">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className={`flex items-center justify-center rounded-lg border border-dashed px-2 py-3 text-center text-[11px] ${over ? "border-brand-500 font-medium text-brand-600 dark:text-brand-300" : "border-border text-muted-foreground"}`}>
+                  {over ? (isEs ? "Suelta para asignar" : "Drop to assign") : (isEs ? "Arrastra una persona aquí" : "Drop a person here")}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Members ─────────────────────────────────────────────────────────────────
 
 function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [mode, setMode] = useState<"directory" | "team" | "external" | "invite" | "manual">("directory");
+  const [view, setView] = useState<"board" | "list">("board");
   const [recs, setRecs] = useState<{ project_role: string; delivery_role: string; governance_role: string; permission_level: string; rationale: string }[] | null>(null);
 
   // form state
@@ -189,6 +294,25 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
 
   return (
     <div className="space-y-4">
+      {/* View toggle: Board (drag & drop) vs List (full controls) */}
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setView("board")}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${view === "board" ? "bg-brand-600 text-white" : "border border-border text-muted-foreground hover:bg-muted"}`}
+        >
+          <LayoutGrid className="h-4 w-4" />{isEs ? "Tablero" : "Board"}
+        </button>
+        <button
+          onClick={() => setView("list")}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${view === "list" ? "bg-brand-600 text-white" : "border border-border text-muted-foreground hover:bg-muted"}`}
+        >
+          <List className="h-4 w-4" />{isEs ? "Lista" : "List"}
+        </button>
+      </div>
+
+      {view === "board" && <RoleAssignmentBoard p={p} isEs={isEs} onChange={refresh} />}
+
+      {view === "list" && (<>
       {/* Add bar */}
       <div className="rounded-xl border border-border bg-card p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -319,6 +443,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
           </tbody>
         </table>
       </div>
+      </>)}
     </div>
   );
 }
