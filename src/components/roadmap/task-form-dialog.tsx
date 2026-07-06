@@ -11,6 +11,7 @@ import {
 } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import { askIsabella } from "@/lib/isabella/ask-isabella";
+import { EntityAttachmentsSection } from "@/components/attachments/entity-attachments-section";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1287,6 +1288,16 @@ export function TaskFormDialog({
                   />
                 </div>
               </FormSection>
+            )}
+
+            {/* ── Attachments (TASK-SUBTASK-FILE-ATTACHMENTS) ──
+                Only in edit mode (needs a persisted task id). Uploads/lists/
+                removes run through the dedicated server actions — independent of
+                this form's submit (the file input carries no name). */}
+            {isEdit && task && (
+              <div className="rounded-lg border border-border px-3 py-2">
+                <EntityAttachmentsSection projectId={projectId} taskId={task.id} />
+              </div>
             )}
           </div>
 
