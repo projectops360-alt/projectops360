@@ -158,6 +158,13 @@ export async function updateProjectMemberAction(input: { projectId: string; id: 
   if (!c) return { error: "not_authenticated" };
   const p = input.patch;
   const patch: Record<string, unknown> = {};
+  // Identity fields — used to FILL an unassigned role placeholder with a real
+  // person (internal user or external contact) instead of inserting a duplicate
+  // row. member_type + exactly one of user_id / external_contact_id + a name.
+  if (p.member_type !== undefined) patch.member_type = p.member_type;
+  if (p.user_id !== undefined) patch.user_id = p.user_id || null;
+  if (p.external_contact_id !== undefined) patch.external_contact_id = p.external_contact_id || null;
+  if (p.display_name !== undefined) patch.display_name = p.display_name?.trim() || null;
   if (p.project_role !== undefined) patch.project_role = p.project_role?.trim() || null;
   if (p.delivery_role !== undefined) patch.delivery_role = p.delivery_role?.trim() || null;
   if (p.governance_role !== undefined) patch.governance_role = p.governance_role?.trim() || null;

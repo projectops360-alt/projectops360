@@ -88,6 +88,69 @@ export function TeamClient(p: Props) {
   );
 }
 
+// ── Inline "assign a person" for an unassigned role placeholder ─────────────
+// Fills the EXISTING row (updateProjectMemberAction identity patch) instead of
+// adding a duplicate. Pick an internal directory user or an external contact.
+function AssignPersonInline({ p, isEs, rowId, onAssigned }: { p: Props; isEs: boolean; rowId: string; onAssigned: () => void }) {
+  const [sel, setSel] = useState("");
+  const [busy, start] = useTransition();
+
+  const assign = () => {
+    if (!sel) return;
+    start(async () => {
+      let patch: { member_type: string; user_id: string | null; external_contact_id: string | null; display_name: string | null };
+      if (sel.startsWith("user:")) {
+        const uid = sel.slice(5);
+        const u = p.directory.find((d) => d.userId === uid);
+        patch = { member_type: "internal_user", user_id: uid, external_contact_id: null, display_name: u?.name ?? null };
+      } else {
+        const eid = sel.slice(4);
+        const e = p.externals.find((x) => String(x.id) === eid);
+        patch = {
+          member_type: e && String(e.contact_type) === "vendor" ? "vendor" : "external_contact",
+          user_id: null,
+          external_contact_id: eid,
+          display_name: e ? String(e.name) : null,
+        };
+      }
+      await updateProjectMemberAction({ projectId: p.projectId, id: rowId, patch });
+      setSel("");
+      onAssigned();
+    });
+  };
+
+  return (
+    <div className="mt-1 flex items-center gap-1">
+      <select
+        value={sel}
+        onChange={(e) => setSel(e.target.value)}
+        disabled={busy}
+        aria-label={isEs ? "Asignar persona" : "Assign person"}
+        className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px]"
+      >
+        <option value="">{isEs ? "Selecciona persona…" : "Select person…"}</option>
+        {p.directory.length > 0 && (
+          <optgroup label={isEs ? "Directorio" : "Directory"}>
+            {p.directory.map((d) => <option key={d.userId} value={`user:${d.userId}`}>{d.name}</option>)}
+          </optgroup>
+        )}
+        {p.externals.length > 0 && (
+          <optgroup label={isEs ? "Contactos externos" : "External contacts"}>
+            {p.externals.map((x) => <option key={String(x.id)} value={`ext:${String(x.id)}`}>{String(x.name)}</option>)}
+          </optgroup>
+        )}
+      </select>
+      <button
+        onClick={assign}
+        disabled={!sel || busy}
+        className="rounded bg-brand-600 px-1.5 py-0.5 text-[11px] font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+      >
+        {busy ? "…" : isEs ? "Asignar" : "Assign"}
+      </button>
+    </div>
+  );
+}
+
 // ── Members ─────────────────────────────────────────────────────────────────
 
 function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
@@ -223,7 +286,12 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
                 <tr key={id} className="border-t border-border/50 align-top">
                   <td className="px-3 py-2">
                     <div className="font-medium text-foreground">{m.display_name ? String(m.display_name) : <span className="italic text-amber-600 dark:text-amber-400">{isEs ? "Sin asignar" : "Unassigned"}</span>}</div>
-                    {unassigned && <div className="text-[10px] text-muted-foreground">{isEs ? "Rol pendiente de asignar persona" : "Role missing assignment"}</div>}
+                    {unassigned && (
+                      <>
+                        <div className="text-[10px] text-muted-foreground">{isEs ? "Rol pendiente de asignar persona" : "Role missing assignment"}</div>
+                        <AssignPersonInline p={p} isEs={isEs} rowId={id} onAssigned={refresh} />
+                      </>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{labelOf(MEMBER_TYPES, String(m.member_type), isEs)}</td>
                   <td className="px-3 py-2">
