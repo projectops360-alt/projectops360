@@ -18,6 +18,7 @@ import {
 import type { Locale } from "@/types/database";
 import { localizedHref } from "@/i18n/href";
 import { listDatasets, getDataset } from "@/lib/reports/registry";
+import { localizeDataset, trReport } from "@/lib/reports/i18n";
 import { listPrebuiltReports } from "@/lib/reports/report-library";
 import { listKpis } from "@/lib/reports/kpi-dictionary";
 import type {
@@ -131,8 +132,8 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
   const validInitial = initialProjectId && initialProjects.some((p) => p.id === initialProjectId) ? initialProjectId : null;
   const [projectScope, setProjectScope] = useState<string | null>(validInitial);
 
-  const datasets = listDatasets();
-  const dataset = config ? getDataset(config.datasetId) : null;
+  const datasets = listDatasets().map((d) => localizeDataset(d, locale));
+  const dataset = config ? (() => { const d = getDataset(config.datasetId); return d ? localizeDataset(d, locale) : null; })() : null;
   const activeProject = projectScope ? initialProjects.find((p) => p.id === projectScope) ?? null : null;
   const scopeName = activeProject ? activeProject.name : t.scope.all;
 
@@ -221,7 +222,7 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
         })}
       </div>
 
-      {tab === "overview" && <Overview t={t} datasets={datasets} saved={saved} onBuild={() => openBuilder(emptyConfig(datasets[0].id))} onLibrary={() => setTab("library")} onExplore={() => setTab("explorer")} onOpenSaved={(r) => openBuilder(savedToConfig(r))} />}
+      {tab === "overview" && <Overview t={t} locale={locale} datasets={datasets} saved={saved} onBuild={() => openBuilder(emptyConfig(datasets[0].id))} onLibrary={() => setTab("library")} onExplore={() => setTab("explorer")} onOpenSaved={(r) => openBuilder(savedToConfig(r))} />}
       {tab === "library" && <Library t={t} onRun={(cfg) => { openBuilder(cfg); run(cfg); }} />}
       {tab === "builder" && (
         <Builder
@@ -232,7 +233,7 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
         />
       )}
       {tab === "saved" && (
-        <Saved t={t} saved={saved} onOpen={(r) => { openBuilder(savedToConfig(r)); setProjectScope(r.project_id && initialProjects.some((p) => p.id === r.project_id) ? r.project_id : null); }} onDelete={async (id) => { await deleteSavedReportAction({ reportId: id }); setSaved((s) => s.filter((x) => x.id !== id)); }} onDuplicate={async (id) => { const r = await duplicateSavedReportAction({ reportId: id }); if (r.reportId) { const src = saved.find((x) => x.id === id); if (src) setSaved((s) => [{ ...src, id: r.reportId!, report_name: `${src.report_name} (copy)` }, ...s]); } }} />
+        <Saved t={t} locale={locale} saved={saved} onOpen={(r) => { openBuilder(savedToConfig(r)); setProjectScope(r.project_id && initialProjects.some((p) => p.id === r.project_id) ? r.project_id : null); }} onDelete={async (id) => { await deleteSavedReportAction({ reportId: id }); setSaved((s) => s.filter((x) => x.id !== id)); }} onDuplicate={async (id) => { const r = await duplicateSavedReportAction({ reportId: id }); if (r.reportId) { const src = saved.find((x) => x.id === id); if (src) setSaved((s) => [{ ...src, id: r.reportId!, report_name: `${src.report_name} (copy)` }, ...s]); } }} />
       )}
       {tab === "explorer" && <Explorer t={t} datasets={datasets} onBuild={(id) => openBuilder(emptyConfig(id))} />}
       {tab === "kpi" && <KpiDictionary t={t} />}
@@ -385,8 +386,8 @@ function ProjectScopePicker({ t, projects, value, onChange }: {
   );
 }
 
-function Overview({ t, datasets, saved, onBuild, onLibrary, onExplore, onOpenSaved }: {
-  t: Labels; datasets: ReturnType<typeof listDatasets>; saved: SavedReportRow[];
+function Overview({ t, locale, datasets, saved, onBuild, onLibrary, onExplore, onOpenSaved }: {
+  t: Labels; locale: Locale; datasets: ReturnType<typeof listDatasets>; saved: SavedReportRow[];
   onBuild: () => void; onLibrary: () => void; onExplore: () => void; onOpenSaved: (r: SavedReportRow) => void;
 }) {
   const cats = [...new Set(datasets.map((d) => d.category))];
@@ -421,7 +422,7 @@ function Overview({ t, datasets, saved, onBuild, onLibrary, onExplore, onOpenSav
               <li key={r.id}>
                 <button type="button" onClick={() => onOpenSaved(r)} className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-muted/40">
                   <span className="text-sm font-medium text-foreground">{r.report_name}</span>
-                  <span className="text-xs text-muted-foreground">{getDataset(r.dataset_id)?.displayName ?? r.dataset_id}</span>
+                  <span className="text-xs text-muted-foreground">{trReport(getDataset(r.dataset_id)?.displayName ?? r.dataset_id, locale)}</span>
                 </button>
               </li>
             ))}
@@ -484,7 +485,7 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
 
   // Calculated fields appear as selectable numeric columns in a "Calculated" group.
   const calcCols: DatasetColumn[] = (config.calculatedFields ?? []).map((f) => ({
-    key: f.key, label: f.label, group: "Calculated", type: "number" as const,
+    key: f.key, label: f.label, group: trReport("Calculated", locale), type: "number" as const,
     filterable: true, sortable: true, aggregatable: true, description: f.expression,
   }));
   const effectiveCols: DatasetColumn[] = [...dataset.columns, ...calcCols];
@@ -540,7 +541,7 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
         <div className="flex flex-wrap items-center gap-2">
           <select value={config.visualization} onChange={(e) => setConfig({ ...config, visualization: e.target.value as VisualizationType })}
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
-            {VIS_OPTIONS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+            {VIS_OPTIONS.map((v) => <option key={v.value} value={v.value}>{trReport(v.label, locale)}</option>)}
           </select>
           <select value={config.grouping?.column ?? ""} onChange={(e) => setConfig({ ...config, grouping: e.target.value ? { column: e.target.value, metrics: [{ column: config.columns[0] ?? "", fn: "count", label: t.count }] } : null })}
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
@@ -774,7 +775,7 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                {result.columns.map((c) => <th key={c.key} className="px-3 py-2 font-medium">{c.label}</th>)}
+                {result.columns.map((c) => <th key={c.key} className="px-3 py-2 font-medium">{trReport(c.label, locale)}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -789,7 +790,7 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
                   >
                     {result.columns.map((c, ci) => (
                       <td key={c.key} className={`max-w-[260px] truncate px-3 py-1.5 ${ci === 0 && href ? "font-medium text-brand-600 dark:text-brand-400" : "text-foreground"}`}>
-                        {formatCell(row[c.key], c)}
+                        {formatCell(row[c.key], c, locale)}
                       </td>
                     ))}
                   </tr>
@@ -803,10 +804,10 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
   );
 }
 
-function formatCell(v: string | number | boolean | null, c: DatasetColumn): string {
+function formatCell(v: string | number | boolean | null, c: DatasetColumn, locale: Locale): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "Yes" : "No";
-  if (c.type === "enum" && c.enumValues) return c.enumValues.find((e) => e.value === v)?.label ?? String(v);
+  if (typeof v === "boolean") return v ? (locale === "es" ? "Sí" : "Yes") : (locale === "es" ? "No" : "No");
+  if (c.type === "enum" && c.enumValues) return trReport(c.enumValues.find((e) => e.value === v)?.label ?? String(v), locale);
   return String(v);
 }
 
@@ -820,8 +821,8 @@ function ResultMeta({ t, result }: { t: Labels; result: ReportResult }) {
 
 // ── Saved ─────────────────────────────────────────────────────────────────
 
-function Saved({ t, saved, onOpen, onDelete, onDuplicate }: {
-  t: Labels; saved: SavedReportRow[]; onOpen: (r: SavedReportRow) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void;
+function Saved({ t, locale, saved, onOpen, onDelete, onDuplicate }: {
+  t: Labels; locale: Locale; saved: SavedReportRow[]; onOpen: (r: SavedReportRow) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void;
 }) {
   if (saved.length === 0) return <Empty icon={<Bookmark className="h-8 w-8" />} text={t.noRecent} />;
   return (
@@ -837,7 +838,7 @@ function Saved({ t, saved, onOpen, onDelete, onDuplicate }: {
           {saved.map((r) => (
             <tr key={r.id} className="border-b border-border last:border-0">
               <td className="px-3 py-2"><button type="button" onClick={() => onOpen(r)} className="font-medium text-brand-600 hover:underline dark:text-brand-400">{r.report_name}</button></td>
-              <td className="px-3 py-2 text-muted-foreground">{getDataset(r.dataset_id)?.displayName ?? r.dataset_id}</td>
+              <td className="px-3 py-2 text-muted-foreground">{trReport(getDataset(r.dataset_id)?.displayName ?? r.dataset_id, locale)}</td>
               <td className="px-3 py-2 text-muted-foreground">{r.visualization_type}</td>
               <td className="px-3 py-2 text-muted-foreground">{t.vis[r.visibility]}</td>
               <td className="px-3 py-2">
