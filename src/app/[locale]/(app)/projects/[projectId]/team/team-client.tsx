@@ -5,16 +5,18 @@
 // Project teams are operational; adding people here never creates a paid seat.
 // ============================================================================
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { RoleBoard } from "./role-board";
+import { computeCompletenessFromRows, type Row as BoardRow } from "@/lib/team-roles/board-model";
 import {
   Users, UserPlus, Loader2, Trash2, Sparkles, ShieldCheck, Eye, Plus, X,
-  AlertTriangle, Building2, Mail, UserCog, GripVertical, LayoutGrid, List,
+  AlertTriangle, Building2, Mail, UserCog, LayoutGrid, List,
 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import {
   MEMBER_TYPES, PERMISSION_LEVELS, PROJECT_ROLES, DELIVERY_ROLES, GOVERNANCE_ROLES,
-  RACI_ROLES, ACCESS_LEVELS, PERMISSION_FLAG_LABELS, labelOf, type PermissionFlag,
+  RACI_ROLES, ACCESS_LEVELS, PERMISSION_FLAG_LABELS, labelOf, CRITICAL_ROLES, type PermissionFlag,
 } from "@/lib/team-roles/config";
 import {
   addProjectMemberAction, addCompanyTeamToProjectAction, addStakeholderViewerAction,
@@ -42,7 +44,15 @@ const TABS = [
 export function TeamClient(p: Props) {
   const isEs = p.locale === "es";
   const [tab, setTab] = useState("members");
-  const comp = p.completeness;
+  // Lifted team state: Board AND List read/write the SAME in-memory rows, and
+  // completeness recalculates instantly (identity-aware) without a full reload.
+  // Re-seeded from the server after each router.refresh() (reconciliation).
+  const [team, setTeam] = useState<BoardRow[]>(p.team as BoardRow[]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reconcile with fresh server rows after refresh
+    setTeam(p.team as BoardRow[]);
+  }, [p.team]);
+  const comp = useMemo(() => computeCompletenessFromRows(team, CRITICAL_ROLES), [team]);
   const scoreTone = comp.score >= 80 ? "text-green-600 dark:text-green-400" : comp.score >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
 
   return (
@@ -81,7 +91,7 @@ export function TeamClient(p: Props) {
         ))}
       </div>
 
-      {tab === "members" && <MembersTab p={p} isEs={isEs} />}
+      {tab === "members" && <MembersTab p={p} isEs={isEs} team={team} setTeam={setTeam} />}
       {tab === "raci" && <RaciTab p={p} isEs={isEs} />}
       {tab === "stakeholders" && <StakeholdersTab p={p} isEs={isEs} />}
     </div>
@@ -151,163 +161,12 @@ function AssignPersonInline({ p, isEs, rowId, onAssigned }: { p: Props; isEs: bo
   );
 }
 
-// ── Role assignment board (drag a person from the Directory onto a Role) ────
-// Visual, drop-to-assign. A person chip is dragged onto a role bucket; the drop
-// FILLS that existing role row (updateProjectMemberAction identity patch) — no
-// duplicate row. People stay in the directory (a person can hold several roles).
-type BoardPerson = { kind: "user" | "ext"; id: string; name: string; sub?: string; contactType?: string };
-
-function initialsOf(name: string): string {
-  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
-}
-
-function RoleAssignmentBoard({ p, isEs, onChange }: { p: Props; isEs: boolean; onChange: () => void }) {
-  const [busy, start] = useTransition();
-  const [dragging, setDragging] = useState<BoardPerson | null>(null);
-  const [overRow, setOverRow] = useState<string | null>(null);
-  const [newRole, setNewRole] = useState("");
-
-  const addRole = (role: string) => {
-    const r = role.trim();
-    if (!r) return;
-    start(async () => {
-      await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "internal_user", project_role: r, permission_level: "contributor" } });
-      setNewRole("");
-      onChange();
-    });
-  };
-
-  const people: BoardPerson[] = [
-    ...p.directory.map((d) => ({ kind: "user" as const, id: d.userId, name: d.name, sub: d.email ?? undefined })),
-    ...p.externals.map((x) => ({
-      kind: "ext" as const, id: String(x.id), name: String(x.name),
-      sub: x.company_name ? String(x.company_name) : undefined, contactType: String(x.contact_type ?? ""),
-    })),
-  ];
-
-  const patchFor = (person: BoardPerson) =>
-    person.kind === "user"
-      ? { member_type: "internal_user", user_id: person.id, external_contact_id: null, display_name: person.name }
-      : { member_type: person.contactType === "vendor" ? "vendor" : "external_contact", user_id: null, external_contact_id: person.id, display_name: person.name };
-
-  const assign = (rowId: string, person: BoardPerson) =>
-    start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id: rowId, patch: patchFor(person) }); onChange(); });
-  const unassign = (rowId: string) =>
-    start(async () => { await updateProjectMemberAction({ projectId: p.projectId, id: rowId, patch: { user_id: null, external_contact_id: null, display_name: null } }); onChange(); });
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-      {/* Directory */}
-      <div className="rounded-xl border border-border bg-card p-3">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Users className="h-4 w-4 text-brand-500" />{isEs ? "Directorio" : "Directory"}</h3>
-        <p className="mb-3 mt-1 text-[11px] text-muted-foreground">{isEs ? "Arrastra una persona a un rol →" : "Drag a person onto a role →"}</p>
-        <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1">
-          {people.length === 0 && <p className="text-xs text-muted-foreground">{isEs ? "No hay personas en el directorio." : "No people in the directory."}</p>}
-          {people.map((person) => (
-            <div
-              key={`${person.kind}:${person.id}`}
-              draggable
-              onDragStart={() => setDragging(person)}
-              onDragEnd={() => { setDragging(null); setOverRow(null); }}
-              className="group flex cursor-grab items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5 hover:border-brand-400 hover:bg-brand-50/40 active:cursor-grabbing dark:hover:bg-brand-950/20"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300">{initialsOf(person.name)}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium text-foreground">{person.name}</span>
-                {person.sub && <span className="block truncate text-[10px] text-muted-foreground">{person.sub}</span>}
-              </span>
-              <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-40 group-hover:opacity-100" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add-role toolbar + role buckets */}
-      <div className="space-y-3">
-        {/* Add a role bucket right here — quick chips for missing critical roles
-            + a free-text role (datalist of common roles). No need to leave the board. */}
-        <div className="rounded-xl border border-border bg-card p-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{isEs ? "Crear rol:" : "Create role:"}</span>
-            {p.completeness.missingCritical.map((role) => (
-              <button
-                key={role}
-                onClick={() => addRole(role)}
-                disabled={busy}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
-              >
-                <Plus className="h-3 w-3" />{role}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <input
-              list="board-roles"
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRole(newRole); } }}
-              placeholder={isEs ? "Nombre del rol (ej. Project Manager)" : "Role name (e.g. Project Manager)"}
-              disabled={busy}
-              className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm"
-            />
-            <datalist id="board-roles">{PROJECT_ROLES.map((r) => <option key={r} value={r} />)}</datalist>
-            <button
-              onClick={() => addRole(newRole)}
-              disabled={busy || !newRole.trim()}
-              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{isEs ? "Agregar rol" : "Add role"}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {p.team.length === 0 && (
-          <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-            {isEs ? "Aún no hay roles. Crea uno arriba (o usa “Recomendar roles con IA” en la vista Lista) y luego arrastra una persona." : "No roles yet. Create one above (or use “AI role recommendation” in the List view), then drag a person."}
-          </p>
-        )}
-        {p.team.map((m) => {
-          const rowId = String(m.id);
-          const assigned = !!m.display_name;
-          const over = overRow === rowId;
-          return (
-            <div
-              key={rowId}
-              onDragOver={(e) => { if (dragging) { e.preventDefault(); setOverRow(rowId); } }}
-              onDragLeave={() => setOverRow((r) => (r === rowId ? null : r))}
-              onDrop={(e) => { e.preventDefault(); if (dragging) { assign(rowId, dragging); setDragging(null); setOverRow(null); } }}
-              className={`rounded-xl border p-3 transition-all ${over ? "border-brand-500 bg-brand-50 ring-2 ring-brand-500/30 dark:bg-brand-950/30" : assigned ? "border-border bg-card" : "border-dashed border-border bg-muted/30"}`}
-            >
-              <div className="text-sm font-semibold text-foreground">{String(m.project_role ?? "—")}</div>
-              <div className="mb-2 mt-0.5 text-[11px] text-muted-foreground">
-                {[m.delivery_role, m.governance_role].filter(Boolean).join(" · ") || labelOf(PERMISSION_LEVELS, String(m.permission_level), isEs)}
-              </div>
-              {assigned ? (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{initialsOf(String(m.display_name))}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{String(m.display_name)}</span>
-                  <button onClick={() => unassign(rowId)} disabled={busy} aria-label={isEs ? "Quitar persona" : "Unassign person"} title={isEs ? "Quitar" : "Unassign"} className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-red-500 disabled:opacity-50">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className={`flex items-center justify-center rounded-lg border border-dashed px-2 py-3 text-center text-[11px] ${over ? "border-brand-500 font-medium text-brand-600 dark:text-brand-300" : "border-border text-muted-foreground"}`}>
-                  {over ? (isEs ? "Suelta para asignar" : "Drop to assign") : (isEs ? "Arrastra una persona aquí" : "Drop a person here")}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Members ─────────────────────────────────────────────────────────────────
 
-function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
+function MembersTab({ p, isEs, team, setTeam }: {
+  p: Props; isEs: boolean; team: BoardRow[];
+  setTeam: (updater: (prev: BoardRow[]) => BoardRow[]) => void;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [mode, setMode] = useState<"directory" | "team" | "external" | "invite" | "manual">("directory");
@@ -325,7 +184,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
   const [perm, setPerm] = useState("contributor");
 
   const refresh = () => router.refresh();
-  const onProjRole = p.team; // alias
+  const onProjRole = team; // Board + List share the same lifted rows
 
   const addDirectory = () => { const u = p.directory.find((d) => d.userId === dirUser); if (!u) return; start(async () => { await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "internal_user", user_id: u.userId, display_name: u.name, project_role: role, delivery_role: delivery, governance_role: governance, permission_level: perm } }); setDirUser(""); setRole(""); refresh(); }); };
   const addTeam = () => { if (!teamId) return; start(async () => { await addCompanyTeamToProjectAction({ projectId: p.projectId, teamId, locale: p.locale }); setTeamId(""); refresh(); }); };
@@ -360,7 +219,18 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
         </button>
       </div>
 
-      {view === "board" && <RoleAssignmentBoard p={p} isEs={isEs} onChange={refresh} />}
+      {view === "board" && (
+        <RoleBoard
+          projectId={p.projectId}
+          locale={p.locale}
+          isEs={isEs}
+          team={team}
+          setTeam={setTeam}
+          directory={p.directory}
+          externals={p.externals}
+          requiredRoles={CRITICAL_ROLES}
+        />
+      )}
 
       {view === "list" && (<>
       {/* Add bar */}
@@ -489,7 +359,7 @@ function MembersTab({ p, isEs }: { p: Props; isEs: boolean }) {
                 </tr>
               );
             })}
-            {p.team.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "Sin miembros. Agrega del directorio, un equipo, contactos externos o deja que la IA recomiende roles." : "No members. Add from the directory, a team, external contacts, or let AI recommend roles."}</td></tr>}
+            {team.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">{isEs ? "Sin miembros. Agrega del directorio, un equipo, contactos externos o deja que la IA recomiende roles." : "No members. Add from the directory, a team, external contacts, or let AI recommend roles."}</td></tr>}
           </tbody>
         </table>
       </div>
