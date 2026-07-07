@@ -2,6 +2,7 @@
 
 import React from "react";
 import { localizedHref } from "@/i18n/href";
+import { buildBlockerResolveHref } from "@/lib/execution/blocker-resolve";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -289,21 +290,12 @@ export function ProjectDashboard({
     [projectId, projectName, statusScope, tasks, milestones, statusDependencies, statusRisks],
   );
 
-  // ── Resolve blocker handler ──────────────────────────────────────────────────
-  const [resolvingBlocker, setResolvingBlocker] = React.useState<string | null>(null);
-
-  const handleResolveBlocker = async (taskId: string) => {
-    setResolvingBlocker(taskId);
-    try {
-      const { updateTaskStatusAction } = await import("./roadmap/actions");
-      await updateTaskStatusAction({ taskId, status: "in_progress", projectId });
-      router.refresh();
-    } catch {
-      // If resolve fails, navigate to workboard as fallback
-      router.push(`${base}/workboard`);
-    } finally {
-      setResolvingBlocker(null);
-    }
+  // ── Resolve blocker handler (REG-BLOCKER-RESOLVE-OPENS-TASK) ─────────────────
+  // "Resolve now" OPENS the blocked task in the Workboard editor so the user
+  // decides what to do — it must NEVER mutate (no status change, no auto-resolve).
+  // A plain navigation, so the button can never hang on a server action.
+  const handleResolveBlocker = (taskId: string) => {
+    router.push(buildBlockerResolveHref(base, taskId));
   };
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -456,14 +448,9 @@ export function ProjectDashboard({
           <button
             type="button"
             onClick={() => handleResolveBlocker(blockedTasks[0].id)}
-            disabled={resolvingBlocker === blockedTasks[0].id}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
           >
-            {resolvingBlocker === blockedTasks[0].id ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <ArrowRight className="h-3 w-3" />
-            )}
+            <ArrowRight className="h-3 w-3" />
             {locale === "es" ? "Resolver ahora" : "Resolve now"}
           </button>
         </div>
