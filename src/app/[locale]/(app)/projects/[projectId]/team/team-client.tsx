@@ -165,6 +165,17 @@ function RoleAssignmentBoard({ p, isEs, onChange }: { p: Props; isEs: boolean; o
   const [busy, start] = useTransition();
   const [dragging, setDragging] = useState<BoardPerson | null>(null);
   const [overRow, setOverRow] = useState<string | null>(null);
+  const [newRole, setNewRole] = useState("");
+
+  const addRole = (role: string) => {
+    const r = role.trim();
+    if (!r) return;
+    start(async () => {
+      await addProjectMemberAction({ projectId: p.projectId, locale: p.locale, member: { member_type: "internal_user", project_role: r, permission_level: "contributor" } });
+      setNewRole("");
+      onChange();
+    });
+  };
 
   const people: BoardPerson[] = [
     ...p.directory.map((d) => ({ kind: "user" as const, id: d.userId, name: d.name, sub: d.email ?? undefined })),
@@ -211,11 +222,49 @@ function RoleAssignmentBoard({ p, isEs, onChange }: { p: Props; isEs: boolean; o
         </div>
       </div>
 
-      {/* Role buckets */}
-      <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Add-role toolbar + role buckets */}
+      <div className="space-y-3">
+        {/* Add a role bucket right here — quick chips for missing critical roles
+            + a free-text role (datalist of common roles). No need to leave the board. */}
+        <div className="rounded-xl border border-border bg-card p-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">{isEs ? "Crear rol:" : "Create role:"}</span>
+            {p.completeness.missingCritical.map((role) => (
+              <button
+                key={role}
+                onClick={() => addRole(role)}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+              >
+                <Plus className="h-3 w-3" />{role}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              list="board-roles"
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRole(newRole); } }}
+              placeholder={isEs ? "Nombre del rol (ej. Project Manager)" : "Role name (e.g. Project Manager)"}
+              disabled={busy}
+              className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm"
+            />
+            <datalist id="board-roles">{PROJECT_ROLES.map((r) => <option key={r} value={r} />)}</datalist>
+            <button
+              onClick={() => addRole(newRole)}
+              disabled={busy || !newRole.trim()}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{isEs ? "Agregar rol" : "Add role"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {p.team.length === 0 && (
           <p className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-            {isEs ? "No hay roles todavía. Agrega roles en la vista Lista o con “Recomendar roles con IA”." : "No roles yet. Add roles in the List view or with “AI role recommendation”."}
+            {isEs ? "Aún no hay roles. Crea uno arriba (o usa “Recomendar roles con IA” en la vista Lista) y luego arrastra una persona." : "No roles yet. Create one above (or use “AI role recommendation” in the List view), then drag a person."}
           </p>
         )}
         {p.team.map((m) => {
@@ -250,6 +299,7 @@ function RoleAssignmentBoard({ p, isEs, onChange }: { p: Props; isEs: boolean; o
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
