@@ -5,6 +5,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
 import { CRITICAL_ROLES } from "./config";
+import { computeCompletenessFromRows } from "./board-model";
 
 type Row = Record<string, unknown>;
 
@@ -110,22 +111,9 @@ export interface TeamCompleteness {
 }
 
 export function computeTeamCompleteness(members: Row[]): TeamCompleteness {
-  const active = members.filter((m) => String(m.status) !== "removed");
-  const roles = new Set(active.map((m) => String(m.project_role ?? "")));
-  const hasPM = active.some((m) =>
-    m.permission_level === "project_manager" || m.permission_level === "project_owner" ||
-    String(m.project_role ?? "").toLowerCase().includes("project manager"));
-  const hasApprover = active.some((m) =>
-    m.can_approve_changes === true || m.permission_level === "approver" ||
-    /approver|sponsor|steering|accountable/i.test(String(m.governance_role ?? "")));
-  const missingCritical = CRITICAL_ROLES.filter((r) => ![...roles].some((x) => x.toLowerCase() === r.toLowerCase()));
-
-  let score = 100;
-  score -= missingCritical.length * 22;
-  if (!hasApprover) score -= 18;
-  if (active.length === 0) score = 0;
-  score = Math.max(0, Math.min(100, score));
-  return { score, hasPM, hasApprover, missingCritical, totalMembers: active.length };
+  // Identity-aware (board-model): empty role placeholders are NOT members and
+  // never mark a role covered, so completeness reflects real people, not slots.
+  return computeCompletenessFromRows(members, CRITICAL_ROLES);
 }
 
 // ── Project Memory event (best-effort, fire-and-forget) ─────────────────────

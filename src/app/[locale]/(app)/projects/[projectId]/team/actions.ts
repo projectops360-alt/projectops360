@@ -189,6 +189,121 @@ export async function removeProjectMemberAction(input: { projectId: string; id: 
   return error ? { error: "unexpected" } : {};
 }
 
+// ── Role Assignment Board — encapsulated assign / move / remove / restore ────
+// Server-side dedup (defence beyond the client oracle). A person can hold many
+// roles, but never twice in the SAME role. Assigning fills an empty placeholder
+// first (keeps its id → RACI-safe) before inserting a new row. Removing the last
+// person of a role reverts the row to a placeholder so the bucket survives.
+
+interface BoardPersonInput { kind: "user" | "ext"; id: string; name: string }
+
+function identityFields(p: BoardPersonInput) {
+  return {
+    member_type: p.kind === "user" ? "internal_user" : "external_contact",
+    user_id: p.kind === "user" ? p.id : null,
+    external_contact_id: p.kind === "ext" ? p.id : null,
+    display_name: p.name?.trim() || null,
+  };
+}
+
+export async function assignPersonToRoleAction(input: { projectId: string; role: string; person: BoardPersonInput; locale?: string }): Promise<{ error?: string; duplicate?: boolean; memberId?: string }> {
+  const c = await ctx();
+  if (!c) return { error: "not_authenticated" };
+  const role = input.role.trim();
+  const p = input.person;
+  if (!role || !p?.id) return { error: "empty" };
+  const idCol = p.kind === "user" ? "user_id" : "external_contact_id";
+
+  // Server-side dedup: same person already in this role?
+  const { data: mine } = await c.supabase.from("project_team_members")
+    .select("id, project_role").eq("project_id", input.projectId).eq("organization_id", c.org.organizationId)
+    .neq("status", "removed").eq(idCol, p.id);
+  if ((mine ?? []).some((r) => String(r.project_role ?? "").trim().toLowerCase() === role.toLowerCase())) {
+    return { duplicate: true };
+  }
+
+  // Fill an empty placeholder for this role if one exists (keeps its id).
+  const { data: sameRole } = await c.supabase.from("project_team_members")
+    .select("id, user_id, external_contact_id, display_name").eq("project_id", input.projectId)
+    .eq("organization_id", c.org.organizationId).neq("status", "removed").ilike("project_role", role);
+  const placeholder = (sameRole ?? []).find((r) => !r.user_id && !r.external_contact_id && !r.display_name);
+  const identity = identityFields(p);
+
+  if (placeholder) {
+    const { error } = await c.supabase.from("project_team_members").update(identity)
+      .eq("id", placeholder.id).eq("organization_id", c.org.organizationId);
+    if (error) return { error: "unexpected" };
+    await logAudit({ org: c.org, projectId: input.projectId, action: "update", entityType: "project_team_members", entityId: String(placeholder.id), metadata: { assigned: p.name, role } });
+    return { memberId: String(placeholder.id) };
+  }
+
+  const { data: inserted, error } = await c.supabase.from("project_team_members")
+    .insert(buildRow(c.org.organizationId, input.projectId, { ...identity, project_role: role, permission_level: "contributor" }))
+    .select("id").single();
+  if (error || !inserted) return { error: "unexpected" };
+  await logAudit({ org: c.org, projectId: input.projectId, action: "create", entityType: "project_team_members", entityId: String(inserted.id), metadata: { assigned: p.name, role } });
+  return { memberId: String(inserted.id) };
+}
+
+export async function movePersonRoleAction(input: { projectId: string; id: string; toRole: string }): Promise<{ error?: string; duplicate?: boolean }> {
+  const c = await ctx();
+  if (!c) return { error: "not_authenticated" };
+  const toRole = input.toRole.trim();
+  if (!toRole) return { error: "empty" };
+  const { data: row } = await c.supabase.from("project_team_members")
+    .select("id, user_id, external_contact_id, project_role").eq("id", input.id)
+    .eq("organization_id", c.org.organizationId).neq("status", "removed").maybeSingle();
+  if (!row) return { error: "not_found" };
+
+  const pcol = row.user_id ? "user_id" : row.external_contact_id ? "external_contact_id" : null;
+  const pid = row.user_id ?? row.external_contact_id;
+  if (pcol && pid) {
+    const { data: dupes } = await c.supabase.from("project_team_members")
+      .select("id, project_role").eq("project_id", input.projectId).eq("organization_id", c.org.organizationId)
+      .neq("status", "removed").neq("id", input.id).eq(pcol, pid);
+    if ((dupes ?? []).some((r) => String(r.project_role ?? "").trim().toLowerCase() === toRole.toLowerCase())) {
+      return { duplicate: true };
+    }
+  }
+  const { error } = await c.supabase.from("project_team_members").update({ project_role: toRole })
+    .eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : {};
+}
+
+export async function removeAssignmentAction(input: { projectId: string; id: string }): Promise<{ error?: string; mode?: "cleared" | "removed" }> {
+  const c = await ctx();
+  if (!c) return { error: "not_authenticated" };
+  const { data: row } = await c.supabase.from("project_team_members")
+    .select("id, project_role").eq("id", input.id).eq("organization_id", c.org.organizationId)
+    .neq("status", "removed").maybeSingle();
+  if (!row) return { error: "not_found" };
+  const role = String(row.project_role ?? "");
+
+  const { data: siblings } = await c.supabase.from("project_team_members")
+    .select("id, user_id, external_contact_id, display_name").eq("project_id", input.projectId)
+    .eq("organization_id", c.org.organizationId).neq("status", "removed").neq("id", input.id).ilike("project_role", role);
+  const hasSibling = (siblings ?? []).some((r) => r.user_id || r.external_contact_id || r.display_name);
+
+  if (!hasSibling) {
+    const { error } = await c.supabase.from("project_team_members")
+      .update({ user_id: null, external_contact_id: null, display_name: null })
+      .eq("id", input.id).eq("organization_id", c.org.organizationId);
+    return error ? { error: "unexpected" } : { mode: "cleared" };
+  }
+  const { error } = await c.supabase.from("project_team_members").update({ status: "removed" })
+    .eq("id", input.id).eq("organization_id", c.org.organizationId);
+  return error ? { error: "unexpected" } : { mode: "removed" };
+}
+
+/** Undo a soft-removed assignment (restore status active). */
+export async function restoreAssignmentAction(input: { projectId: string; id: string }): Promise<{ error?: string }> {
+  const c = await ctx();
+  if (!c) return { error: "not_authenticated" };
+  const { error } = await c.supabase.from("project_team_members").update({ status: "active" })
+    .eq("id", input.id).eq("organization_id", c.org.organizationId).eq("status", "removed");
+  return error ? { error: "unexpected" } : {};
+}
+
 // ── AI role recommendation ──────────────────────────────────────────────────
 
 export async function recommendRolesAction(input: { projectId: string; locale: string }) {
