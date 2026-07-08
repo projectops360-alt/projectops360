@@ -546,5 +546,115 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-019 — Isabella misroutes screen/UI-label questions into Process Intelligence
+- **Description:** On the **Resources / "Who participates in this project?"** screen, asking Isabella
+  *"explícame qué significa member está unassigned"* / *"qué significa unassigned"* returned the
+  **Daily Project Diagnosis** (tasks without owner, project status, milestones, daily focus) instead of
+  explaining the **UI label**. Separately, *"Explain this screen"* explained the **Open Projects** list
+  instead of the Resources participants screen (stale/wrong screen context).
+- **Observed:** Two independent defects.
+  1. **Routing.** `classifyIsabellaIntent` has no category for UI-meaning questions, so
+     *"qué significa …"* fell through to the `project_status_question` **default** →
+     `daily_diagnosis`. With `ISABELLA_PROCESS_INTELLIGENCE_ENABLED` on, that rendered the Daily
+     Diagnosis for a question about a table column. The runtime also never conveyed screen context to
+     the router.
+  2. **Stale screen.** The project participants screen (`/projects/{id}/team`) had **no entry** in the
+     Screen Intelligence registry (`src/lib/knowledge-os/screens.ts`), so `resolveScreen` fell through
+     to the `/projects` prefix and resolved the generic **Projects list** — so "Explain this screen"
+     described "Open Projects".
+- **Expected:** A question about the **visible screen, its columns/buttons, or a UI term** (Unassigned,
+  Member, Permission, Access) is answered from **screen context**, never from Daily Diagnosis /
+  Root Cause / Recommendation. **Domain distinction:** on Resources, *"Unassigned"* = a **project role
+  slot with no person assigned yet** ("Role missing assignment"); on a task/Workboard screen,
+  *"unassigned"* = a **task with no owner**. These are never conflated. When screen context is
+  missing/ambiguous, Isabella asks a safe clarification instead of guessing another screen, and such an
+  answer is **never presented as "Verified 100%"**.
+- **Impact:** High — Isabella gives a confidently-wrong, off-topic answer to a basic "what does this
+  mean?" question, and describes the wrong screen. Erodes trust in the assistant. **Severity:** High (P0).
+- **Root cause:** (1) **missing high-priority route** — UI/screen questions had no classification and
+  defaulted into the status/diagnosis engine; (2) **incomplete screen registry** — the participants
+  screen was unmapped, so screen resolution silently degraded to the Projects list.
+- **Status: RESOLVED (2026-07-07).** Fix:
+  - **New `screen_context_explanation` route** with **highest priority** in `routeIsabellaQuestion`
+    (runs BEFORE `mixed`, `daily_diagnosis`, `root_cause`, `recommendation`, and the factual/RAG
+    fallback). UI/screen questions can never reach an engine.
+  - **Deterministic content module** `src/lib/isabella/screen-help/` — bilingual explanations of the
+    Resources participants screen + its columns, and the **domain-distinct** meaning of "Unassigned"
+    (role slot vs task owner). Unknown/ambiguous screen → safe clarification, `confident:false` →
+    the wiring returns a non-verified tier (never "Verified 100%").
+  - **Registry entry** for `/projects/{id}/team` (`project_team` / `project_participants`) with the real
+    columns (Member, Type, Role/Delivery/Governance, Permission, Access) and add-participant actions, so
+    "Explain this screen" resolves the participants screen — not the Projects list.
+  - **Classifier widened** so *"qué debería revisar primero"* → `recommendation` and *"cómo agrego …"* →
+    `product_help` (how-to) rather than the diagnosis default. Tool-use gateway prompt also guards
+    UI-label questions away from `get_daily_diagnosis`.
+  - Files: `src/lib/isabella/screen-help/screen-help.ts` (+ `index.ts`),
+    `src/lib/isabella/process-intelligence-runtime/{router.ts,runtime.ts,types.ts}`,
+    `src/lib/isabella/process-intelligence/intent-contract.ts`, `src/lib/isabella/tools/gateway.ts`,
+    `src/lib/knowledge-os/screens.ts`. Tests:
+    `src/lib/isabella/screen-help/__tests__/screen-help.test.ts`,
+    `src/lib/isabella/process-intelligence-runtime/__tests__/{router,runtime}.test.ts`,
+    `src/lib/knowledge-os/__tests__/screens-participants.test.ts`.
+- **Protection rule (binding):** **Screen/UI questions are answered from screen context, never from the
+  process-intelligence engines.** A UI-label or "explain this screen" question that routes to Daily
+  Diagnosis (or describes a different screen than the active one) is a regression. Resources "Unassigned"
+  (role slot) and task-owner "unassigned" must stay distinct. Missing/stale screen context → safe
+  clarification, never "Verified 100%". Related: [REG-013](#reg-013), [REG-014],
+  [UX-001](32-product-ux-contracts.md), [No silent regressions rule].
+- **Owner:** Product/Engineering. **Verify:** on Resources, ask "qué significa unassigned" → role-slot
+  explanation (no Daily Diagnosis); ask "Explain this screen" → participants screen (not Open Projects);
+  on a task, ask "owner unassigned?" → task-owner explanation.
+
+---
+
+## REG-020 — Isabella's intent default routes every unclassified question to Daily Diagnosis
+- **Description:** With `ISABELLA_PROCESS_INTELLIGENCE_ENABLED` on, a **knowledge / "how it works"**
+  question that is NOT about the visible screen — e.g. *"¿cómo funciona el Living Graph?"*,
+  *"how does the Workboard work?"*, *"¿qué es el Execution Map?"* — returned the **Daily Project
+  Diagnosis** (project briefing) instead of a product-knowledge answer.
+- **Observed:** This is the second half of [REG-019](#reg-019). REG-019 added the high-priority
+  `screen_context_explanation` route, which only catches questions about the *active screen*
+  ("qué significa …", "explain this screen"). A general knowledge question does **not** match that
+  route, so it reached `classifyIsabellaIntent` — whose **final default was `project_status_question`**
+  (`intent-contract.ts`), which the router maps to `daily_diagnosis`. So every unclassified question
+  still fell into the diagnosis engine. Two related classifier gaps compounded it:
+  1. `RE_NAV` did not recognize "how it works / what is / para qué sirve / explain / what does … do".
+  2. `RE_ROOT_CAUSE` matched **any** "why / por qué", so *"¿por qué se llama Living Graph?"* was
+     misrouted to the (future) Root Cause engine instead of the Knowledge OS.
+- **Expected:** The **conservative default is the Knowledge OS (RAG / `product_help`)**, not an engine.
+  A knowledge/how-to/what-is question is answered from product knowledge; only genuine status/attention
+  asks ("cómo va el proyecto", "what needs attention", "what is happening today") route to Daily
+  Diagnosis, and only a *why-about-a-problem* ("why is this milestone delayed/blocked?") routes to
+  Root Cause. Isabella must never answer "how does X work?" with the project briefing.
+- **Impact:** High — with Process Intelligence enabled, ordinary product questions get a confidently
+  off-topic project briefing; the app-screens Knowledge OS corpus is never consulted. **Severity:** High (P0).
+- **Root cause:** the intent classifier's **fallback category** was an engine-bound status question, and
+  `RE_NAV`/`RE_ROOT_CAUSE` were too narrow/too broad respectively. Fixing the screen route (REG-019) did
+  not change the default for non-screen questions.
+- **Status: RESOLVED (2026-07-07).** Fix (`src/lib/isabella/process-intelligence/intent-contract.ts`):
+  - **Fallback flipped** from `project_status_question` → **`navigation_or_how_to`** (→ Knowledge OS).
+  - **`RE_NAV` widened** (bilingual) to cover *cómo funciona / how does … work / qué es / what is /
+    para qué sirve / explica / explain / qué hace / what does … do*, with negative lookaheads so
+    *"what is happening/going"* stays a status ask.
+  - **`RE_STATUS` widened** to explicitly catch the daily-status phrasings that previously relied on the
+    default (*what is happening / qué está pasando / what needs attention / qué necesita atención*), so
+    flipping the default causes **no regression** to Daily Diagnosis.
+  - **`RE_ROOT_CAUSE` narrowed** to *why/por qué + a problem word* (delay/blocked/stuck/at-risk/…) so a
+    naming question ("¿por qué se llama …?") is knowledge, not root cause.
+  - The classification **order is unchanged** (report → root-cause → recommend → diagnosis → nav → status
+    → default); only the regexes and the default category changed.
+- **Protection rule (binding):** **The conservative default for an unclassified Isabella question is the
+  Knowledge OS (`navigation_or_how_to` / `product_help`), never a Process-Intelligence engine.** A
+  knowledge/"how it works"/"what is" question that routes to Daily Diagnosis (or a "why is it called X"
+  that routes to Root Cause) is a regression. Genuine status/attention asks must still reach Daily
+  Diagnosis. Guard id **ISABELLA-INTENT-FALLBACK-TO-KNOWLEDGE**. Related: [REG-019](#reg-019),
+  [REG-013](#reg-013), ISABELLA-PROCESS-INTELLIGENCE-UI-REALTIME-FINAL-INTEGRATION, [No silent regressions rule].
+- **Owner:** Product/Engineering. **Verify:** with Process Intelligence on, ask "¿cómo funciona el Living
+  Graph?" / "how does the Workboard work?" / "¿qué es el Execution Map?" → product-knowledge answer
+  (not the Daily Diagnosis); ask "cómo va el proyecto" / "what needs attention" → Daily Diagnosis
+  (no regression); ask "¿por qué se llama Living Graph?" → knowledge, not Root Cause.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

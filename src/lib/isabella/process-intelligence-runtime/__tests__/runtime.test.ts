@@ -67,6 +67,44 @@ describe("engine orchestration", () => {
   });
 });
 
+describe("screen-context explanation (never Daily Diagnosis, no engine, no DB)", () => {
+  const RES = { screenContext: { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" } };
+  const TASK = { screenContext: { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" } };
+
+  it("Resources 'unassigned' → answered from screen context, never builds diagnosis", async () => {
+    let called = 0;
+    const r = await runIsabellaProcessIntelligence(req("explícame qué significa member está unassigned", RES), {
+      buildContext: async () => { called++; return ctx(); },
+    });
+    expect(r.route).toBe("screen_context_explanation");
+    expect(r.status).toBe("answered");
+    expect(called).toBe(0); // no context build, no engine
+    expect(r.audit.enginesUsed).toEqual([]);
+    expect(r.answer.toLowerCase()).toMatch(/role|rol/);
+    expect(r.answer.toLowerCase()).not.toMatch(/daily|diagnos|tareas? sin responsable/);
+  });
+
+  it("'Explain this screen' on Resources explains participants, not Open Projects", async () => {
+    const r = await runIsabellaProcessIntelligence(req("Explain this screen", RES), { buildContext: build() });
+    expect(r.route).toBe("screen_context_explanation");
+    expect(r.answer.toLowerCase()).not.toContain("open projects");
+    expect(r.answer).toMatch(/participat/i);
+  });
+
+  it("task owner unassigned is a distinct explanation from the role slot", async () => {
+    const r = await runIsabellaProcessIntelligence(req("qué significa owner unassigned?", TASK), { buildContext: build() });
+    expect(r.route).toBe("screen_context_explanation");
+    expect(r.answer.toLowerCase()).toMatch(/tarea|task/);
+  });
+
+  it("missing/ambiguous screen → needs_clarification, NOT verified 100%", async () => {
+    const r = await runIsabellaProcessIntelligence(req("What does Unassigned mean?"), { buildContext: build() });
+    expect(r.route).toBe("screen_context_explanation");
+    expect(r.status).toBe("needs_clarification");
+    expect(r.audit.confidence).not.toBe("high");
+  });
+});
+
 describe("access + safety states", () => {
   it("unauthorized context → unauthorized, no data leak", async () => {
     const r = await runIsabellaProcessIntelligence(req("Why is this blocked?"), { buildContext: build("unauthorized", "Not authorized") });

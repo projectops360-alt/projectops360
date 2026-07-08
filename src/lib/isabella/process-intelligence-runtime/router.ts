@@ -10,10 +10,11 @@
 // ============================================================================
 
 import { classifyIsabellaIntent } from "@/lib/isabella/process-intelligence/intent-contract";
-import type { IsabellaRoute, IsabellaSelectedNode } from "./types";
+import { isScreenExplanationIntent, resolveScreenArea } from "@/lib/isabella/screen-help";
+import type { IsabellaRoute, IsabellaScreenContext, IsabellaSelectedNode } from "./types";
 
 // A recommendation ask combined with a status/attention/why ask → `mixed`.
-const RE_WANTS_RECOMMENDATION = /\brecommend|recomien|next (action|step)|pr[oó]ximos pasos|qu[eé] (debo|deber[ií]a) hacer|what should i do/i;
+const RE_WANTS_RECOMMENDATION = /\brecommend|recomien|next (action|step)|pr[oó]ximos pasos|qu[eé] (debo|deber[ií]a) (hacer|revisar|priorizar|atender|empezar|abordar)|what should i (do|review|check|look at)|revisar primero|review first|check first/i;
 const RE_WANTS_STATUS_OR_CAUSE = /what.*happen|qu[eé] .*(pasa|pasando|atenci[oó]n)|needs? attention|necesita atenci[oó]n|\bwhy\b|por qu[eé]|\bcaus/i;
 
 export interface IsabellaRouteDecision {
@@ -39,11 +40,30 @@ export function resolveNodeScope(node: IsabellaSelectedNode | undefined): { mile
  */
 export function routeIsabellaQuestion(
   question: string,
-  opts: { hasProject: boolean; selectedNode?: IsabellaSelectedNode },
+  opts: { hasProject: boolean; selectedNode?: IsabellaSelectedNode; screenContext?: IsabellaScreenContext },
 ): IsabellaRouteDecision {
   const q = (question ?? "").trim();
   const scope = resolveNodeScope(opts.selectedNode);
   const hasScope = opts.hasProject || !!opts.selectedNode;
+
+  // ── HIGHEST PRIORITY: screen / UI-label questions ─────────────────────────
+  // "Explain this screen", "what does Unassigned/Member/Permission/Access mean",
+  // "qué significa …", "explain this column/field/button" are about the VISIBLE
+  // screen — they MUST be answered from screen context, NEVER from the diagnosis /
+  // root-cause / recommendation engines nor the factual fallback. This runs before
+  // `mixed` and before intent classification so a UI-meaning ask can never leak
+  // into Daily Diagnosis (the reported P0). ISABELLA-SCREEN-CONTEXT-EXPLANATION.
+  if (isScreenExplanationIntent(q)) {
+    const area = resolveScreenArea(opts.screenContext);
+    // We have deterministic content for Resources/participants and task surfaces;
+    // unknown/ambiguous screens still route here so the runtime can ask a safe
+    // clarification instead of guessing another screen.
+    if (area === "resources" || area === "task" || area === "unknown") {
+      return { route: "screen_context_explanation", scope, needsClarification: false };
+    }
+    // A known-but-uncovered screen → RAG (product knowledge), never an engine.
+    return { route: "product_help", scope, needsClarification: false };
+  }
 
   // `mixed`: a recommendation ask joined with a status/attention/why ask.
   if (RE_WANTS_RECOMMENDATION.test(q) && RE_WANTS_STATUS_OR_CAUSE.test(q)) {

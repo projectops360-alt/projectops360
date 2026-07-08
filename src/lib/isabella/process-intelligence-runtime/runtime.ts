@@ -15,6 +15,7 @@ import type { IsabellaProcessContext } from "@/lib/isabella/process-context/type
 import { assembleDailyDiagnosis, formatDailyDiagnosisForIsabella } from "@/lib/isabella/daily-diagnosis";
 import { assembleRootCauseAnalysis, formatRootCauseAnalysisForIsabella } from "@/lib/isabella/root-cause";
 import { assembleRecommendationPlan, formatRecommendationPlanForIsabella } from "@/lib/isabella/recommendations";
+import { answerScreenHelp } from "@/lib/isabella/screen-help";
 import { routeIsabellaQuestion } from "./router";
 import type {
   IsabellaProcessIntelligenceAudit,
@@ -56,7 +57,11 @@ export async function runIsabellaProcessIntelligence(
   const started = Date.now();
   const language: RuntimeLanguage = request.locale === "es" ? "es" : "en";
   const hasProject = !!request.projectId || !!request.selectedNode;
-  const decision = routeIsabellaQuestion(request.question, { hasProject, selectedNode: request.selectedNode });
+  const decision = routeIsabellaQuestion(request.question, {
+    hasProject,
+    selectedNode: request.selectedNode,
+    screenContext: request.screenContext,
+  });
 
   const audit = (over: Partial<IsabellaProcessIntelligenceAudit>): IsabellaProcessIntelligenceAudit => ({
     processIntelligenceEnabled: true,
@@ -70,6 +75,24 @@ export async function runIsabellaProcessIntelligence(
     executionMs: Date.now() - started,
     ...over,
   });
+
+  // Screen / UI-label explanation — deterministic, from screen context. Never an
+  // engine, never Daily Diagnosis. When the screen is unknown/ambiguous it returns
+  // a safe clarification (confident=false) so we do NOT mark it "Verified 100%".
+  if (decision.route === "screen_context_explanation") {
+    const help = answerScreenHelp(request.question, request.screenContext, language);
+    return {
+      status: help.confident ? "answered" : "needs_clarification",
+      route: "screen_context_explanation",
+      answer: help.answer,
+      audit: audit({
+        route: "screen_context_explanation",
+        resultStatus: help.confident ? "answered" : "needs_clarification",
+        confidence: help.confident ? "high" : "unavailable",
+        selectedScope: { type: scopeType(request.selectedNode), id: help.area },
+      }),
+    };
+  }
 
   // RAG / factual-data are handled by the existing pipeline — fall back cleanly.
   if (decision.route === "product_help" || decision.route === "factual_project_data") {
