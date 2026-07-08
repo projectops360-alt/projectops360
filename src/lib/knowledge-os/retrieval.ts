@@ -11,6 +11,17 @@
 // best match wins regardless of language; the answer is still produced in the
 // user's language (handled in the prompt). The lexical half also receives PM
 // synonym expansion (Language Intelligence Layer). Degrades gracefully.
+//
+// QUERY DILUTION (REG-021 / KNOWLEDGE-OS-RETRIEVAL-QUERY-DILUTION): the caller
+// may blend screen context (module/screen/pageTitle) into the main query — that
+// helps vague asks ("how do I use this?") but DROWNS a specific ask about a
+// DIFFERENT screen ("explícame el bottleneck view" asked from the Projects
+// list). The LEXICAL half therefore ranks by the user's RAW question
+// (`lexicalQuery`) when provided; the blended query stays on the vector half
+// where the embedding absorbs context gracefully. The vector threshold is also
+// calibrated for cross-language asks (a correct ES↔EN match measured ≈0.53;
+// the old 0.6 filtered it out) — RRF ranking + the grounding gate handle
+// precision, so the threshold only needs to cut noise, not near-matches.
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -98,6 +109,13 @@ export interface RetrieveOptions {
   language: string;
   matchCount?: number;
   vectorThreshold?: number;
+  /**
+   * The user's RAW question, WITHOUT blended screen context. When provided,
+   * the lexical half ranks by this (context words like the current screen's
+   * module/pageTitle must never outrank the actual topic — REG-021). Falls
+   * back to the main query when empty (vague/intent-only asks).
+   */
+  lexicalQuery?: string;
 }
 
 /**
@@ -113,7 +131,11 @@ export async function retrieveKnowledge(
 
   const supabase = createAdminClient();
   const matchCount = opts.matchCount ?? 8;
-  const threshold = opts.vectorThreshold ?? 0.6;
+  // 0.45 keeps legitimate cross-language matches (measured ≈0.53 for a correct
+  // ES question ↔ EN chunk) while still cutting noise; RRF + the grounding
+  // gate downstream handle precision. 0.6 silently emptied the vector half.
+  const threshold = opts.vectorThreshold ?? 0.45;
+  const lexicalQuery = (opts.lexicalQuery ?? "").trim() || q;
 
   // Run both halves concurrently.
   const [vectorList, lexicalList] = await Promise.all([
@@ -148,7 +170,8 @@ export async function retrieveKnowledge(
     (async (): Promise<RetrievedChunk[]> => {
       const { data, error } = await supabase.rpc("match_knowledge_lexical", {
         // Language Intelligence: expand PM synonyms/acronyms for recall.
-        query_text: expandQueryForLexical(q),
+        // RAW question only — blended screen context must not dilute ranking.
+        query_text: expandQueryForLexical(lexicalQuery),
         filter_organization_id: opts.organizationId,
         // Multilingual: the RPC parses the query in both languages; search all.
         filter_language: null,
