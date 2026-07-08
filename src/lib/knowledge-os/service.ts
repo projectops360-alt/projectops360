@@ -248,9 +248,14 @@ export async function askKnowledgeOs(org: OrgContext, input: AskGuideInput): Pro
   const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[locale === "es" ? "es" : "en"] };
 
   // ── 1. Retrieve (hybrid, multilingual, context-aware) ────────────────────
+  // The blended query (question + screen context) feeds the VECTOR half only;
+  // the lexical half ranks by the raw question so context words never drown
+  // the actual topic (REG-021 — "explícame el bottleneck view" asked from the
+  // Projects list must retrieve the bottleneck sheet, not projects sheets).
   const retrieved = await retrieveKnowledge(buildRetrievalQuery(input), {
     organizationId: org.organizationId,
     language: locale,
+    lexicalQuery: input.query,
   });
 
   // ── 2. No knowledge → honest fallback, NO fabricated answer ──────────────

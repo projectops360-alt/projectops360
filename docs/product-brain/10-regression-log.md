@@ -656,5 +656,46 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-021 — Knowledge OS retrieval: screen context drowns the question; vector threshold drops cross-language matches
+- **Description:** Asking Isabella *"explícame el bottleneck view"* from the **Projects list** returned
+  "No tengo una respuesta verificada…" (AI suggestion · 20%) although the corpus contains
+  `screen-living-graph-view-bottleneck` fully embedded (`index_status=completed`).
+- **Observed:** The `knowledge_answers` record for the real ask shows 8 retrieved chunks — **none of
+  them the bottleneck sheet** (projects-list/settings/charter/import ranked instead) and **every chunk
+  with `similarity: null`** (vector half empty). Two independent retrieval defects:
+  1. **Query dilution (lexical half).** `buildRetrievalQuery` blends the question with screen context
+     (module/screen/pageTitle → "… Projects projects projects list"), and that blended string fed the
+     LEXICAL ranking. Context words outranked the actual topic, so the correct sheet fell out of the
+     top-8. With the raw question, the same sheet ranks lexical **1.0 (#1)**.
+  2. **Vector threshold too strict.** The correct sheet is the **top vector match** for the raw
+     question at similarity **≈0.53**, but the hardcoded threshold was **0.6** → the vector half
+     returned nothing (cross-language ES question ↔ EN chunk lowers cosine).
+  With only irrelevant passages, the LLM honestly answered `grounded:false` — correct behavior given
+  wrong retrieval.
+- **Expected:** A specific question about screen X asked from screen Y retrieves screen X's sheet. The
+  user's actual words always dominate ranking; ambient screen context is a weak prior, never a
+  substitute topic. Legitimate cross-language matches are not silently filtered out.
+- **Impact:** High — Isabella "can't answer" questions the corpus covers whenever the user asks from a
+  different screen, eroding trust in the whole app-screens corpus investment. **Severity:** High (P1).
+- **Root cause:** one blended query string served both retrieval halves (context pollution), plus an
+  uncalibrated vector similarity threshold.
+- **Status: RESOLVED (2026-07-07).** Fix (`src/lib/knowledge-os/retrieval.ts` + `service.ts`):
+  - `RetrieveOptions.lexicalQuery` — the LEXICAL half now ranks by the user's **raw question**
+    (`input.query`), falling back to the blended query only when the raw one is empty
+    (vague/intent-only asks). The blended query stays on the VECTOR half, where the embedding absorbs
+    context gracefully.
+  - Default vector threshold **0.6 → 0.45** (measured: correct ES↔EN match ≈0.53). RRF fusion + the
+    LLM grounding gate handle precision downstream; the threshold only needs to cut noise.
+- **Protection rule (binding):** **The user's raw question drives lexical ranking; blended screen
+  context must never displace the asked topic. The vector threshold must admit legitimate
+  cross-language matches (≤0.5 band).** A specific screen question that retrieves the CURRENT screen's
+  sheets instead of the ASKED screen's sheet is a regression. Guard id
+  **KNOWLEDGE-OS-RETRIEVAL-QUERY-DILUTION**. Related: [REG-020](#reg-020) (routing default),
+  the multilingual retrieval fix (retrieval.ts header), Knowledge OS (doc 16).
+- **Owner:** Product/Engineering. **Verify:** from the Projects list, ask "explícame el bottleneck
+  view" → grounded answer citing `screen-living-graph-view-bottleneck` (not "no verified answer").
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*
