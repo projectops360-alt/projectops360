@@ -80,10 +80,10 @@ export const INTENT_CATEGORY_CONTRACT: Record<IsabellaIntentCategory, IntentCate
 };
 
 const RE_ROOT_CAUSE = /\bwhy\b|por qu[eé]|\bcaus(a|e|ing|ando)\b|root cause|raíz|origen del (retraso|bloqueo)/i;
-const RE_RECOMMEND = /\brecommend|recomien|next (action|step)|pr[oó]ximos pasos|qu[eé] (debo|deber[ií]a) hacer|what should i do/i;
+const RE_RECOMMEND = /\brecommend|recomien|next (action|step)|pr[oó]ximos pasos|qu[eé] (debo|deber[ií]a) (hacer|revisar|priorizar|atender|empezar|abordar)|what should i (do|review|check|look at)|revisar primero|review first|check first|d[oó]nde empiezo|where (do i|to) start/i;
 const RE_DIAGNOSIS = /\bdiagnos|health (today|of)|focus (today|on)|enfocar(me)? hoy|salud (de hoy|del proyecto hoy)/i;
 const RE_STATUS = /how is (this|the) project|c[oó]mo va|estado del proyecto|project status|qu[eé] (est[aá]|hay) bloque/i;
-const RE_NAV = /\bwhere\b|how do i|d[oó]nde (veo|puedo|est[aá])|c[oó]mo (abro|accedo|veo|navego)/i;
+const RE_NAV = /\bwhere\b|how do i|d[oó]nde (veo|puedo|est[aá])|c[oó]mo (abro|accedo|veo|navego|agrego|agregar|a[nñ]ado|a[nñ]adir|creo|crear|hago|hacer|configuro|configurar|invito|invitar|asigno|asignar|edito|editar|elimino|eliminar)/i;
 
 export interface IsabellaIntentClassification {
   category: IsabellaIntentCategory;

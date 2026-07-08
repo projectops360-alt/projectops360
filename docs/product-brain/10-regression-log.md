@@ -546,5 +546,66 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-019 — Isabella misroutes screen/UI-label questions into Process Intelligence
+- **Description:** On the **Resources / "Who participates in this project?"** screen, asking Isabella
+  *"explícame qué significa member está unassigned"* / *"qué significa unassigned"* returned the
+  **Daily Project Diagnosis** (tasks without owner, project status, milestones, daily focus) instead of
+  explaining the **UI label**. Separately, *"Explain this screen"* explained the **Open Projects** list
+  instead of the Resources participants screen (stale/wrong screen context).
+- **Observed:** Two independent defects.
+  1. **Routing.** `classifyIsabellaIntent` has no category for UI-meaning questions, so
+     *"qué significa …"* fell through to the `project_status_question` **default** →
+     `daily_diagnosis`. With `ISABELLA_PROCESS_INTELLIGENCE_ENABLED` on, that rendered the Daily
+     Diagnosis for a question about a table column. The runtime also never conveyed screen context to
+     the router.
+  2. **Stale screen.** The project participants screen (`/projects/{id}/team`) had **no entry** in the
+     Screen Intelligence registry (`src/lib/knowledge-os/screens.ts`), so `resolveScreen` fell through
+     to the `/projects` prefix and resolved the generic **Projects list** — so "Explain this screen"
+     described "Open Projects".
+- **Expected:** A question about the **visible screen, its columns/buttons, or a UI term** (Unassigned,
+  Member, Permission, Access) is answered from **screen context**, never from Daily Diagnosis /
+  Root Cause / Recommendation. **Domain distinction:** on Resources, *"Unassigned"* = a **project role
+  slot with no person assigned yet** ("Role missing assignment"); on a task/Workboard screen,
+  *"unassigned"* = a **task with no owner**. These are never conflated. When screen context is
+  missing/ambiguous, Isabella asks a safe clarification instead of guessing another screen, and such an
+  answer is **never presented as "Verified 100%"**.
+- **Impact:** High — Isabella gives a confidently-wrong, off-topic answer to a basic "what does this
+  mean?" question, and describes the wrong screen. Erodes trust in the assistant. **Severity:** High (P0).
+- **Root cause:** (1) **missing high-priority route** — UI/screen questions had no classification and
+  defaulted into the status/diagnosis engine; (2) **incomplete screen registry** — the participants
+  screen was unmapped, so screen resolution silently degraded to the Projects list.
+- **Status: RESOLVED (2026-07-07).** Fix:
+  - **New `screen_context_explanation` route** with **highest priority** in `routeIsabellaQuestion`
+    (runs BEFORE `mixed`, `daily_diagnosis`, `root_cause`, `recommendation`, and the factual/RAG
+    fallback). UI/screen questions can never reach an engine.
+  - **Deterministic content module** `src/lib/isabella/screen-help/` — bilingual explanations of the
+    Resources participants screen + its columns, and the **domain-distinct** meaning of "Unassigned"
+    (role slot vs task owner). Unknown/ambiguous screen → safe clarification, `confident:false` →
+    the wiring returns a non-verified tier (never "Verified 100%").
+  - **Registry entry** for `/projects/{id}/team` (`project_team` / `project_participants`) with the real
+    columns (Member, Type, Role/Delivery/Governance, Permission, Access) and add-participant actions, so
+    "Explain this screen" resolves the participants screen — not the Projects list.
+  - **Classifier widened** so *"qué debería revisar primero"* → `recommendation` and *"cómo agrego …"* →
+    `product_help` (how-to) rather than the diagnosis default. Tool-use gateway prompt also guards
+    UI-label questions away from `get_daily_diagnosis`.
+  - Files: `src/lib/isabella/screen-help/screen-help.ts` (+ `index.ts`),
+    `src/lib/isabella/process-intelligence-runtime/{router.ts,runtime.ts,types.ts}`,
+    `src/lib/isabella/process-intelligence/intent-contract.ts`, `src/lib/isabella/tools/gateway.ts`,
+    `src/lib/knowledge-os/screens.ts`. Tests:
+    `src/lib/isabella/screen-help/__tests__/screen-help.test.ts`,
+    `src/lib/isabella/process-intelligence-runtime/__tests__/{router,runtime}.test.ts`,
+    `src/lib/knowledge-os/__tests__/screens-participants.test.ts`.
+- **Protection rule (binding):** **Screen/UI questions are answered from screen context, never from the
+  process-intelligence engines.** A UI-label or "explain this screen" question that routes to Daily
+  Diagnosis (or describes a different screen than the active one) is a regression. Resources "Unassigned"
+  (role slot) and task-owner "unassigned" must stay distinct. Missing/stale screen context → safe
+  clarification, never "Verified 100%". Related: [REG-013](#reg-013), [REG-014],
+  [UX-001](32-product-ux-contracts.md), [No silent regressions rule].
+- **Owner:** Product/Engineering. **Verify:** on Resources, ask "qué significa unassigned" → role-slot
+  explanation (no Daily Diagnosis); ask "Explain this screen" → participants screen (not Open Projects);
+  on a task, ask "owner unassigned?" → task-owner explanation.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

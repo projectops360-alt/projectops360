@@ -137,6 +137,43 @@ export const SCREEN_REGISTRY: ScreenDefinition[] = [
     },
   },
   {
+    // ISABELLA-SCREEN-CONTEXT-EXPLANATION — the project participants screen
+    // (Resources / "Who participates in this project?"). Without this entry the
+    // route `/projects/{id}/team` fell through to the generic Projects list, so
+    // "Explain this screen" wrongly described "Open Projects" (P0 regression).
+    match: "/projects",
+    projectSubroute: "team",
+    module: "project_team",
+    screen: "project_participants",
+    title: { en: "Team & Roles — Who participates", es: "Equipo y Roles — Quién participa" },
+    workflow: {
+      en: "Define who participates in this project, in which role, with what permission and access — from the Directory, a Company team, an External contact, an email invite, or a manual role.",
+      es: "Definir quién participa en este proyecto, con qué rol, permiso y acceso — desde el Directorio, un Equipo de empresa, un Contacto externo, una invitación por correo o un rol manual.",
+    },
+    components: {
+      en: [
+        "\"Who participates in this project?\" panel",
+        "Add participant source tabs: Directory, Company team, External contact, Invite by email, Manual role",
+        "AI role recommendation button",
+        "Members table — columns: Member, Type, Role / Delivery / Governance, Permission, Access",
+        "\"Unassigned\" member = role slot with no person assigned yet (\"Role missing assignment\")",
+        "RACI matrix and Stakeholder access sections",
+      ],
+      es: [
+        "Panel \"¿Quién participa en este proyecto?\"",
+        "Pestañas de origen: Directorio, Equipo de empresa, Contacto externo, Invitar por correo, Rol manual",
+        "Botón Recomendar roles con IA",
+        "Tabla de miembros — columnas: Miembro, Tipo, Rol / Entrega / Gobernanza, Permiso, Accesos",
+        "\"Sin asignar\" en Miembro = rol sin persona asignada aún (\"Rol pendiente de asignar persona\")",
+        "Secciones de matriz RACI y acceso de stakeholders",
+      ],
+    },
+    followups: {
+      en: ["What does \"Unassigned\" mean here?", "How do I add a participant?", "What is the difference between Permission and Access?"],
+      es: ["¿Qué significa \"Sin asignar\" aquí?", "¿Cómo agrego un participante?", "¿Cuál es la diferencia entre Permiso y Accesos?"],
+    },
+  },
+  {
     // REG-016/REG-017 — Isabella must understand the Closeout Report screen and
     // its record-backed readiness, especially the "Risks resolved" blocker.
     match: "/projects",
