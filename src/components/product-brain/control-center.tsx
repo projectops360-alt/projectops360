@@ -24,6 +24,7 @@ import {
   type ProductBrainFilter,
 } from "@/lib/product-brain-center/select";
 import { askIsabellaAboutItemAction, exportProductBrainAction } from "./actions";
+import { IndexKnowledgeButton } from "./index-knowledge-button";
 import { ProductIntelligenceCenter } from "./product-intelligence-center";
 
 const GITHUB_BASE = "https://github.com/projectops360-alt/projectops360/blob/master/docs/product-brain";
@@ -110,10 +111,13 @@ export function ProductBrainControlCenter({
             </p>
           </div>
         </div>
-        <button onClick={doExport} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400">
-          <Download className="h-4 w-4" />
-          {tt("Export report", "Exportar reporte")}
-        </button>
+        <div className="flex items-start gap-2">
+          {isAdmin && <IndexKnowledgeButton es={es} />}
+          <button onClick={doExport} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400">
+            <Download className="h-4 w-4" />
+            {tt("Export report", "Exportar reporte")}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
