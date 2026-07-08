@@ -34,6 +34,36 @@ describe("deterministic routing", () => {
   });
 });
 
+// ISABELLA-INTENT-FALLBACK-TO-KNOWLEDGE — a knowledge / "how it works" question
+// must route to product_help (Knowledge OS / RAG), NEVER daily_diagnosis. This is
+// the reported P0: with Process Intelligence on, "¿cómo funciona el living graph?"
+// returned the Daily Diagnosis briefing.
+describe("knowledge / how-it-works routing (never Daily Diagnosis)", () => {
+  it("'how it works / what is / para qué sirve' → product_help (EN/ES)", () => {
+    for (const q of [
+      "¿cómo funciona el living graph?",
+      "how does the workboard work",
+      "qué es el execution map",
+      "what is the Execution Map?",
+      "¿para qué sirve el workboard?",
+      "explain the Living Graph",
+    ]) {
+      const d = routeIsabellaQuestion(q, P);
+      expect(d.route, q).toBe("product_help");
+      expect(d.route, q).not.toBe("daily_diagnosis");
+    }
+  });
+  it("'¿por qué se llama living graph?' → product_help, not root_cause", () => {
+    const d = routeIsabellaQuestion("¿por qué se llama living graph?", P);
+    expect(d.route).toBe("product_help");
+    expect(d.route).not.toBe("root_cause");
+  });
+  it("but 'cómo va el proyecto' still → daily_diagnosis (no regression)", () => {
+    expect(routeIsabellaQuestion("cómo va el proyecto", P).route).toBe("daily_diagnosis");
+    expect(routeIsabellaQuestion("What needs my attention?", P).route).toBe("daily_diagnosis");
+  });
+});
+
 // ISABELLA-SCREEN-CONTEXT-EXPLANATION — UI/screen questions MUST take priority
 // over the engines and never leak into Daily Diagnosis (the reported P0).
 describe("screen-context explanation priority", () => {

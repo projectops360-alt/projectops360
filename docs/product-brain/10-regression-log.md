@@ -607,5 +607,54 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-020 — Isabella's intent default routes every unclassified question to Daily Diagnosis
+- **Description:** With `ISABELLA_PROCESS_INTELLIGENCE_ENABLED` on, a **knowledge / "how it works"**
+  question that is NOT about the visible screen — e.g. *"¿cómo funciona el Living Graph?"*,
+  *"how does the Workboard work?"*, *"¿qué es el Execution Map?"* — returned the **Daily Project
+  Diagnosis** (project briefing) instead of a product-knowledge answer.
+- **Observed:** This is the second half of [REG-019](#reg-019). REG-019 added the high-priority
+  `screen_context_explanation` route, which only catches questions about the *active screen*
+  ("qué significa …", "explain this screen"). A general knowledge question does **not** match that
+  route, so it reached `classifyIsabellaIntent` — whose **final default was `project_status_question`**
+  (`intent-contract.ts`), which the router maps to `daily_diagnosis`. So every unclassified question
+  still fell into the diagnosis engine. Two related classifier gaps compounded it:
+  1. `RE_NAV` did not recognize "how it works / what is / para qué sirve / explain / what does … do".
+  2. `RE_ROOT_CAUSE` matched **any** "why / por qué", so *"¿por qué se llama Living Graph?"* was
+     misrouted to the (future) Root Cause engine instead of the Knowledge OS.
+- **Expected:** The **conservative default is the Knowledge OS (RAG / `product_help`)**, not an engine.
+  A knowledge/how-to/what-is question is answered from product knowledge; only genuine status/attention
+  asks ("cómo va el proyecto", "what needs attention", "what is happening today") route to Daily
+  Diagnosis, and only a *why-about-a-problem* ("why is this milestone delayed/blocked?") routes to
+  Root Cause. Isabella must never answer "how does X work?" with the project briefing.
+- **Impact:** High — with Process Intelligence enabled, ordinary product questions get a confidently
+  off-topic project briefing; the app-screens Knowledge OS corpus is never consulted. **Severity:** High (P0).
+- **Root cause:** the intent classifier's **fallback category** was an engine-bound status question, and
+  `RE_NAV`/`RE_ROOT_CAUSE` were too narrow/too broad respectively. Fixing the screen route (REG-019) did
+  not change the default for non-screen questions.
+- **Status: RESOLVED (2026-07-07).** Fix (`src/lib/isabella/process-intelligence/intent-contract.ts`):
+  - **Fallback flipped** from `project_status_question` → **`navigation_or_how_to`** (→ Knowledge OS).
+  - **`RE_NAV` widened** (bilingual) to cover *cómo funciona / how does … work / qué es / what is /
+    para qué sirve / explica / explain / qué hace / what does … do*, with negative lookaheads so
+    *"what is happening/going"* stays a status ask.
+  - **`RE_STATUS` widened** to explicitly catch the daily-status phrasings that previously relied on the
+    default (*what is happening / qué está pasando / what needs attention / qué necesita atención*), so
+    flipping the default causes **no regression** to Daily Diagnosis.
+  - **`RE_ROOT_CAUSE` narrowed** to *why/por qué + a problem word* (delay/blocked/stuck/at-risk/…) so a
+    naming question ("¿por qué se llama …?") is knowledge, not root cause.
+  - The classification **order is unchanged** (report → root-cause → recommend → diagnosis → nav → status
+    → default); only the regexes and the default category changed.
+- **Protection rule (binding):** **The conservative default for an unclassified Isabella question is the
+  Knowledge OS (`navigation_or_how_to` / `product_help`), never a Process-Intelligence engine.** A
+  knowledge/"how it works"/"what is" question that routes to Daily Diagnosis (or a "why is it called X"
+  that routes to Root Cause) is a regression. Genuine status/attention asks must still reach Daily
+  Diagnosis. Guard id **ISABELLA-INTENT-FALLBACK-TO-KNOWLEDGE**. Related: [REG-019](#reg-019),
+  [REG-013](#reg-013), ISABELLA-PROCESS-INTELLIGENCE-UI-REALTIME-FINAL-INTEGRATION, [No silent regressions rule].
+- **Owner:** Product/Engineering. **Verify:** with Process Intelligence on, ask "¿cómo funciona el Living
+  Graph?" / "how does the Workboard work?" / "¿qué es el Execution Map?" → product-knowledge answer
+  (not the Daily Diagnosis); ask "cómo va el proyecto" / "what needs attention" → Daily Diagnosis
+  (no regression); ask "¿por qué se llama Living Graph?" → knowledge, not Root Cause.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

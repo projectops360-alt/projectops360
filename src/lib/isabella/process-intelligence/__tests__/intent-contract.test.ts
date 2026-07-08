@@ -71,4 +71,54 @@ describe("intent contract", () => {
     expect(classifyIsabellaIntent("").category).toBe("unsupported_or_missing_context");
     expect(classifyIsabellaIntent("   ").category).toBe("unsupported_or_missing_context");
   });
+
+  // ISABELLA-INTENT-FALLBACK-TO-KNOWLEDGE — a knowledge / "how it works" question
+  // must classify as navigation_or_how_to (→ Knowledge OS), never as a status
+  // question that would route to Daily Diagnosis. This was the reported P0: with
+  // Process Intelligence on, EVERY question fell through to project_status_question.
+  describe("knowledge / how-it-works questions reach the Knowledge OS", () => {
+    it("classifies 'how it works / what is / explain' questions as navigation_or_how_to (EN/ES)", () => {
+      for (const q of [
+        "how does the Living Graph work?",
+        "¿cómo funciona el Living Graph?",
+        "how does the workboard work",
+        "what is the Execution Map?",
+        "¿qué es el Execution Map?",
+        "¿para qué sirve el Workboard?",
+        "explain the Living Graph",
+        "explícame el Execution Map",
+        "what does the roadmap do?",
+      ]) {
+        expect(classifyIsabellaIntent(q).category, q).toBe("navigation_or_how_to");
+      }
+    });
+
+    it("the conservative DEFAULT is knowledge, not a status/diagnosis engine", () => {
+      // An unclassified free-form question no longer falls through to
+      // project_status_question (which routes to Daily Diagnosis).
+      expect(classifyIsabellaIntent("tell me about the Living Graph").category).toBe("navigation_or_how_to");
+      expect(classifyIsabellaIntent("Living Graph").category).toBe("navigation_or_how_to");
+    });
+
+    it("'why is it called X' is knowledge, NOT root cause (RE_ROOT_CAUSE is problem-scoped)", () => {
+      expect(classifyIsabellaIntent("¿por qué se llama Living Graph?").category).toBe("navigation_or_how_to");
+      expect(classifyIsabellaIntent("why is it called the Execution Map?").category).toBe("navigation_or_how_to");
+      // …but a why-about-a-problem is still root cause (no regression).
+      expect(classifyIsabellaIntent("why is this milestone delayed?").category).toBe("root_cause_analysis");
+      expect(classifyIsabellaIntent("¿por qué está bloqueado este hito?").category).toBe("root_cause_analysis");
+    });
+
+    it("genuine status/attention asks still classify as project_status_question (no regression)", () => {
+      for (const q of [
+        "cómo va el proyecto",
+        "how is this project doing?",
+        "What is happening in this project today?",
+        "¿Qué está pasando en este proyecto hoy?",
+        "¿Qué necesita atención hoy?",
+        "What needs my attention?",
+      ]) {
+        expect(classifyIsabellaIntent(q).category, q).toBe("project_status_question");
+      }
+    });
+  });
 });
