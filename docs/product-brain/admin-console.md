@@ -1,8 +1,8 @@
 # Admin Console — Platform Administration Surface
 
-**Status:** Internal, read-only, server-gated. **No production deploy performed** for this
-feature. **Route:** `/<locale>/admin` (inside the authenticated `(app)` group), e.g.
-`/admin` (EN) or `/es/admin` (ES).
+**Status:** Internal, read-only, server-gated. Deployed to production (PR #158), with the
+shared-allowlist access fix in a follow-up. **Route:** `/<locale>/admin` (inside the
+authenticated `(app)` group), e.g. `/admin` (EN) or `/es/admin` (ES).
 
 ## Purpose
 
@@ -21,9 +21,16 @@ Access is a **strict server-side** check, evaluated in `src/lib/admin-console/ac
 
 1. **Table allowlist** — an active (`is_active = true`) row for the normalized email in
    `admin_authorized_users`. (Future source of truth; empty/absent table falls through.)
-2. **Temporary fallback** — the normalized email equals `pmo@xxx-demo.io`
-   (`FALLBACK_ADMIN_EMAIL`).
-3. Otherwise → **denied** (the route returns **404** and loads **no data**).
+2. **Shared platform-admin allowlist** — the email is in the same allowlist resolved by
+   Product Brain (`PRODUCT_BRAIN_ALLOWED_EMAILS` env-var, or its built-in defaults
+   `efrain.pradas@gmail.com` + `pmo@xxx-demo.io`). The Admin Console reuses this list so the
+   platform owners reach both internal surfaces (Admin Console + Product Brain Control
+   Center) with one config. Configure in production via
+   `PRODUCT_BRAIN_ALLOWED_EMAILS=a@x.io,b@y.io` (comma-separated; overrides the defaults).
+3. **Anti-lockout fallback** — the normalized email equals `pmo@xxx-demo.io`
+   (`FALLBACK_ADMIN_EMAIL`). Redundant with #2 (which also contains it), kept defensively
+   so the Console is never locked out even if the env var is unset and the defaults change.
+4. Otherwise → **denied** (the route returns **404** and loads **no data**).
 
 Email comparison is **case-insensitive and trimmed** (reuses `normalizeEmail` from
 `src/lib/product-brain/access.ts`). `PMO@XXX-DEMO.IO` and `  pmo@xxx-demo.io  ` are
@@ -34,9 +41,11 @@ The 404 (via `notFound()`) is deliberate and consistent with the rest of the adm
 guarantees no admin query runs. The spec's "403 or equivalent" is satisfied by this
 equivalent — a hard denial with no data.
 
-**Only `pmo@xxx-demo.io` is authorized today.** No role (owner/admin/member/viewer) grants
-access by itself. Org `owner`/`admin` roles are org-scoped, not platform-scoped, and do
-**not** open this console.
+**Authorized today:** `efrain.pradas@gmail.com` and `pmo@xxx-demo.io` (via the shared
+allowlist defaults, set in prod through `PRODUCT_BRAIN_ALLOWED_EMAILS`), plus any active
+row in `admin_authorized_users` once that migration is applied. No role
+(owner/admin/member/viewer) grants access by itself. Org `owner`/`admin` roles are
+org-scoped, not platform-scoped, and do **not** open this console.
 
 ## How the route is protected
 
@@ -102,9 +111,9 @@ A new migration is included — **NOT applied to production** (review & apply ma
   (service role only).
 
 The access helper (`access.server.ts`) tolerates the table being **absent** (query error or
-client throw → falls back to `pmo@xxx-demo.io`), so the console keeps working before the
-migration is applied. Once applied and seeded, the table becomes the source of truth and
-the fallback can be removed.
+client throw → falls through to the shared allowlist, then the `pmo@xxx-demo.io` fallback),
+so the console keeps working before the migration is applied. Once applied and seeded,
+the table becomes the source of truth and the fallback can be removed.
 
 The console renders an **"Admin Access"** tab (read-only) showing current authorized
 admins (email, role, status, authorized-on) and a note that editing/granting will be added
@@ -134,9 +143,10 @@ conventions (no new UI library).
 ## How to test locally
 
 1. `npm run dev`.
-2. Sign in as `pmo@xxx-demo.io`. The sidebar shows **Admin Console**. Open `/admin`:
-   KPI cards, the five tabs (Overview, Companies, Users & Projects, Project Tasks, Admin
-   Access), filters and the company/task drill-downs work against real data.
+2. Sign in as `pmo@xxx-demo.io` **or** `efrain.pradas@gmail.com` (both in the shared
+   allowlist). The sidebar shows **Admin Console**. Open `/admin`: KPI cards, the five
+   tabs (Overview, Companies, Users & Projects, Project Tasks, Admin Access), filters and
+   the company/task drill-downs work against real data.
 3. Sign in as any other user (including an org `owner`/`admin`). The sidebar does **not**
    show Admin Console. Hitting `/admin` (or `/es/admin`) directly returns a **404** and
    loads no admin data.
@@ -144,8 +154,9 @@ conventions (no new UI library).
 
 Automated tests:
 - `src/lib/admin-console/__tests__/access.test.ts` — RBAC: fallback authorized,
-  case-insensitive, other users denied, empty/null denied, table-first, fallback on
-  absent table / missing service role, denial logging.
+  case-insensitive, shared Product Brain allowlist (defaults + env override) authorized,
+  other users denied, empty/null denied, table-first, fallback on absent table / missing
+  service role, denial logging.
 - `src/lib/admin-console/__tests__/queries.test.ts` — aggregation math (KPIs, users per
   company, projects per user, task-status rollups, paginated drill-down, filter recording,
   honest degradation on error).

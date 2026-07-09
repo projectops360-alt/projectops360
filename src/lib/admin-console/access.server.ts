@@ -5,18 +5,21 @@ import "server-only";
 // ============================================================================
 // The Admin Console (/<locale>/admin) is a platform-wide, cross-org surface:
 // it reads companies, users, projects and tasks across every tenant. Access
-// is a STRICT server-side check — never frontend-only. Today exactly one
-// address is allowed:
-//
-//   pmo@xxx-demo.io
+// is a STRICT server-side check — never frontend-only.
 //
 // Authorization logic (evaluated server-side, case-insensitive, trimmed):
 //   1. If `admin_authorized_users` has an active (is_active=true) row for the
 //      normalized email → authorized. (Future source of truth; empty/absent
 //      table falls through.)
-//   2. Else if the normalized email equals FALLBACK_ADMIN_EMAIL → authorized
-//      (temporary, until the table is populated from the Admin Console UI).
-//   3. Else → denied (the route returns 404 and loads NO data).
+//   2. Else if the email is in the shared platform-admin allowlist resolved by
+//      Product Brain (`PRODUCT_BRAIN_ALLOWED_EMAILS` env-var, or its built-in
+//      defaults — efrain.pradas@gmail.com + pmo@xxx-demo.io) → authorized.
+//      This is the SAME list that gates the Product Brain Control Center, so
+//      the platform owners reach both internal surfaces with one config.
+//   3. Else if the normalized email equals FALLBACK_ADMIN_EMAIL → authorized
+//      (anti-lockout; redundant with #2 but kept so the Console is never
+//      locked out even if the env var is unset AND the defaults change).
+//   4. Else → denied (the route returns 404 and loads NO data).
 //
 // Every admin query (page render, server actions) MUST call isPlatformAdmin()
 // first and bail before touching any business table. The allowlist itself
@@ -24,6 +27,7 @@ import "server-only";
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isProductBrainAllowedEmail } from "@/lib/product-brain/access.server";
 import { normalizeEmail } from "@/lib/product-brain/access";
 import { logAdminEvent } from "./audit";
 import type { AuthorizedAdminRow } from "./types";
@@ -60,8 +64,14 @@ export async function isPlatformAdmin(
 ): Promise<boolean> {
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
+  // 1) Table allowlist (future source of truth; empty/absent → fall through).
   const tableEmails = await activeAuthorizedEmails();
   if (tableEmails.has(normalized)) return true;
+  // 2) Shared platform-admin allowlist (Product Brain env-var + defaults).
+  //    This is the same list gating the Product Brain Control Center, so the
+  //    platform owners reach both internal surfaces with one config.
+  if (isProductBrainAllowedEmail(normalized)) return true;
+  // 3) Anti-lockout fallback (redundant with #2; kept defensively).
   return normalized === normalizeEmail(FALLBACK_ADMIN_EMAIL);
 }
 
