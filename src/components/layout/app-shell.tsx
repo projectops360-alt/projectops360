@@ -21,11 +21,13 @@ export interface AppShellProps {
   org?: OrgData;
   /** Server-computed: may the current user see the Product Brain Control Center? */
   canViewProductBrain?: boolean;
+  /** Server-computed: may the current user see the Admin Console? */
+  canViewAdminConsole?: boolean;
 }
 
-export function AppShell({ children, user, org, canViewProductBrain = false }: AppShellProps) {
+export function AppShell({ children, user, org, canViewProductBrain = false, canViewAdminConsole = false }: AppShellProps) {
   return (
-    <AppFrame header={<Header user={user} org={org} />} role={org?.role} canViewProductBrain={canViewProductBrain}>
+    <AppFrame header={<Header user={user} org={org} />} role={org?.role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole}>
       {children}
     </AppFrame>
   );

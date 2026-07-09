@@ -6,6 +6,7 @@ import { setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { LivingGuideWidget } from "@/components/living-guide";
 import { isProductBrainAllowedEmail } from "@/lib/product-brain/access.server";
+import { isPlatformAdmin } from "@/lib/admin-console/access.server";
 import type { Locale } from "@/types/database";
 
 export default async function AppLayout({
@@ -49,6 +50,7 @@ export default async function AppLayout({
         role: org.role,
       }}
       canViewProductBrain={isProductBrainAllowedEmail(org.email)}
+      canViewAdminConsole={await isPlatformAdmin(org.email)}
     >
       {children}
       {/* Isabella is present app-wide, so she persists across navigation and her
