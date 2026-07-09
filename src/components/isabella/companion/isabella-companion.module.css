@@ -1,0 +1,472 @@
+/* ============================================================================
+   Isabella Companion — estilos portados 1:1 del prototipo validado
+   isabella-holograma-prototipo.html. NO cambiar valores sin pasar por el
+   Product UX Contract correspondiente.
+   ========================================================================= */
+
+.root {
+  display: contents;
+  /* Paleta autocontenida (el prototipo la definía en :root) */
+  --holo-a: #9BE8FF;
+  --holo-b: #B79CFF;
+  --holo-glow: rgba(140, 190, 255, 0.55);
+  --warn: #FFB454;
+  --line: #262E48;
+  --panel-2: #1C2338;
+  --text: #E9EDF9;
+  --muted: #8A93AD;
+  --bg: #0E1220;
+  --state-glow: #8CBEFF;
+}
+
+/* ============ contenedor fijo ============ */
+.isabella {
+  position: fixed;
+  right: 26px;
+  bottom: 20px;
+  z-index: 50;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.35s, transform 0.35s;
+  font-size: 14px;
+  color: var(--text);
+}
+.hiddenHolo {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(24px) scale(0.9);
+}
+
+.holoStage {
+  position: relative;
+  width: 210px;
+  height: 250px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+/* cono de luz del proyector */
+.cone {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 225px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--state-glow, #8CBEFF) 16%, transparent),
+    transparent 78%
+  );
+  clip-path: polygon(38% 100%, 62% 100%, 96% 0%, 4% 0%);
+  filter: blur(1.5px);
+  animation: coneFlicker 5.5s ease-in-out infinite;
+}
+@keyframes coneFlicker {
+  0%, 100% { opacity: 0.75; }
+  47% { opacity: 0.55; }
+  52% { opacity: 0.8; }
+  78% { opacity: 0.62; }
+}
+
+/* base proyectora */
+.base {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 26px;
+}
+.disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--state-glow, #8CBEFF) 55%, transparent),
+    transparent 68%
+  );
+}
+.ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--state-glow, #8CBEFF) 60%, transparent);
+  transform: translate(-50%, -50%) scaleY(0.22);
+  animation: ringPulse 3.2s ease-out infinite;
+}
+.ring:nth-child(3) {
+  animation-delay: 1.6s;
+}
+@keyframes ringPulse {
+  from { width: 34px; height: 34px; opacity: 0.9; }
+  to { width: 150px; height: 150px; opacity: 0; }
+}
+
+.figure {
+  position: relative;
+  width: 170px;
+  height: 225px;
+  animation: breath 4.6s ease-in-out infinite;
+  transform-origin: 50% 92%;
+  filter: drop-shadow(0 0 14px var(--state-glow, #8CBEFF))
+    drop-shadow(0 0 40px color-mix(in srgb, var(--state-glow, #8CBEFF) 40%, transparent));
+  transition: filter 0.8s;
+}
+@keyframes breath {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.012) translateY(-2.5px); }
+}
+
+/* glitch ocasional */
+@keyframes glitch {
+  0%, 93%, 100% { transform: translateX(0); opacity: 1; }
+  94% { transform: translateX(1.5px); opacity: 0.85; }
+  95% { transform: translateX(-1.5px); }
+  96% { transform: translateX(0); opacity: 1; }
+}
+.figure svg {
+  animation: glitch 9s steps(1) infinite;
+}
+
+/* scanlines recortadas a la silueta (grupo SVG clipado con silClip) */
+.scan {
+  animation: scanMove 7s linear infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes scanMove {
+  from { transform: translateY(0); }
+  to { transform: translateY(40px); }
+}
+
+/* cejas y boca transicionan entre estados */
+.brow {
+  transition: all 0.5s;
+}
+.mouth {
+  transition: d 0.4s, opacity 0.2s;
+}
+
+/* ============ burbuja de diálogo ============ */
+.bubble {
+  position: fixed;
+  right: 238px;
+  bottom: 120px;
+  z-index: 51;
+  max-width: 280px;
+  background: var(--panel-2);
+  border: 1px solid color-mix(in srgb, var(--state-glow, #8CBEFF) 45%, var(--line));
+  border-radius: 14px 14px 4px 14px;
+  padding: 13px 15px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45),
+    0 0 18px color-mix(in srgb, var(--state-glow, #8CBEFF) 18%, transparent);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.bubbleShow {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.who {
+  font-family: 'Sora', system-ui, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--state-glow, #8CBEFF);
+  margin-bottom: 5px;
+}
+.you {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 11px;
+}
+.actions button {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+}
+.actions button.primary {
+  background: linear-gradient(120deg, var(--holo-a), var(--holo-b));
+  color: #0B1020;
+  border: none;
+}
+.actions button:hover {
+  filter: brightness(1.12);
+}
+.bubbleClose {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px;
+  line-height: 1;
+}
+
+/* ============ dock de control (debug) ============ */
+.dock {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(14, 18, 32, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 7px;
+}
+.dock button {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 99px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dock button:hover {
+  color: var(--text);
+}
+.dock button.dockOn {
+  background: var(--panel-2);
+  color: var(--state-glow, #8CBEFF);
+}
+.sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+
+/* ============ orbe minimizado ============ */
+.orb {
+  position: fixed;
+  right: 30px;
+  bottom: 26px;
+  z-index: 50;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--holo-a), var(--holo-b) 70%);
+  box-shadow: 0 0 22px var(--holo-glow), 0 0 60px rgba(140, 190, 255, 0.25);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  animation: orbPulse 3s ease-in-out infinite;
+}
+.orbShow {
+  display: flex;
+}
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+.orb::after {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  filter: blur(5px);
+}
+
+/* ============ haz señalador (overlay a pantalla completa) ============ */
+.beamLayer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 49;
+}
+.beam {
+  stroke: var(--warn);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 7;
+  fill: none;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(255, 180, 84, 0.7));
+  transition: opacity 0.3s;
+}
+.beamOn {
+  opacity: 0.9;
+  animation: dashMove 1.1s linear infinite;
+}
+@keyframes dashMove {
+  to { stroke-dashoffset: -26; }
+}
+
+/* elemento del dashboard señalado (clase genérica, global a propósito) */
+:global(.spotlight) {
+  border-color: #FFB454 !important;
+  box-shadow: 0 0 0 1px #FFB454, 0 0 28px rgba(255, 180, 84, 0.28) !important;
+  transform: translateX(-2px);
+}
+
+/* ============ puntitos "pensando" ============ */
+.think {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.thinkOn {
+  opacity: 1;
+}
+.think circle {
+  animation: orbit 2.4s linear infinite;
+  transform-origin: 100px 16px;
+}
+.think circle:nth-child(2) {
+  animation-delay: -0.8s;
+}
+.think circle:nth-child(3) {
+  animation-delay: -1.6s;
+}
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(16px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(16px) rotate(-360deg); }
+}
+
+/* ============ ecualizador de voz ============ */
+.voice {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.voiceOn {
+  opacity: 1;
+}
+.voice rect {
+  animation: eq 0.7s ease-in-out infinite;
+  transform-origin: center 78px;
+}
+.voice rect:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.voice rect:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.voice rect:nth-child(4) {
+  animation-delay: 0.36s;
+}
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+/* ============ barra de conversación ============ */
+.chatbar {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 230px;
+  background: rgba(14, 18, 32, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 5px 8px;
+}
+.chatbar input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 4px;
+}
+.chatbar input::placeholder {
+  color: var(--muted);
+}
+.chatbar button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 5px;
+  border-radius: 99px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.chatbar button:hover {
+  color: var(--text);
+}
+.langBtn {
+  font-size: 10.5px !important;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--line) !important;
+  padding: 3px 7px !important;
+}
+.rec {
+  color: #FF7A7A !important;
+  animation: recPulse 1.1s ease-in-out infinite;
+}
+@keyframes recPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+
+/* selector de voz */
+.voiceSel {
+  margin-top: 5px;
+  width: 230px;
+  background: rgba(14, 18, 32, 0.75);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 10.5px;
+  padding: 4px 6px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+/* ============ reduced motion ============ */
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.15s !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .bubble {
+    right: 16px;
+    bottom: 290px;
+  }
+}
