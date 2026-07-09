@@ -3,13 +3,17 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { isPlatformAdmin } from "@/lib/billing/service";
+import { isPlatformAdmin } from "@/lib/admin-console/access.server";
 import { LIMIT_FIELDS, FEATURE_FIELDS } from "@/lib/billing/config";
 
+// The plan catalog is GLOBAL (it powers the landing-page pricing), so edits
+// require a real platform/system admin — the same gate as the Admin Console
+// (admin_authorized_users + hardcoded platform owners), NOT the org-level
+// "owner" role, which every personal org has.
 async function platformAdmin() {
   let org;
   try { org = await getOrgContext(); } catch { return null; }
-  return isPlatformAdmin(org) ? org : null;
+  return (await isPlatformAdmin(org.email)) ? org : null;
 }
 
 const LIMIT_KEYS = LIMIT_FIELDS.map((f) => f.key);

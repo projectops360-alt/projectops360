@@ -1,18 +1,22 @@
 # Admin Console — Platform Administration Surface
 
-**Status:** Internal, read-only, server-gated. Deployed to production (PR #158), with the
-shared-allowlist access fix in a follow-up. **Route:** `/<locale>/admin` (inside the
-authenticated `(app)` group), e.g. `/admin` (EN) or `/es/admin` (ES).
+**Status:** Internal, server-gated. Deployed to production (PR #158; allowlist fix #159/#160;
+admin platform foundation — company users RPC fix, renames, system-admin management,
+global plan catalog — in the 20260841/20260842 iteration). **Route:** `/<locale>/admin`
+(inside the authenticated `(app)` group), e.g. `/admin` (EN) or `/es/admin` (ES).
 
 ## Purpose
 
 A platform-wide, cross-tenant administration surface giving visibility over **companies,
-users, projects and tasks** across every organization — not just the caller's own org. It
-is the foundation for future platform administration (configuring who may access this
-console, then other platform operations).
+users, projects and tasks** across every organization — not just the caller's own org, plus
+a small, explicit set of platform-admin writes.
 
-This page is **read-only**. It does not create, edit, or delete any company, user, project,
-task, milestone, or any other entity. It performs no destructive action.
+**Reads:** everything (cross-tenant aggregates and drill-downs).
+**Writes (exhaustive list):** rename any company (`admin_rename_organization` RPC),
+grant/revoke system-admin access (`admin_authorized_users`), and edit the GLOBAL plan
+catalog (via `/organization/plans`, same gate). Nothing else — no project/task/user
+mutation exists on this surface. Every write is persisted to `audit_logs`
+(`organization_renamed`, `admin_granted`, `admin_revoked`).
 
 ## Who can access it (today)
 
@@ -20,17 +24,11 @@ Access is a **strict server-side** check, evaluated in `src/lib/admin-console/ac
 (`isPlatformAdmin`). Authorization order:
 
 1. **Table allowlist** — an active (`is_active = true`) row for the normalized email in
-   `admin_authorized_users`. (Future source of truth; empty/absent table falls through.)
-2. **Shared platform-admin allowlist** — the email is in the same allowlist resolved by
-   Product Brain (`PRODUCT_BRAIN_ALLOWED_EMAILS` env-var, or its built-in defaults
-   `efrain.pradas@gmail.com` + `pmo@xxx-demo.io`). The Admin Console reuses this list so the
-   platform owners reach both internal surfaces (Admin Console + Product Brain Control
-   Center) with one config. Configure in production via
-   `PRODUCT_BRAIN_ALLOWED_EMAILS=a@x.io,b@y.io` (comma-separated; overrides the defaults).
-3. **Anti-lockout fallback** — the normalized email equals `pmo@xxx-demo.io`
-   (`FALLBACK_ADMIN_EMAIL`). Redundant with #2 (which also contains it), kept defensively
-   so the Console is never locked out even if the env var is unset and the defaults change.
-4. Otherwise → **denied** (the route returns **404** and loads **no data**).
+   `admin_authorized_users` (source of truth; managed from the Admin Access tab).
+2. **Hardcoded platform owners** — `ADMIN_CONSOLE_ALLOWED_EMAILS`
+   (`efrain.pradas@gmail.com` + `pmo@xxx-demo.io`), self-contained on purpose (no env-var,
+   no migration dependency) so the owners can never be locked out (PR #160).
+3. Otherwise → **denied** (the route returns **404** and loads **no data**).
 
 Email comparison is **case-insensitive and trimmed** (reuses `normalizeEmail` from
 `src/lib/product-brain/access.ts`). `PMO@XXX-DEMO.IO` and `  pmo@xxx-demo.io  ` are
@@ -41,10 +39,9 @@ The 404 (via `notFound()`) is deliberate and consistent with the rest of the adm
 guarantees no admin query runs. The spec's "403 or equivalent" is satisfied by this
 equivalent — a hard denial with no data.
 
-**Authorized today:** `efrain.pradas@gmail.com` and `pmo@xxx-demo.io` (via the shared
-allowlist defaults, set in prod through `PRODUCT_BRAIN_ALLOWED_EMAILS`), plus any active
-row in `admin_authorized_users` once that migration is applied. No role
-(owner/admin/member/viewer) grants access by itself. Org `owner`/`admin` roles are
+**Authorized today:** `efrain.pradas@gmail.com` and `pmo@xxx-demo.io` (hardcoded owners),
+plus any active row in `admin_authorized_users` (granted from the Admin Access tab). No
+role (owner/admin/member/viewer) grants access by itself. Org `owner`/`admin` roles are
 org-scoped, not platform-scoped, and do **not** open this console.
 
 ## How the route is protected
@@ -86,7 +83,10 @@ excluded.
 | Total projects | `projects` | `count` where `deleted_at IS NULL` |
 | Total tasks | `roadmap_tasks` | `count` where `deleted_at IS NULL` |
 | Admin users | `admin_authorized_users` | `count` where `is_active = true` (excludes fallback) |
-| Users per company | `organization_members` + `profiles` | grouped by `organization_id`; email via `auth.users` (service role) |
+| Users per company | RPC `admin_list_company_users` | `organization_members` LEFT JOIN `profiles` + `auth.users` inside the DB (see "Admin RPCs" below) |
+| Owner emails | RPC `admin_get_user_emails` | batch lookup against `auth.users` inside the DB |
+| Company plan | `subscriptions` + `plans` | informational per-company subscription (name + status) |
+| Global plan catalog | `plans` + `subscriptions` | catalog rows + subscriber counts (Billing & Plans tab) |
 | Projects per user | `projects.created_by` | grouped by owner (`created_by` = `auth.users.id`) |
 | Tasks per project | `roadmap_tasks` | grouped by `(project_id, status)`: total / open (≠done/deferred) / completed (done) / blocked (blocked) |
 | Tasks assigned per user | `roadmap_tasks.assigned_to` | grouped by assignee |
@@ -100,24 +100,74 @@ task status is the 9-value enum (`not_started … done/blocked/deferred`) — th
 Aggregation is server-side (counts and group-bys); we never fetch all rows to count them.
 The task drill-down is paginated (`limit/offset` via `.range()`) to bound volume.
 
-## Future authorized-users configuration (prepared, not built)
+## Admin RPCs (migrations 20260841 + 20260842)
 
-A new migration is included — **NOT applied to production** (review & apply manually):
+Two production bugs shared one root cause: `organization_members.user_id` references
+**`auth.users`**, not `profiles`, so the PostgREST embed
+`profiles!organization_members_user_id_fkey` always errored ("No users in this company"),
+and `auth.users` is not reachable via `.from()` even with the service role (EMAIL column
+always "—"). The fix moves those reads **inside the database** as `SECURITY DEFINER`
+functions, all gated the same way (`service_role` OR `public.is_platform_admin()` — an
+active row in `admin_authorized_users` matching the caller's email):
 
-- `supabase/migrations/20260840000000_admin_authorized_users.sql` — table
-  `admin_authorized_users(id, email, role, is_active, granted_by → profiles, created_at,
-  updated_at, revoked_at)`, a UNIQUE index on `lower(trim(email))`, an active-allowlist
-  index, an `updated_at` trigger, and RLS that denies all anon/authenticated access
-  (service role only).
+- `is_platform_admin()` — DB-level gate over `admin_authorized_users`.
+- `admin_list_company_users(p_org_id)` — members + display name + email + role/org_role/status.
+- `admin_get_user_emails(p_user_ids)` — batch email lookup for owner columns.
+- `admin_rename_organization(p_org_id, p_name)` — validated rename (2–120 chars), writes
+  `name_i18n` for BOTH locales (proper noun — never auto-translated).
 
-The access helper (`access.server.ts`) tolerates the table being **absent** (query error or
-client throw → falls through to the shared allowlist, then the `pmo@xxx-demo.io` fallback),
-so the console keeps working before the migration is applied. Once applied and seeded,
-the table becomes the source of truth and the fallback can be removed.
+**Security stance (deliberate):** business-table RLS is **NOT** widened for admins.
+Platform admins read cross-org data only through these gated RPCs or the service role on
+the server, always AFTER `requirePlatformAdmin`. The two hardcoded platform owners pass
+the app-level gate even with an empty table; DB-level RPC access for anyone else requires
+an active `admin_authorized_users` row.
 
-The console renders an **"Admin Access"** tab (read-only) showing current authorized
-admins (email, role, status, authorized-on) and a note that editing/granting will be added
-in a later iteration. **No CRUD is implemented yet** — by design (read-only phase).
+The same migration set also:
+- makes `handle_new_user()` / `ensure_user_org()` honor the optional signup metadata
+  `company_name` (fixes "every org is called My Organization"); the signup form
+  (`signup-form.tsx` → `signupAction`) captures it.
+- adds the `on_auth_user_deleted` trigger that deletes a deleted user's personal org
+  (`org_<user_id>`) when it has no other members and no projects — the source of the 25
+  orphaned orgs found in prod. `scripts/cleanup-orphan-orgs.sql` is the reviewable,
+  two-step (report → delete) cleanup for the pre-existing orphans; it is NOT run
+  automatically.
+- widens the `audit_logs.action` CHECK with `admin_granted` / `admin_revoked` /
+  `organization_renamed` so platform-admin writes are persisted (org-scoped: renames on
+  the renamed org; grants/revokes on the actor's org with `targetEmail` in metadata).
+
+Regular owners/admins rename their OWN org in **Settings → Organization**
+(`/settings`, `renameOrganizationAction`) through their RLS session — the existing
+policy "PMO can update own organizations" (`is_pmo_level`) authorizes it; no new grant.
+
+## Billing & Plans tab (GLOBAL catalog)
+
+The **Billing & Plans** tab shows the **global plan catalog** (`plans` +
+`plan_entitlements`): the plans and prices rendered on the public landing-page pricing.
+It is NOT any company's individual billing — each company's subscription appears as an
+informational column in the Companies tab. Editing goes through `/organization/plans`,
+which (as of this iteration) is gated by the **same** platform-admin check as the Admin
+Console (`isPlatformAdmin(email)` from `access.server.ts`). The old
+`lib/billing/service.isPlatformAdmin(org)` is deprecated: its `role === "owner"` fallback
+was a false positive (every personal org makes its user an owner).
+
+## System-admin management (Admin Access tab)
+
+The **Admin Access** tab manages `admin_authorized_users` (table applied to production;
+migration `20260840000000_admin_authorized_users.sql`):
+
+- **Grant** ("Make system admin"): enter an email → inserts (or re-activates) a row with
+  `role='system_admin'`, `is_active=true`, `granted_by=<actor>`. Server action
+  `grantSystemAdminAction`, gated by `requirePlatformAdmin`, writes via service role.
+- **Revoke**: soft-revoke (`is_active=false`, `revoked_at=now()`); access disappears
+  immediately (the gate reads active rows only). **Reactivate** flips it back.
+- Only an already-authorized platform admin can grant/revoke. The two hardcoded platform
+  owners (`ADMIN_CONSOLE_ALLOWED_EMAILS`) keep app-level access regardless of table state
+  — by design, anti-lockout.
+- Every change is persisted to `audit_logs` (`admin_granted` / `admin_revoked`) plus a
+  structured server log.
+
+The access helper (`access.server.ts`) still tolerates the table being absent (falls
+through to the hardcoded owners), so the console can never lock out the owners.
 
 ## Observability
 
@@ -126,11 +176,11 @@ in a later iteration. **No CRUD is implemented yet** — by design (read-only ph
 with `email`, `userId`, `route`, `result`, and non-sensitive `extra` (counts, page
 numbers). Non-throwing; never logs payload bodies.
 
-The existing `audit_logs` table is **not** reused: it is org-scoped
-(`organization_id NOT NULL`) and its `action` column is CHECK-constrained to task/project
-lifecycle values — it cannot host platform-wide admin events without polluting an org's
-audit trail and widening the CHECK constraint (out of scope). A future
-`platform_audit_logs` table is the documented TODO.
+Platform-admin **writes** (rename / grant / revoke) ARE persisted to `audit_logs` via
+`recordAdminAudit` (the CHECK was widened by migration 20260841; rows are org-scoped —
+renames attach to the renamed org, grants/revokes to the actor's org). Read/access events
+(`admin_page_viewed`, …) stay as structured logs only; a dedicated `platform_audit_logs`
+table remains the documented TODO for those.
 
 ## i18n
 
@@ -143,10 +193,11 @@ conventions (no new UI library).
 ## How to test locally
 
 1. `npm run dev`.
-2. Sign in as `pmo@xxx-demo.io` **or** `efrain.pradas@gmail.com` (both in the shared
-   allowlist). The sidebar shows **Admin Console**. Open `/admin`: KPI cards, the five
-   tabs (Overview, Companies, Users & Projects, Project Tasks, Admin Access), filters and
-   the company/task drill-downs work against real data.
+2. Sign in as `pmo@xxx-demo.io` **or** `efrain.pradas@gmail.com` (hardcoded platform
+   owners). The sidebar shows **Admin Console**. Open `/admin`: KPI cards, the six tabs
+   (Overview, Companies, Users & Projects, Project Tasks, Billing & Plans, Admin Access),
+   filters, company rename, the company/task drill-downs and system-admin grant/revoke
+   work against real data.
 3. Sign in as any other user (including an org `owner`/`admin`). The sidebar does **not**
    show Admin Console. Hitting `/admin` (or `/es/admin`) directly returns a **404** and
    loads no admin data.
@@ -165,13 +216,14 @@ Automated tests:
 
 ## What is intentionally left for a next iteration
 
-- CRUD for `admin_authorized_users` (grant/revoke/role) from the Admin Access tab.
-- A dedicated `platform_audit_logs` table (today: structured server logs only).
-- Removing the `pmo@xxx-demo.io` fallback once the table is seeded.
-- Applying the migration to production (review required; not done here).
+- A dedicated `platform_audit_logs` table for read/access events (writes are already
+  persisted to `audit_logs`).
+- Running `scripts/cleanup-orphan-orgs.sql` against prod (manual, reviewable, two-step).
+- In-app cross-org navigation for system admins (today: all cross-org visibility lives in
+  this console; the normal app remains strictly org-scoped by RLS — deliberate).
 
 ## Out of scope / not touched
 
 No changes to projects, tasks, milestones, Isabella, Living Graph, Dashboard, Execution
-Map, Closeout, GitHub Intelligence, RBAC/RLS, or any other module. No global visual
-changes. No production deploy.
+Map, Closeout, GitHub Intelligence, or business-table RLS policies (deliberately NOT
+widened for admins). No global visual changes.

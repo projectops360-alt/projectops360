@@ -28,6 +28,9 @@ export async function signupAction(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const displayName = formData.get("displayName") as string;
+  // Optional company name → raw_user_meta_data.company_name, consumed by the
+  // handle_new_user() trigger to name the new organization (both locales).
+  const companyName = ((formData.get("companyName") as string) ?? "").trim();
 
   // Prefer an explicit canonical site URL (production) over the request origin,
   // so confirmation links always point at the real domain — not a Vercel preview
@@ -39,7 +42,10 @@ export async function signupAction(formData: FormData) {
     email,
     password,
     options: {
-      data: { display_name: displayName },
+      data: {
+        display_name: displayName,
+        ...(companyName ? { company_name: companyName } : {}),
+      },
       emailRedirectTo: `${origin}/auth/callback`,
     },
   });

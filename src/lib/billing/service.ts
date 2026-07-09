@@ -202,9 +202,15 @@ export function hasFeature(entitlements: Entitlements | null, key: keyof Entitle
 
 // ── Platform admin (who may edit GLOBAL plan pricing) ────────────────────────
 // Prices are global. Editing them affects all orgs, so it is platform-level.
-// Allowlist via PLATFORM_ADMIN_EMAILS (comma-separated). If unset, fall back to
-// organization owners so the feature works out of the box for the founder.
 
+/**
+ * @deprecated Do NOT use for authorization. The `org.role === "owner"`
+ * fallback is a false positive: every personal org makes its user an "owner".
+ * The plan catalog and the Admin Console now gate through
+ * `isPlatformAdmin(email)` in `@/lib/admin-console/access.server`
+ * (admin_authorized_users + hardcoded platform owners). Kept only until all
+ * legacy references disappear.
+ */
 export function isPlatformAdmin(org: OrgContext): boolean {
   const allow = (process.env.PLATFORM_ADMIN_EMAILS ?? "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);

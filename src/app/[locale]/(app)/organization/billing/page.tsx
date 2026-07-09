@@ -4,7 +4,8 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { Link } from "@/i18n/navigation";
-import { getOrgBilling, getPlansWithEntitlements, checkLimit, isPlatformAdmin, type Entitlements } from "@/lib/billing/service";
+import { getOrgBilling, getPlansWithEntitlements, checkLimit, type Entitlements } from "@/lib/billing/service";
+import { isPlatformAdmin } from "@/lib/admin-console/access.server";
 import { PLAN_LABELS, FEATURE_FIELDS, formatLimit } from "@/lib/billing/config";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function BillingPage({ params }: { params: Promise<{ locale
   const [billing, plans] = await Promise.all([getOrgBilling(org), getPlansWithEntitlements()]);
   const { plan, entitlements: ent, usage, subscription } = billing;
   const orgName = getI18nValue(org.organizationName, locale as Locale) || org.organizationSlug;
-  const canManagePlans = isPlatformAdmin(org);
+  const canManagePlans = await isPlatformAdmin(org.email);
 
   const planLabel = plan ? (PLAN_LABELS[plan.plan_code]?.[isEs ? "es" : "en"] ?? plan.name) : "—";
   const statusTone: Record<string, string> = {
