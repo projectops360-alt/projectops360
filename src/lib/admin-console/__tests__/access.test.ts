@@ -9,8 +9,10 @@ vi.mock("server-only", () => ({}));
 // ============================================================================
 // Executes the exact server logic (access.server.ts) the /admin route and the
 // sidebar flag both rely on. Asserts: only authorized emails pass, comparison
-// is case-insensitive/trimmed, the table allowlist wins, and the temporary
-// fallback (pmo@xxx-demo.io) authorizes when the table is empty/absent.
+// is case-insensitive/trimmed, the table allowlist wins, the shared Product
+// Brain allowlist (env-var + defaults: efrain.pradas@gmail.com + pmo@xxx-demo.io)
+// authorizes the platform owners, and the temporary fallback (pmo@xxx-demo.io)
+// authorizes when the table is empty/absent.
 // ============================================================================
 
 // ── Mocked Supabase admin client ──────────────────────────────────────────────
@@ -77,6 +79,32 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
   it("authorizes a table email case-insensitively", async () => {
     h.setActiveEmails(["Owner@Enterprise.io"]);
     expect(await isPlatformAdmin("owner@enterprise.IO")).toBe(true);
+  });
+
+  it("authorizes a Product Brain allowlist email (shared platform-admin list)", async () => {
+    // efrain.pradas@gmail.com is a built-in default of the Product Brain
+    // allowlist (PRODUCT_BRAIN_ALLOWED_EMAILS unset → defaults). The Admin
+    // Console reuses that list so the platform owner reaches both internal
+    // surfaces with one config.
+    expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
+  });
+
+  it("authorizes a Product Brain allowlist email case-insensitively", async () => {
+    expect(await isPlatformAdmin("  Efrain.Pradas@gmail.com ")).toBe(true);
+  });
+
+  it("authorizes an email added via the PRODUCT_BRAIN_ALLOWED_EMAILS env override", async () => {
+    vi.stubEnv("PRODUCT_BRAIN_ALLOWED_EMAILS", "custom@admin.io");
+    try {
+      expect(await isPlatformAdmin("custom@admin.io")).toBe(true);
+      // Override REPLACES the defaults, so a default-only email is no longer
+      // authorized via the allowlist…
+      expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(false);
+      // …but pmo@xxx-demo.io still passes via the anti-lockout fallback (#3).
+      expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("denies any other authenticated user", async () => {
