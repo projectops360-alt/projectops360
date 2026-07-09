@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { IsabellaLang } from "./isabellaBrain";
 
 // --- Tipos mínimos de SpeechRecognition (no están en lib.dom) ---------------
-interface SpeechRecognitionLike {
+export interface SpeechRecognitionLike {
   lang: string;
   interimResults: boolean;
   maxAlternatives: number;
@@ -27,7 +27,7 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
-function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+export function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as {
     SpeechRecognition?: SpeechRecognitionCtor;

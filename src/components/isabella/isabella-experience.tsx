@@ -9,7 +9,10 @@
 // modes (Assistant · Guide · Executive).
 //
 // • THEME-AWARE — follows the app theme; optional dark/minimal panel tone.
-// • VOICE — optional female TTS (off by default), conversation language.
+// • VOICE — optional female TTS (off by default): LATAM Spanish / US English
+//   ranking validated in the hologram prototype (never es-ES over a LATAM
+//   voice, never an English voice reading Spanish, never a male voice). She
+//   also LISTENS: single-utterance mic (es-MX / en-US) next to the input.
 // • GUIDED LINKS — answers render "Open <X>" actions that navigate AND keep
 //   Isabella present (she's mounted app-wide), so she takes you there.
 // • 3D-READY — the presence area hosts the validated hologram figure
@@ -25,7 +28,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   Send, X, ThumbsUp, ThumbsDown, BookOpen, ChevronDown, ChevronUp, ChevronRight,
   ScanSearch, ListChecks, MessageCircleQuestion, Sparkles, TriangleAlert, Info,
-  Volume2, VolumeX, Square, Palette, Play, PanelLeft, PanelRight, Minus,
+  Volume2, VolumeX, Square, Palette, Play, PanelLeft, PanelRight, Minus, Mic,
   Maximize2, Minimize2, GripHorizontal, Compass, Presentation, MessageSquare,
   BadgeCheck,
 } from "lucide-react";
@@ -142,6 +145,8 @@ export function IsabellaExperience({
   const [guideNote, setGuideNote] = useState<string | null>(null);
   // True when voice is enabled but no female voice could play (text-only, never male).
   const [voiceUnavailable, setVoiceUnavailable] = useState(false);
+  // Aviso del micrófono (permiso denegado / navegador sin reconocimiento).
+  const [micNote, setMicNote] = useState<string | null>(null);
   const [tone, setTone] = useState<StageTone>(() => {
     try {
       const s = typeof window !== "undefined" ? (window.localStorage.getItem(TONE_STORAGE) as StageTone | null) : null;
@@ -177,6 +182,8 @@ export function IsabellaExperience({
 
   const presence: PresenceState = pending
     ? "thinking"
+    : voice.listening
+    ? "listening"
     : speaking || voice.speaking
     ? "speaking"
     : greeting
@@ -204,6 +211,7 @@ export function IsabellaExperience({
     const answerLanguage: Locale = (q ? detectLanguage(q) : null) ?? locale;
 
     setGuideNote(null);
+    setMicNote(null);
     setTurns((t) => [...t, { id, question: label, intent }]);
     setInput("");
     setSpeaking(false);
@@ -253,6 +261,38 @@ export function IsabellaExperience({
     // ask is stable for this purpose; we intentionally run only for the seeded query.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAsk]);
+
+  // Oír — micrófono de una frase (es-MX / en-US según el idioma de la
+  // conversación). Lo escuchado se pregunta directamente, como en el prototipo.
+  function onMicClick() {
+    if (voice.listening) {
+      voice.stopListening();
+      return;
+    }
+    setMicNote(null);
+    const started = voice.startListening({
+      lang: locale,
+      onResult: (transcript) => ask("question", transcript),
+      onError: (error) => {
+        if (error === "not-allowed") {
+          setMicNote(
+            tt(
+              "I need microphone permission — check the lock icon in the browser bar.",
+              "Necesito permiso para usar el micrófono — revisa el candado en la barra del navegador.",
+            ),
+          );
+        }
+      },
+    });
+    if (!started) {
+      setMicNote(
+        tt(
+          "Your browser doesn't support speech recognition. Try Chrome or Edge.",
+          "Tu navegador no soporta reconocimiento de voz. Prueba con Chrome o Edge.",
+        ),
+      );
+    }
+  }
 
   // Guided action: she navigates AND stays present (mounted app-wide), then
   // offers to continue on the new screen.
@@ -623,10 +663,31 @@ export function IsabellaExperience({
         </div>
 
         {/* ── Input ─────────────────────────────────────────────────────── */}
+        {micNote && (
+          <p className="px-4 pt-2 text-[11px] text-muted-foreground">{micNote}</p>
+        )}
         <form
           className="flex items-center gap-2 px-3 py-3"
           onSubmit={(e) => { e.preventDefault(); ask("question", input); }}
         >
+          <button
+            type="button"
+            onClick={onMicClick}
+            disabled={pending}
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition disabled:opacity-40 ${
+              voice.listening
+                ? "animate-pulse border-red-500/60 bg-red-500/10 text-red-500"
+                : "border-border bg-background text-muted-foreground hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400"
+            }`}
+            title={
+              voice.listening
+                ? tt("Listening… click to stop", "Escuchando… clic para detener")
+                : tt("Talk to Isabella (microphone)", "Háblale a Isabella (micrófono)")
+            }
+            aria-label={tt("Talk to Isabella with the microphone", "Háblale a Isabella con el micrófono")}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
           <input
             ref={inputRef}
             value={input}
