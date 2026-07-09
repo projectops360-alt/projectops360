@@ -14,6 +14,7 @@ import {
   Settings,
   CreditCard,
   Brain,
+  ShieldCheck,
 } from "lucide-react";
 
 export type NavItem = {
@@ -26,6 +27,13 @@ export type NavItem = {
   /** Child navigation items (e.g. project sub-pages) */
   children?: NavItem[];
 };
+
+/**
+ * Which server-computed access flag gates an internal nav item. Sidebar shows
+ * the item only when the matching flag is true. Hiding is UX-only — every
+ * gated route + its server actions enforce access server-side.
+ */
+export type InternalGate = "productBrain" | "adminConsole";
 
 export const sidebarNav: NavItem[] = [
   { title: "commandCenter", href: "/", icon: LayoutDashboard },
@@ -45,10 +53,12 @@ export const bottomNav: NavItem[] = [
 ];
 
 /**
- * Internal, role-gated navigation. Only rendered for users who pass the
- * server-enforced access check (owner/admin) — see lib/product-brain/access.
- * The route itself also enforces access server-side; hiding here is UX only.
+ * Internal, access-gated navigation. Each item carries a `gate` naming the
+ * server-computed flag that controls its visibility (Sidebar). The route
+ * itself also enforces access server-side; hiding here is UX only. The
+ * allowlists / flags never reach the client.
  */
-export const internalNav: NavItem[] = [
-  { title: "productIntelligence", href: "/product-intelligence", icon: Brain },
+export const internalNav: (NavItem & { gate: InternalGate })[] = [
+  { title: "productIntelligence", href: "/product-intelligence", icon: Brain, gate: "productBrain" },
+  { title: "adminConsole", href: "/admin", icon: ShieldCheck, gate: "adminConsole" },
 ];

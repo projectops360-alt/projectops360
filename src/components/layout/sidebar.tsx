@@ -5,7 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { sidebarNav, bottomNav, internalNav, type NavItem } from "@/config/navigation";
+import { sidebarNav, bottomNav, internalNav, type NavItem, type InternalGate } from "@/config/navigation";
 import { Logo } from "@/components/shared/logo";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
@@ -63,7 +63,7 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain = false }: { collapsed?: boolean; onToggle?: () => void; role?: string; canViewProductBrain?: boolean }) {
+export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain = false, canViewAdminConsole = false }: { collapsed?: boolean; onToggle?: () => void; role?: string; canViewProductBrain?: boolean; canViewAdminConsole?: boolean }) {
   void role;
   const pathname = usePathname();
   const tNav = useTranslations("nav");
@@ -72,10 +72,15 @@ export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain
   // Separate global and project-scoped items
   const globalItems = sidebarNav.filter((item) => !item.projectScoped);
   const projectItems = sidebarNav.filter((item) => item.projectScoped);
-  // Internal items — gated by the server-computed STRICT EMAIL ALLOWLIST
-  // (TASK 10A). Hiding here is UX only; the route + actions enforce access
-  // server-side. The allowlist itself never reaches the client.
-  const internalItems = canViewProductBrain ? internalNav : [];
+  // Internal items — each gated by its own server-computed access flag
+  // (email allowlist for Product Brain, platform-admin gate for the Admin
+  // Console). Hiding here is UX only; the route + actions enforce access
+  // server-side. The allowlists themselves never reach the client.
+  const gateFlags: Record<InternalGate, boolean> = {
+    productBrain: canViewProductBrain,
+    adminConsole: canViewAdminConsole,
+  };
+  const internalItems = internalNav.filter((item) => gateFlags[item.gate]);
 
   // Resolve project-scoped hrefs with the current projectId
   function resolveHref(item: NavItem): string {

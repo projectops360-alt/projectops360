@@ -15,6 +15,7 @@ export function AppFrame({
   children,
   role,
   canViewProductBrain = false,
+  canViewAdminConsole = false,
 }: {
   header: React.ReactNode;
   children: React.ReactNode;
@@ -22,6 +23,8 @@ export function AppFrame({
   role?: string;
   /** Server-computed allowlist flag for the Product Brain Control Center. */
   canViewProductBrain?: boolean;
+  /** Server-computed platform-admin flag for the Admin Console. */
+  canViewAdminConsole?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -48,7 +51,7 @@ export function AppFrame({
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} />
       <div className={cn("transition-[padding] duration-200", collapsed ? "pl-16" : "pl-64")}>
         {header}
         <main className="p-6">{children}</main>
