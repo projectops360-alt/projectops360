@@ -9,10 +9,9 @@ vi.mock("server-only", () => ({}));
 // ============================================================================
 // Executes the exact server logic (access.server.ts) the /admin route and the
 // sidebar flag both rely on. Asserts: only authorized emails pass, comparison
-// is case-insensitive/trimmed, the table allowlist wins, the shared Product
-// Brain allowlist (env-var + defaults: efrain.pradas@gmail.com + pmo@xxx-demo.io)
-// authorizes the platform owners, and the temporary fallback (pmo@xxx-demo.io)
-// authorizes when the table is empty/absent.
+// is case-insensitive/trimmed, the table allowlist wins, and the two hardcoded
+// platform owners (efrain.pradas@gmail.com + pmo@xxx-demo.io) always authorize —
+// independently of PRODUCT_BRAIN_ALLOWED_EMAILS and of the table being seeded.
 // ============================================================================
 
 // ── Mocked Supabase admin client ──────────────────────────────────────────────
@@ -81,27 +80,25 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
     expect(await isPlatformAdmin("owner@enterprise.IO")).toBe(true);
   });
 
-  it("authorizes a Product Brain allowlist email (shared platform-admin list)", async () => {
-    // efrain.pradas@gmail.com is a built-in default of the Product Brain
-    // allowlist (PRODUCT_BRAIN_ALLOWED_EMAILS unset → defaults). The Admin
-    // Console reuses that list so the platform owner reaches both internal
-    // surfaces with one config.
+  it("authorizes the platform owner efrain.pradas@gmail.com (hardcoded allowlist)", async () => {
     expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
   });
 
-  it("authorizes a Product Brain allowlist email case-insensitively", async () => {
+  it("authorizes the platform owner case-insensitively and trimmed", async () => {
     expect(await isPlatformAdmin("  Efrain.Pradas@gmail.com ")).toBe(true);
   });
 
-  it("authorizes an email added via the PRODUCT_BRAIN_ALLOWED_EMAILS env override", async () => {
+  it("authorizes both owners regardless of PRODUCT_BRAIN_ALLOWED_EMAILS", async () => {
+    // The Admin Console gate is self-contained: it must NOT read this env-var.
+    // Setting it to something that excludes both owners must NOT lock them out
+    // (this was the exact prod bug — Efrain got a 404 because the env-var
+    // override omitted him).
     vi.stubEnv("PRODUCT_BRAIN_ALLOWED_EMAILS", "custom@admin.io");
     try {
-      expect(await isPlatformAdmin("custom@admin.io")).toBe(true);
-      // Override REPLACES the defaults, so a default-only email is no longer
-      // authorized via the allowlist…
-      expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(false);
-      // …but pmo@xxx-demo.io still passes via the anti-lockout fallback (#3).
+      expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
       expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+      // And the env-var value does NOT grant Admin Console access.
+      expect(await isPlatformAdmin("custom@admin.io")).toBe(false);
     } finally {
       vi.unstubAllEnvs();
     }
