@@ -9,17 +9,17 @@ import "server-only";
 //
 // Authorization logic (evaluated server-side, case-insensitive, trimmed):
 //   1. If `admin_authorized_users` has an active (is_active=true) row for the
-//      normalized email → authorized. (Future source of truth; empty/absent
-//      table falls through.)
-//   2. Else if the email is in the shared platform-admin allowlist resolved by
-//      Product Brain (`PRODUCT_BRAIN_ALLOWED_EMAILS` env-var, or its built-in
-//      defaults — efrain.pradas@gmail.com + pmo@xxx-demo.io) → authorized.
-//      This is the SAME list that gates the Product Brain Control Center, so
-//      the platform owners reach both internal surfaces with one config.
-//   3. Else if the normalized email equals FALLBACK_ADMIN_EMAIL → authorized
-//      (anti-lockout; redundant with #2 but kept so the Console is never
-//      locked out even if the env var is unset AND the defaults change).
-//   4. Else → denied (the route returns 404 and loads NO data).
+//      normalized email → authorized. (Future source of truth for admins added
+//      from inside the Console; empty/absent table falls through.)
+//   2. Else if the email is one of the two hardcoded platform owners
+//      (ADMIN_CONSOLE_ALLOWED_EMAILS — efrain.pradas@gmail.com + pmo@xxx-demo.io)
+//      → authorized. This is intentionally SELF-CONTAINED: it does NOT depend on
+//      the `PRODUCT_BRAIN_ALLOWED_EMAILS` env-var (which in prod excludes Efrain
+//      and previously caused a 404 for him) nor on the migration being applied.
+//   3. Else → denied (the route returns 404 and loads NO data).
+//
+// Result: exactly these two owners always reach the Console, plus anyone an
+// admin later grants via the table. No one else.
 //
 // Every admin query (page render, server actions) MUST call isPlatformAdmin()
 // first and bail before touching any business table. The allowlist itself
@@ -27,17 +27,23 @@ import "server-only";
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isProductBrainAllowedEmail } from "@/lib/product-brain/access.server";
 import { normalizeEmail } from "@/lib/product-brain/access";
 import { logAdminEvent } from "./audit";
 import type { AuthorizedAdminRow } from "./types";
 
 /**
- * Temporary fallback administrator. Stays authorized even when
- * admin_authorized_users is empty or absent (e.g. migration not yet applied),
-// so the Console is never locked out. Remove once the table is the source of
-// truth and seeded.
+ * The two platform owners who may always reach the Admin Console. This list is
+ * self-contained on purpose: it does NOT read any env-var and does NOT depend on
+ * the admin_authorized_users migration being applied, so the Console can never
+ * be locked out for these owners (and no one else is authorized unless an admin
+ * grants them via the table). Case is normalized at the gate.
  */
+export const ADMIN_CONSOLE_ALLOWED_EMAILS: readonly string[] = [
+  "efrain.pradas@gmail.com",
+  "pmo@xxx-demo.io",
+];
+
+/** @deprecated Use ADMIN_CONSOLE_ALLOWED_EMAILS. Kept for existing callers/tests. */
 export const FALLBACK_ADMIN_EMAIL = "pmo@xxx-demo.io";
 
 /** Active authorizations from the table (empty array if the table is absent). */
@@ -64,15 +70,15 @@ export async function isPlatformAdmin(
 ): Promise<boolean> {
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
-  // 1) Table allowlist (future source of truth; empty/absent → fall through).
+  // 1) Table allowlist (source of truth for admins granted from inside the
+  //    Console; empty/absent → fall through).
   const tableEmails = await activeAuthorizedEmails();
   if (tableEmails.has(normalized)) return true;
-  // 2) Shared platform-admin allowlist (Product Brain env-var + defaults).
-  //    This is the same list gating the Product Brain Control Center, so the
-  //    platform owners reach both internal surfaces with one config.
-  if (isProductBrainAllowedEmail(normalized)) return true;
-  // 3) Anti-lockout fallback (redundant with #2; kept defensively).
-  return normalized === normalizeEmail(FALLBACK_ADMIN_EMAIL);
+  // 2) The two hardcoded platform owners. Self-contained: no env-var, no
+  //    migration dependency, so these owners are never locked out.
+  return ADMIN_CONSOLE_ALLOWED_EMAILS.some(
+    (a) => normalizeEmail(a) === normalized,
+  );
 }
 
 /**
