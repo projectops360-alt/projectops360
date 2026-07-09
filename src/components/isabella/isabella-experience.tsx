@@ -12,9 +12,10 @@
 // • VOICE — optional female TTS (off by default), conversation language.
 // • GUIDED LINKS — answers render "Open <X>" actions that navigate AND keep
 //   Isabella present (she's mounted app-wide), so she takes you there.
-// • 3D-READY — the presence area hosts the holographic placeholder today and the
-//   Ready Player Me + Mixamo 3D figure (React Three Fiber) next, behind the same
-//   PresenceState contract. The old SVG portrait is retired here.
+// • 3D-READY — the presence area hosts the validated hologram figure
+//   (hologram/hologram-figure.tsx, port of the approved prototype) today and
+//   the Ready Player Me + Mixamo 3D figure (React Three Fiber) next, behind
+//   the same PresenceState contract. The old SVG portrait is retired here.
 //
 // Knowledge stays in Knowledge OS — same action, confidence and sources.
 // ============================================================================
@@ -46,7 +47,7 @@ import { ConfidenceBadge, AnswerText } from "@/components/living-guide";
 import { IsabellaPresence, type PresenceState } from "./avatar";
 import { ProjectBriefing } from "./project-briefing";
 import { PortfolioBriefing } from "./portfolio-briefing";
-import { HologramPlaceholder } from "./hologram/hologram-placeholder";
+import { HologramFigure } from "./hologram/hologram-figure";
 import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
 import styles from "./isabella-experience.module.css";
@@ -326,7 +327,7 @@ export function IsabellaExperience({
           onPointerDown={wf.onDragStart}
           className={`flex cursor-grab items-center gap-2 rounded-full border ${panelTone} py-1.5 pl-1.5 pr-3 text-foreground shadow-xl active:cursor-grabbing`}
         >
-          <HologramPlaceholder state={presence} size={34} accent={expert.presentation.accent} />
+          <HologramFigure state={presence} size={34} label={expert.displayName} />
           <span className="text-sm font-semibold">{expert.displayName}</span>
           <button onClick={wf.toggleMinimize} className={iconBtn} title={tt("Expand", "Expandir")} aria-label={tt("Expand", "Expandir")}>
             <Maximize2 className="h-4 w-4" />
@@ -429,7 +430,7 @@ export function IsabellaExperience({
             className={`${styles.compactHeader} flex items-center justify-between gap-2 border-b border-border px-3 py-1.5`}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <HologramPlaceholder state={presence} size={28} accent={expert.presentation.accent} />
+              <HologramFigure state={presence} size={28} label={expert.displayName} />
               <span className="truncate text-xs font-semibold text-foreground">{expert.displayName}</span>
               <span
                 className="hidden shrink-0 items-center gap-0.5 rounded-full border border-brand-500/30 bg-brand-500/10 px-1.5 text-[9px] font-medium text-brand-600 dark:text-brand-400 sm:inline-flex"
@@ -477,10 +478,10 @@ export function IsabellaExperience({
               </button>
             )}
             <div className={`${styles.materialize} relative`} style={{ width: presenceSize, height: presenceSize }}>
-              {/* Holographic base (also the graceful fallback if the 3D figure
-                  can't load). The real-time 3D character renders on top. */}
+              {/* Holograma validado del prototipo (también el fallback elegante
+                  si la figura 3D no carga). The real-time 3D character renders on top. */}
               <div className="absolute inset-0">
-                <HologramPlaceholder state={presence} size={presenceSize} accent={expert.presentation.accent} label={expert.displayName} />
+                <HologramFigure state={presence} size={presenceSize} stage label={expert.displayName} />
               </div>
               {HAS_3D_AVATAR && (
                 <div className="absolute inset-0">

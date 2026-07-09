@@ -1,0 +1,196 @@
+/* ============================================================================
+   Isabella — figura holográfica (SVG validado del prototipo
+   isabella-holograma-prototipo.html). Presentación pura: estos valores están
+   APROBADOS — no cambiarlos sin decisión de Product UX Contract.
+   ========================================================================= */
+
+.root {
+  position: relative;
+  pointer-events: none;
+  --holo-a: #9BE8FF;
+  --holo-b: #B79CFF;
+  --state-glow: #8CBEFF;
+}
+
+/* escenario 210x250 escalado al tamaño solicitado, anclado abajo-centro */
+.scaler {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 210px;
+  height: 250px;
+  transform-origin: 50% 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+/* cono de luz del proyector */
+.cone {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190px;
+  height: 225px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--state-glow, #8CBEFF) 16%, transparent),
+    transparent 78%
+  );
+  clip-path: polygon(38% 100%, 62% 100%, 96% 0%, 4% 0%);
+  filter: blur(1.5px);
+  animation: coneFlicker 5.5s ease-in-out infinite;
+}
+@keyframes coneFlicker {
+  0%, 100% { opacity: 0.75; }
+  47% { opacity: 0.55; }
+  52% { opacity: 0.8; }
+  78% { opacity: 0.62; }
+}
+
+/* base proyectora */
+.base {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 26px;
+}
+.disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--state-glow, #8CBEFF) 55%, transparent),
+    transparent 68%
+  );
+}
+.ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--state-glow, #8CBEFF) 60%, transparent);
+  transform: translate(-50%, -50%) scaleY(0.22);
+  animation: ringPulse 3.2s ease-out infinite;
+}
+.ring:nth-child(3) {
+  animation-delay: 1.6s;
+}
+@keyframes ringPulse {
+  from { width: 34px; height: 34px; opacity: 0.9; }
+  to { width: 150px; height: 150px; opacity: 0; }
+}
+
+.figure {
+  position: relative;
+  width: 170px;
+  height: 225px;
+  animation: breath 4.6s ease-in-out infinite;
+  transform-origin: 50% 92%;
+  filter: drop-shadow(0 0 14px var(--state-glow, #8CBEFF))
+    drop-shadow(0 0 40px color-mix(in srgb, var(--state-glow, #8CBEFF) 40%, transparent));
+  transition: filter 0.8s;
+}
+@keyframes breath {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.012) translateY(-2.5px); }
+}
+
+/* glitch ocasional */
+@keyframes glitch {
+  0%, 93%, 100% { transform: translateX(0); opacity: 1; }
+  94% { transform: translateX(1.5px); opacity: 0.85; }
+  95% { transform: translateX(-1.5px); }
+  96% { transform: translateX(0); opacity: 1; }
+}
+.figure svg {
+  animation: glitch 9s steps(1) infinite;
+}
+
+/* modo busto (tamaños pequeños: header compacto / píldora) */
+.bust {
+  display: block;
+  filter: drop-shadow(0 0 6px var(--state-glow, #8CBEFF));
+  transition: filter 0.8s;
+}
+
+/* scanlines recortadas a la silueta */
+.scan {
+  animation: scanMove 7s linear infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes scanMove {
+  from { transform: translateY(0); }
+  to { transform: translateY(40px); }
+}
+
+/* cejas y boca transicionan entre estados */
+.brow {
+  transition: all 0.5s;
+}
+.mouth {
+  transition: d 0.4s, opacity 0.2s;
+}
+
+/* puntitos "pensando" */
+.think {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.thinkOn {
+  opacity: 1;
+}
+.think circle {
+  animation: orbit 2.4s linear infinite;
+  transform-origin: 100px 16px;
+}
+.think circle:nth-child(2) {
+  animation-delay: -0.8s;
+}
+.think circle:nth-child(3) {
+  animation-delay: -1.6s;
+}
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(16px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(16px) rotate(-360deg); }
+}
+
+/* ecualizador de voz (reemplaza la boca solo en estado habla) */
+.voice {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.voiceOn {
+  opacity: 1;
+}
+.voice rect {
+  animation: eq 0.7s ease-in-out infinite;
+  transform-origin: center 78px;
+}
+.voice rect:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.voice rect:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.voice rect:nth-child(4) {
+  animation-delay: 0.36s;
+}
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.15s !important;
+  }
+}
