@@ -114,6 +114,26 @@ export function SignupForm() {
 
       <div className="space-y-2">
         <label
+          htmlFor="signup-companyName"
+          className="block text-sm font-medium text-foreground"
+        >
+          {t("companyName")}
+        </label>
+        <input
+          id="signup-companyName"
+          name="companyName"
+          type="text"
+          autoComplete="organization"
+          maxLength={120}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          placeholder="Acme Construction"
+          disabled={isPending}
+        />
+        <p className="text-xs text-muted-foreground">{t("companyNameHint")}</p>
+      </div>
+
+      <div className="space-y-2">
+        <label
           htmlFor="signup-email"
           className="block text-sm font-medium text-foreground"
         >

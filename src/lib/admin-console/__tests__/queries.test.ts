@@ -18,6 +18,8 @@ const h = vi.hoisted(() => {
   // Per-table store: { rows: any[], count: number|null, error: any|null, headCount: number|null }
   const tables: Record<string, { rows: unknown[]; count: number | null; error: unknown; headCount: number | null }> = {};
   const calls: Record<string, Array<Record<string, unknown>>> = {};
+  // Per-RPC store: rows or error returned by client.rpc(fn, args).
+  const rpcs: Record<string, { rows: unknown[]; error: unknown }> = {};
 
   function get(table: string) {
     if (!tables[table]) tables[table] = { rows: [], count: null, error: null, headCount: null };
@@ -68,12 +70,23 @@ const h = vi.hoisted(() => {
   return {
     client: {
       from: (table: string) => makeBuilder(table),
+      rpc: (fn: string, args?: Record<string, unknown>) => {
+        recordCall(`rpc:${fn}`, { args: args ?? {} });
+        const store = rpcs[fn] ?? { rows: [], error: null };
+        return Promise.resolve({ data: store.error ? null : store.rows, error: store.error });
+      },
     },
     setRows(table: string, rows: unknown[]) { get(table).rows = rows; },
     setHeadCount(table: string, n: number) { get(table).headCount = n; },
     setError(table: string, e: unknown) { get(table).error = e; },
+    setRpc(fn: string, rows: unknown[]) { rpcs[fn] = { rows, error: null }; },
+    setRpcError(fn: string, e: unknown) { rpcs[fn] = { rows: [], error: e }; },
     callsFor: (table: string) => calls[table] ?? [],
-    reset() { for (const k of Object.keys(tables)) delete tables[k]; for (const k of Object.keys(calls)) delete calls[k]; },
+    reset() {
+      for (const k of Object.keys(tables)) delete tables[k];
+      for (const k of Object.keys(calls)) delete calls[k];
+      for (const k of Object.keys(rpcs)) delete rpcs[k];
+    },
   };
 });
 
@@ -82,6 +95,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.client }));
 import {
   getAdminMetrics, getCompaniesWithCounts, getUsersByCompany,
   getProjectsByUser, getProjectTaskAggregates, getProjectTasks,
+  getPlanCatalog, renameOrganization,
 } from "@/lib/admin-console/queries";
 
 beforeEach(() => h.reset());
@@ -149,12 +163,16 @@ describe("getCompaniesWithCounts — users / projects / tasks per company", () =
 });
 
 describe("getUsersByCompany — expandable users under a company", () => {
-  it("joins membership + profile + email + project/task counts", async () => {
-    h.setRows("organization_members", [
-      { user_id: "u1", role: "owner", created_at: "2026-01-01T00:00:00Z", profiles: { display_name: "Alice", created_at: "2026-01-01T00:00:00Z" } },
-      { user_id: "u2", role: "member", created_at: null, profiles: { display_name: null, created_at: null } },
+  // REGRESSION (Admin Console "No users in this company"): the old PostgREST
+  // embed profiles!organization_members_user_id_fkey could never resolve —
+  // organization_members.user_id references auth.users, not profiles — so the
+  // drill-down was always empty. The fix routes through the SECURITY DEFINER
+  // RPC admin_list_company_users; these tests pin that path.
+  it("maps the admin_list_company_users RPC rows + project/task counts", async () => {
+    h.setRpc("admin_list_company_users", [
+      { user_id: "u1", display_name: "Alice", email: "alice@acme.io", role: "owner", org_role: "COMPANY_OWNER", status: "active", joined_at: "2026-01-01T00:00:00Z" },
+      { user_id: "u2", display_name: null, email: "bob@acme.io", role: "member", org_role: null, status: null, joined_at: null },
     ]);
-    h.setRows("auth.users", [{ id: "u1", email: "alice@acme.io" }, { id: "u2", email: "bob@acme.io" }]);
     h.setRows("projects", [{ created_by: "u1" }, { created_by: "u1" }]);
     h.setRows("roadmap_tasks", [{ assigned_to: "u2" }, { assigned_to: "u2" }, { assigned_to: "u2" }]);
 
@@ -164,12 +182,65 @@ describe("getUsersByCompany — expandable users under a company", () => {
     const bob = users.find((u) => u.userId === "u2")!;
     expect(alice.email).toBe("alice@acme.io");
     expect(alice.role).toBe("owner");
+    expect(alice.orgRole).toBe("COMPANY_OWNER");
+    expect(alice.status).toBe("active");
     expect(alice.projectCount).toBe(2);
     expect(alice.assignedTaskCount).toBe(0);
     expect(bob.email).toBe("bob@acme.io");
     expect(bob.assignedTaskCount).toBe(3);
     expect(bob.projectCount).toBe(0);
     expect(bob.displayName).toBeNull();
+  });
+
+  it("passes the org id to the RPC and returns [] on RPC error", async () => {
+    h.setRpc("admin_list_company_users", [
+      { user_id: "u1", display_name: "Alice", email: "a@a.io", role: "owner", org_role: null, status: null, joined_at: null },
+    ]);
+    await getUsersByCompany("org-42", "en");
+    const rpcCalls = h.callsFor("rpc:admin_list_company_users");
+    expect(rpcCalls).toHaveLength(1);
+    expect((rpcCalls[0].args as Record<string, unknown>).p_org_id).toBe("org-42");
+
+    h.setRpcError("admin_list_company_users", { message: "not_authorized" });
+    expect(await getUsersByCompany("org-42", "en")).toEqual([]);
+  });
+});
+
+describe("renameOrganization — platform-admin rename via RPC", () => {
+  it("delegates to admin_rename_organization and returns old/new names", async () => {
+    // The RPC returns a jsonb object (not a row set); the mock passes data through.
+    h.setRpc("admin_rename_organization", { oldName: { en: "My Organization" }, newName: "Acme Corp" } as unknown as unknown[]);
+    const res = await renameOrganization("o1", "Acme Corp");
+    expect(res).toEqual({ oldName: { en: "My Organization" }, newName: "Acme Corp" });
+    const calls = h.callsFor("rpc:admin_rename_organization");
+    expect((calls[0].args as Record<string, unknown>).p_name).toBe("Acme Corp");
+  });
+
+  it("returns null when the RPC rejects (invalid name / not authorized)", async () => {
+    h.setRpcError("admin_rename_organization", { message: "invalid_name" });
+    expect(await renameOrganization("o1", "x")).toBeNull();
+  });
+});
+
+describe("getPlanCatalog — GLOBAL plan catalog with subscriber counts", () => {
+  it("maps plans and counts subscriptions per plan", async () => {
+    h.setRows("plans", [
+      { id: "pl1", plan_code: "starter", name: "Starter", price_monthly: 0, price_yearly: 0, currency: "USD", is_enterprise: false, is_active: true, sort_order: 1 },
+      { id: "pl2", plan_code: "pro", name: "Pro", price_monthly: 49, price_yearly: 490, currency: "USD", is_enterprise: false, is_active: true, sort_order: 2 },
+    ]);
+    h.setRows("subscriptions", [{ plan_id: "pl1" }, { plan_id: "pl2" }, { plan_id: "pl2" }, { plan_id: null }]);
+
+    const rows = await getPlanCatalog();
+    expect(rows).toHaveLength(2);
+    expect(rows[0].planCode).toBe("starter");
+    expect(rows[0].subscriberCount).toBe(1);
+    expect(rows[1].subscriberCount).toBe(2);
+    expect(rows[1].priceMonthly).toBe(49);
+  });
+
+  it("returns [] when there are no plans", async () => {
+    h.setRows("plans", []);
+    expect(await getPlanCatalog()).toEqual([]);
   });
 });
 
@@ -188,7 +259,7 @@ describe("getProjectsByUser — per-project task rollup", () => {
     ]);
     h.setRows("organizations", [{ id: "o1", slug: "acme", name_i18n: { en: "Acme" } }]);
     h.setRows("profiles", [{ id: "u1", display_name: "Alice" }]);
-    h.setRows("auth.users", [{ id: "u1", email: "alice@acme.io" }]);
+    h.setRpc("admin_get_user_emails", [{ user_id: "u1", email: "alice@acme.io" }]);
 
     const rows = await getProjectsByUser("en");
     expect(rows).toHaveLength(1);

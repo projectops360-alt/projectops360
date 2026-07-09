@@ -21,6 +21,7 @@ import {
   getCompaniesWithCounts,
   getProjectsByUser,
   getProjectTaskAggregates,
+  getPlanCatalog,
 } from "@/lib/admin-console/queries";
 import { logAdminEvent } from "@/lib/admin-console/audit";
 import type { Locale } from "@/types/database";
@@ -56,12 +57,13 @@ export default async function AdminConsolePage({
   // 3) Admin queries — only run AFTER the gate. Cross-org via service role.
   logAdminEvent({ event: "admin_page_viewed", email: ctx.email, userId: ctx.userId, route, result: "ok" });
 
-  const [metrics, companies, projectsByUser, projectTasks, admins] = await Promise.all([
+  const [metrics, companies, projectsByUser, projectTasks, admins, planCatalog] = await Promise.all([
     getAdminMetrics(),
     getCompaniesWithCounts(locale as Locale),
     getProjectsByUser(locale as Locale),
     getProjectTaskAggregates(locale as Locale),
     getAuthorizedAdmins(),
+    getPlanCatalog(),
   ]);
 
   logAdminEvent({
@@ -86,6 +88,7 @@ export default async function AdminConsolePage({
       projectsByUser={projectsByUser}
       projectTasks={projectTasks}
       admins={admins}
+      planCatalog={planCatalog}
       fallbackEmail="pmo@xxx-demo.io"
     />
   );

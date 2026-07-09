@@ -27,7 +27,25 @@ export interface CompanyRow {
   userCount: number;
   projectCount: number;
   taskCount: number;
+  /** Subscribed plan name (informational — billing stays per-company). */
+  planName: string | null;
+  subscriptionStatus: string | null;
   createdAt: string | null;
+}
+
+/** One plan of the GLOBAL catalog (drives the landing-page pricing). */
+export interface PlanCatalogRow {
+  id: string;
+  planCode: string;
+  name: string;
+  priceMonthly: number | null;
+  priceYearly: number | null;
+  currency: string | null;
+  isEnterprise: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  /** Companies currently subscribed to this plan. */
+  subscriberCount: number;
 }
 
 /** A user belonging to a company, expandable under a CompanyRow. */
@@ -37,6 +55,10 @@ export interface CompanyUserRow {
   displayName: string | null;
   email: string | null;
   role: string | null;
+  /** Workspace-level role (COMPANY_OWNER, PMO_ADMIN, …) when assigned. */
+  orgRole: string | null;
+  /** Membership status (active, invited, …) when tracked. */
+  status: string | null;
   projectCount: number;
   assignedTaskCount: number;
   createdAt: string | null;

@@ -697,5 +697,33 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-022 — Admin Console "View users" always empty; user emails unreadable
+
+- **Reported:** 2026-07-08 (verified directly against prod: org XXX `dc8205c1-…` has 10
+  valid members yet the drill-down showed "No users in this company"; EMAIL column always "—").
+- **Symptom:** Expanding any company in the Admin Console → Companies tab returned zero
+  users; every email column across the console rendered "—".
+- **Root cause (two, same theme — the auth schema is not reachable from PostgREST):**
+  1. `getUsersByCompany` used the embed `profiles!organization_members_user_id_fkey(...)`,
+     but `organization_members.user_id` references **`auth.users`**, NOT `profiles` — the
+     named FK does not point where the embed assumes, PostgREST errors, and the code
+     degraded to `[]`.
+  2. `fetchEmailsById` queried `.from("auth.users")` — PostgREST does not expose the
+     `auth` schema via `.from()` even to the service role, so emails always came back empty.
+- **Status: RESOLVED (2026-07-08).** Fix (migrations `20260841`/`20260842` + `queries.ts`):
+  reads that need `auth.users` moved INSIDE the database as `SECURITY DEFINER` RPCs gated
+  by `service_role OR is_platform_admin()` (active row in `admin_authorized_users`):
+  `admin_list_company_users(p_org_id)` (members + profile + email + org_role/status) and
+  `admin_get_user_emails(p_user_ids)` (batch owner emails). Business-table RLS was NOT
+  widened.
+- **Protection rule (binding):** **Admin Console reads that involve `auth.users` (member
+  lists, emails) must go through the gated admin RPCs — never a PostgREST embed on
+  `organization_members → profiles` and never `.from("auth.users")`.** A company with
+  members whose drill-down renders empty is a regression.
+- **Owner:** Product/Engineering. **Verify:** as a platform admin, expand XXX
+  (`dc8205c1-…`) in Companies → 10 users listed, each with email.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

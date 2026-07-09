@@ -13,19 +13,24 @@
 
 import { useMemo, useState, useTransition, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ShieldCheck, Building2, Users, FolderKanban, ListTodo, Lock, Search,
-  ChevronDown, ChevronRight, Loader2, UserCircle2, Inbox,
+  ChevronDown, ChevronRight, Loader2, UserCircle2, Inbox, Pencil, CreditCard,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import type { TaskStatus } from "@/types/database";
 import type {
   AdminMetrics, CompanyRow, CompanyUserRow, UserProjectRow,
-  ProjectTaskAggregate, AuthorizedAdminRow, AdminTaskPage,
+  ProjectTaskAggregate, AuthorizedAdminRow, AdminTaskPage, PlanCatalogRow,
 } from "@/lib/admin-console/types";
-import { getOrgUsersAction, getProjectTasksAction } from "@/app/[locale]/(app)/admin/actions";
+import {
+  getOrgUsersAction, getProjectTasksAction, renameOrgAdminAction,
+  grantSystemAdminAction, revokeSystemAdminAction,
+} from "@/app/[locale]/(app)/admin/actions";
 
-type Tab = "overview" | "companies" | "usersProjects" | "projectTasks" | "adminAccess";
+type Tab = "overview" | "companies" | "usersProjects" | "projectTasks" | "plans" | "adminAccess";
 
 const TASK_STATUSES: TaskStatus[] = [
   "not_started", "prompt_ready", "sent_to_ai", "in_progress",
@@ -54,7 +59,7 @@ const ROLE_TONE: Record<string, string> = {
 const inp = "rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none";
 
 export function AdminConsole({
-  locale, metrics, companies, projectsByUser, projectTasks, admins, fallbackEmail,
+  locale, metrics, companies, projectsByUser, projectTasks, admins, planCatalog, fallbackEmail,
 }: {
   locale: Locale;
   metrics: AdminMetrics;
@@ -62,6 +67,7 @@ export function AdminConsole({
   projectsByUser: UserProjectRow[];
   projectTasks: ProjectTaskAggregate[];
   admins: AuthorizedAdminRow[];
+  planCatalog: PlanCatalogRow[];
   fallbackEmail: string;
 }) {
   const t = useTranslations("adminConsole");
@@ -77,6 +83,7 @@ export function AdminConsole({
     { key: "companies", label: t("companies"), icon: Building2 },
     { key: "usersProjects", label: t("usersProjects"), icon: Users },
     { key: "projectTasks", label: t("projectTasks"), icon: ListTodo },
+    { key: "plans", label: t("plansTab"), icon: CreditCard },
     { key: "adminAccess", label: t("adminAccess"), icon: Lock },
   ];
 
@@ -219,6 +226,10 @@ export function AdminConsole({
         </div>
       )}
 
+      {tab === "plans" && (
+        <PlansTab t={t} locale={locale} plans={planCatalog} />
+      )}
+
       {tab === "adminAccess" && (
         <AdminAccessTab t={t} admins={admins} fallbackEmail={fallbackEmail} />
       )}
@@ -274,12 +285,14 @@ function OverviewTab({
   );
 }
 
-// ── Companies (expandable to users) ──────────────────────────────────────────
+// ── Companies (expandable to users; renameable by platform admins) ──────────
 function CompaniesTab({ t, companies }: { t: (k: string) => string; companies: CompanyRow[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [users, setUsers] = useState<CompanyUserRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  // Optimistic display names after a successful rename (server revalidates too).
+  const [renamed, setRenamed] = useState<Map<string, string>>(new Map());
 
   function toggle(orgId: string) {
     if (expanded === orgId) { setExpanded(null); return; }
@@ -302,6 +315,7 @@ function CompaniesTab({ t, companies }: { t: (k: string) => string; companies: C
           <tr>
             <th className="px-3 py-2 text-left">{t("colCompany")}</th>
             <th className="px-3 py-2 text-left">{t("colOrgId")}</th>
+            <th className="px-3 py-2 text-left">{t("colPlan")}</th>
             <th className="px-3 py-2 text-right">{t("colUsers")}</th>
             <th className="px-3 py-2 text-right">{t("colProjects")}</th>
             <th className="px-3 py-2 text-right">{t("colTasks")}</th>
@@ -311,7 +325,18 @@ function CompaniesTab({ t, companies }: { t: (k: string) => string; companies: C
         </thead>
         <tbody>
           {companies.map((c) => (
-            <CompanyRowItem key={c.id} c={c} t={t} expanded={expanded === c.id} pending={pending} onToggle={() => toggle(c.id)} users={expanded === c.id ? users : []} err={expanded === c.id ? err : null} />
+            <CompanyRowItem
+              key={c.id}
+              c={c}
+              displayName={renamed.get(c.id) ?? c.name}
+              t={t}
+              expanded={expanded === c.id}
+              pending={pending}
+              onToggle={() => toggle(c.id)}
+              onRenamed={(name) => setRenamed((m) => new Map(m).set(c.id, name))}
+              users={expanded === c.id ? users : []}
+              err={expanded === c.id ? err : null}
+            />
           ))}
         </tbody>
       </table>
@@ -320,21 +345,94 @@ function CompaniesTab({ t, companies }: { t: (k: string) => string; companies: C
 }
 
 function CompanyRowItem({
-  c, t, expanded, pending, onToggle, users, err,
+  c, displayName, t, expanded, pending, onToggle, onRenamed, users, err,
 }: {
   c: CompanyRow;
+  displayName: string;
   t: (k: string) => string;
   expanded: boolean;
   pending: boolean;
   onToggle: () => void;
+  onRenamed: (name: string) => void;
   users: CompanyUserRow[];
   err: string | null;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [renameErr, setRenameErr] = useState<string | null>(null);
+  const [saving, startSave] = useTransition();
+
+  function startEdit() {
+    setDraft(displayName || c.slug);
+    setRenameErr(null);
+    setEditing(true);
+  }
+
+  function save() {
+    startSave(async () => {
+      const res = await renameOrgAdminAction(c.id, draft);
+      if (!res.ok) {
+        setRenameErr(
+          res.reason === "invalid_name" ? t("renameErrorInvalid")
+            : res.reason === "not_authorized" ? t("denied")
+              : t("renameErrorGeneric"),
+        );
+        return;
+      }
+      onRenamed(res.name);
+      setEditing(false);
+    });
+  }
+
   return (
     <>
       <tr className="border-t border-border/50">
-        <td className="px-3 py-2 font-medium text-foreground">{c.name || c.slug}</td>
+        <td className="px-3 py-2 font-medium text-foreground">
+          {editing ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                minLength={2}
+                maxLength={120}
+                disabled={saving}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+                className="w-44 rounded-lg border border-border bg-background px-2 py-1 text-sm focus:border-brand-500 focus:outline-none"
+              />
+              <button onClick={save} disabled={saving} className="rounded-lg bg-brand-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : t("renameSave")}
+              </button>
+              <button onClick={() => setEditing(false)} disabled={saving} className="rounded-lg border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted">
+                {t("renameCancel")}
+              </button>
+              {renameErr && <span className="w-full text-[11px] text-red-600 dark:text-red-400">{renameErr}</span>}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              {displayName || c.slug}
+              <button
+                onClick={startEdit}
+                title={t("rename")}
+                aria-label={t("rename")}
+                className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+        </td>
         <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{c.id}</td>
+        <td className="px-3 py-2 text-muted-foreground">
+          {c.planName ? (
+            <span className="inline-flex items-center gap-1">
+              {c.planName}
+              {c.subscriptionStatus && (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{c.subscriptionStatus}</span>
+              )}
+            </span>
+          ) : "—"}
+        </td>
         <td className="px-3 py-2 text-right text-muted-foreground">{c.userCount}</td>
         <td className="px-3 py-2 text-right text-muted-foreground">{c.projectCount}</td>
         <td className="px-3 py-2 text-right text-muted-foreground">{c.taskCount}</td>
@@ -348,7 +446,7 @@ function CompanyRowItem({
       </tr>
       {expanded && (
         <tr className="bg-muted/20">
-          <td colSpan={7} className="px-3 py-2">
+          <td colSpan={8} className="px-3 py-2">
             {err ? (
               <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{err}</p>
             ) : users.length === 0 ? (
@@ -361,6 +459,8 @@ function CompanyRowItem({
                       <th className="px-2 py-1.5 text-left">{t("colName")}</th>
                       <th className="px-2 py-1.5 text-left">{t("colEmail")}</th>
                       <th className="px-2 py-1.5 text-left">{t("colRole")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("colOrgRole")}</th>
+                      <th className="px-2 py-1.5 text-left">{t("colMemberStatus")}</th>
                       <th className="px-2 py-1.5 text-right">{t("colUserProjects")}</th>
                       <th className="px-2 py-1.5 text-right">{t("colAssignedTasks")}</th>
                       <th className="px-2 py-1.5 text-left">{t("colCreated")}</th>
@@ -374,6 +474,8 @@ function CompanyRowItem({
                         <td className="px-2 py-1.5">
                           {u.role ? <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${ROLE_TONE[u.role] ?? "bg-muted text-muted-foreground"}`}>{u.role}</span> : "—"}
                         </td>
+                        <td className="px-2 py-1.5 text-muted-foreground">{u.orgRole ?? "—"}</td>
+                        <td className="px-2 py-1.5 text-muted-foreground">{u.status ?? "—"}</td>
                         <td className="px-2 py-1.5 text-right text-muted-foreground">{u.projectCount}</td>
                         <td className="px-2 py-1.5 text-right text-muted-foreground">{u.assignedTaskCount}</td>
                         <td className="px-2 py-1.5 text-muted-foreground">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
@@ -580,7 +682,7 @@ function ProjectTaskDrilldown({ t, projectId }: { t: (k: string, vars?: Record<s
   );
 }
 
-// ── Admin Access ─────────────────────────────────────────────────────────────
+// ── Admin Access (grant / revoke system admins) ──────────────────────────────
 function AdminAccessTab({
   t, admins, fallbackEmail,
 }: {
@@ -588,12 +690,73 @@ function AdminAccessTab({
   admins: AuthorizedAdminRow[];
   fallbackEmail: string;
 }) {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [formErr, setFormErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const [rowPending, setRowPending] = useState<string | null>(null);
+
+  function grant(target: string) {
+    setFormErr(null);
+    setRowPending(target);
+    start(async () => {
+      const res = await grantSystemAdminAction(target);
+      setRowPending(null);
+      if (!res.ok) {
+        setFormErr(res.reason === "invalid_email" ? t("grantErrorEmail") : res.reason === "not_authorized" ? t("denied") : t("grantErrorGeneric"));
+        return;
+      }
+      setEmail("");
+      router.refresh();
+    });
+  }
+
+  function revoke(target: string) {
+    setFormErr(null);
+    setRowPending(target);
+    start(async () => {
+      const res = await revokeSystemAdminAction(target);
+      setRowPending(null);
+      if (!res.ok) { setFormErr(t("grantErrorGeneric")); return; }
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-brand-500/30 bg-brand-500/[0.04] p-4 text-sm text-foreground">
         <p className="font-semibold">{t("adminAccessTitle")}</p>
         <p className="mt-1 text-xs text-muted-foreground">{t("fallbackNote", { email: fallbackEmail })}</p>
       </div>
+
+      {/* Grant form */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-sm font-semibold text-foreground">{t("grantTitle")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("grantHint")}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t("grantPlaceholder")}
+            disabled={pending}
+            onKeyDown={(e) => { if (e.key === "Enter" && email.trim()) grant(email); }}
+            className="w-full max-w-xs rounded-lg border border-border bg-background px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
+          />
+          <button
+            onClick={() => grant(email)}
+            disabled={pending || !email.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {pending && rowPending === email && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {t("grantSubmit")}
+          </button>
+        </div>
+        {formErr && (
+          <p className="mt-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">{formErr}</p>
+        )}
+      </div>
+
       {admins.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-6 text-center">
           <Inbox className="mx-auto h-6 w-6 text-muted-foreground" />
@@ -608,6 +771,7 @@ function AdminAccessTab({
                 <th className="px-3 py-2 text-left">{t("colAdminRole")}</th>
                 <th className="px-3 py-2 text-left">{t("colAdminStatus")}</th>
                 <th className="px-3 py-2 text-left">{t("colAdminGranted")}</th>
+                <th className="px-3 py-2 text-right">{t("colAdminActions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -621,6 +785,105 @@ function AdminAccessTab({
                     </span>
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{a.grantedAt ? new Date(a.grantedAt).toLocaleDateString() : "—"}</td>
+                  <td className="px-3 py-2 text-right">
+                    {a.isActive ? (
+                      <button
+                        onClick={() => revoke(a.email)}
+                        disabled={pending}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+                      >
+                        {pending && rowPending === a.email && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {t("revoke")}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => grant(a.email)}
+                        disabled={pending}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        {pending && rowPending === a.email && <Loader2 className="h-3 w-3 animate-spin" />}
+                        {t("reactivate")}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Billing & Plans (GLOBAL catalog, read-only view) ─────────────────────────
+function PlansTab({
+  t, locale, plans,
+}: {
+  t: (k: string) => string;
+  locale: Locale;
+  plans: PlanCatalogRow[];
+}) {
+  const fmtPrice = (value: number | null, currency: string | null) => {
+    if (value === null || value === undefined) return "—";
+    try {
+      return new Intl.NumberFormat(locale, { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(value);
+    } catch {
+      return `${value} ${currency ?? ""}`.trim();
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-brand-500/30 bg-brand-500/[0.04] p-4 text-sm text-foreground">
+        <p className="font-semibold">{t("plansGlobalTitle")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("plansGlobalNote")}</p>
+        <Link
+          href="/organization/plans"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+        >
+          <CreditCard className="h-3.5 w-3.5" />
+          {t("plansEdit")}
+        </Link>
+      </div>
+
+      {plans.length === 0 ? (
+        <Empty t={t} text={t("noPlans")} />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left">{t("colPlan")}</th>
+                <th className="px-3 py-2 text-left">{t("colPlanCode")}</th>
+                <th className="px-3 py-2 text-right">{t("colPriceMonthly")}</th>
+                <th className="px-3 py-2 text-right">{t("colPriceYearly")}</th>
+                <th className="px-3 py-2 text-right">{t("colSubscribers")}</th>
+                <th className="px-3 py-2 text-left">{t("colStatus")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plans.map((p) => (
+                <tr key={p.id} className="border-t border-border/50">
+                  <td className="px-3 py-2 font-medium text-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      {p.name}
+                      {p.isEnterprise && (
+                        <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
+                          {t("enterprise")}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{p.planCode}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{fmtPrice(p.priceMonthly, p.currency)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{fmtPrice(p.priceYearly, p.currency)}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{p.subscriberCount}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${p.isActive ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : "bg-muted text-muted-foreground"}`}>
+                      {p.isActive ? t("active") : t("inactive")}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

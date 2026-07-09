@@ -17,19 +17,26 @@ import esMessages from "../../../../messages/es.json";
 vi.mock("@/app/[locale]/(app)/admin/actions", () => ({
   getOrgUsersAction: vi.fn(async () => ({ ok: true, users: [] })),
   getProjectTasksAction: vi.fn(async () => ({ ok: true, page: { rows: [], total: 0, page: 1, pageSize: 25 } })),
+  renameOrgAdminAction: vi.fn(async () => ({ ok: true, name: "Renamed" })),
+  grantSystemAdminAction: vi.fn(async () => ({ ok: true })),
+  revokeSystemAdminAction: vi.fn(async () => ({ ok: true })),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 
 import { AdminConsole } from "../admin-console";
 import type {
-  AdminMetrics, CompanyRow, UserProjectRow, ProjectTaskAggregate, AuthorizedAdminRow,
+  AdminMetrics, CompanyRow, UserProjectRow, ProjectTaskAggregate, AuthorizedAdminRow, PlanCatalogRow,
 } from "@/lib/admin-console/types";
 
 const METRICS: AdminMetrics = {
   totalCompanies: 3, totalUsers: 10, totalProjects: 5, totalTasks: 42, activeAdminUsers: 1,
 };
 const COMPANIES: CompanyRow[] = [
-  { id: "o1", name: "Acme", slug: "acme", userCount: 4, projectCount: 2, taskCount: 12, createdAt: "2026-01-01T00:00:00Z" },
-  { id: "o2", name: "Beta", slug: "beta", userCount: 6, projectCount: 3, taskCount: 30, createdAt: null },
+  { id: "o1", name: "Acme", slug: "acme", userCount: 4, projectCount: 2, taskCount: 12, planName: "Pro", subscriptionStatus: "active", createdAt: "2026-01-01T00:00:00Z" },
+  { id: "o2", name: "Beta", slug: "beta", userCount: 6, projectCount: 3, taskCount: 30, planName: null, subscriptionStatus: null, createdAt: null },
 ];
 const PROJECTS_BY_USER: UserProjectRow[] = [
   { userId: "u1", ownerName: "Alice", ownerEmail: "alice@acme.io", organizationId: "o1", organizationName: "Acme", projectId: "p1", projectTitle: "Tower", projectStatus: "active", totalTasks: 5, openTasks: 3, completedTasks: 1, blockedTasks: 1, updatedAt: "2026-07-01T00:00:00Z" },
@@ -40,6 +47,26 @@ const PROJECT_TASKS: ProjectTaskAggregate[] = [
 const ADMINS: AuthorizedAdminRow[] = [
   { email: "pmo@xxx-demo.io", role: "platform_admin", isActive: true, grantedAt: "2026-01-01T00:00:00Z" },
 ];
+const PLAN_CATALOG: PlanCatalogRow[] = [
+  { id: "pl1", planCode: "starter", name: "Starter", priceMonthly: 0, priceYearly: 0, currency: "USD", isEnterprise: false, isActive: true, sortOrder: 1, subscriberCount: 2 },
+  { id: "pl2", planCode: "enterprise", name: "Enterprise", priceMonthly: null, priceYearly: null, currency: "USD", isEnterprise: true, isActive: true, sortOrder: 9, subscriberCount: 1 },
+];
+
+function consoleWith(over: Partial<React.ComponentProps<typeof AdminConsole>> = {}) {
+  return (
+    <AdminConsole
+      locale={(over.locale as "en" | "es") ?? "en"}
+      metrics={METRICS}
+      companies={COMPANIES}
+      projectsByUser={PROJECTS_BY_USER}
+      projectTasks={PROJECT_TASKS}
+      admins={ADMINS}
+      planCatalog={PLAN_CATALOG}
+      fallbackEmail="pmo@xxx-demo.io"
+      {...over}
+    />
+  );
+}
 
 function render(node: React.ReactElement, locale: "en" | "es" = "en"): string {
   return renderToStaticMarkup(
@@ -51,9 +78,7 @@ function render(node: React.ReactElement, locale: "en" | "es" = "en"): string {
 
 describe("AdminConsole — render", () => {
   it("renders the header, badge and KPI cards (EN)", () => {
-    const html = render(
-      <AdminConsole locale="en" metrics={METRICS} companies={COMPANIES} projectsByUser={PROJECTS_BY_USER} projectTasks={PROJECT_TASKS} admins={ADMINS} fallbackEmail="pmo@xxx-demo.io" />,
-    );
+    const html = render(consoleWith());
     expect(html).toContain("Admin Console");
     expect(html).toContain("Restricted Access");
     expect(html).toContain("Companies");
@@ -65,31 +90,26 @@ describe("AdminConsole — render", () => {
   });
 
   it("renders in ES without Spanglish", () => {
-    const html = render(
-      <AdminConsole locale="es" metrics={METRICS} companies={COMPANIES} projectsByUser={PROJECTS_BY_USER} projectTasks={PROJECT_TASKS} admins={ADMINS} fallbackEmail="pmo@xxx-demo.io" />,
-      "es",
-    );
+    const html = render(consoleWith({ locale: "es" }), "es");
     expect(html).toContain("Consola de Administración");
     expect(html).toContain("Acceso Restringido");
     expect(html).toContain("Empresas");
     expect(html).toContain("Usuarios Admin");
+    expect(html).toContain("Facturación y Planes");
   });
 
-  it("renders the five tabs", () => {
-    const html = render(
-      <AdminConsole locale="en" metrics={METRICS} companies={COMPANIES} projectsByUser={PROJECTS_BY_USER} projectTasks={PROJECT_TASKS} admins={ADMINS} fallbackEmail="pmo@xxx-demo.io" />,
-    );
+  it("renders the six tabs (including Billing & Plans)", () => {
+    const html = render(consoleWith());
     expect(html).toContain("Overview");
     expect(html).toContain("Companies");
     expect(html).toContain("Users &amp; Projects");
     expect(html).toContain("Project Tasks");
+    expect(html).toContain("Billing &amp; Plans");
     expect(html).toContain("Admin Access");
   });
 
   it("Overview tab renders companies + projects summaries", () => {
-    const html = render(
-      <AdminConsole locale="en" metrics={METRICS} companies={COMPANIES} projectsByUser={PROJECTS_BY_USER} projectTasks={PROJECT_TASKS} admins={ADMINS} fallbackEmail="pmo@xxx-demo.io" />,
-    );
+    const html = render(consoleWith());
     expect(html).toContain("Acme");
     expect(html).toContain("Tower");
   });
@@ -97,7 +117,7 @@ describe("AdminConsole — render", () => {
   it("renders empty states when there is no data", () => {
     const empty: AdminMetrics = { totalCompanies: 0, totalUsers: 0, totalProjects: 0, totalTasks: 0, activeAdminUsers: 0 };
     const html = render(
-      <AdminConsole locale="en" metrics={empty} companies={[]} projectsByUser={[]} projectTasks={[]} admins={[]} fallbackEmail="pmo@xxx-demo.io" />,
+      consoleWith({ metrics: empty, companies: [], projectsByUser: [], projectTasks: [], admins: [], planCatalog: [] }),
     );
     // KPIs render zero values
     expect(html).toContain("Admin Console");
@@ -113,10 +133,6 @@ describe("AdminConsole — render", () => {
     // interaction not exercised in node-env SSR. We assert the full tree
     // mounts cleanly with sample data, which exercises the filter `useMemo`
     // builders (company/user/project options) on every render.
-    expect(() =>
-      render(
-        <AdminConsole locale="en" metrics={METRICS} companies={COMPANIES} projectsByUser={PROJECTS_BY_USER} projectTasks={PROJECT_TASKS} admins={ADMINS} fallbackEmail="pmo@xxx-demo.io" />,
-      ),
-    ).not.toThrow();
+    expect(() => render(consoleWith())).not.toThrow();
   });
 });

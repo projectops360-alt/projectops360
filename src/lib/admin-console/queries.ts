@@ -23,6 +23,7 @@ import type {
   AdminTaskFilters,
   CompanyRow,
   CompanyUserRow,
+  PlanCatalogRow,
   ProjectTaskAggregate,
   UserProjectRow,
 } from "./types";
@@ -79,14 +80,16 @@ export async function getCompaniesWithCounts(locale: Locale): Promise<CompanyRow
 
   const orgIds = orgs.map((o) => (o as { id: string }).id);
 
-  const [membersByOrg, projectsByOrg, tasksByOrg] = await Promise.all([
+  const [membersByOrg, projectsByOrg, tasksByOrg, subscriptionByOrg] = await Promise.all([
     groupCount(supabase, "organization_members", "organization_id", orgIds),
     groupCount(supabase, "projects", "organization_id", orgIds, "deleted_at", null),
     groupCount(supabase, "roadmap_tasks", "organization_id", orgIds, "deleted_at", null),
+    fetchSubscriptionsByOrg(supabase, orgIds),
   ]);
 
   return orgs.map((o) => {
     const org = o as { id: string; slug: string; name_i18n: I18nField; created_at: string | null };
+    const sub = subscriptionByOrg.get(org.id);
     return {
       id: org.id,
       name: nameFromI18n(org.name_i18n, locale) || org.slug,
@@ -94,54 +97,121 @@ export async function getCompaniesWithCounts(locale: Locale): Promise<CompanyRow
       userCount: membersByOrg.get(org.id) ?? 0,
       projectCount: projectsByOrg.get(org.id) ?? 0,
       taskCount: tasksByOrg.get(org.id) ?? 0,
+      planName: sub?.planName ?? null,
+      subscriptionStatus: sub?.status ?? null,
       createdAt: org.created_at,
     };
   });
 }
 
-/** Users per company (organization_members + profiles), expandable rows. */
+/**
+ * GLOBAL plan catalog (plans + subscriber counts). These rows power the
+ * landing-page pricing — they are NOT any company's individual billing.
+ * Editing happens in /organization/plans (platform-admin gated).
+ */
+export async function getPlanCatalog(): Promise<PlanCatalogRow[]> {
+  const supabase = createAdminClient();
+  const [{ data: plans }, { data: subs }] = await Promise.all([
+    supabase
+      .from("plans")
+      .select("id, plan_code, name, price_monthly, price_yearly, currency, is_enterprise, is_active, sort_order")
+      .order("sort_order", { ascending: true }),
+    supabase.from("subscriptions").select("plan_id"),
+  ]);
+
+  if (!plans) return [];
+
+  const subscribersByPlan = new Map<string, number>();
+  for (const row of (subs ?? []) as { plan_id: string | null }[]) {
+    if (!row.plan_id) continue;
+    subscribersByPlan.set(row.plan_id, (subscribersByPlan.get(row.plan_id) ?? 0) + 1);
+  }
+
+  return (plans as Array<{
+    id: string; plan_code: string; name: string; price_monthly: number | null;
+    price_yearly: number | null; currency: string | null; is_enterprise: boolean;
+    is_active: boolean; sort_order: number;
+  }>).map((p) => ({
+    id: p.id,
+    planCode: p.plan_code,
+    name: p.name,
+    priceMonthly: p.price_monthly,
+    priceYearly: p.price_yearly,
+    currency: p.currency,
+    isEnterprise: p.is_enterprise,
+    isActive: p.is_active,
+    sortOrder: p.sort_order,
+    subscriberCount: subscribersByPlan.get(p.id) ?? 0,
+  }));
+}
+
+/**
+ * Users per company, expandable rows. Goes through the SECURITY DEFINER RPC
+ * admin_list_company_users (migration 20260841) instead of PostgREST embeds:
+ * organization_members.user_id references auth.users (NOT profiles), so the
+ * old profiles!organization_members_user_id_fkey embed always errored (the
+ * "No users in this company" bug), and auth.users emails are only reachable
+ * inside the database. The RPC is additionally gated by is_platform_admin()
+ * for any non-service-role caller.
+ */
 export async function getUsersByCompany(orgId: string, locale: Locale): Promise<CompanyUserRow[]> {
   const supabase = createAdminClient();
-  const { data: members } = await supabase
-    .from("organization_members")
-    .select("user_id, role, created_at, profiles!organization_members_user_id_fkey(display_name, created_at)")
-    .eq("organization_id", orgId)
-    .order("created_at", { ascending: true });
+  const { data: members, error } = await supabase.rpc("admin_list_company_users", {
+    p_org_id: orgId,
+  });
 
-  if (!members || members.length === 0) return [];
+  if (error || !members || members.length === 0) return [];
 
-  const userIds = members
-    .map((m) => (m as { user_id: string }).user_id)
-    .filter(Boolean);
+  const rows = members as Array<{
+    user_id: string;
+    display_name: string | null;
+    email: string | null;
+    role: string | null;
+    org_role: string | null;
+    status: string | null;
+    joined_at: string | null;
+  }>;
 
-  // Email lives on auth.users (not exposed via RLS to the anon client); the
-  // service role can query the Supabase auth schema.
-  const emailById = await fetchEmailsById(supabase, userIds);
+  const userIds = rows.map((m) => m.user_id).filter(Boolean);
 
   const [projectsByUser, tasksByUser] = await Promise.all([
     groupCount(supabase, "projects", "created_by", userIds, "deleted_at", null),
     groupCount(supabase, "roadmap_tasks", "assigned_to", userIds, "deleted_at", null),
   ]);
 
-  return members.map((m) => {
-    const row = m as unknown as {
-      user_id: string;
-      role: string | null;
-      created_at: string | null;
-      profiles: { display_name: string | null; created_at: string | null } | null;
-    };
-    return {
-      organizationId: orgId,
-      userId: row.user_id,
-      displayName: row.profiles?.display_name ?? null,
-      email: emailById.get(row.user_id) ?? null,
-      role: row.role,
-      projectCount: projectsByUser.get(row.user_id) ?? 0,
-      assignedTaskCount: tasksByUser.get(row.user_id) ?? 0,
-      createdAt: row.profiles?.created_at ?? row.created_at,
-    };
-  });
+  return rows.map((row) => ({
+    organizationId: orgId,
+    userId: row.user_id,
+    displayName: row.display_name,
+    email: row.email,
+    role: row.role,
+    orgRole: row.org_role,
+    status: row.status,
+    projectCount: projectsByUser.get(row.user_id) ?? 0,
+    assignedTaskCount: tasksByUser.get(row.user_id) ?? 0,
+    createdAt: row.joined_at,
+  }));
   void locale;
+}
+
+/**
+ * Rename any organization (platform-admin write path). Delegates to the
+ * SECURITY DEFINER RPC so validation (2–120 chars, org exists, not deleted)
+ * lives in one place; the service role passes the RPC gate. Returns the old
+ * name for auditing, or null on failure.
+ */
+export async function renameOrganization(
+  orgId: string,
+  name: string,
+): Promise<{ oldName: unknown; newName: string } | null> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc("admin_rename_organization", {
+    p_org_id: orgId,
+    p_name: name,
+  });
+  if (error || !data) return null;
+  const result = data as { oldName?: unknown; newName?: string };
+  return { oldName: result.oldName ?? null, newName: result.newName ?? name.trim() };
 }
 
 /** Projects grouped by owner (created_by) with per-project task-status rollup. */
@@ -377,6 +447,31 @@ async function fetchDisplayNames(
   return out;
 }
 
+/** Latest subscription (plan name + status) per organization. */
+async function fetchSubscriptionsByOrg(
+  supabase: ReturnType<typeof createAdminClient>,
+  orgIds: string[],
+): Promise<Map<string, { planName: string | null; status: string | null }>> {
+  const out = new Map<string, { planName: string | null; status: string | null }>();
+  if (orgIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("organization_id, status, plans(name)")
+    .in("organization_id", orgIds);
+  if (error || !data) return out;
+  for (const row of data as unknown as Array<{
+    organization_id: string;
+    status: string | null;
+    plans: { name: string | null } | null;
+  }>) {
+    out.set(row.organization_id, {
+      planName: row.plans?.name ?? null,
+      status: row.status,
+    });
+  }
+  return out;
+}
+
 /** Fetch milestone titles for a set of milestone ids. */
 async function fetchMilestoneTitles(
   supabase: ReturnType<typeof createAdminClient>,
@@ -396,8 +491,10 @@ async function fetchMilestoneTitles(
 }
 
 /**
- * Fetch emails for a set of user ids. Email lives on auth.users; the service
- * role can read the Supabase auth schema. Falls back to empty on any error.
+ * Fetch emails for a set of user ids. Email lives on auth.users, which is NOT
+ * reachable via PostgREST .from() even with the service role — it must be
+ * resolved inside the database via the gated SECURITY DEFINER RPC
+ * admin_get_user_emails (migration 20260842). Falls back to empty on error.
  */
 async function fetchEmailsById(
   supabase: ReturnType<typeof createAdminClient>,
@@ -405,17 +502,12 @@ async function fetchEmailsById(
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (ids.length === 0) return out;
-  try {
-    const { data, error } = await supabase
-      .from("auth.users")
-      .select("id, email")
-      .in("id", ids);
-    if (error || !data) return out;
-    for (const row of data as { id: string; email: string | null }[]) {
-      if (row.email) out.set(row.id, row.email);
-    }
-  } catch {
-    // auth schema unreadable in some environments — degrade to no email.
+  const { data, error } = await supabase.rpc("admin_get_user_emails", {
+    p_user_ids: ids,
+  });
+  if (error || !data) return out;
+  for (const row of data as { user_id: string; email: string | null }[]) {
+    if (row.email) out.set(row.user_id, row.email);
   }
   return out;
 }
