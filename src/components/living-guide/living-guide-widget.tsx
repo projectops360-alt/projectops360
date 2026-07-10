@@ -28,11 +28,14 @@ export function LivingGuideWidget({
   locale,
   context,
   immersive = true,
+  voiceLiveEnabled = false,
 }: {
   locale: Locale;
   context: GuideContext;
   /** When true (default) the launcher opens the immersive Isabella Experience. */
   immersive?: boolean;
+  /** ISABELLA-VOICE-REALTIME-BRIDGE — server-evaluated flag (default OFF). */
+  voiceLiveEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [initialAsk, setInitialAsk] = useState<IsabellaAskDetail | null>(null);
@@ -73,7 +76,7 @@ export function LivingGuideWidget({
 
       {/* Immersive experience (default) */}
       {open && immersive && (
-        <IsabellaExperience locale={locale} baseContext={context} initialAsk={initialAsk} onClose={handleClose} />
+        <IsabellaExperience locale={locale} baseContext={context} initialAsk={initialAsk} onClose={handleClose} voiceLiveEnabled={voiceLiveEnabled} />
       )}
 
       {/* Classic slide-over (back-compat fallback) */}

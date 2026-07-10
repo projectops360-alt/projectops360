@@ -50,6 +50,18 @@ export const env = {
    */
   ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED: process.env.ISABELLA_PROCESS_INTELLIGENCE_UI_ENABLED ?? "",
   /**
+   * Feature flag — Isabella Voice (OpenAI Realtime interface layer, server-side
+   * only). Default OFF. When off, the voice session/bridge endpoints return 404
+   * and no live-voice UI is offered; Isabella's existing panel + browser speech
+   * are unchanged. Rollback = unset this flag (no migration). See
+   * docs/product-brain/isabella-voice.md.
+   */
+  ISABELLA_VOICE_ENABLED: process.env.ISABELLA_VOICE_ENABLED ?? "",
+  /** OpenAI Realtime model for Isabella Voice (default: gpt-realtime). */
+  ISABELLA_VOICE_MODEL: process.env.ISABELLA_VOICE_MODEL ?? "",
+  /** OpenAI Realtime voice for Isabella (default: marin — warm female). */
+  ISABELLA_VOICE_NAME: process.env.ISABELLA_VOICE_NAME ?? "",
+  /**
    * Feature flag — GitHub Intelligence Layer (server-side only). Default OFF.
    * When off, the module is fully dark: no navigation entry, no dashboard/API
    * access, no webhook processing, no Isabella GitHub context. Requires BOTH

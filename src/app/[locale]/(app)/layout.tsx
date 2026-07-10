@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LivingGuideWidget } from "@/components/living-guide";
 import { isProductBrainAllowedEmail } from "@/lib/product-brain/access.server";
 import { isPlatformAdmin } from "@/lib/admin-console/access.server";
+import { isIsabellaVoiceEnabled } from "@/lib/isabella/voice/flag";
 import type { Locale } from "@/types/database";
 
 export default async function AppLayout({
@@ -64,6 +65,8 @@ export default async function AppLayout({
           userId: org.userId,
           organizationId: org.organizationId,
         }}
+        // ISABELLA-VOICE-REALTIME-BRIDGE — server-evaluated flag; default OFF.
+        voiceLiveEnabled={isIsabellaVoiceEnabled()}
       />
     </AppShell>
   );
