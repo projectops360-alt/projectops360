@@ -65,6 +65,52 @@ describe("runVoiceBridge — validation", () => {
     expect(ask).not.toHaveBeenCalled();
   });
 
+  // REGRESSION (prod 2026-07-09): once the spoken conversation grew, EVERY
+  // bridge call 422'd because Isabella's own transcripts exceeded the per-turn
+  // bound and the whole body was rejected — voice answered "there was a
+  // problem" for questions the text panel answered fine. Auxiliary metadata
+  // must DEGRADE (truncate/drop), never fail the turn.
+  it("accepts oversized recentConversation transcripts (audit-only → truncated, not rejected)", async () => {
+    let received: AskGuideInput | null = null;
+    const ask = vi.fn(async (input: AskGuideInput) => {
+      received = input;
+      return guideAnswer();
+    });
+    const res = await runVoiceBridge(
+      validBody({
+        recentConversation: [
+          { role: "assistant", text: "A very long spoken answer. ".repeat(40) }, // ~1080 chars
+          { role: "user", text: "¿Qué es el Living Graph?" },
+        ],
+      }),
+      { ask },
+    );
+    expect(res.ok).toBe(true);
+    expect(received).not.toBeNull();
+    expect(ask).toHaveBeenCalledTimes(1);
+  });
+
+  it("degrades an improvised intent label to a normal question instead of rejecting", async () => {
+    let received: AskGuideInput | null = null;
+    const ask = vi.fn(async (input: AskGuideInput) => {
+      received = input;
+      return guideAnswer();
+    });
+    const res = await runVoiceBridge(validBody({ intentHint: "explain" }), { ask });
+    expect(res.ok).toBe(true);
+    expect(received!.intent).toBe("question");
+  });
+
+  it("degrades a malformed recentConversation instead of rejecting the turn", async () => {
+    const ask = vi.fn(async () => guideAnswer());
+    const res = await runVoiceBridge(
+      validBody({ recentConversation: [{ role: "system", text: "nope" }] }),
+      { ask },
+    );
+    expect(res.ok).toBe(true);
+    expect(ask).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a non-uuid projectId", async () => {
     const ask = vi.fn();
     const res = await runVoiceBridge(

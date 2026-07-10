@@ -70,6 +70,10 @@ with each call and maps to `GuideContext` — same shape as the panel.
   scope are enforced by the existing pipeline (`resolveIsabellaProjectAccess`, RLS).
 - **Strict input validation.** Zod `.strict()` schemas with bounded lengths on every
   endpoint body; unknown fields (e.g. smuggled `sql`) are rejected before execution.
+  **Tolerance rule** (regression, 2026-07-09): security-relevant fields reject hard
+  (unknown keys, question bound, projectId shape); AUXILIARY metadata degrades instead —
+  long audit transcripts are truncated and an improvised intent label falls back to
+  "question". A spoken turn must never 422 because Isabella's own transcript was long.
 - **The permanent `OPENAI_API_KEY` never reaches the browser.** The session endpoint
   mints a short-lived ephemeral client secret server-side; upstream error bodies are
   never forwarded to the client.
@@ -116,6 +120,7 @@ Rollback = unset `ISABELLA_VOICE_ENABLED`. No migration exists; nothing else cha
 | 502 from session endpoint | OpenAI upstream rejected the session (check key validity/quota; details are in server logs only, never in the response). |
 | Mic error after clicking | Browser permission denied — the UI explains; check the lock icon. |
 | Isabella speaks but answers "couldn't check the data" | Bridge returned an error (`ai_runs` rows with `model=isabella-voice`, `status=failed` show the code). |
+| Every bridge call fails `invalid_request` with `executionMs` ≈ 0 | Body rejected by schema BEFORE the pipeline. Fixed 2026-07-09 (auxiliary metadata now degrades); if it reappears, diff the client payload in `useRealtimeVoice.ts` against `schemas.ts`. |
 | Wrong/robotic voice | Check `ISABELLA_VOICE_NAME`; default is `marin`. |
 | She answers project data without checking | Should not happen — guardrails + single tool; if observed, capture the transcript and file a regression. |
 

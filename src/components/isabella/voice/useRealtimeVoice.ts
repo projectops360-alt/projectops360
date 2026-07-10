@@ -32,6 +32,18 @@ export type VoiceActivity = "none" | "listening" | "speaking" | "consulting";
 
 const OPENAI_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 const MAX_TRANSCRIPT_ITEMS = 40;
+// Mirror the bridge schema bounds (schemas.ts) so a payload never fails
+// validation because Isabella's own spoken transcript was long or the model
+// improvised an intent label. The server additionally degrades gracefully.
+const BRIDGE_QUESTION_MAX = 600;
+const BRIDGE_TURN_TEXT_MAX = 400;
+const BRIDGE_INTENTS = new Set([
+  "question",
+  "explain_screen",
+  "step_by_step",
+  "best_practices",
+  "common_mistakes",
+]);
 
 interface RealtimeEvent {
   type?: string;
@@ -112,15 +124,18 @@ export function useRealtimeVoice({
       let output: VoiceBridgeResult;
       try {
         const args = JSON.parse(rawArgs || "{}") as { question?: string; intent?: string };
+        const intent = String(args.intent ?? "");
         const res = await fetch("/api/isabella/voice/bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            question: String(args.question ?? "").slice(0, 600),
-            intentHint: args.intent,
+            question: String(args.question ?? "").slice(0, BRIDGE_QUESTION_MAX),
+            intentHint: BRIDGE_INTENTS.has(intent) ? intent : undefined,
             locale,
             context: contextRef.current,
-            recentConversation: transcriptRef.current.slice(-6),
+            recentConversation: transcriptRef.current
+              .slice(-6)
+              .map((t) => ({ role: t.role, text: t.text.slice(0, BRIDGE_TURN_TEXT_MAX) })),
           }),
         });
         output = (await res.json()) as VoiceBridgeResult;
