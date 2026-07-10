@@ -53,6 +53,7 @@ import { PortfolioBriefing } from "./portfolio-briefing";
 import { HologramFigure } from "./hologram/hologram-figure";
 import { useWindowFrame, type WindowMode } from "./hologram/use-window-frame";
 import { useSpeech } from "./use-speech";
+import { IsabellaVoiceLive } from "./voice";
 import styles from "./isabella-experience.module.css";
 
 const ICONS: Record<string, typeof ScanSearch> = {
@@ -86,12 +87,17 @@ export function IsabellaExperience({
   baseContext,
   initialAsk,
   onClose,
+  voiceLiveEnabled = false,
 }: {
   locale: Locale;
   baseContext: GuideContext;
   /** UX-014 — open with a seeded question + entity context (e.g. "Ask Isabella about this task"). */
   initialAsk?: IsabellaAskDetail | null;
   onClose: () => void;
+  /** ISABELLA-VOICE-REALTIME-BRIDGE — server-evaluated flag; default OFF.
+   *  Purely additive: renders the live-voice control above the composer.
+   *  Never changes the hero lifecycle (UX-001) or the text pipeline. */
+  voiceLiveEnabled?: boolean;
 }) {
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
@@ -661,6 +667,22 @@ export function IsabellaExperience({
             );
           })}
         </div>
+
+        {/* ── Live voice (flag-gated, additive — ISABELLA-VOICE-REALTIME-BRIDGE) */}
+        {voiceLiveEnabled && (
+          <IsabellaVoiceLive
+            locale={locale}
+            context={{
+              projectId: context.projectId,
+              module: context.module || undefined,
+              screen: context.screen,
+              pathname: context.pathname,
+              pageTitle: context.pageTitle,
+              tab: context.tab,
+              currentEntity: context.currentEntity,
+            }}
+          />
+        )}
 
         {/* ── Input ─────────────────────────────────────────────────────── */}
         {micNote && (
