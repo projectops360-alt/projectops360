@@ -13,17 +13,20 @@ import type { OrgContext } from "@/lib/auth";
 import type { IsabellaProjectScope } from "@/lib/isabella/process-context/types";
 import type { ToolResult } from "./serializers";
 import {
+  executiveBriefArgsSchema,
   getProjectSummaryArgsSchema,
   processIntelligenceArgsSchema,
   queryProjectDataArgsSchema,
   queryTasksArgsSchema,
   TOOL_LIMIT_MAX,
+  type ExecutiveBriefArgs,
   type GetProjectSummaryArgs,
   type ProcessIntelligenceArgs,
   type QueryProjectDataArgs,
   type QueryTasksArgs,
 } from "./schemas";
 import { executeGetProjectSummary, executeQueryProjectData, executeQueryTasks } from "./executors";
+import { executeGetProjectExecutiveBrief, executeGetProjectRiskOutlook } from "./executive-executors";
 import { executeGetDailyDiagnosis, executeGetRecommendationPlan, executeGetRootCauseAnalysis } from "./intelligence-executors";
 import { isIsabellaProcessIntelligenceEnabled } from "@/lib/isabella/process-intelligence-runtime/flag";
 
@@ -61,6 +64,23 @@ export const ISABELLA_TOOLS: Record<string, IsabellaToolDef> = {
     schema: getProjectSummaryArgsSchema,
     maxLimit: 0,
     execute: (org, scope, args) => executeGetProjectSummary(org, scope, args as GetProjectSummaryArgs),
+  },
+  // ── REG-023 composite, decision-oriented tools ─────────────────────────────
+  get_project_executive_brief: {
+    name: "get_project_executive_brief",
+    description:
+      "Read-only EXECUTIVE brief of the current project: health band, progress, blockers, at-risk milestones, overdue/unassigned work, open risk counts, recent decisions, next milestone, honest data gaps. Use for 'project summary / how is the project / project health / what changed / what needs attention'.",
+    schema: executiveBriefArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetProjectExecutiveBrief(org, scope, args as ExecutiveBriefArgs),
+  },
+  get_project_risk_outlook: {
+    name: "get_project_risk_outlook",
+    description:
+      "Read-only RISK outlook of the current project. Returns registeredRisks (formal risk records) STRICTLY SEPARATED from detectedRiskSignals (blockers, overdue, at-risk milestones, unowned work) and dataGaps. Use for 'what are the risks / what could go wrong / are we at risk of missing a milestone / can we finish on time'. Present registered records and detected signals separately; never merge them.",
+    schema: executiveBriefArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetProjectRiskOutlook(org, scope, args as ExecutiveBriefArgs),
   },
 };
 

@@ -697,6 +697,40 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-023 — Isabella cannot answer basic project-status and risk questions (query-engine hijack)
+- **Description:** P0 capability regression (2026-07-09, reported by voice and text): *"necesito un
+  resumen del proyecto, ¿cuáles son los posibles riesgos que tengo hoy?"* answered with *"solo puedo
+  generar reportes sobre las tareas…"* although every needed engine (REG-013 briefing, risks register,
+  Process Intelligence, RAG) already existed and had the data.
+- **Root cause (routing, not capability):** the generic query engine's parser resolves FUTURE entity
+  aliases ("riesgos", "hitos", "decisiones"…) into a plan, but the task adapter executes ONLY
+  `entity === "task"` and returned the hardcoded `unsupported_entity` message
+  (`query-engine/task-adapter.ts`). Because that deterministic path answered FIRST in
+  `askLivingGuideAction`, Process Intelligence, the briefing engine and RAG never ran. Multi-intent
+  questions (summary + risks) had no goal planner. Verified in prod `ai_runs` and in code.
+- **Status: RESOLVED (2026-07-09).** Fix (`src/lib/isabella/executive-brief/*`,
+  `components/living-guide/actions.ts`, tool registry):
+  1. **Executive Brief gateway** runs FIRST for detected PM goals (`project_summary` /
+     `risk_outlook` — bilingual, cue-based, multi-intent): answers deterministically from the
+     REG-013 briefing engine + the risks register, with `registeredRisks` strictly separated from
+     `detectedRiskSignals` and honest `dataGaps`; RBAC/tenant scope via the REG-013 gate; audited in
+     `ai_runs` (`model: isabella-executive-brief`, detectedGoals/tools/latency/counts).
+  2. **Non-task query plans no longer dead-end:** only `entity === "task"` runs the task adapter;
+     other entities fall through to Process Intelligence / RAG.
+  3. **Composite tools** `get_project_executive_brief` / `get_project_risk_outlook` registered in
+     the tool loop over the SAME service — one brain for text, voice and the LLM loop.
+- **Protection rule (binding):** **A deterministic short-circuit may only RETURN an answer for an
+  entity/intent it can actually execute; anything else must fall through to the next pipeline
+  layer.** "Solo puedo generar reportes de tareas" (or equivalent) reaching a user whose question
+  the platform CAN answer is this regression returning. Registered risks and detected/inferred
+  signals must never be merged. Guard id **ISABELLA-EXECUTIVE-BRIEF**. Related: [REG-013](#reg-013),
+  [REG-020](#reg-020), ISABELLA-GENERIC-PROJECT-DATA-QUERY-ENGINE, ISABELLA-VOICE-REALTIME-BRIDGE.
+- **Owner:** Product/Engineering. **Verify:** inside a project ask (voice or text) *"dame un resumen
+  del proyecto y los riesgos de hoy"* → one grounded executive answer with real counts, registered
+  risks and detected operational signals — never the task-only phrase.
+
+---
+
 ## REG-022 — Admin Console "View users" always empty; user emails unreadable
 
 - **Reported:** 2026-07-08 (verified directly against prod: org XXX `dc8205c1-…` has 10

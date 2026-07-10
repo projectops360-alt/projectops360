@@ -15,6 +15,7 @@ import { indexPendingKnowledge } from "@/lib/knowledge-os/indexer";
 import { resolveExpert, buildPersonaOverlay } from "@/lib/knowledge-os/experts";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
 import { parseProjectDataQuery, answerTaskQuery } from "@/lib/isabella/query-engine";
+import { maybeAnswerWithExecutiveBrief } from "@/lib/isabella/executive-brief/gateway";
 import { isIsabellaToolUseEnabled } from "@/lib/isabella/tools/flag";
 import { maybeAnswerWithTools } from "@/lib/isabella/tools/gateway";
 import { maybeAnswerWithProcessIntelligence } from "@/lib/isabella/process-intelligence-runtime/wiring";
@@ -51,6 +52,27 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
 
   const projectId = input.context.projectId;
 
+  // ── Executive Brief / Risk Outlook (REG-023, deterministic) ─────────────────
+  // ISABELLA-EXECUTIVE-BRIEF. PM-level project questions ("project summary",
+  // "today's risks", "can we finish on time", multi-intent combinations) are
+  // answered FIRST from the REG-013 briefing engine + the risk register —
+  // record-backed, RBAC-scoped, bilingual, with registered risks separated from
+  // detected signals and honest data gaps. This runs BEFORE the generic query
+  // engine because tokens like "riesgos"/"hitos" used to hijack these questions
+  // into the task-only adapter and dead-end in "solo puedo generar reportes de
+  // tareas" (REG-023). Detects nothing → the pipeline below is unchanged.
+  {
+    const ebLang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+    const ebExpert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
+    const ebExpertInfo = { key: ebExpert.key, displayName: ebExpert.displayName, title: ebExpert.title[ebLang] };
+    try {
+      const ebAnswer = await maybeAnswerWithExecutiveBrief(org, safeInput, ebExpertInfo);
+      if (ebAnswer) return ebAnswer;
+    } catch {
+      // Never break the answer flow — fall through to the existing pipeline.
+    }
+  }
+
   // ── Generic deterministic project-data query engine ─────────────────────────
   // ISABELLA-GENERIC-PROJECT-DATA-QUERY-ENGINE. A report/list/filter/sort/group
   // request about project data is DETERMINISTIC — parse it into a safe query plan
@@ -60,7 +82,11 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
   // short-circuit (ISABELLA-TASK-REPORT-VERIFIED-PROJECT-DATA).
   const reportLang: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
   const queryPlan = parseProjectDataQuery(input.query ?? "", { language: reportLang });
-  if (queryPlan) {
+  // REG-023 — only TASK plans run the deterministic task adapter. A plan whose
+  // entity is a future/unsupported one (risk, milestone, decision, approval,
+  // subtask) used to dead-end here with "solo puedo generar reportes de tareas";
+  // now it falls through to process intelligence / RAG, which CAN answer.
+  if (queryPlan && queryPlan.entity === "task") {
     const expert = resolveExpert({ expertKey: input.expertKey, module: input.context.module });
     const expertInfo = { key: expert.key, displayName: expert.displayName, title: expert.title[reportLang] };
 

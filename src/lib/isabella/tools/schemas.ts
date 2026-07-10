@@ -80,6 +80,16 @@ export const getProjectSummaryArgsSchema = z
 
 export type GetProjectSummaryArgs = z.infer<typeof getProjectSummaryArgsSchema>;
 
+// ── executive brief / risk outlook (REG-023 composite tools) ─────────────────
+
+export const executiveBriefArgsSchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+  })
+  .strict();
+
+export type ExecutiveBriefArgs = z.infer<typeof executiveBriefArgsSchema>;
+
 // ── process-intelligence tools (diagnosis / root cause / recommendation) ───────
 // Read-only wrappers over the accepted Task 3/4/5 engines. Optional scope narrows
 // the analysis to a milestone or task (never coordinates, never a raw id leak).
