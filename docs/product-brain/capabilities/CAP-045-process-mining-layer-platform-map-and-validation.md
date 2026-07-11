@@ -25,9 +25,9 @@
 
 | Field | Value |
 |---|---|
-| **Approval status** | ⏳ **Pending Product Owner approval** |
-| **Approver** | Efrain Prada — Product Owner (pending) |
-| **Approval date** | — |
+| **Approval status** | ✅ **Approved** |
+| **Approver** | Efrain Prada — Product Owner |
+| **Approval date** | 2026-07-11 (recorded in-session) |
 | **Effect** | Approval closes **Phase 1** (P1-T1 + P1-T2 + P1-T3) and enables milestone **P1-M1**; **Phase 2 — Event Architecture & Process Mining Foundation** formally opens. The D3.1 map becomes the **progress baseline** for the whole plan. The frozen ontology (PD-016) was **not modified** by this validation — gaps/tensions are recorded as open decisions for Phase 2. |
 
 ---
@@ -326,4 +326,7 @@ ontology (PD-016); it does not resolve open decisions #1–#12; it does not star
 
 ## 7. Last reviewed
 
-2026-07-11 — created (P1-T3, docs-only). Approval pending — see Approval block.
+2026-07-11 — created (P1-T3, docs-only) and **approved by the Product Owner in-session the
+same day** (see Approval block). **Phase 1 is closed** (P1-T1 + P1-T2 + P1-T3 all approved);
+milestone P1-M1 enabled; **Phase 2 — Event Architecture & Process Mining Foundation is
+formally open.**

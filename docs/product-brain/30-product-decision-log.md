@@ -419,9 +419,9 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T3** (consolidates
   S1-T2, S2-T2, S2-T3); depends on PD-015 (baseline) + PD-016 (ontology). Sources: Etapa 1/2
   documents (julio 2026) + repository audit 2026-07-11.
-- **Status: Decided** (docs-only; document **Pending Product Owner approval** — approval closes
-  **Phase 1** and enables milestone **P1-M1**, formally opening Phase 2 — Event Architecture &
-  Process Mining Foundation). CAP-045.
+- **Status: Decided** (docs-only; document **Approved** by the Product Owner — Efrain Prada,
+  2026-07-11. **Phase 1 closed**; milestone P1-M1 enabled; Phase 2 — Event Architecture &
+  Process Mining Foundation formally open). CAP-045.
 
 ---
 
