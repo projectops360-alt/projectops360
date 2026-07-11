@@ -21,3 +21,6 @@ Deep-dives in this folder:
 - **CAP-045 · Risk-to-Resolution ontology** →
   [`CAP-045-process-mining-layer-ontology-risk-to-resolution.md`](CAP-045-process-mining-layer-ontology-risk-to-resolution.md)
   — canonical PM ontology & lifecycle semantic contract (P1-T2 / PD-016).
+- **CAP-045 · Platform map & validation** →
+  [`CAP-045-process-mining-layer-platform-map-and-validation.md`](CAP-045-process-mining-layer-platform-map-and-validation.md)
+  — current vs target map, vocabulary alignment, 3-case validation (P1-T3 / PD-017).
