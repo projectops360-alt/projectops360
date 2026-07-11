@@ -365,6 +365,36 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-016 — Risk-to-Resolution Canonical Ontology & Lifecycle (P1-T2)
+- **Decision:** The **canonical PM ontology and lifecycle for the Risk-to-Resolution pilot** of
+  the Process Mining Layer (CAP-045) is **frozen as a semantic contract**: object-centric model,
+  ontological principles PO-01…PO-10, canonical risk definition, 12 related objects, process
+  boundary, taxonomy, **12 canonical states**, **24 canonical events** (`snake_case`, past-tense
+  facts) with minimum attributes, 14 Living Graph semantic relationships, transition invariants
+  **RI-01…RI-15**, evidence/exception/rework model (8 deviation classes), analytical questions +
+  12 semantic metrics, 10 event-log quality dimensions, the Isabella domain contract, and the
+  **10 open decisions transferred to Phase 2** (recorded, not resolved). Canonical text:
+  [CAP-045 Risk-to-Resolution ontology](capabilities/CAP-045-process-mining-layer-ontology-risk-to-resolution.md).
+- **Reason:** decision D-06 of the approved baseline (PD-015) — Risk-to-Resolution is the first
+  pilot; D-07 requires the ontology before any implementation. State ≠ event and risk ≠ issue
+  must be frozen semantics before the event audit, or the audit measures the wrong things.
+- **Rules (binding):**
+  - **A semantic contract, not a design:** approval authorizes advancing to Phase 2 (Event
+    Architecture & event audit) only — no tables, migrations, algorithms, UI, or code.
+  - **PO-01: the ontology governs over the current schema.** Divergences with the real risks
+    module are recorded in the document's "Current-state divergences" section (12 found,
+    audited 2026-07-11) and must be resolved **explicitly** in Etapa 3/Phase 2 — never silently.
+  - The frozen content changes only via a new Product Owner decision in this log.
+  - The 10 open decisions transfer to Phase 2 **unresolved**; resolving any of them requires
+    its own recorded decision.
+- **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T2** (consolidates
+  S2-T1); depends on CAP-045/PD-015 (baseline Approved 2026-07-10). Source: *ProjectOps360
+  Process Mining Layer — Etapa 2, julio 2026*.
+- **Status: Decided** (docs-only; ontology document **Pending Product Owner approval** — Phase 2
+  may not begin until Approved). CAP-045.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery
