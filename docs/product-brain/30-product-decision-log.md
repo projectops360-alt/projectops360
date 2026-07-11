@@ -360,7 +360,8 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
   - This decision authorizes **documentation only** — no code, no schema, no UI, no roadmap.
 - **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T1** (consolidates
   S1-T1 + S1-T3). Source: *ProjectOps360 Process Mining Layer — Etapa 1, julio 2026*.
-- **Status: Decided** (docs-only; baseline document **Pending Product Owner approval**). CAP-045.
+- **Status: Decided** (docs-only; baseline **Approved** by the Product Owner — Efrain Prada,
+  2026-07-10). CAP-045.
 
 ---
 

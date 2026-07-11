@@ -21,9 +21,9 @@
 
 | Field | Value |
 |---|---|
-| **Approval status** | ⏳ **Pending Product Owner approval** |
-| **Approver** | Efrain Prada — Product Owner (pending) |
-| **Approval date** | — |
+| **Approval status** | ✅ **Approved** |
+| **Approver** | Efrain Prada — Product Owner |
+| **Approval date** | 2026-07-10 (recorded in-session) |
 | **Effect** | This baseline governs all subsequent Process Mining Layer phases. Later phases (ontology, event audit, conceptual design, implementation) **may not begin** until this baseline is Approved. Any change to the frozen content below requires a new Product Owner decision recorded in the [Product Decision Log](../30-product-decision-log.md). |
 
 ---
@@ -212,5 +212,6 @@ documentation and governance only.
 
 ## 12. Last reviewed
 
-2026-07-10 — created (P1-T1, docs-only). Approval pending — see Approval block. The 12 open
-questions of §8 were transcribed verbatim from the Etapa 1 source document (§15).
+2026-07-10 — created (P1-T1, docs-only) and **approved by the Product Owner in-session the
+same day** (see Approval block). The 12 open questions of §8 were transcribed verbatim from
+the Etapa 1 source document (§15).
