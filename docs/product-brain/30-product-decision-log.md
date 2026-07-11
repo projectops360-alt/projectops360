@@ -338,6 +338,33 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-015 — Living Graph Process Mining Layer · Foundation Baseline (P1-T1)
+- **Decision:** The approved output of **Etapa 1 — Research & Concept Definition (July 2026)** for
+  the **Living Graph Process Mining Layer** is **frozen as the foundation baseline** before any
+  architecture change, schema, or code: vision, scope, non-goals, adopted decisions D-01…D-08,
+  design principles P1…P10, hypotheses H1…H7 (pending — not facts), guardrails, and the Etapa 1
+  exit state. Canonical text:
+  [CAP-045 foundation baseline](capabilities/CAP-045-process-mining-layer-foundation-baseline.md).
+- **Reason:** governance-first. The capability's phases (ontology, event audit, conceptual design,
+  implementation) may only build on an explicitly approved, unchanging baseline — preventing AI
+  scope drift and silent reinterpretation (plan risk R-001).
+- **Rules (binding):**
+  - The frozen content is changed only by a new Product Owner decision recorded in this log.
+  - Later Process Mining Layer phases **may not begin** until the baseline is **Approved** by the
+    Product Owner (Efrain Prada).
+  - No parallel source of truth: the baseline converges with the
+    [Product Constitution](00-product-constitution.md) §9 (Process Intelligence Engine,
+    APPROVED-DESIGN), §7–§8 (Living Graph consumer-only / Graph Mode Engine), §15 (required
+    ADR-030 Process Mining), and with the implemented Milestone Process Flow Engine — it extends
+    and links, never forks (CLAUDE.md rule #5).
+  - This decision authorizes **documentation only** — no code, no schema, no UI, no roadmap.
+- **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T1** (consolidates
+  S1-T1 + S1-T3). Source: *ProjectOps360 Process Mining Layer — Etapa 1, julio 2026*.
+- **Status: Decided** (docs-only; baseline **Approved** by the Product Owner — Efrain Prada,
+  2026-07-10). CAP-045.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery
