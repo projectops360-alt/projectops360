@@ -14,4 +14,7 @@ Recovery docs that already serve this purpose at the top level:
 - Resource Capacity → [`../13-resource-capacity-intelligence.md`](../13-resource-capacity-intelligence.md)
 - Execution Status Engine → [`../18-execution-status-engine.md`](../18-execution-status-engine.md)
 
-Empty for now — deep-dives are added per capability as needed.
+Deep-dives in this folder:
+- **CAP-045 Living Graph Process Mining Layer** →
+  [`CAP-045-process-mining-layer-foundation-baseline.md`](CAP-045-process-mining-layer-foundation-baseline.md)
+  — frozen Etapa 1 foundation baseline (P1-T1 / PD-015).

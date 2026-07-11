@@ -79,6 +79,12 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [capabilities/](capabilities/) | Deep-dive docs per capability (filled over time) |
 | [regressions/](regressions/) | Investigation files for individual regressions |
 
+### Capability deep-dives
+
+| File | Capability |
+|------|-----------|
+| [capabilities/CAP-045-process-mining-layer-foundation-baseline.md](capabilities/CAP-045-process-mining-layer-foundation-baseline.md) | **CAP-045 Living Graph Process Mining Layer** — frozen Etapa 1 foundation baseline (P1-T1 / PD-015; approval pending) |
+
 ---
 
 ## Status legend (used across registries)

@@ -56,6 +56,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-042 | Product Intelligence Center | P5 | Implemented | 70% | `lib/product-brain`, `/product-intelligence` |
 | CAP-043 | Evidence Provenance & Traceability | P5 | Implemented (Phase 1) | 70% | `lib/provenance`, `components/provenance` |
 | CAP-044 | Unified People, Roles & Stakeholder Directory | P6 | Partial (Phase 1 — read model) | 40% | `lib/people` (projection over `project_team_members` + sources) |
+| CAP-045 | Living Graph Process Mining Layer | P2/P4 | Documented | 0% | — (concept only; [foundation baseline](capabilities/CAP-045-process-mining-layer-foundation-baseline.md), approval pending) |
 
 `*` CAP-003 is "complete" only in the sense that it was fully superseded by Knowledge OS.
 
