@@ -24,9 +24,9 @@
 
 | Field | Value |
 |---|---|
-| **Approval status** | ⏳ **Pending Product Owner approval** |
-| **Approver** | Efrain Prada — Product Owner (pending) |
-| **Approval date** | — |
+| **Approval status** | ✅ **Approved** |
+| **Approver** | Efrain Prada — Product Owner |
+| **Approval date** | 2026-07-11 (recorded in-session) |
 | **Effect** | This ontology is the semantic source of truth for the Risk-to-Resolution pilot (PO-01: concepts precede tables). Phase 2 (Event Architecture & event audit) **may not begin** until it is Approved. Changes require a new Product Owner decision in the [Product Decision Log](../30-product-decision-log.md). |
 
 ---
@@ -405,4 +405,5 @@ D-07, PO principles' parent guardrails) · [05-capability-registry.md](../05-cap
 
 ## 15. Last reviewed
 
-2026-07-11 — created (P1-T2, docs-only). Approval pending — see Approval block.
+2026-07-11 — created (P1-T2, docs-only) and **approved by the Product Owner in-session the
+same day** (see Approval block). Phase 2 (Event Architecture & event audit) is now authorized.

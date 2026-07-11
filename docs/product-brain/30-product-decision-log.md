@@ -390,8 +390,8 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T2** (consolidates
   S2-T1); depends on CAP-045/PD-015 (baseline Approved 2026-07-10). Source: *ProjectOps360
   Process Mining Layer — Etapa 2, julio 2026*.
-- **Status: Decided** (docs-only; ontology document **Pending Product Owner approval** — Phase 2
-  may not begin until Approved). CAP-045.
+- **Status: Decided** (docs-only; ontology **Approved** by the Product Owner — Efrain Prada,
+  2026-07-11 — Phase 2 is authorized). CAP-045.
 
 ---
 
