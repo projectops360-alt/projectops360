@@ -18,3 +18,6 @@ Deep-dives in this folder:
 - **CAP-045 Living Graph Process Mining Layer** →
   [`CAP-045-process-mining-layer-foundation-baseline.md`](CAP-045-process-mining-layer-foundation-baseline.md)
   — frozen Etapa 1 foundation baseline (P1-T1 / PD-015).
+- **CAP-045 · Risk-to-Resolution ontology** →
+  [`CAP-045-process-mining-layer-ontology-risk-to-resolution.md`](CAP-045-process-mining-layer-ontology-risk-to-resolution.md)
+  — canonical PM ontology & lifecycle semantic contract (P1-T2 / PD-016).
