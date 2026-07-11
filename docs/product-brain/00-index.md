@@ -85,6 +85,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 |------|-----------|
 | [capabilities/CAP-045-process-mining-layer-foundation-baseline.md](capabilities/CAP-045-process-mining-layer-foundation-baseline.md) | **CAP-045 Living Graph Process Mining Layer** — frozen Etapa 1 foundation baseline (P1-T1 / PD-015; approved 2026-07-10) |
 | [capabilities/CAP-045-process-mining-layer-ontology-risk-to-resolution.md](capabilities/CAP-045-process-mining-layer-ontology-risk-to-resolution.md) | **CAP-045 · Risk-to-Resolution ontology** — canonical PM ontology & lifecycle, semantic contract (P1-T2 / PD-016; approved 2026-07-11) |
+| [capabilities/CAP-045-process-mining-layer-platform-map-and-validation.md](capabilities/CAP-045-process-mining-layer-platform-map-and-validation.md) | **CAP-045 · Platform map & validation** — current vs target map (10 layers), vocabulary alignment, 3-case ontology validation (P1-T3 / PD-017; approved 2026-07-11 — Phase 1 closed) |
 
 ---
 

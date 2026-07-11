@@ -395,6 +395,36 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-017 — Process Mining Layer Platform Map & Ontology Validation (P1-T3, closes Phase 1)
+- **Decision:** The **current-state vs target-state platform map** (10 layers of the canonical
+  cognitive stack, with verified CAP-### and code-path evidence), the **vocabulary alignment**
+  of the 12 canonical objects against the real platform, and the **validation of the frozen
+  Risk-to-Resolution ontology with three realistic cases** (software, construction, hybrid) are
+  recorded as the closing deliverables of plan Phase 1 (D3.1–D3.3). Canonical text:
+  [CAP-045 platform map & validation](capabilities/CAP-045-process-mining-layer-platform-map-and-validation.md).
+- **Validation verdict:** the ontology **sustains all three project types**. The cases exercised
+  the normal route, materialization→blocker, reopening, retirement, invalidation, an
+  opportunity (Exploit), an authorized exception, a data gap, an escalation, and all 14 Living
+  Graph relationships — every invariant RI-01..RI-15 held. Two vocabulary gaps found, both with
+  invariant-safe workarounds, recorded as **open decisions #11** (`risk_materialized_transferred`
+  terminal event vs closure reason — inherited source inconsistency) and **#12** (opportunity
+  closure reasons). **The frozen ontology (PD-016) was NOT modified** — changing the contract
+  still requires a new PO decision.
+- **Rules (binding):**
+  - The **D3.1 map is the progress baseline** for the whole plan; Phase 2 starts from layer 4
+    (Canonical Event Architecture) as mapped.
+  - Risk divergences remain owned by PD-016 §12 (one source of truth per finding; D3.2 links,
+    never duplicates).
+  - Open decisions #1–#12 transfer to Phase 2 unresolved.
+- **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 1 · **P1-T3** (consolidates
+  S1-T2, S2-T2, S2-T3); depends on PD-015 (baseline) + PD-016 (ontology). Sources: Etapa 1/2
+  documents (julio 2026) + repository audit 2026-07-11.
+- **Status: Decided** (docs-only; document **Approved** by the Product Owner — Efrain Prada,
+  2026-07-11. **Phase 1 closed**; milestone P1-M1 enabled; Phase 2 — Event Architecture &
+  Process Mining Foundation formally open). CAP-045.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery
