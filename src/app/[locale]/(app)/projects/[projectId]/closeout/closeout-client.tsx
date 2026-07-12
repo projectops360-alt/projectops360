@@ -26,7 +26,10 @@ import {
   CLOSEOUT_STEP_KEYS, type CloseoutState, type CloseoutCta,
 } from "@/lib/rhythm/closeout-workflow";
 import type { CloseoutRiskRecord } from "@/lib/rhythm/closeout-criteria";
-import { generateCloseoutNarrativeAction, resolveRiskAction, markCloseoutExportedAction } from "./actions";
+import {
+  generateCloseoutNarrativeAction, resolveRiskAction, markCloseoutExportedAction,
+  assessRiskAction, materializeRiskAction, reopenRiskAction,
+} from "./actions";
 
 interface Props {
   locale: string;
@@ -43,11 +46,14 @@ interface Props {
   closingMeetingId: string | null;
   canRunCloseout: boolean;
   exported?: boolean;
+  /** RISK-EVENT-CAPTURE (P2-T2/PD-018) — server-evaluated pilot flag; default
+   *  OFF. When off, the risk lines render exactly as before. */
+  riskEventCapture?: boolean;
 }
 
 export function CloseoutReportClient({
   locale, projectId, projectName, metrics: m, readiness, milestoneDurations, archive, narrative, executiveSummary, generatedAt,
-  closingMeetingStatus, closingMeetingId, canRunCloseout, exported: exportedInitial = false,
+  closingMeetingStatus, closingMeetingId, canRunCloseout, exported: exportedInitial = false, riskEventCapture = false,
 }: Props) {
   const isEs = locale === "es";
   const router = useRouter();
@@ -179,7 +185,7 @@ export function CloseoutReportClient({
       </div>
 
       {/* ── Readiness gate (screen only) ─────────────────────────────────────── */}
-      <ReadinessPanel readiness={readiness} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canRunCloseout} />
+      <ReadinessPanel readiness={readiness} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canRunCloseout} riskEventCapture={riskEventCapture} />
 
       <div id="closeout-report-print" className="space-y-6 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         {/* Header */}
@@ -349,7 +355,7 @@ export function CloseoutReportClient({
 
 // ── Readiness gate panel (screen only) ──────────────────────────────────────
 
-function ReadinessPanel({ readiness, isEs, base, projectId, locale, canResolve }: { readiness: CloseoutReadiness; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean }) {
+function ReadinessPanel({ readiness, isEs, base, projectId, locale, canResolve, riskEventCapture }: { readiness: CloseoutReadiness; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean; riskEventCapture: boolean }) {
   const { ready, failCount, warnCount, checks, score } = readiness;
   return (
     <div className="mb-4 rounded-xl border border-border bg-card p-4 print:hidden">
@@ -373,13 +379,13 @@ function ReadinessPanel({ readiness, isEs, base, projectId, locale, canResolve }
         </div>
       </div>
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canResolve} />)}
+        {checks.map((c) => <CheckRow key={c.key} check={c} isEs={isEs} base={base} projectId={projectId} locale={locale} canResolve={canResolve} riskEventCapture={riskEventCapture} />)}
       </div>
     </div>
   );
 }
 
-function CheckRow({ check, isEs, base, projectId, locale, canResolve }: { check: ReadinessCheck; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean }) {
+function CheckRow({ check, isEs, base, projectId, locale, canResolve, riskEventCapture }: { check: ReadinessCheck; isEs: boolean; base: string; projectId: string; locale: string; canResolve: boolean; riskEventCapture: boolean }) {
   // REG-017 — record-backed checks (open risks) reveal the EXACT records inline,
   // so a count like "2 open risk(s)" is always clickable down to the 2 records.
   const [expanded, setExpanded] = useState(false);
@@ -448,7 +454,7 @@ function CheckRow({ check, isEs, base, projectId, locale, canResolve }: { check:
             <p className="text-[11px] text-muted-foreground">{isEs ? "No hay riesgos abiertos." : "No open risks."}</p>
           ) : (
             <ul className="space-y-1">
-              {records.map((r) => <RiskLine key={r.id} risk={r} isEs={isEs} projectId={projectId} locale={locale} canResolve={canResolve} />)}
+              {records.map((r) => <RiskLine key={r.id} risk={r} isEs={isEs} projectId={projectId} locale={locale} canResolve={canResolve} riskEventCapture={riskEventCapture} />)}
             </ul>
           )}
           {isDev && check.diagnostics && <DevDiagnostics diagnostics={check.diagnostics} />}
@@ -458,49 +464,192 @@ function CheckRow({ check, isEs, base, projectId, locale, canResolve }: { check:
   );
 }
 
-function RiskLine({ risk, isEs, projectId, locale, canResolve }: { risk: CloseoutRiskRecord; isEs: boolean; projectId: string; locale: string; canResolve: boolean }) {
+// RISK-EVENT-CAPTURE (P2-T2/PD-018) — canonical vocabularies for the three
+// flag-gated affordances. Values are canonical identifiers (not UI copy).
+const CLOSURE_REASON_OPTIONS = ["mitigated", "avoided", "accepted", "expired", "materialized_transferred"] as const;
+const ASSESS_METHOD_OPTIONS = ["probability_impact_matrix", "qualitative", "quantitative", "expert_judgment"] as const;
+const REOPEN_REASON_OPTIONS = ["closure_invalidated", "risk_resurfaced", "new_information", "materialized_after_closure"] as const;
+
+function riskOptionLabel(value: string, isEs: boolean): string {
+  const labels: Record<string, { en: string; es: string }> = {
+    mitigated: { en: "Mitigated", es: "Mitigado" },
+    avoided: { en: "Avoided", es: "Evitado" },
+    accepted: { en: "Accepted", es: "Aceptado" },
+    expired: { en: "Expired", es: "Expirado" },
+    materialized_transferred: { en: "Materialized (transferred)", es: "Materializado (transferido)" },
+    probability_impact_matrix: { en: "Probability × impact matrix", es: "Matriz probabilidad × impacto" },
+    qualitative: { en: "Qualitative", es: "Cualitativo" },
+    quantitative: { en: "Quantitative", es: "Cuantitativo" },
+    expert_judgment: { en: "Expert judgment", es: "Juicio experto" },
+    closure_invalidated: { en: "Closure lost validity", es: "El cierre perdió validez" },
+    risk_resurfaced: { en: "Risk resurfaced", es: "El riesgo reapareció" },
+    new_information: { en: "New information", es: "Nueva información" },
+    materialized_after_closure: { en: "Materialized after closure", es: "Se materializó tras el cierre" },
+    total: { en: "Total", es: "Total" },
+    partial: { en: "Partial", es: "Parcial" },
+  };
+  const l = labels[value];
+  return l ? (isEs ? l.es : l.en) : value;
+}
+
+function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture }: { risk: CloseoutRiskRecord; isEs: boolean; projectId: string; locale: string; canResolve: boolean; riskEventCapture: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState(false);
+  // Flag-gated affordance panel (null = collapsed). Legacy behavior when the
+  // pilot flag is off: the Resolve button acts immediately, exactly as before.
+  const [panel, setPanel] = useState<null | "resolve" | "assess" | "materialize" | "reopen">(null);
+  const [closureReason, setClosureReason] = useState<string>("accepted");
+  const [assessMethod, setAssessMethod] = useState<string>("probability_impact_matrix");
+  const [matScope, setMatScope] = useState<string>("partial");
+  const [matNote, setMatNote] = useState<string>("");
+  const [reopenReason, setReopenReason] = useState<string>("closure_invalidated");
+  const [done, setDone] = useState<string | null>(null);
 
-  function handleResolve() {
+  const isClosed = risk.status === "resolved" || risk.status === "closed";
+
+  function run(fn: () => Promise<{ ok: boolean }>, doneLabel?: string) {
     setError(false);
     start(async () => {
-      const res = await resolveRiskAction(projectId, risk.id, locale as Locale);
-      if (res.ok) router.refresh();
-      else setError(true);
+      const res = await fn();
+      if (res.ok) {
+        setPanel(null);
+        if (doneLabel) setDone(doneLabel);
+        router.refresh();
+      } else setError(true);
     });
   }
 
+  function handleResolve() {
+    // Affordance 1 (flag ON): mandatory canonical closure reason.
+    run(() => resolveRiskAction(projectId, risk.id, locale as Locale, riskEventCapture ? closureReason : undefined));
+  }
+
+  const actionBtn = "inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 disabled:opacity-50 dark:hover:text-brand-400";
+  const selectCls = "rounded-md border border-border bg-background px-1 py-0.5 text-[10px] text-foreground";
+
   return (
-    <li className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1">
-      <div className="flex min-w-0 items-center gap-1.5">
-        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-        <span className="truncate text-[11px] font-medium text-foreground">{risk.title}</span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">· {risk.ownerName ?? (isEs ? "sin responsable" : "unassigned")}</span>
+    <li className="rounded-md bg-muted/30 px-2 py-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <span className="truncate text-[11px] font-medium text-foreground">{risk.title}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">· {risk.ownerName ?? (isEs ? "sin responsable" : "unassigned")}</span>
+          {done && <span className="shrink-0 rounded bg-green-500/15 px-1 py-0.5 text-[9px] font-medium text-green-700 dark:text-green-400">{done}</span>}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <SeverityBadge severity={risk.severity} />
+          <RiskStatusBadge status={risk.status} isEs={isEs} />
+          {canResolve && riskEventCapture && !isClosed && (
+            <>
+              <button type="button" disabled={pending} onClick={() => setPanel(panel === "assess" ? null : "assess")} className={actionBtn}>
+                {isEs ? "Evaluar" : "Assess"}
+              </button>
+              <button type="button" disabled={pending} onClick={() => setPanel(panel === "materialize" ? null : "materialize")} className={actionBtn}>
+                {isEs ? "Materializar" : "Materialize"}
+              </button>
+            </>
+          )}
+          {canResolve && riskEventCapture && isClosed && (
+            <button type="button" disabled={pending} onClick={() => setPanel(panel === "reopen" ? null : "reopen")} className={actionBtn}>
+              {isEs ? "Reabrir" : "Reopen"}
+            </button>
+          )}
+          {canResolve && !isClosed && (
+            <button
+              type="button"
+              onClick={() => (riskEventCapture ? setPanel(panel === "resolve" ? null : "resolve") : handleResolve())}
+              disabled={pending}
+              title={error ? (isEs ? "No se pudo completar. Inténtalo de nuevo." : "Could not complete. Try again.") : undefined}
+              className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+                error
+                  ? "border-red-300 text-red-600 hover:border-red-500 dark:text-red-400"
+                  : "border-border bg-background text-foreground hover:border-green-500 hover:text-green-600 dark:hover:text-green-400"
+              }`}
+            >
+              {pending
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <CheckCircle2 className="h-3 w-3" />}
+              {isEs ? "Resolver" : "Resolve"}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <SeverityBadge severity={risk.severity} />
-        <RiskStatusBadge status={risk.status} isEs={isEs} />
-        {canResolve && (
+
+      {/* ── Flag-gated affordance panels (the ONLY new UI of P2-T2) ── */}
+      {riskEventCapture && panel === "resolve" && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
+          <span className="text-[10px] text-muted-foreground">{isEs ? "Razón de cierre:" : "Closure reason:"}</span>
+          <select value={closureReason} onChange={(e) => setClosureReason(e.target.value)} className={selectCls} aria-label={isEs ? "Razón de cierre" : "Closure reason"}>
+            {CLOSURE_REASON_OPTIONS.map((r) => <option key={r} value={r}>{riskOptionLabel(r, isEs)}</option>)}
+          </select>
+          <button type="button" disabled={pending} onClick={handleResolve} className={actionBtn}>
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {isEs ? "Confirmar cierre" : "Confirm closure"}
+          </button>
+        </div>
+      )}
+      {riskEventCapture && panel === "assess" && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
+          <span className="text-[10px] text-muted-foreground">{isEs ? "Método:" : "Method:"}</span>
+          <select value={assessMethod} onChange={(e) => setAssessMethod(e.target.value)} className={selectCls} aria-label={isEs ? "Método de evaluación" : "Assessment method"}>
+            {ASSESS_METHOD_OPTIONS.map((m2) => <option key={m2} value={m2}>{riskOptionLabel(m2, isEs)}</option>)}
+          </select>
+          <span className="text-[10px] text-muted-foreground">
+            {isEs ? "Confirma los valores vigentes del riesgo" : "Confirms the risk's current values"}
+          </span>
           <button
             type="button"
-            onClick={handleResolve}
             disabled={pending}
-            title={error ? (isEs ? "No se pudo resolver. Inténtalo de nuevo." : "Could not resolve. Try again.") : undefined}
-            className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
-              error
-                ? "border-red-300 text-red-600 hover:border-red-500 dark:text-red-400"
-                : "border-border bg-background text-foreground hover:border-green-500 hover:text-green-600 dark:hover:text-green-400"
-            }`}
+            onClick={() => run(() => assessRiskAction(projectId, risk.id, assessMethod), isEs ? "Evaluado" : "Assessed")}
+            className={actionBtn}
           >
-            {pending
-              ? <Loader2 className="h-3 w-3 animate-spin" />
-              : <CheckCircle2 className="h-3 w-3" />}
-            {isEs ? "Resolver" : "Resolve"}
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {isEs ? "Confirmar evaluación" : "Confirm assessment"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
+      {riskEventCapture && panel === "materialize" && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
+          <span className="text-[10px] text-muted-foreground">{isEs ? "Alcance:" : "Scope:"}</span>
+          <select value={matScope} onChange={(e) => setMatScope(e.target.value)} className={selectCls} aria-label={isEs ? "Alcance de materialización" : "Materialization scope"}>
+            {(["partial", "total"] as const).map((s) => <option key={s} value={s}>{riskOptionLabel(s, isEs)}</option>)}
+          </select>
+          <input
+            value={matNote}
+            onChange={(e) => setMatNote(e.target.value)}
+            placeholder={isEs ? "Impacto observado (opcional)" : "Observed impact (optional)"}
+            className={`${selectCls} min-w-[160px] flex-1`}
+            aria-label={isEs ? "Impacto observado" : "Observed impact"}
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => materializeRiskAction(projectId, risk.id, matScope, matNote), isEs ? "Materializado" : "Materialized")}
+            className={actionBtn}
+          >
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <AlertTriangle className="h-3 w-3" />}
+            {isEs ? "Registrar materialización" : "Record materialization"}
+          </button>
+        </div>
+      )}
+      {riskEventCapture && panel === "reopen" && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
+          <span className="text-[10px] text-muted-foreground">{isEs ? "Razón de reapertura:" : "Reopen reason:"}</span>
+          <select value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} className={selectCls} aria-label={isEs ? "Razón de reapertura" : "Reopen reason"}>
+            {REOPEN_REASON_OPTIONS.map((r) => <option key={r} value={r}>{riskOptionLabel(r, isEs)}</option>)}
+          </select>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => reopenRiskAction(projectId, risk.id, reopenReason, locale as Locale), isEs ? "Reabierto" : "Reopened")}
+            className={actionBtn}
+          >
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            {isEs ? "Confirmar reapertura" : "Confirm reopen"}
+          </button>
+        </div>
+      )}
     </li>
   );
 }

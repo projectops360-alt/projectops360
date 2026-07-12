@@ -12,6 +12,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emitProcessNode, emitProcessEdge } from "@/lib/graph/emit-event";
+import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
 import { recalculateCriticalPath } from "@/lib/execution/critical-path-service";
 import { generateImportRecommendations } from "./validate";
 import type {
@@ -401,6 +402,25 @@ export async function executeImport(params: {
     if (row) {
       await track(supabase, organizationId, jobId, "risks", row.id);
       bump("risks");
+      // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): the
+      // import job's user is the actor; the import trail is the evidence.
+      if (projectId) {
+        emitRiskEventSafe(buildRiskRegistered({
+          risk: {
+            riskId: row.id as string,
+            organizationId,
+            projectId,
+            linkedTaskId: risk.linked_task_source_id ? taskIdBySourceId.get(risk.linked_task_source_id) ?? null : null,
+          },
+          actor: { actorType: "human", actorId: params.userId },
+          captureMethod: "imported",
+          origin: "import",
+          sourceModule: "import-intelligence",
+          title: risk.title,
+          evidenceRef: { type: "project_import_job", id: jobId },
+          extraProvenance: risk.source_reference ? { source_reference: risk.source_reference } : undefined,
+        }));
+      }
     }
   }
 

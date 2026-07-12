@@ -13,6 +13,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
 import type { Locale } from "@/types/database";
 import { analyzeScribeCapture, type ScribeAnalysis } from "@/lib/scribe/ai";
 
@@ -177,6 +178,20 @@ async function createEntityForItem(
       status: "open", origin: "ai_suggested",
       confidence_score: it.confidence ?? null, needs_review: true,
     }).select("id").single();
+    if (data) {
+      // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): the
+      // approving user is the real actor; the Scribe source chain is evidence.
+      emitRiskEventSafe(buildRiskRegistered({
+        risk: { riskId: String(data.id), organizationId: org.organizationId, projectId },
+        actor: { actorType: "human", actorId: org.userId },
+        captureMethod: "direct",
+        origin: "ai_suggested",
+        sourceModule: "scribe",
+        title,
+        evidenceRef: { type: "project_memory_item", id: memoryItemId },
+        extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
+      }));
+    }
     return data ? { type: "risk", id: String(data.id) } : null;
   }
   return null; // issue/blocker/dependency/project_impact/open_question/follow_up → memory-only in MVP

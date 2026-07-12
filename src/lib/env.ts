@@ -70,6 +70,15 @@ export const env = {
    * docs/product-brain/github-intelligence-layer.md.
    */
   GITHUB_INTELLIGENCE_ENABLED: process.env.GITHUB_INTELLIGENCE_ENABLED ?? "",
+  /**
+   * Feature flag — Risk-to-Resolution event capture pilot (P2-T2 / PD-018,
+   * server-side only). Comma-separated list of pilot project IDs, or the
+   * literal "all" (local testing only). Default OFF (empty): risk writers emit
+   * NO canonical risk events and current behavior is byte-identical. Rollback =
+   * unset this flag (no migration needed; captured events stay inert). See
+   * docs/product-brain/capabilities/CAP-045-canonical-event-contract-and-source-audit.md.
+   */
+  RISK_EVENT_CAPTURE_PROJECT_IDS: process.env.RISK_EVENT_CAPTURE_PROJECT_IDS ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

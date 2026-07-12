@@ -9,6 +9,7 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
 import type { ProjectTemplate } from "./templates";
 import { calculateCriticalPath } from "./critical-path";
 
@@ -206,9 +207,27 @@ export async function instantiateTemplate(params: {
       origin: "template",
       needs_review: true,
     }));
-    const { error } = await supabase.from("risks").insert(riskRows);
+    const { data: createdRisks, error } = await supabase
+      .from("risks")
+      .insert(riskRows)
+      .select("id, title");
     if (error) throw new Error(`Template risks failed: ${error.message}`);
     risksCreated = riskRows.length;
+    // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): template
+    // seeding registers risks at project creation; actor = project creator.
+    for (const row of createdRisks ?? []) {
+      emitRiskEventSafe(buildRiskRegistered({
+        risk: { riskId: row.id as string, organizationId, projectId },
+        actor: params.createdBy
+          ? { actorType: "human", actorId: params.createdBy }
+          : { actorType: "system" },
+        captureMethod: "direct",
+        origin: "template",
+        sourceModule: "template-service",
+        title: (row.title as string) ?? undefined,
+        evidenceRef: { type: "project", id: projectId },
+      }));
+    }
   }
 
   return {
