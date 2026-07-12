@@ -128,6 +128,8 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     });
 
     // 1. register — ATOMIC: INSERT risk + risk_registered event in one tx.
+    // operationId is a STABLE workflow id (here: a synthetic scribe item id).
+    const REGISTER_OP = "scribe:verify-mem-1";
     const reg = await atomic.captureRiskRegisteredAtomic({
       riskFields: {
         organization_id: ids.org, project_id: ids.project,
@@ -138,9 +140,11 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
       actor: human, captureMethod: "direct", origin: "manual", sourceModule: "risks",
       title: "Vendor SDK deprecation before GA",
       evidenceRef: { type: "project", id: ids.project },
+      operationId: REGISTER_OP,
     });
     expect(reg.ok, `register atomic failed: ${reg.error ?? ""} ${reg.errors ?? ""}`).toBe(true);
     expect(reg.riskId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(reg.deduped).toBe(false); // BLOCKER 2 #8: first call → deduped=false
     ids.risk = reg.riskId!;
     ids.registeredEventId = reg.eventId!;
 
@@ -213,19 +217,62 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
 
     // 6. reopen — ATOMIC: UPDATE status=open + risk_reopened event in one tx.
     //    No prior closure event exists (risk_closed not emitted) → missing_prior_closure.
+    //    BLOCKER 3: expectedFromStatus precondition + stable operationId.
+    const REOPEN_OP = `closeout:reopen:${ids.risk}:resolved:risk_resurfaced:no-prior`;
+    const { data: riskBeforeReopen } = await supabase
+      .from("risks").select("updated_at")
+      .eq("id", ids.risk).single();
     const reopen = await atomic.captureRiskStatusChangeAtomic({
-      riskId: ids.risk, newStatus: "open",
+      riskId: ids.risk, newStatus: "open", expectedFromStatus: "resolved",
       organizationId: ids.org, projectId: ids.project,
+      operationId: REOPEN_OP,
       input: builders.buildRiskReopened({
         risk: riskRef(), actor: human, sourceModule: "closeout",
         reasonCode: "risk_resurfaced",
         priorClosureEventId: null, // none — risk_closed is not capturable yet
+        fromState: "resolved", toState: "open",
       }),
     });
     expect(reopen.ok, `reopen atomic failed: ${reopen.error ?? ""}`).toBe(true);
+    expect(reopen.deduped).toBe(false); // first reopen → deduped=false
     ids.reopenedEventId = reopen.eventId!;
 
-    // 7. dedup proof: re-emitting the SAME registration input dedupes.
+    // 6b. BLOCKER 3 #5 — retry the SAME reopen: deduped, updated_at UNCHANGED.
+    const { data: riskAfterReopen } = await supabase
+      .from("risks").select("updated_at").eq("id", ids.risk).single();
+    const reopenRetry = await atomic.captureRiskStatusChangeAtomic({
+      riskId: ids.risk, newStatus: "open", expectedFromStatus: "resolved",
+      organizationId: ids.org, projectId: ids.project,
+      operationId: REOPEN_OP, // SAME operation id → same dedup_key
+      input: builders.buildRiskReopened({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        reasonCode: "risk_resurfaced", priorClosureEventId: null,
+        fromState: "resolved", toState: "open",
+      }),
+    });
+    expect(reopenRetry.ok).toBe(true);
+    expect(reopenRetry.deduped).toBe(true); // retry → deduped
+    expect(reopenRetry.eventId).toBe(ids.reopenedEventId); // same event
+    const { data: riskAfterRetry } = await supabase
+      .from("risks").select("updated_at").eq("id", ids.risk).single();
+    expect(riskAfterRetry?.updated_at).toBe(riskAfterReopen?.updated_at); // not bumped
+
+    // 6c. BLOCKER 3 #5 — a STALE reopen (expectedFromStatus='resolved' but the
+    //    risk is now 'open') must FAIL without mutating or creating an event.
+    const stale = await atomic.captureRiskStatusChangeAtomic({
+      riskId: ids.risk, newStatus: "open", expectedFromStatus: "resolved",
+      organizationId: ids.org, projectId: ids.project,
+      operationId: `closeout:reopen:${ids.risk}:stale-${Date.now()}`,
+      input: builders.buildRiskReopened({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        reasonCode: "risk_resurfaced", priorClosureEventId: null,
+        fromState: "resolved", toState: "open",
+      }),
+    });
+    expect(stale.ok).toBe(false); // wrong_from_state → rejected
+
+    // 7. BLOCKER 2 #8 — REAL idempotency: re-register with the SAME operationId.
+    //    A network retry after the commit must NOT create a second Risk or event.
     const again = await atomic.captureRiskRegisteredAtomic({
       riskFields: {
         organization_id: ids.org, project_id: ids.project,
@@ -236,12 +283,12 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
       actor: human, captureMethod: "direct", origin: "manual", sourceModule: "risks",
       title: "Vendor SDK deprecation before GA",
       evidenceRef: { type: "project", id: ids.project },
-      // Force the same dedup_key as step 1 by reusing its occurred_at:
-      // (captureRiskRegisteredAtomic generates a fresh occurred_at via the
-      // builder; dedup across retries is covered by the unit tests. Here we
-      // confirm the atomic path returns ok=true for an identical-shape call.)
+      operationId: REGISTER_OP, // SAME operation id as step 1
     });
     expect(again.ok, `re-register failed: ${again.error ?? ""}`).toBe(true);
+    expect(again.deduped).toBe(true); // retry → deduped
+    expect(again.eventId).toBe(ids.registeredEventId); // same event
+    expect(again.riskId).toBe(ids.risk); // SAME canonical risk id (not a new uuid)
 
     // ── Evidence: the ordered log + object refs ──────────────────────────────
     const { data: log } = await supabase
@@ -305,6 +352,23 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     const reopenFlags = (reopened.provenance as { data_quality_flags?: string[] })?.data_quality_flags ?? [];
     expect(reopenFlags).toContain("missing_prior_closure");
     expect((reopened.caused_by as string[])).toEqual([]);
+
+    // ── BLOCKER 2 #8 — REAL idempotency: exactly ONE Risk, ONE risk_registered,
+    //    ONE set of object_refs for the registered event (despite the retry).
+    const { count: riskRowCount } = await supabase
+      .from("risks").select("id", { count: "exact", head: true })
+      .eq("project_id", ids.project);
+    expect(riskRowCount, "exactly one risk row after a retried register").toBe(1);
+
+    const { count: registeredCount } = await supabase
+      .from("project_event_log").select("event_id", { count: "exact", head: true })
+      .eq("project_id", ids.project).eq("event_type", "risk_registered");
+    expect(registeredCount, "exactly one risk_registered event after a retry").toBe(1);
+
+    const { count: reopenedCount } = await supabase
+      .from("project_event_log").select("event_id", { count: "exact", head: true })
+      .eq("project_id", ids.project).eq("event_type", "risk_reopened");
+    expect(reopenedCount, "exactly one risk_reopened event after a retry").toBe(1);
 
     // Object refs persisted for the pilot risk (registered + assessed + materialized + reopened).
     expect((objectRows ?? []).length).toBeGreaterThanOrEqual(4);

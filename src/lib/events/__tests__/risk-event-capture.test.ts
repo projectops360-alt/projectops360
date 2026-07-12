@@ -210,13 +210,14 @@ describe("risk event builders", () => {
     const withPrior = buildRiskReopened({
       risk, actor: { actorType: "human", actorId: USER }, sourceModule: "closeout",
       reasonCode: "closure_invalidated", priorClosureEventId: "77777777-7777-7777-7777-777777777777",
+      fromState: "closed", toState: "open",
     });
     expect((withPrior.provenance as { data_quality_flags?: string[] }).data_quality_flags).toBeUndefined();
     expect(withPrior.causedBy).toEqual(["77777777-7777-7777-7777-777777777777"]);
 
     const without = buildRiskReopened({
       risk, actor: { actorType: "human", actorId: USER }, sourceModule: "closeout",
-      reasonCode: "closure_invalidated",
+      reasonCode: "closure_invalidated", fromState: "closed", toState: "open",
     });
     expect((without.provenance as { data_quality_flags?: string[] }).data_quality_flags).toContain("missing_prior_closure");
     expect(validateProjectEvent(without).ok).toBe(true);

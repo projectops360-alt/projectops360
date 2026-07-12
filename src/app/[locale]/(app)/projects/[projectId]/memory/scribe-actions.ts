@@ -194,6 +194,9 @@ async function createEntityForItem(
       title,
       evidenceRef: { type: "project_memory_item", id: memoryItemId },
       extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
+      // Stable per memory item (REG-009): a Scribe retry of the SAME item dedupes
+      // to the first risk + event, never a second Risk.
+      operationId: `scribe:${memoryItemId}`,
     });
     if (captured.ok && captured.riskId) return { type: "risk", id: captured.riskId };
     if (captured.error === "flag_off") {

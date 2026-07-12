@@ -79,6 +79,15 @@ export interface EmitEventInput {
   eventSchemaVersion?: number;
   /** PD-018: additional object references (subject stays the primary object). */
   objectRefs?: EventObjectRef[];
+  /** Stable operation id for idempotent retries (P2-T2 BLOCKER 2/3). When set,
+   *  the dedup_key is derived ONLY from (projectId, eventType, idempotencyKey),
+   *  independent of occurredAt / subjectId / sourceEntityId, so a retry of the
+   *  same operation produces the SAME dedup_key and dedupes against the first
+   *  attempt — no second Risk, no second event, no second ref set. The idempotency
+   *  key MUST be a stable, persisted identity from the originating workflow
+   *  (Scribe memory item id, import job+source id, or a command operationId) —
+   *  NEVER a fresh timestamp, a per-retry uuid, or an unpersisted random. */
+  idempotencyKey?: string;
 }
 
 export interface EmitResult {
@@ -132,9 +141,19 @@ export function generateProjectionInvalidationTags(input: EmitEventInput): strin
   return [...tags];
 }
 
-/** Stable idempotency key. Compensating events are never deduped (dedupKey=null). */
+/** Stable idempotency key. Compensating events are never deduped (dedupKey=null).
+ *  When `idempotencyKey` is set (P2-T2 BLOCKER 2/3), the key is derived ONLY from
+ *  (projectId, eventType, idempotencyKey) — stable across retries regardless of
+ *  occurredAt / subjectId / sourceEntityId — so the atomic capture RPCs can
+ *  dedup a retry of the same operation. Without it, the legacy shape (which
+ *  includes occurredAt) is used, preserving the existing derived-trail behavior. */
 export function computeDedupKey(input: EmitEventInput): string | null {
   if (input.isCompensatingEvent) return null;
+  if (input.idempotencyKey) {
+    return createHash("sha256")
+      .update([input.projectId, input.eventType, input.idempotencyKey].join("|"))
+      .digest("hex");
+  }
   const payloadHash = createHash("sha256")
     .update(JSON.stringify(input.payload ?? {}))
     .digest("hex")

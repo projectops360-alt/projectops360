@@ -92,6 +92,22 @@ describe("prepareAtomicEvent", () => {
     expect(event.organization_id).toBe(ORG);
   });
 
+  it("derives a STABLE dedup_key from idempotencyKey (independent of occurredAt/subjectId)", () => {
+    // BLOCKER 2: a retry must produce the SAME dedup_key. With idempotencyKey set,
+    // the key ignores the fresh occurredAt and the per-retry risk id.
+    const base = validRegisteredInput();
+    const first = computeDedupKey({ ...base, idempotencyKey: "scribe:mem-1", occurredAt: "2026-07-12T01:00:00Z" });
+    const retry = computeDedupKey({
+      ...base,
+      idempotencyKey: "scribe:mem-1",
+      occurredAt: "2026-07-12T02:00:00Z", // different
+      subjectId: "00000000-0000-0000-0000-000000000099", // different per-retry uuid
+      sourceEntityId: "00000000-0000-0000-0000-000000000099",
+    });
+    expect(first).toBe(retry);
+    expect(first).toBe(createHash("sha256").update(`${PROJ}|risk_registered|scribe:mem-1`).digest("hex"));
+  });
+
   it("fails on an invalid event (missing required payload field) without throwing", () => {
     const input = validRegisteredInput();
     // risk_registered requires payload.origin — remove it.
@@ -183,6 +199,7 @@ describe("captureRiskRegisteredAtomic (INSERT risk + event)", () => {
       sourceModule: "scribe",
       title: "Test risk",
       evidenceRef: { type: "project_memory_item", id: "mem1" },
+      operationId: "scribe:mem1",
     });
     expect(res.ok).toBe(false);
     expect(res.error).toBe("flag_off");
@@ -190,9 +207,10 @@ describe("captureRiskRegisteredAtomic (INSERT risk + event)", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("calls capture_risk_registered with a writer-generated risk id and returns it", async () => {
+  it("calls capture_risk_registered with a writer-generated attempt id and returns the RPC risk_id", async () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
-    const rpc = fakeRpc({ ok: true, event_id: "evt-reg-1", deduped: false });
+    // The RPC returns the canonical risk_id (existing on dedup, new on insert).
+    const rpc = fakeRpc({ ok: true, event_id: "evt-reg-1", deduped: false, risk_id: "rpc-risk-id" });
     const res = await captureRiskRegisteredAtomic({
       riskFields,
       actor: { actorType: "human", actorId: USER },
@@ -201,18 +219,25 @@ describe("captureRiskRegisteredAtomic (INSERT risk + event)", () => {
       sourceModule: "scribe",
       title: "Test risk",
       evidenceRef: { type: "project_memory_item", id: "mem1" },
+      operationId: "scribe:mem1",
     });
     expect(res.ok).toBe(true);
     expect(res.eventId).toBe("evt-reg-1");
-    expect(res.riskId).toMatch(/^[0-9a-f-]{36}$/i); // uuid
+    // BLOCKER 2: the returned risk id is the RPC's canonical id, NOT the
+    // per-retry attempt id.
+    expect(res.riskId).toBe("rpc-risk-id");
     const args = rpc.mock.calls[0][1];
-    expect(args.p_risk.id).toBe(res.riskId);
+    // The attempt id (a uuid) is passed as p_risk.id / subject_id / source_entity_id.
+    expect(args.p_risk.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(args.p_risk.organization_id).toBe(ORG);
-    // The event subject_id points to the same risk id (contract: source = risk).
-    expect(args.p_event.subject_id).toBe(res.riskId);
-    expect(args.p_event.source_entity_id).toBe(res.riskId);
-    // Focal object_ref re-pointed to the real risk id.
-    expect(args.p_refs).toContainEqual({ object_type: "risk", object_id: res.riskId, role: "focal" });
+    expect(args.p_event.subject_id).toBe(args.p_risk.id);
+    expect(args.p_event.source_entity_id).toBe(args.p_risk.id);
+    // The dedup_key is derived from the STABLE operationId, not the attempt id.
+    expect(args.p_event.dedup_key).toBe(
+      createHash("sha256").update(`${PROJ}|risk_registered|scribe:mem1`).digest("hex"),
+    );
+    // Focal object_ref re-pointed to the attempt risk id.
+    expect(args.p_refs).toContainEqual({ object_type: "risk", object_id: args.p_risk.id, role: "focal" });
   });
 });
 
@@ -221,7 +246,8 @@ describe("captureRiskStatusChangeAtomic (UPDATE risk + event)", () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
     const rpc = fakeRpc({ ok: true, event_id: "e" });
     const res = await captureRiskStatusChangeAtomic({
-      riskId: RISK, newStatus: "open", organizationId: ORG, projectId: PROJ,
+      riskId: RISK, newStatus: "open", expectedFromStatus: "resolved",
+      organizationId: ORG, projectId: PROJ, operationId: "closeout:reopen:r1",
       input: {
         ...validRegisteredInput(), eventType: "risk_reopened",
         payload: { reason_code: "risk_resurfaced" },
@@ -231,11 +257,12 @@ describe("captureRiskStatusChangeAtomic (UPDATE risk + event)", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("calls capture_risk_status_change with the risk id + new status", async () => {
+  it("calls capture_risk_status_change with the risk id, expectedFromStatus + stable dedup", async () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
     const rpc = fakeRpc({ ok: true, event_id: "evt-reopen-1", deduped: false });
     const res = await captureRiskStatusChangeAtomic({
-      riskId: RISK, newStatus: "open", organizationId: ORG, projectId: PROJ,
+      riskId: RISK, newStatus: "open", expectedFromStatus: "resolved",
+      organizationId: ORG, projectId: PROJ, operationId: "closeout:reopen:r1",
       input: {
         ...validRegisteredInput(), eventType: "risk_reopened",
         payload: { reason_code: "risk_resurfaced" },
@@ -246,8 +273,14 @@ describe("captureRiskStatusChangeAtomic (UPDATE risk + event)", () => {
     const args = rpc.mock.calls[0][1];
     expect(args.p_risk_id).toBe(RISK);
     expect(args.p_new_status).toBe("open");
+    expect(args.p_expected_from_status).toBe("resolved");
     expect(args.p_organization_id).toBe(ORG);
     expect(args.p_project_id).toBe(PROJ);
+    // BLOCKER 3: the dedup_key is derived from the STABLE operationId, so a
+    // retry produces the same key and the RPC dedupes BEFORE the UPDATE.
+    expect(args.p_event.dedup_key).toBe(
+      createHash("sha256").update(`${PROJ}|risk_reopened|closeout:reopen:r1`).digest("hex"),
+    );
   });
 });
 

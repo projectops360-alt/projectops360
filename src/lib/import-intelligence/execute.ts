@@ -375,7 +375,7 @@ export async function executeImport(params: {
   }
 
   // ── 8. Risks ───────────────────────────────────────────────────────────────
-  for (const risk of canonical.risks) {
+  for (const [riskIndex, risk] of canonical.risks.entries()) {
     const lvl = (v: string, allowCritical = true): string =>
       ["low", "medium", "high"].includes(v) ? v : allowCritical && v === "critical" ? "critical" : "medium";
     const riskFields = {
@@ -410,6 +410,11 @@ export async function executeImport(params: {
           title: risk.title,
           evidenceRef: { type: "project_import_job", id: jobId },
           extraProvenance: risk.source_reference ? { source_reference: risk.source_reference } : undefined,
+          // Stable per import job + source identity: a retry of the SAME import
+          // run dedupes each risk to the first row + event (no second Risk).
+          // Prefer the parsed source_reference (intrinsic per-row id); fall back
+          // to the deterministic parse position, which is stable for a given job.
+          operationId: `import:${jobId}:${risk.source_reference ?? `idx${riskIndex}`}`,
         })
       : ({ ok: false, error: "flag_off" } as { ok: false; error: string; errors?: string[] });
     let riskId: string | null = null;

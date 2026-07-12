@@ -320,20 +320,32 @@ export async function reopenRiskAction(
     .limit(1)
     .maybeSingle();
 
+  // Stable operation id for idempotent retries (BLOCKER 3). priorClosureEventId
+  // disambiguates distinct reopens once risk_closed is captured (RI-05); while
+  // the closeout path is "not capturable yet" it is null → one reopen per
+  // (risk, reasonCode) is recorded, which is correct for this flow.
+  const priorClosureId = (prior?.event_id as string | undefined) ?? null;
+  const operationId = `closeout:reopen:${riskId}:${loaded.risk.status}:${reasonCode.trim()}:${priorClosureId ?? "no-prior"}`;
+
   // Atomic: UPDATE risks.status='open' + risk_reopened event + object_refs in one
-  // transaction. A failure rolls back the status change with the event (no
-  // divergence; no fire-and-forget).
+  // transaction. expectedFromStatus = the live status read above; the RPC
+  // re-checks it atomically (a stale request cannot revert a later state). A
+  // failure rolls back the status change with the event (no divergence).
   const res = await captureRiskStatusChangeAtomic({
     riskId,
     newStatus: "open",
+    expectedFromStatus: loaded.risk.status,
     organizationId: loaded.org.organizationId,
     projectId,
+    operationId,
     input: buildRiskReopened({
       risk: riskRef(projectId, loaded.org.organizationId, loaded.risk),
       actor: { actorType: "human", actorId: loaded.org.userId },
       sourceModule: "closeout",
       reasonCode: reasonCode.trim(),
-      priorClosureEventId: (prior?.event_id as string | undefined) ?? null,
+      priorClosureEventId: priorClosureId,
+      fromState: loaded.risk.status,
+      toState: "open",
     }),
   });
   if (!res.ok) return { ok: false, reason: "failed" };
