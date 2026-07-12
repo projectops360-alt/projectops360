@@ -262,7 +262,7 @@ export function validateProjectEvent(input: EmitEventInput): { ok: boolean; erro
 
 // ── Normalization (fills defaults from the registry) ──────────────────────────
 
-interface NormalizedRow {
+export interface NormalizedRow {
   organization_id: string;
   project_id: string;
   portfolio_id: string | null;
@@ -351,6 +351,37 @@ export function normalizeProjectEvent(input: EmitEventInput): NormalizedRow {
     is_compensating_event: input.isCompensatingEvent ?? false,
     compensates_event_id: input.compensatesEventId ?? null,
   };
+}
+
+// ── Atomic capture support (P2-T2 remediation) ─────────────────────────────────
+// The capture_* RPCs (supabase/migrations/20260845000000) own the transactional
+// boundary; TS still owns validation + normalization + dedup_key + payload
+// serialization so the contract is NOT duplicated. This helper produces the
+// (eventRow, payloadText, refs) triple the RPCs consume. Reuses the exact
+// serialization computeEventHash uses, so the SQL-side hash stays consistent
+// with the non-atomic emission path.
+
+export interface PreparedAtomicEvent {
+  event: Record<string, unknown>;
+  payloadText: string;
+  refs: { object_type: string; object_id: string; role: string }[];
+}
+
+export function prepareAtomicEvent(
+  input: EmitEventInput,
+): { ok: true; data: PreparedAtomicEvent } | { ok: false; errors: string[] } {
+  const { ok, errors } = validateProjectEvent(input);
+  if (!ok) return { ok: false, errors };
+  const row = normalizeProjectEvent(input);
+  const payloadText = JSON.stringify(input.payload ?? {});
+  const refs = (input.objectRefs ?? []).map((r) => ({
+    object_type: r.objectType,
+    object_id: r.objectId,
+    role: r.role,
+  }));
+  // The row is JSON-safe (strings, numbers, nulls, string arrays, jsonb-shaped
+  // objects). The supabase client serializes it to the p_event jsonb param.
+  return { ok: true, data: { event: row as unknown as Record<string, unknown>, payloadText, refs } };
 }
 
 // ── Write path (server-only; service_role via admin client) ───────────────────

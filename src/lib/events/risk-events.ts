@@ -9,8 +9,15 @@
 // the actor travels in the event, not in `risks` (PD-018).
 // ============================================================================
 
+import { randomUUID } from "node:crypto";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isRiskEventCaptureEnabled } from "./risk-capture-flag";
-import { emitProjectEventSafe, type EmitEventInput, type EventObjectRef } from "./ingestion";
+import {
+  emitProjectEventSafe,
+  prepareAtomicEvent,
+  type EmitEventInput,
+  type EventObjectRef,
+} from "./ingestion";
 import type { ActorType, CaptureMethod, ClosureReason, DataQualityFlag } from "./registry";
 
 // ── Shared shapes ─────────────────────────────────────────────────────────────
@@ -268,4 +275,138 @@ export function emitRiskEventSafe(input: EmitEventInput): void {
   } catch (err) {
     console.error("[events] emitRiskEventSafe error:", err);
   }
+}
+
+// ── Atomic capture (P2-T2 remediation; pilot flag ON only) ─────────────────────
+// One PostgreSQL transaction per direct capture: the Risk mutation and its
+// canonical event + object_refs are written together by a capture_* RPC, so a
+// failure can never leave one without the other. Validation + normalization +
+// dedup_key + payload serialization stay in TS (prepareAtomicEvent) — the
+// contract is NOT duplicated. The fire-and-forget emitRiskEventSafe above is
+// retained for the derived response trail (which derives from events already in
+// the PEG and needs no Risk mutation).
+
+export interface AtomicCaptureResult {
+  ok: boolean;
+  eventId?: string;
+  deduped?: boolean;
+  /** Present only for capture_risk_registered — the writer-generated risk id. */
+  riskId?: string;
+  error?: string;
+  errors?: string[];
+}
+
+type RpcReturn = { ok?: boolean; deduped?: boolean; event_id?: string; error?: string } | null;
+
+function rpcResult(data: RpcReturn, error?: { message?: string }): AtomicCaptureResult {
+  if (error) return { ok: false, error: error.message ?? "rpc_failed" };
+  const r = data ?? {};
+  if (r.ok === false) return { ok: false, error: r.error ?? "rpc_failed" };
+  return { ok: true, eventId: r.event_id, deduped: r.deduped };
+}
+
+/**
+ * Atomic risk_registered: INSERT the risk + append the risk_registered event +
+ * object_refs in one transaction. The risk id is generated here (crypto random
+ * uuid) so the event is built with the real subject/source id and the dedup_key
+ * is computed in TS (verbatim computeDedupKey). `riskFields` is the exact
+ * snake_case payload the writer would have passed to .from("risks").insert
+ * (without `id`); the RPC applies the DDL defaults the writer omits, so the
+ * resulting row is structurally identical to the flag-OFF path.
+ */
+export async function captureRiskRegisteredAtomic(params: {
+  riskFields: Record<string, unknown>;
+  actor: RiskEventActor;
+  captureMethod: CaptureMethod;
+  origin: string;
+  sourceModule: string;
+  title?: string;
+  evidenceRef?: { type: string; id: string } | null;
+  extraProvenance?: Record<string, unknown>;
+}): Promise<AtomicCaptureResult> {
+  // Defense in depth: the capture flag OFF is a strict no-op by construction,
+  // regardless of which writer calls this (flag OFF ⇒ byte-identical to pre-P2-T2).
+  if (!isRiskEventCaptureEnabled(String(params.riskFields.project_id))) {
+    return { ok: false, error: "flag_off" };
+  }
+  const riskId = randomUUID();
+  const risk: RiskRefInput = {
+    riskId,
+    organizationId: String(params.riskFields.organization_id),
+    projectId: String(params.riskFields.project_id),
+    linkedMilestoneId: (params.riskFields.linked_milestone_id as string | null | undefined) ?? null,
+    linkedTaskId: (params.riskFields.linked_task_id as string | null | undefined) ?? null,
+  };
+  const input = buildRiskRegistered({
+    risk,
+    actor: params.actor,
+    captureMethod: params.captureMethod,
+    origin: params.origin,
+    sourceModule: params.sourceModule,
+    title: params.title,
+    evidenceRef: params.evidenceRef,
+    extraProvenance: params.extraProvenance,
+  });
+  const prepared = prepareAtomicEvent(input);
+  if (!prepared.ok) return { ok: false, error: "validation_failed", errors: prepared.errors };
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc("capture_risk_registered", {
+    p_risk: { ...params.riskFields, id: riskId },
+    p_event: prepared.data.event,
+    p_payload_text: prepared.data.payloadText,
+    p_refs: prepared.data.refs,
+  });
+  const out = rpcResult(data as RpcReturn, error ?? undefined);
+  return out.ok ? { ...out, riskId } : out;
+}
+
+/**
+ * Atomic risk status transition (risk_reopened → status 'open'). UPDATEs the
+ * risk row + appends the event + object_refs in one transaction. The event
+ * input is built upstream with the real risk id (it exists) and, for reopen,
+ * the pre-read prior closure event id as causation. risk_closed is NOT wired
+ * here (no RI-05 validation gate on the closeout bulk-resolve path).
+ */
+export async function captureRiskStatusChangeAtomic(params: {
+  riskId: string;
+  newStatus: string;
+  organizationId: string;
+  projectId: string;
+  input: EmitEventInput;
+}): Promise<AtomicCaptureResult> {
+  if (!isRiskEventCaptureEnabled(params.projectId)) return { ok: false, error: "flag_off" };
+  const prepared = prepareAtomicEvent(params.input);
+  if (!prepared.ok) return { ok: false, error: "validation_failed", errors: prepared.errors };
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc("capture_risk_status_change", {
+    p_risk_id: params.riskId,
+    p_new_status: params.newStatus,
+    p_organization_id: params.organizationId,
+    p_project_id: params.projectId,
+    p_event: prepared.data.event,
+    p_payload_text: prepared.data.payloadText,
+    p_refs: prepared.data.refs,
+  });
+  return rpcResult(data as RpcReturn, error ?? undefined);
+}
+
+/**
+ * Atomic append-only risk event with no Risk mutation (risk_assessed,
+ * risk_materialized). The operation IS the event; atomicity = a single atomic
+ * append via the RPC.
+ */
+export async function captureRiskEventAtomic(params: {
+  input: EmitEventInput;
+}): Promise<AtomicCaptureResult> {
+  if (!isRiskEventCaptureEnabled(params.input.projectId)) return { ok: false, error: "flag_off" };
+  const prepared = prepareAtomicEvent(params.input);
+  if (!prepared.ok) return { ok: false, error: "validation_failed", errors: prepared.errors };
+  const supabase = createAdminClient();
+  const { data, error } = await supabase.rpc("append_risk_event_atomic", {
+    p_event: prepared.data.event,
+    p_payload_text: prepared.data.payloadText,
+    p_refs: prepared.data.refs,
+  });
+  return rpcResult(data as RpcReturn, error ?? undefined);
 }

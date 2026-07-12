@@ -13,7 +13,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
+import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
 import type { Locale } from "@/types/database";
 import { analyzeScribeCapture, type ScribeAnalysis } from "@/lib/scribe/ai";
 
@@ -169,7 +169,7 @@ async function createEntityForItem(
     return data ? { type: "decision", id: String(data.id) } : null;
   }
   if (it.item_type === "risk") {
-    const { data } = await supabase.from("risks").insert({
+    const riskFields = {
       organization_id: org.organizationId, project_id: projectId,
       title, category: "other",
       probability: lvl(it.extra?.probability, PROBABILITY, "medium"),
@@ -177,22 +177,34 @@ async function createEntityForItem(
       severity: lvl(it.extra?.impact, SEVERITY, "medium"),
       status: "open", origin: "ai_suggested",
       confidence_score: it.confidence ?? null, needs_review: true,
-    }).select("id").single();
-    if (data) {
-      // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): the
-      // approving user is the real actor; the Scribe source chain is evidence.
-      emitRiskEventSafe(buildRiskRegistered({
-        risk: { riskId: String(data.id), organizationId: org.organizationId, projectId },
-        actor: { actorType: "human", actorId: org.userId },
-        captureMethod: "direct",
-        origin: "ai_suggested",
-        sourceModule: "scribe",
-        title,
-        evidenceRef: { type: "project_memory_item", id: memoryItemId },
-        extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
-      }));
+    };
+    // P2-T2 remediation (PD-018): with the pilot flag ON, the risk + its
+    // risk_registered event + object_refs are written in ONE PostgreSQL
+    // transaction (capture_risk_registered RPC) — a failed event can never
+    // leave a risk without its registration evidence (no fire-and-forget). With
+    // the flag OFF the helper returns flag_off BEFORE any DB call and we fall
+    // back to the pre-P2-T2 direct INSERT (byte-identical: same fields, same
+    // DDL defaults, no event). Scribe is REG-009 — behavior preserved.
+    const captured = await captureRiskRegisteredAtomic({
+      riskFields,
+      actor: { actorType: "human", actorId: org.userId },
+      captureMethod: "direct",
+      origin: "ai_suggested",
+      sourceModule: "scribe",
+      title,
+      evidenceRef: { type: "project_memory_item", id: memoryItemId },
+      extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
+    });
+    if (captured.ok && captured.riskId) return { type: "risk", id: captured.riskId };
+    if (captured.error === "flag_off") {
+      // flag OFF → pre-P2-T2 behavior: direct INSERT, no event.
+      const { data } = await supabase.from("risks").insert(riskFields).select("id").single();
+      return data ? { type: "risk", id: String(data.id) } : null;
     }
-    return data ? { type: "risk", id: String(data.id) } : null;
+    // Atomic capture failed (flag ON, validation/DB error) → the risk was NOT
+    // created (rolled back with the event). Fail loudly — no silent divergence.
+    console.error("[scribe] atomic risk_registered capture failed:", captured.error, captured.errors ?? "");
+    return null;
   }
   return null; // issue/blocker/dependency/project_impact/open_question/follow_up → memory-only in MVP
 }

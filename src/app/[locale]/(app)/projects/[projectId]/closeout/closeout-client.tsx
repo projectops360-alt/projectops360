@@ -464,9 +464,10 @@ function CheckRow({ check, isEs, base, projectId, locale, canResolve, riskEventC
   );
 }
 
-// RISK-EVENT-CAPTURE (P2-T2/PD-018) — canonical vocabularies for the three
-// flag-gated affordances. Values are canonical identifiers (not UI copy).
-const CLOSURE_REASON_OPTIONS = ["mitigated", "avoided", "accepted", "expired", "materialized_transferred"] as const;
+// RISK-EVENT-CAPTURE (P2-T2/PD-018) — canonical vocabularies for the capturable
+// affordances (Assess / Materialize / Reopen). Values are canonical identifiers
+// (not UI copy). The closure-reason vocabulary is retained in riskOptionLabel
+// for the future RI-05 closure workflow but has no affordance surface today.
 const ASSESS_METHOD_OPTIONS = ["probability_impact_matrix", "qualitative", "quantitative", "expert_judgment"] as const;
 const REOPEN_REASON_OPTIONS = ["closure_invalidated", "risk_resurfaced", "new_information", "materialized_after_closure"] as const;
 
@@ -496,10 +497,12 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState(false);
-  // Flag-gated affordance panel (null = collapsed). Legacy behavior when the
-  // pilot flag is off: the Resolve button acts immediately, exactly as before.
-  const [panel, setPanel] = useState<null | "resolve" | "assess" | "materialize" | "reopen">(null);
-  const [closureReason, setClosureReason] = useState<string>("accepted");
+  // Affordance panel (null = collapsed). The affordances flag gates the three
+  // CAPTURABLE affordances (Assess / Materialize / Reopen). The Resolve button
+  // ALWAYS acts immediately (legacy): risk_closed is "not capturable yet" (RI-05
+  // validation gate does not exist on this path — Fase 6), so the "Closure
+  // reason" affordance is suppressed until a validated closure workflow exists.
+  const [panel, setPanel] = useState<null | "assess" | "materialize" | "reopen">(null);
   const [assessMethod, setAssessMethod] = useState<string>("probability_impact_matrix");
   const [matScope, setMatScope] = useState<string>("partial");
   const [matNote, setMatNote] = useState<string>("");
@@ -521,8 +524,9 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
   }
 
   function handleResolve() {
-    // Affordance 1 (flag ON): mandatory canonical closure reason.
-    run(() => resolveRiskAction(projectId, risk.id, locale as Locale, riskEventCapture ? closureReason : undefined));
+    // Legacy immediate resolve: status → resolved (no risk_closed event; the
+    // closure_reason affordance is suppressed until RI-05 exists — Fase 6).
+    run(() => resolveRiskAction(projectId, risk.id, locale as Locale));
   }
 
   const actionBtn = "inline-flex items-center gap-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:border-brand-500 hover:text-brand-600 disabled:opacity-50 dark:hover:text-brand-400";
@@ -558,7 +562,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           {canResolve && !isClosed && (
             <button
               type="button"
-              onClick={() => (riskEventCapture ? setPanel(panel === "resolve" ? null : "resolve") : handleResolve())}
+              onClick={handleResolve}
               disabled={pending}
               title={error ? (isEs ? "No se pudo completar. Inténtalo de nuevo." : "Could not complete. Try again.") : undefined}
               className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 ${
@@ -576,19 +580,10 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
         </div>
       </div>
 
-      {/* ── Flag-gated affordance panels (the ONLY new UI of P2-T2) ── */}
-      {riskEventCapture && panel === "resolve" && (
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
-          <span className="text-[10px] text-muted-foreground">{isEs ? "Razón de cierre:" : "Closure reason:"}</span>
-          <select value={closureReason} onChange={(e) => setClosureReason(e.target.value)} className={selectCls} aria-label={isEs ? "Razón de cierre" : "Closure reason"}>
-            {CLOSURE_REASON_OPTIONS.map((r) => <option key={r} value={r}>{riskOptionLabel(r, isEs)}</option>)}
-          </select>
-          <button type="button" disabled={pending} onClick={handleResolve} className={actionBtn}>
-            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-            {isEs ? "Confirmar cierre" : "Confirm closure"}
-          </button>
-        </div>
-      )}
+      {/* ── Affordance panels (Assess / Materialize / Reopen) — capturable risk
+          events, gated by the affordances flag (capture flag must also be on so
+          the event is actually written). The Resolve / closure-reason affordance
+          is intentionally absent: risk_closed is "not capturable yet" (RI-05). ─ */}
       {riskEventCapture && panel === "assess" && (
         <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-1.5">
           <span className="text-[10px] text-muted-foreground">{isEs ? "Método:" : "Method:"}</span>

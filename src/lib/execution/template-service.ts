@@ -9,7 +9,6 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
 import type { ProjectTemplate } from "./templates";
 import { calculateCriticalPath } from "./critical-path";
 
@@ -207,27 +206,19 @@ export async function instantiateTemplate(params: {
       origin: "template",
       needs_review: true,
     }));
-    const { data: createdRisks, error } = await supabase
+    const { error } = await supabase
       .from("risks")
-      .insert(riskRows)
-      .select("id, title");
+      .insert(riskRows);
     if (error) throw new Error(`Template risks failed: ${error.message}`);
     risksCreated = riskRows.length;
-    // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): template
-    // seeding registers risks at project creation; actor = project creator.
-    for (const row of createdRisks ?? []) {
-      emitRiskEventSafe(buildRiskRegistered({
-        risk: { riskId: row.id as string, organizationId, projectId },
-        actor: params.createdBy
-          ? { actorType: "human", actorId: params.createdBy }
-          : { actorType: "system" },
-        captureMethod: "direct",
-        origin: "template",
-        sourceModule: "template-service",
-        title: (row.title as string) ?? undefined,
-        evidenceRef: { type: "project", id: projectId },
-      }));
-    }
+    // P2-T2 remediation (PD-018): "not capturable yet". Template seeding is a
+    // BULK INSERT of placeholder risks; migrating it to the per-row atomic
+    // capture_risk_registered RPC would alter the bulk-write contract
+    // (single-statement insert → per-row RPC loop, different atomicity/round-
+    // trips). Per the acceptance decision, a writer that cannot migrate
+    // without altering its behavior stays without synchronous emit and is
+    // reported — no silent divergence, no fire-and-forget fallback. risk_registered
+    // for templates will be wired when a per-row creation path exists.
   }
 
   return {
