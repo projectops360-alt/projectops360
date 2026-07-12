@@ -51,7 +51,6 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
   let supabase: any;
   let emitProjectEvent: any;
   let builders: any;
-  let bridge: any;
   let atomic: any;
 
   const ids = {
@@ -79,7 +78,6 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     supabase = admin.createAdminClient();
     ({ emitProjectEvent } = await import("@/lib/events/ingestion"));
     builders = await import("@/lib/events/risk-events");
-    bridge = await import("@/lib/events/risk-derived-bridge");
     atomic = await import("@/lib/events/risk-events");
 
     // Anchor org: reuse the org of any existing project (no org mutation).
@@ -105,7 +103,7 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     // A linked response task (created directly; its PEG events are emitted below).
     const { data: task } = await supabase.from("roadmap_tasks").insert({
       organization_id: ids.org, project_id: ids.project,
-      title: "Mitigation: vendor abstraction layer", status: "todo",
+      title: "Mitigation: vendor abstraction layer", status: "not_started",
     }).select("id").single();
     ids.task = task.id;
     // NOTE: the risk is NOT pre-inserted — step 1 creates it atomically via the
@@ -226,8 +224,10 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     expect(matAgain.deduped).toBe(false);
 
     // 4. linked task advances → derived trail. Task events enter through the
-    //    SAME gateway; the derived bridge fires inside it. We call the bridge
-    //    deterministically here (the in-gateway hook is fire-and-forget).
+    //    SAME gateway; the derived bridge fires inside it (fire-and-forget).
+    //    We do NOT call the bridge manually here — doing so would duplicate each
+    //    derived event (gateway hook + manual call). The poll before the log
+    //    fetch waits for the fire-and-forget derivation to land.
     const taskCreated = await emitProjectEvent({
       organizationId: ids.org, projectId: ids.project, eventType: "TaskCreated",
       subjectId: ids.task, actorType: "human", actorId: ids.owner,
@@ -235,22 +235,12 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
       payload: { title: "Mitigation: vendor abstraction layer" },
     });
     expect(taskCreated.ok).toBe(true);
-    await bridge.deriveRiskEventsForTaskEvent({
-      eventId: taskCreated.eventId, eventType: "TaskCreated",
-      organizationId: ids.org, projectId: ids.project, taskId: ids.task,
-      toState: null, occurredAt: new Date().toISOString(),
-    });
 
     const taskStarted = await emitProjectEvent({
       organizationId: ids.org, projectId: ids.project, eventType: "TaskStatusChanged",
       subjectId: ids.task, actorType: "human", actorId: ids.owner,
       sourceModule: "roadmap", sourceEntityType: "roadmap_tasks", sourceEntityId: ids.task,
       toState: "in_progress",
-    });
-    await bridge.deriveRiskEventsForTaskEvent({
-      eventId: taskStarted.eventId, eventType: "TaskStatusChanged",
-      organizationId: ids.org, projectId: ids.project, taskId: ids.task,
-      toState: "in_progress", occurredAt: new Date().toISOString(),
     });
 
     const taskCompleted = await emitProjectEvent({
@@ -259,11 +249,8 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
       sourceModule: "roadmap", sourceEntityType: "roadmap_tasks", sourceEntityId: ids.task,
       toState: "done",
     });
-    await bridge.deriveRiskEventsForTaskEvent({
-      eventId: taskCompleted.eventId, eventType: "TaskCompleted",
-      organizationId: ids.org, projectId: ids.project, taskId: ids.task,
-      toState: "done", occurredAt: new Date().toISOString(),
-    });
+    void taskStarted;
+    void taskCompleted;
 
     // 5. resolve — direct UPDATE status=resolved, NO event (Fase 6: not capturable
     //    yet). This mirrors resolveRiskAction's preserved transaccional behavior.
@@ -346,6 +333,19 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     expect(again.deduped).toBe(true); // retry → deduped
     expect(again.eventId).toBe(ids.registeredEventId); // same event
     expect(again.riskId).toBe(ids.risk); // SAME canonical risk id (not a new uuid)
+
+    // Wait for the gateway's fire-and-forget derived-risk bridge to land the 3
+    // derived events (the bridge is invoked async, not awaited by emitProjectEvent).
+    const EXPECTED_DERIVED = ["risk_response_action_created", "risk_response_started", "risk_response_action_completed"];
+    const pollUntil = Date.now() + 15_000;
+    for (;;) {
+      const { data: present } = await supabase
+        .from("project_event_log").select("event_type")
+        .eq("project_id", ids.project).in("event_type", EXPECTED_DERIVED);
+      const got = new Set((present ?? []).map((r: { event_type: string }) => r.event_type));
+      if (EXPECTED_DERIVED.every((t) => got.has(t)) || Date.now() > pollUntil) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
 
     // ── Evidence: the ordered log + object refs ──────────────────────────────
     const { data: log } = await supabase

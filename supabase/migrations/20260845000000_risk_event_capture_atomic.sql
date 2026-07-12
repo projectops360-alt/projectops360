@@ -23,7 +23,10 @@
 --     mutation included) rolls back atomically.
 --
 -- Security (BLOCKER 1): every function is SECURITY DEFINER + SET search_path =
--- public. EXECUTE is REVOKEd EXPLICITLY from PUBLIC, anon AND authenticated on
+-- public, extensions. Supabase installs pgcrypto into the `extensions` schema,
+-- so digest()/hmac() (tamper-evident event_hash + dedup_key) only resolve when
+-- `extensions` is on the search_path; `extensions` is a trusted schema. EXECUTE
+-- is REVOKEd EXPLICITLY from PUBLIC, anon AND authenticated on
 -- ALL functions; the internal helpers (_append_event_atomic, _risk_refs_ok)
 -- are REVOKEd from PUBLIC, anon, authenticated AND service_role (no grant —
 -- callable only by the owner, i.e. the capture_* SECURITY DEFINER functions).
@@ -80,6 +83,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 --                 (structural invariant — the DB rejects an event_type the
 --                 calling RPC is not responsible for).
 -- Returns {"ok","deduped","event_id","sequence_number" | "error"}.
+
 CREATE OR REPLACE FUNCTION public._append_event_atomic(
   p_event          jsonb,
   p_payload_text   text,
@@ -95,7 +99,7 @@ CREATE OR REPLACE FUNCTION public._append_event_atomic(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_project_id         uuid  := (p_event->>'project_id')::uuid;
@@ -282,7 +286,7 @@ CREATE OR REPLACE FUNCTION public.capture_risk_registered(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_risk_id            uuid;
@@ -435,7 +439,7 @@ CREATE OR REPLACE FUNCTION public.capture_risk_status_change(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_dedup_key          text  := p_event->>'dedup_key';
@@ -582,7 +586,7 @@ CREATE OR REPLACE FUNCTION public.append_risk_event_atomic(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_subject_id  uuid;
@@ -649,10 +653,10 @@ $$;
 -- migration role = the same owner as the capture_* SECURITY DEFINER functions).
 
 -- Internal helper _append_event_atomic: revoke from everyone, grant to nobody.
-REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM anon;
-REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM authenticated;
-REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM service_role;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[], boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[], boolean) FROM anon;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[], boolean) FROM authenticated;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[], boolean) FROM service_role;
 
 -- Internal helper _risk_refs_ok: revoke from everyone, grant to nobody.
 REVOKE ALL ON FUNCTION public._risk_refs_ok(jsonb, text, text) FROM PUBLIC;

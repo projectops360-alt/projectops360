@@ -76,7 +76,7 @@ describe.runIf(RUN)("P2-T2 BLOCKER 5 — cross-tenant RLS verification (local DB
     const { data: userA } = await admin.auth.admin.createUser({ email: emailA, password: "Rls-test-A-123!", email_confirm: true });
     a.userId = userA?.user?.id ?? "";
     await admin.from("organization_members").insert({
-      organization_id: a.orgId, user_id: a.userId, role: "member", org_role: "member", status: "active",
+      organization_id: a.orgId, user_id: a.userId, role: "member", org_role: "TEAM_MEMBER", status: "active",
     });
 
     const { data: projA, error: projAErr } = await admin.from("projects").insert({
@@ -123,7 +123,7 @@ describe.runIf(RUN)("P2-T2 BLOCKER 5 — cross-tenant RLS verification (local DB
     const { data: userB } = await admin.auth.admin.createUser({ email: emailB, password: "Rls-test-B-123!", email_confirm: true });
     b.userId = userB?.user?.id ?? "";
     await admin.from("organization_members").insert({
-      organization_id: b.orgId, user_id: b.userId, role: "member", org_role: "member", status: "active",
+      organization_id: b.orgId, user_id: b.userId, role: "member", org_role: "TEAM_MEMBER", status: "active",
     });
 
     const { data: projB, error: projBErr } = await admin.from("projects").insert({

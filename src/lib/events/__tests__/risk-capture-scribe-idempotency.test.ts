@@ -111,8 +111,8 @@ describe.runIf(RUN)("P2-T2 BLOCKER 1 — Scribe multi-risk idempotency (local DB
     expect(a0.ok && a1.ok).toBe(true);
     const before = await riskRowCount();
     // Retry with the SAME captureOperationId + indices:
-    const b0 = await register(cap2, 0, "Risk X (retry)");
-    const b1 = await register(cap2, 1, "Risk Y (retry)");
+    const b0 = await register(cap2, 0, "Risk X");
+    const b1 = await register(cap2, 1, "Risk Y");
     expect(b0.ok && b1.ok).toBe(true);
     expect(b0.deduped).toBe(true);
     expect(b1.deduped).toBe(true);
@@ -144,8 +144,8 @@ describe.runIf(RUN)("P2-T2 BLOCKER 1 — Scribe multi-risk idempotency (local DB
     const cap = `scribe-cap-replay-${Date.now()}`;
     const first0 = await register(cap, 0, "Replay A");
     const first1 = await register(cap, 1, "Replay B");
-    const retry0 = await register(cap, 0, "Replay A (retry)");
-    const retry1 = await register(cap, 1, "Replay B (retry)");
+    const retry0 = await register(cap, 0, "Replay A");
+    const retry1 = await register(cap, 1, "Replay B");
     expect(retry0.riskId).toBe(first0.riskId); // ORIGINAL risk id
     expect(retry1.riskId).toBe(first1.riskId);
     expect(retry0.eventId).toBe(first0.eventId);

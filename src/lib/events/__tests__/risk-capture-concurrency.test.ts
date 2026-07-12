@@ -181,12 +181,14 @@ describe.runIf(RUN)("P2-T2 BLOCKER 3 — concurrency + reopen idempotency (local
       actorType: "human", sourceModule: "conc-test", idempotencyKey: existingOpId,
     } as never);
     const { data: stored } = await supabase.from("project_event_log")
-      .select("event_id, dedup_key, subject_id, updated_at").eq("project_id", ids.project)
+      .select("event_id, dedup_key, subject_id, event_hash").eq("project_id", ids.project)
       .eq("event_type", "risk_reopened").eq("subject_id", ids.risk)
       .order("sequence_number", { ascending: true }).limit(1).single();
     expect(stored?.dedup_key).toBe(expectedDedup);
     const storedEventId = stored?.event_id as string;
-    const storedUpdatedAt = (stored as { updated_at?: string } | null)?.updated_at ?? null;
+    // project_event_log is APPEND-ONLY (tamper-evident hash chain). There is no
+    // updated_at; event_hash is the immutable row fingerprint.
+    const storedEventHash = (stored as { event_hash?: string | null } | null)?.event_hash ?? null;
     // Re-resolve so the state WOULD allow a transition if the id were new.
     await setStatus("resolved");
     const before = await reopenedCount();
@@ -196,10 +198,10 @@ describe.runIf(RUN)("P2-T2 BLOCKER 3 — concurrency + reopen idempotency (local
     expect(retry.eventId).toBe(storedEventId); // same event id as cycle 1
     expect(await reopenedCount()).toBe(before); // no new event
     expect(await currentStatus()).toBe("resolved"); // NOT transitioned back to open
-    // No mutation: the stored row's updated_at is unchanged by a dedup hit.
+    // No mutation: a dedup hit does not rewrite the append-only row.
     const { data: after } = await supabase.from("project_event_log")
-      .select("updated_at").eq("event_id", storedEventId).single();
-    expect((after as { updated_at?: string } | null)?.updated_at ?? null).toBe(storedUpdatedAt);
+      .select("event_hash").eq("event_id", storedEventId).single();
+    expect((after as { event_hash?: string | null } | null)?.event_hash ?? null).toBe(storedEventHash);
   }, 120_000);
 
   it("5. a dedup hit NEVER returns success leaving the state wrong", async () => {

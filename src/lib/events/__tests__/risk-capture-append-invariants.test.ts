@@ -116,10 +116,10 @@ describe.runIf(RUN)("P2-T2 BLOCKER 4 — append_risk_event_atomic invariants (lo
     const sourceEntityType = opts.sourceEntityType ?? "risks";
     const sourceEntityId = opts.sourceEntityId ?? opts.subjectId;
     const refs = opts.refsOk === false
-      ? [{ object_type: "risk", object_id: opts.subjectId, role: "focal" }] // missing context
+      ? [{ objectType: "risk", objectId: opts.subjectId, role: "focal" }] // missing context
       : [
-          { object_type: "risk", object_id: opts.subjectId, role: "focal" },
-          { object_type: "project", object_id: opts.projId, role: "context" },
+          { objectType: "risk", objectId: opts.subjectId, role: "focal" },
+          { objectType: "project", objectId: opts.projId, role: "context" },
         ];
     const input = builders.buildRiskAssessed({
       risk: { riskId: opts.subjectId, organizationId: opts.orgId, projectId: opts.projId },
