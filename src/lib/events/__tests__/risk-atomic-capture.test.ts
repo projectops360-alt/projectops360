@@ -120,38 +120,47 @@ describe("prepareAtomicEvent", () => {
 });
 
 describe("captureRiskEventAtomic (append-only: assess / materialize)", () => {
+  const assessInput = {
+    organizationId: ORG, projectId: PROJ, eventType: "risk_assessed" as const,
+    subjectId: RISK, actorType: "human" as const, actorId: USER,
+    sourceModule: "closeout", sourceEntityType: "risks", sourceEntityId: RISK,
+    payload: { method: "qualitative", values: { probability: "medium", impact: "high", severity: "high" }, assessed_at: "2026-07-12T00:00:00Z" },
+    objectRefs: [{ objectType: "risk", objectId: RISK, role: "focal" }],
+  };
+
   it("is a strict no-op when the capture flag is OFF (no RPC call)", async () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(false);
     const rpc = fakeRpc({ ok: true, deduped: false, event_id: "evt-1" });
-    const res = await captureRiskEventAtomic({
-      input: {
-        ...validRegisteredInput(),
-        eventType: "risk_assessed",
-        payload: { method: "qualitative", values: { probability: "medium", impact: "high", severity: "high" }, assessed_at: "2026-07-12T00:00:00Z" },
-      },
-    });
+    const res = await captureRiskEventAtomic({ input: assessInput, operationId: "assess-1" });
     expect(res).toEqual({ ok: false, error: "flag_off" });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing operationId (no RPC) even with the flag on (BLOCKER 2)", async () => {
+    (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    const rpc = fakeRpc({ ok: true, event_id: "x" });
+    const res = await captureRiskEventAtomic({ input: assessInput, operationId: "  " });
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("validation_failed");
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("calls append_risk_event_atomic with the prepared triple and returns the event id", async () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
     const rpc = fakeRpc({ ok: true, deduped: false, event_id: "evt-assess-1" });
-    const input = {
-      organizationId: ORG, projectId: PROJ, eventType: "risk_assessed",
-      subjectId: RISK, actorType: "human" as const, actorId: USER,
-      sourceModule: "closeout", sourceEntityType: "risks", sourceEntityId: RISK,
-      payload: { method: "qualitative", values: { probability: "medium", impact: "high", severity: "high" }, assessed_at: "2026-07-12T00:00:00Z" },
-      objectRefs: [{ objectType: "risk", objectId: RISK, role: "focal" }],
-    };
-    const res = await captureRiskEventAtomic({ input });
+    const res = await captureRiskEventAtomic({ input: assessInput, operationId: "assess-1" });
     expect(res.ok).toBe(true);
     expect(res.eventId).toBe("evt-assess-1");
     expect(rpc).toHaveBeenCalledTimes(1);
     const args = rpc.mock.calls[0][1];
     expect(args).toEqual({ p_event: expect.any(Object), p_payload_text: expect.any(String), p_refs: expect.any(Array) });
-    expect(args.p_payload_text).toBe(JSON.stringify(input.payload));
+    expect(args.p_payload_text).toBe(JSON.stringify(assessInput.payload));
     expect(args.p_refs[0]).toEqual({ object_type: "risk", object_id: RISK, role: "focal" });
+    // BLOCKER 2: the dedup_key is derived from the stable operationId, so a
+    // retry (fresh assessedAt in the payload) still dedupes to the first event.
+    expect(args.p_event.dedup_key).toBe(
+      createHash("sha256").update(`${PROJ}|risk_assessed|assess-1`).digest("hex"),
+    );
     // No risk mutation param for the append-only RPC.
     expect(args).not.toHaveProperty("p_risk");
   });
@@ -161,6 +170,7 @@ describe("captureRiskEventAtomic (append-only: assess / materialize)", () => {
     const rpc = fakeRpc({ ok: true, event_id: "x" });
     const res = await captureRiskEventAtomic({
       input: { ...validRegisteredInput(), eventType: "risk_assessed", payload: { method: "x" } }, // missing values + assessed_at
+      operationId: "assess-2",
     });
     expect(res.ok).toBe(false);
     expect(res.error).toBe("validation_failed");
@@ -171,12 +181,7 @@ describe("captureRiskEventAtomic (append-only: assess / materialize)", () => {
     (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
     const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "boom" } });
     (createAdminClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ rpc });
-    const res = await captureRiskEventAtomic({
-      input: {
-        ...validRegisteredInput(), eventType: "risk_assessed",
-        payload: { method: "qualitative", values: { probability: "medium", impact: "high", severity: "high" }, assessed_at: "2026-07-12T00:00:00Z" },
-      },
-    });
+    const res = await captureRiskEventAtomic({ input: assessInput, operationId: "assess-3" });
     expect(res).toEqual({ ok: false, error: "boom" });
   });
 });
@@ -302,5 +307,83 @@ describe("hash consistency between TS and the SQL RPC contract", () => {
       JSON.stringify(input.payload ?? {}), prev ?? "",
     ].join("|");
     expect(tsHash).toBe(createHash("sha256").update(stable).digest("hex"));
+  });
+});
+
+// ── BLOCKER 1 — Scribe multi-risk idempotency identity ─────────────────────────
+// A Scribe capture creates N approved risks. Each must get a UNIQUE, retry-stable
+// idempotency identity so two risks from the same note do NOT share a dedup key,
+// and a retry of the whole capture dedupes each risk to its first row + event.
+// The identity is `${captureOperationId}:item:${itemIndex}` — driven by the
+// client-generated captureOperationId + the stable item ordering, NOT the
+// memoryItemId (which changes on a full-capture retry).
+describe("Scribe capture: per-item idempotency identity (BLOCKER 1)", () => {
+  const riskFields = {
+    organization_id: ORG, project_id: PROJ, title: "Scribe risk", category: "other",
+    probability: "medium", impact: "medium", severity: "medium", status: "open",
+    origin: "ai_suggested", confidence_score: 0.85, needs_review: true,
+  };
+  const callParams = (captureOperationId: string, itemIndex: number) => ({
+    riskFields,
+    actor: { actorType: "human" as const, actorId: USER },
+    captureMethod: "direct" as const,
+    origin: "ai_suggested",
+    sourceModule: "scribe",
+    title: `Scribe risk ${itemIndex}`,
+    evidenceRef: { type: "project_memory_item", id: "mem-1" },
+    operationId: `${captureOperationId}:item:${itemIndex}`,
+  });
+
+  function keyFor(captureOperationId: string, itemIndex: number): string {
+    return createHash("sha256").update(`${PROJ}|risk_registered|${captureOperationId}:item:${itemIndex}`).digest("hex");
+  }
+
+  beforeEach(() => {
+    (isRiskEventCaptureEnabled as unknown as ReturnType<typeof vi.fn>).mockReturnValue(true);
+  });
+
+  it("two risks from the same note get DISTINCT dedup keys (no collapse)", async () => {
+    const rpc = fakeRpc({ ok: true, deduped: false, event_id: "evt-0", risk_id: "R0" });
+    const captureOperationId = "scribe-cap-1";
+    await captureRiskRegisteredAtomic(callParams(captureOperationId, 0));
+    rpc.mockResolvedValueOnce({ data: { ok: true, deduped: false, event_id: "evt-1", risk_id: "R1" }, error: null });
+    await captureRiskRegisteredAtomic(callParams(captureOperationId, 1));
+    const keys = rpc.mock.calls.map((c) => c[1].p_event.dedup_key as string);
+    expect(keys[0]).toBe(keyFor(captureOperationId, 0));
+    expect(keys[1]).toBe(keyFor(captureOperationId, 1));
+    expect(keys[0]).not.toBe(keys[1]); // distinct → second risk is NOT deduped against the first
+  });
+
+  it("retry of the same capture reuses the SAME keys (dedup against the first)", async () => {
+    const captureOperationId = "scribe-cap-2";
+    const rpc = fakeRpc({ ok: true, deduped: false, event_id: "evt-0", risk_id: "R0" });
+    await captureRiskRegisteredAtomic(callParams(captureOperationId, 0));
+    rpc.mockResolvedValueOnce({ data: { ok: true, deduped: false, event_id: "evt-1", risk_id: "R1" }, error: null });
+    await captureRiskRegisteredAtomic(callParams(captureOperationId, 1));
+    // Retry: RPC returns deduped=true + the ORIGINAL ids (stable identity).
+    rpc.mockResolvedValueOnce({ data: { ok: true, deduped: true, event_id: "evt-0", risk_id: "R0" }, error: null });
+    const r0 = await captureRiskRegisteredAtomic(callParams(captureOperationId, 0));
+    rpc.mockResolvedValueOnce({ data: { ok: true, deduped: true, event_id: "evt-1", risk_id: "R1" }, error: null });
+    const r1 = await captureRiskRegisteredAtomic(callParams(captureOperationId, 1));
+    expect(r0.deduped).toBe(true);
+    expect(r1.deduped).toBe(true);
+    // BLOCKER 1 #4: retry returns the ORIGINAL riskIds (canonical, not new uuids).
+    expect(r0.riskId).toBe("R0");
+    expect(r1.riskId).toBe("R1");
+    // The retry sent the SAME dedup keys as the first attempt.
+    const allKeys = rpc.mock.calls.map((c) => c[1].p_event.dedup_key as string);
+    expect(allKeys[0]).toBe(allKeys[2]); // item 0 retry == item 0 first
+    expect(allKeys[1]).toBe(allKeys[3]); // item 1 retry == item 1 first
+  });
+
+  it("a second intentional capture (new captureOperationId) produces NEW keys → new risks allowed", async () => {
+    const rpc = fakeRpc({ ok: true, deduped: false, event_id: "evt-a", risk_id: "RA" });
+    await captureRiskRegisteredAtomic(callParams("scribe-cap-3", 0));
+    rpc.mockResolvedValueOnce({ data: { ok: true, deduped: false, event_id: "evt-b", risk_id: "RB" }, error: null });
+    await captureRiskRegisteredAtomic(callParams("scribe-cap-4", 0)); // different capture, same itemIndex
+    const keys = rpc.mock.calls.map((c) => c[1].p_event.dedup_key as string);
+    expect(keys[0]).toBe(keyFor("scribe-cap-3", 0));
+    expect(keys[1]).toBe(keyFor("scribe-cap-4", 0));
+    expect(keys[0]).not.toBe(keys[1]); // different capture → different key → a new risk is allowed
   });
 });

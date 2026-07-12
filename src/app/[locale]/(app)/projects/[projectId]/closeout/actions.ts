@@ -237,14 +237,23 @@ export async function assessRiskAction(
   projectId: string,
   riskId: string,
   method: string,
+  /** Stable command id from the client (BLOCKER 2). Generated once per user
+   *  intent and reused on retries so the server dedups a retry to the first
+   *  risk_assessed. A later, legitimate assessment passes a NEW id. Never
+   *  derived here (no timestamp / no method-based key). */
+  commandId: string,
 ): Promise<RiskEventActionResult> {
   const loaded = await loadScopedRisk(projectId, riskId);
   if ("error" in loaded) return { ok: false, reason: loaded.error };
   if (!method || !method.trim()) return { ok: false, reason: "invalid" };
+  if (!commandId?.trim()) return { ok: false, reason: "invalid" };
 
   // Atomic append (no Risk mutation): the assessment IS the event. A failure is
-  // propagated, never silently dropped (no fire-and-forget).
+  // propagated, never silently dropped (no fire-and-forget). The assessedAt is
+  // informational inside the payload; the idempotency identity is commandId, so
+  // a retry (fresh assessedAt) still dedupes to the first event.
   const res = await captureRiskEventAtomic({
+    operationId: commandId,
     input: buildRiskAssessed({
       risk: riskRef(projectId, loaded.org.organizationId, loaded.risk),
       actor: { actorType: "human", actorId: loaded.org.userId },
@@ -271,13 +280,19 @@ export async function materializeRiskAction(
   projectId: string,
   riskId: string,
   scope: string,
-  impactNote?: string,
+  impactNote: string | undefined,
+  /** Stable command id from the client (BLOCKER 2). Same contract as
+   *  assessRiskAction: one id per user intent, reused on retries, new id for a
+   *  later, legitimate materialization. */
+  commandId: string,
 ): Promise<RiskEventActionResult> {
   const loaded = await loadScopedRisk(projectId, riskId);
   if ("error" in loaded) return { ok: false, reason: loaded.error };
   if (scope !== "total" && scope !== "partial") return { ok: false, reason: "invalid" };
+  if (!commandId?.trim()) return { ok: false, reason: "invalid" };
 
   const res = await captureRiskEventAtomic({
+    operationId: commandId,
     input: buildRiskMaterialized({
       risk: riskRef(projectId, loaded.org.organizationId, loaded.risk),
       actor: { actorType: "human", actorId: loaded.org.userId },
@@ -299,10 +314,18 @@ export async function reopenRiskAction(
   riskId: string,
   reasonCode: string,
   locale: Locale,
+  /** Stable command id from the client (BLOCKER 3). The idempotency identity of
+   *  a reopen is the COMMAND, not its semantic content (riskId+status+reason).
+   *  Two legitimate reopen cycles with the same reason and no prior closure
+   *  must NOT share a key — otherwise the second would dedup against the first
+   *  while the risk is still resolved. The client generates one id per reopen
+   *  intent and reuses it on retries. */
+  commandId: string,
 ): Promise<RiskEventActionResult> {
   const loaded = await loadScopedRisk(projectId, riskId);
   if ("error" in loaded) return { ok: false, reason: loaded.error };
   if (!reasonCode || !reasonCode.trim()) return { ok: false, reason: "invalid" };
+  if (!commandId?.trim()) return { ok: false, reason: "invalid" };
   if (loaded.risk.status !== "resolved" && loaded.risk.status !== "closed") {
     return { ok: false, reason: "invalid" };
   }
@@ -319,25 +342,20 @@ export async function reopenRiskAction(
     .order("sequence_number", { ascending: false })
     .limit(1)
     .maybeSingle();
-
-  // Stable operation id for idempotent retries (BLOCKER 3). priorClosureEventId
-  // disambiguates distinct reopens once risk_closed is captured (RI-05); while
-  // the closeout path is "not capturable yet" it is null → one reopen per
-  // (risk, reasonCode) is recorded, which is correct for this flow.
   const priorClosureId = (prior?.event_id as string | undefined) ?? null;
-  const operationId = `closeout:reopen:${riskId}:${loaded.risk.status}:${reasonCode.trim()}:${priorClosureId ?? "no-prior"}`;
 
   // Atomic: UPDATE risks.status='open' + risk_reopened event + object_refs in one
   // transaction. expectedFromStatus = the live status read above; the RPC
-  // re-checks it atomically (a stale request cannot revert a later state). A
-  // failure rolls back the status change with the event (no divergence).
+  // re-checks it atomically (a stale request cannot revert a later state). The
+  // operationId is the client command id (BLOCKER 3), so a retry dedupes but a
+  // second legitimate reopen (new id) is allowed.
   const res = await captureRiskStatusChangeAtomic({
     riskId,
     newStatus: "open",
     expectedFromStatus: loaded.risk.status,
     organizationId: loaded.org.organizationId,
     projectId,
-    operationId,
+    operationId: commandId,
     input: buildRiskReopened({
       risk: riskRef(projectId, loaded.org.organizationId, loaded.risk),
       actor: { actorType: "human", actorId: loaded.org.userId },

@@ -148,8 +148,11 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
     ids.risk = reg.riskId!;
     ids.registeredEventId = reg.eventId!;
 
-    // 2. assess — ATOMIC append (no Risk mutation).
+    // 2. assess — ATOMIC append (no Risk mutation). BLOCKER 2: operationId drives
+    //    the dedup_key; a retry (fresh assessedAt) dedupes to the first event.
+    const ASSESS_OP = "closeout:assess:1";
     const assess = await atomic.captureRiskEventAtomic({
+      operationId: ASSESS_OP,
       input: builders.buildRiskAssessed({
         risk: riskRef(), actor: human, sourceModule: "closeout",
         method: "probability_impact_matrix",
@@ -158,15 +161,69 @@ describe.runIf(RUN)("P2-T2 functional verification (local DB, atomic path, throw
       }),
     });
     expect(assess.ok, `assess atomic failed: ${assess.error ?? ""}`).toBe(true);
+    expect(assess.deduped).toBe(false); // first assess → deduped=false
 
-    // 3. materialize — ATOMIC append (no Risk mutation).
+    // 2b. retry the SAME assess: deduped=true, no second event.
+    const assessRetry = await atomic.captureRiskEventAtomic({
+      operationId: ASSESS_OP,
+      input: builders.buildRiskAssessed({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        method: "probability_impact_matrix",
+        values: { probability: "medium", impact: "high", severity: "high" },
+        assessedAt: new Date().toISOString(), // fresh timestamp, same operationId
+      }),
+    });
+    expect(assessRetry.ok).toBe(true);
+    expect(assessRetry.deduped).toBe(true);
+    expect(assessRetry.eventId).toBe(assess.eventId);
+
+    // 2c. a NEW operationId allows a later, legitimate assessment.
+    const assessAgain = await atomic.captureRiskEventAtomic({
+      operationId: "closeout:assess:2",
+      input: builders.buildRiskAssessed({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        method: "qualitative",
+        values: { probability: "high", impact: "high", severity: "critical" },
+        assessedAt: new Date().toISOString(),
+      }),
+    });
+    expect(assessAgain.ok).toBe(true);
+    expect(assessAgain.deduped).toBe(false);
+
+    // 3. materialize — ATOMIC append (no Risk mutation). BLOCKER 2: same contract.
+    const MATERIALIZE_OP = "closeout:materialize:1";
     const mat = await atomic.captureRiskEventAtomic({
+      operationId: MATERIALIZE_OP,
       input: builders.buildRiskMaterialized({
         risk: riskRef(), actor: human, sourceModule: "closeout",
         materializationScope: "partial", impactNote: "Schedule slip on integration tests",
       }),
     });
     expect(mat.ok, `materialize atomic failed: ${mat.error ?? ""}`).toBe(true);
+    expect(mat.deduped).toBe(false);
+
+    // 3b. retry the SAME materialize: deduped=true.
+    const matRetry = await atomic.captureRiskEventAtomic({
+      operationId: MATERIALIZE_OP,
+      input: builders.buildRiskMaterialized({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        materializationScope: "partial", impactNote: "Schedule slip on integration tests",
+      }),
+    });
+    expect(matRetry.ok).toBe(true);
+    expect(matRetry.deduped).toBe(true);
+    expect(matRetry.eventId).toBe(mat.eventId);
+
+    // 3c. a NEW operationId allows a later, legitimate materialization.
+    const matAgain = await atomic.captureRiskEventAtomic({
+      operationId: "closeout:materialize:2",
+      input: builders.buildRiskMaterialized({
+        risk: riskRef(), actor: human, sourceModule: "closeout",
+        materializationScope: "total", impactNote: "Full integration stop",
+      }),
+    });
+    expect(matAgain.ok).toBe(true);
+    expect(matAgain.deduped).toBe(false);
 
     // 4. linked task advances → derived trail. Task events enter through the
     //    SAME gateway; the derived bridge fires inside it. We call the bridge

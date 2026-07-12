@@ -8,7 +8,7 @@
 // ============================================================================
 
 import type { ReactNode } from "react";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,6 +30,27 @@ import {
   generateCloseoutNarrativeAction, resolveRiskAction, markCloseoutExportedAction,
   assessRiskAction, materializeRiskAction, reopenRiskAction,
 } from "./actions";
+
+/** Generate a stable command id ONCE per user intent (BLOCKER 2/3). The client
+ *  owns it; the server never derives it. Reused across retries of the same
+ *  request (so the RPC dedups); a new intent generates a new id. */
+function genCommandId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `cmd-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+
+/** Per-intent command id: `get()` returns a stable id (generating one lazily) and
+ *  `reset()` clears it on success, so a LATER, legitimate action gets a fresh id
+ *  while a RETRY of a failed action reuses the same one. */
+function useCommandId() {
+  const ref = useRef<string | null>(null);
+  return {
+    get: () => (ref.current ?? (ref.current = genCommandId())),
+    reset: () => { ref.current = null; },
+  };
+}
 
 interface Props {
   locale: string;
@@ -508,14 +529,20 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
   const [matNote, setMatNote] = useState<string>("");
   const [reopenReason, setReopenReason] = useState<string>("closure_invalidated");
   const [done, setDone] = useState<string | null>(null);
+  // Per-intent command ids (BLOCKER 2/3): stable across retries of the SAME
+  // intent, reset on success so a LATER, legitimate action gets a fresh id.
+  const assessCmd = useCommandId();
+  const materializeCmd = useCommandId();
+  const reopenCmd = useCommandId();
 
   const isClosed = risk.status === "resolved" || risk.status === "closed";
 
-  function run(fn: () => Promise<{ ok: boolean }>, doneLabel?: string) {
+  function run(fn: () => Promise<{ ok: boolean }>, doneLabel?: string, onOk?: () => void) {
     setError(false);
     start(async () => {
       const res = await fn();
       if (res.ok) {
+        if (onOk) onOk(); // reset the command id so a later intent gets a new one
         setPanel(null);
         if (doneLabel) setDone(doneLabel);
         router.refresh();
@@ -596,7 +623,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => assessRiskAction(projectId, risk.id, assessMethod), isEs ? "Evaluado" : "Assessed")}
+            onClick={() => run(() => assessRiskAction(projectId, risk.id, assessMethod, assessCmd.get()), isEs ? "Evaluado" : "Assessed", assessCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
@@ -620,7 +647,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => materializeRiskAction(projectId, risk.id, matScope, matNote), isEs ? "Materializado" : "Materialized")}
+            onClick={() => run(() => materializeRiskAction(projectId, risk.id, matScope, matNote, materializeCmd.get()), isEs ? "Materializado" : "Materialized", materializeCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <AlertTriangle className="h-3 w-3" />}
@@ -637,7 +664,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => reopenRiskAction(projectId, risk.id, reopenReason, locale as Locale), isEs ? "Reabierto" : "Reopened")}
+            onClick={() => run(() => reopenRiskAction(projectId, risk.id, reopenReason, locale as Locale, reopenCmd.get()), isEs ? "Reabierto" : "Reopened", reopenCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}

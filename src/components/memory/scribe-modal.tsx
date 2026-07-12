@@ -35,6 +35,19 @@ const TYPE_META: Record<string, { es: string; en: string; icon: typeof ListCheck
 
 interface UiItem extends ScribeItemInput { id: number }
 
+/** Generate a stable capture operation id ONCE per Scribe interaction (BLOCKER 1).
+ *  The client owns it: the server never derives it (no timestamp / no server uuid
+ *  inside the action). It persists across retries of the same save (the modal
+ *  stays mounted on failure) so the server dedups each approved risk to its first
+ *  row + event. A fresh capture (modal re-open = remount) generates a new id, so
+ *  an intentional second capture creates new risks. */
+function genCaptureOperationId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `scribe-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+
 export function ScribeModal({ projectId, locale, onClose }: { projectId: string; locale: string; onClose: () => void }) {
   const isEs = locale === "es";
   const router = useRouter();
@@ -48,6 +61,10 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
   const [err, setErr] = useState<string | null>(null);
 
   const [dictLang, setDictLang] = useState(locale === "es" ? "es" : "en");
+  // BLOCKER 1: stable across retries of the same save (lazy init, persists for
+  // the modal's lifetime). Passed to saveScribeEntryAction as the idempotency
+  // anchor for every approved risk this capture creates.
+  const [captureOperationId] = useState(genCaptureOperationId);
   const dictation = useDictation(dictLang, (t) => setText((prev) => (prev ? `${prev} ${t}` : t)));
 
   const analyze = () => {
@@ -80,6 +97,7 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
           needs_review: it.needs_review, extra: it.extra,
         })),
         createApproved, locale,
+        captureOperationId,
       });
       if (r.error) { setErr(isEs ? "No se pudo guardar." : "Could not save."); return; }
       onClose();

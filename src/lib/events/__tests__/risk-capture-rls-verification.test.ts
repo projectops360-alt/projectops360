@@ -222,6 +222,7 @@ describe.runIf(RUN)("P2-T2 BLOCKER 5 — cross-tenant RLS verification (local DB
   it("7. service_role CAN run the authorized pipeline (assess on A's risk)", async () => {
     const { captureRiskEventAtomic, buildRiskAssessed } = await import("@/lib/events/risk-events");
     const res = await captureRiskEventAtomic({
+      operationId: `rls-test:assess:${a.riskId}:${STAMP}`,
       input: buildRiskAssessed({
         risk: { riskId: a.riskId, organizationId: a.orgId, projectId: a.projectId },
         actor: { actorType: "human", actorId: a.userId },

@@ -23,20 +23,30 @@
 --     mutation included) rolls back atomically.
 --
 -- Security (BLOCKER 1): every function is SECURITY DEFINER + SET search_path =
--- public. EXECUTE is REVOKEd from PUBLIC and GRANTed ONLY to service_role on
--- the three public RPCs; the internal helper _append_event_atomic is REVOKEd
--- from PUBLIC with NO grant (callable only by the owner, i.e. the capture_*
--- SECURITY DEFINER functions). Each public RPC additionally guards
--- auth.role() <> 'service_role' (defense in depth — do NOT rely on the TS
--- client alone).
+-- public. EXECUTE is REVOKEd EXPLICITLY from PUBLIC, anon AND authenticated on
+-- ALL functions; the internal helpers (_append_event_atomic, _risk_refs_ok)
+-- are REVOKEd from PUBLIC, anon, authenticated AND service_role (no grant —
+-- callable only by the owner, i.e. the capture_* SECURITY DEFINER functions).
+-- EXECUTE is then GRANTed ONLY to service_role on the three public RPCs. We do
+-- NOT assume a grant never existed before — REVOKE is explicit against every
+-- role. Each public RPC additionally guards auth.role() <> 'service_role'
+-- (defense in depth — do NOT rely on the grants alone).
 --
 -- Idempotency (BLOCKER 2/3): the dedup_key is computed in TS from a STABLE
 -- operation id supplied by the originating workflow (never a fresh timestamp
 -- or a per-retry uuid). capture_risk_registered checks dedup BEFORE inserting
 -- the Risk and returns the existing risk_id on a hit. capture_risk_status_change
--- checks dedup BEFORE the UPDATE (a retry never re-mutates the Risk nor bumps
--- updated_at) and enforces an expectedFromStatus precondition (a stale request
--- cannot revert a later state).
+-- locks the risk row (SELECT ... FOR UPDATE), re-checks dedup AFTER the lock,
+-- enforces an expectedFromStatus precondition, and applies a conditional
+-- UPDATE (status = expected) validated by ROW_COUNT — so two concurrent
+-- transitions can never both succeed and a dedup hit never leaves the state
+-- wrong (BLOCKER 3).
+--
+-- Invariants (BLOCKER 4): append_risk_event_atomic verifies the REAL risk row
+-- before appending — subject_type/source_entity_type, subject_id =
+-- source_entity_id, risks.id exists, the risk belongs to the received
+-- org+project, deleted_at IS NULL, the project belongs to the same org, and
+-- the focal/context refs match. Any failure raises WITHOUT a partial write.
 --
 -- Additive: no changes to project_event_log / project_event_objects / risks.
 -- ============================================================================
@@ -50,8 +60,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- p_payload_text = JSON.stringify(payload) from TS (hash consistency).
 -- p_refs        = [{"object_type","object_id","role"}, ...] (OCEL 2.0).
 -- p_allowed_types = the set of event_type values the CALLER is allowed to append
---                 (BLOCKER 4: structural invariant — the DB rejects an event_type
---                 the calling RPC is not responsible for).
+--                 (structural invariant — the DB rejects an event_type the
+--                 calling RPC is not responsible for).
 -- Returns {"ok","deduped","event_id","sequence_number" | "error"}.
 CREATE OR REPLACE FUNCTION public._append_event_atomic(
   p_event          jsonb,
@@ -73,13 +83,13 @@ DECLARE
   v_stable             text;
   v_hash               text;
 BEGIN
-  -- BLOCKER 4 — structural invariant: event_type must be in the caller's allowlist.
+  -- Structural invariant: event_type must be in the caller's allowlist.
   IF p_allowed_types <> '{}' AND NOT (p_event->>'event_type' = ANY (p_allowed_types)) THEN
     RAISE EXCEPTION 'invariant_event_type';
   END IF;
 
-  -- Idempotency (BLOCKER 2/3): a retry with the same dedup_key returns the
-  -- existing event WITHOUT writing anything (no second event, no second ref).
+  -- Idempotency: a retry with the same dedup_key returns the existing event
+  -- WITHOUT writing anything (no second event, no second ref).
   IF v_dedup_key IS NOT NULL THEN
     SELECT event_id INTO v_existing_event_id
     FROM public.project_event_log
@@ -232,7 +242,8 @@ DECLARE
   v_event_org          text  := p_event->>'organization_id';
   v_event_project      text  := p_event->>'project_id';
   v_dedup_key          text  := p_event->>'dedup_key';
-  v_existing           RECORD;
+  v_existing_event_id  uuid;
+  v_existing_risk_id   uuid;
   v_project_ok         boolean;
 BEGIN
   -- BLOCKER 1 — defense in depth: only the service role (admin client) may call.
@@ -265,15 +276,15 @@ BEGIN
   -- BLOCKER 2 — idempotency FIRST: a retry with the same (stable) dedup_key
   -- returns the existing event + risk id and does NOT insert another Risk.
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id, subject_id INTO v_existing
+    SELECT event_id, subject_id INTO v_existing_event_id, v_existing_risk_id
     FROM public.project_event_log
     WHERE project_id = v_risk_project AND dedup_key = v_dedup_key
     LIMIT 1;
-    IF v_existing.event_id IS NOT NULL THEN
+    IF v_existing_event_id IS NOT NULL THEN
       RETURN jsonb_build_object(
         'ok', true, 'deduped', true,
-        'event_id', v_existing.event_id,
-        'risk_id', v_existing.subject_id
+        'event_id', v_existing_event_id,
+        'risk_id', v_existing_risk_id
       );
     END IF;
   END IF;
@@ -311,10 +322,18 @@ $$;
 -- yet" per CAP-045 §A.10 #11 (binding). This function is retained for the
 -- future validated-closure workflow and for reopen.
 --
--- BLOCKER 3 — order: dedup check BEFORE the UPDATE. A retry (same dedup_key)
--- returns deduped WITHOUT touching status or updated_at. An unknown/stale
--- request (current status <> p_expected_from_status) raises WITHOUT any
--- mutation or event.
+-- BLOCKER 3 — concurrency-safe order:
+--   1. (optional) fast-path dedup pre-check before locking;
+--   2. SELECT ... FOR UPDATE locks the risk row for this transaction;
+--   3. re-check dedup AFTER the lock (a concurrent peer with the same command id
+--      that committed while we waited now appears here);
+--   4. verify the expected-from precondition against the locked row;
+--   5. conditional UPDATE (status = expected) validated by ROW_COUNT;
+--   6. append the event + refs in the SAME transaction.
+-- Two concurrent same-command calls → one event + one transition. Two
+-- different-command calls from the same state → only one valid transition.
+-- A dedup hit returns BEFORE any mutation, so it can never leave the state
+-- wrong. A stale request raises WITHOUT any mutation or event.
 CREATE OR REPLACE FUNCTION public.capture_risk_status_change(
   p_risk_id            uuid,
   p_new_status         text,
@@ -330,10 +349,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_dedup_key    text  := p_event->>'dedup_key';
-  v_existing     RECORD;
-  v_current      text;
-  v_updated      int;
+  v_dedup_key          text  := p_event->>'dedup_key';
+  v_existing_event_id  uuid;
+  v_current            text;
+  v_updated            int;
 BEGIN
   IF auth.role() <> 'service_role' THEN
     RAISE EXCEPTION 'not_authorized';
@@ -354,47 +373,72 @@ BEGIN
     RAISE EXCEPTION 'invariant_object_refs';
   END IF;
 
-  -- BLOCKER 3 — dedup BEFORE the mutation: a retry returns deduped and does NOT
-  -- re-update the status nor bump updated_at.
+  -- (1) Fast-path dedup pre-check (before locking). Avoids a row lock when the
+  --     request is an obvious retry.
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id INTO v_existing.event_id
+    SELECT event_id INTO v_existing_event_id
     FROM public.project_event_log
     WHERE project_id = p_project_id AND dedup_key = v_dedup_key
     LIMIT 1;
-    IF v_existing.event_id IS NOT NULL THEN
+    IF v_existing_event_id IS NOT NULL THEN
       RETURN jsonb_build_object(
         'ok', true, 'deduped', true,
-        'event_id', v_existing.event_id,
+        'event_id', v_existing_event_id,
         'risk_id', p_risk_id
       );
     END IF;
   END IF;
 
-  -- Read the current status (scoped to this org+project) for the precondition.
+  -- (2) Lock the risk row for the rest of this transaction (BLOCKER 3). A
+  --     concurrent capture_risk_status_change on the same risk waits here until
+  --     the first commits; then the re-check below sees the committed event.
   SELECT status INTO v_current
   FROM public.risks
   WHERE id = p_risk_id AND organization_id = p_organization_id
-    AND project_id = p_project_id AND deleted_at IS NULL;
+    AND project_id = p_project_id AND deleted_at IS NULL
+  FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'risk_not_found_in_scope';
   END IF;
 
-  -- BLOCKER 3 — expectedFromStatus precondition: a stale request cannot revert
-  -- a later state. Fails WITHOUT any mutation or event.
+  -- (3) Re-check dedup AFTER acquiring the lock: a concurrent peer with the
+  --     SAME command id that committed while we waited now shows up here → we
+  --     return deduped WITHOUT touching the row.
+  IF v_dedup_key IS NOT NULL THEN
+    SELECT event_id INTO v_existing_event_id
+    FROM public.project_event_log
+    WHERE project_id = p_project_id AND dedup_key = v_dedup_key
+    LIMIT 1;
+    IF v_existing_event_id IS NOT NULL THEN
+      RETURN jsonb_build_object(
+        'ok', true, 'deduped', true,
+        'event_id', v_existing_event_id,
+        'risk_id', p_risk_id
+      );
+    END IF;
+  END IF;
+
+  -- (4) Precondition: the locked row is still in the expected state. A stale
+  --     request (the risk has since moved) is rejected WITHOUT any mutation.
   IF v_current <> p_expected_from_status THEN
     RAISE EXCEPTION 'wrong_from_state';
   END IF;
 
-  -- Apply the transition + append the event in ONE transaction.
+  -- (5) Conditional transition: only if the row is STILL in the expected state
+  --     (redundant under the FOR UPDATE lock, but defensive and proves the
+  --     invariant via ROW_COUNT). Under the lock no concurrent writer can race
+  --     between the precondition and the UPDATE.
   UPDATE public.risks
   SET status = p_new_status, updated_at = now()
   WHERE id = p_risk_id AND organization_id = p_organization_id
-    AND project_id = p_project_id AND deleted_at IS NULL;
+    AND project_id = p_project_id AND deleted_at IS NULL
+    AND status = p_expected_from_status;
   GET DIAGNOSTICS v_updated = ROW_COUNT;
   IF v_updated = 0 THEN
-    RAISE EXCEPTION 'risk_not_found_in_scope';
+    RAISE EXCEPTION 'wrong_from_state';
   END IF;
 
+  -- (6) Append the event + refs in the SAME transaction.
   RETURN public._append_event_atomic(
     p_event, p_payload_text, p_refs, ARRAY['risk_reopened', 'risk_closed']
   ) || jsonb_build_object('risk_id', p_risk_id);
@@ -405,6 +449,12 @@ $$;
 -- risk_assessed / risk_materialized (and the other append-only risk events) do
 -- not change the risk row. The "operation" IS the event, so atomicity = a
 -- single atomic append via the helper.
+--
+-- BLOCKER 4 — before appending, verify the REAL risk row the event claims to
+-- describe: subject_type/source_entity_type are 'risk'/'risks', subject_id =
+-- source_entity_id, the risk exists, belongs to the received org+project, is
+-- not deleted, and its project belongs to the same org. The focal/context
+-- refs must match those ids. Any failure raises WITHOUT a partial write.
 CREATE OR REPLACE FUNCTION public.append_risk_event_atomic(
   p_event         jsonb,
   p_payload_text  text,
@@ -414,19 +464,51 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_subject_id  uuid;
+  v_risk_ok     boolean;
 BEGIN
   IF auth.role() <> 'service_role' THEN
     RAISE EXCEPTION 'not_authorized';
   END IF;
 
-  -- BLOCKER 4 — structural invariants: append-only risk events only, and the
-  -- focal/context refs must point at the event subject (the risk).
+  -- BLOCKER 4 — event_type allowlist (append-only risk events only).
   IF p_event->>'event_type' NOT IN (
     'risk_assessed', 'risk_materialized',
     'risk_owner_assigned', 'risk_owner_changed', 'risk_response_plan_approved'
   ) THEN
     RAISE EXCEPTION 'invariant_event_type';
   END IF;
+
+  -- subject/source consistency.
+  IF p_event->>'subject_type' <> 'risk' THEN
+    RAISE EXCEPTION 'invariant_subject_type';
+  END IF;
+  IF COALESCE(p_event->>'source_entity_type', '') <> 'risks' THEN
+    RAISE EXCEPTION 'invariant_source_entity_type';
+  END IF;
+  v_subject_id := NULLIF(p_event->>'subject_id', '')::uuid;
+  IF v_subject_id IS NULL OR (p_event->>'subject_id') <> COALESCE(p_event->>'source_entity_id', '') THEN
+    RAISE EXCEPTION 'invariant_subject_source_mismatch';
+  END IF;
+
+  -- The risk must exist, belong to the received org+project, not be deleted,
+  -- and its project must belong to the same org.
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.risks r
+    JOIN public.projects p ON p.id = r.project_id AND p.organization_id = r.organization_id
+    WHERE r.id = v_subject_id
+      AND r.organization_id = (p_event->>'organization_id')::uuid
+      AND r.project_id = (p_event->>'project_id')::uuid
+      AND r.deleted_at IS NULL
+      AND p.deleted_at IS NULL
+  ) INTO v_risk_ok;
+  IF NOT v_risk_ok THEN
+    RAISE EXCEPTION 'invariant_risk_not_in_scope';
+  END IF;
+
+  -- The focal/context refs must point at this risk + this project.
   IF NOT public._risk_refs_ok(p_refs, p_event->>'subject_id', p_event->>'project_id') THEN
     RAISE EXCEPTION 'invariant_object_refs';
   END IF;
@@ -439,28 +521,48 @@ BEGIN
 END;
 $$;
 
--- ── Privileges (BLOCKER 1) ─────────────────────────────────────────────────────
--- Internal helper: revoke from PUBLIC, grant to NOBODY. Only the owner (the
--- migration role = the same owner as the capture_* SECURITY DEFINER functions)
--- can execute it, so the capture_* functions (which run as that owner) may call
--- it; anon / authenticated / service_role clients cannot invoke it directly.
-REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM PUBLIC;
+-- ── Privileges (BLOCKER 1 — privilege hardening) ──────────────────────────────
+-- REVOKE explicitly from EVERY role (PUBLIC, anon, authenticated) on ALL
+-- functions. Do NOT assume a grant never existed before. Then grant EXECUTE
+-- ONLY to service_role on the three public RPCs. The two internal helpers get
+-- NO grant (REVOKE from service_role too) — callable only by their owner (the
+-- migration role = the same owner as the capture_* SECURITY DEFINER functions).
 
--- Public RPCs: revoke from PUBLIC, grant EXECUTE ONLY to service_role.
+-- Internal helper _append_event_atomic: revoke from everyone, grant to nobody.
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM anon;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM authenticated;
+REVOKE ALL ON FUNCTION public._append_event_atomic(jsonb, text, jsonb, text[]) FROM service_role;
+
+-- Internal helper _risk_refs_ok: revoke from everyone, grant to nobody.
+REVOKE ALL ON FUNCTION public._risk_refs_ok(jsonb, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._risk_refs_ok(jsonb, text, text) FROM anon;
+REVOKE ALL ON FUNCTION public._risk_refs_ok(jsonb, text, text) FROM authenticated;
+REVOKE ALL ON FUNCTION public._risk_refs_ok(jsonb, text, text) FROM service_role;
+
+-- Public RPCs: revoke from PUBLIC, anon, authenticated; grant ONLY to service_role.
 REVOKE ALL ON FUNCTION public.capture_risk_registered(jsonb, jsonb, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.capture_risk_registered(jsonb, jsonb, text, jsonb) FROM anon;
+REVOKE ALL ON FUNCTION public.capture_risk_registered(jsonb, jsonb, text, jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.capture_risk_registered(jsonb, jsonb, text, jsonb) TO service_role;
 
 REVOKE ALL ON FUNCTION public.capture_risk_status_change(uuid, text, text, uuid, uuid, jsonb, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.capture_risk_status_change(uuid, text, text, uuid, uuid, jsonb, text, jsonb) FROM anon;
+REVOKE ALL ON FUNCTION public.capture_risk_status_change(uuid, text, text, uuid, uuid, jsonb, text, jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.capture_risk_status_change(uuid, text, text, uuid, uuid, jsonb, text, jsonb) TO service_role;
 
 REVOKE ALL ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) FROM anon;
+REVOKE ALL ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) TO service_role;
 
 COMMENT ON FUNCTION public._append_event_atomic IS
-  'P2-T2 atomic event append: dedup + per-project sequence + tamper-evident hash + object_refs, in one transaction. Failures propagate (no swallow) so the outer Risk mutation rolls back with the event. Internal helper — REVOKEd from PUBLIC, no GRANT; callable only by the capture_* SECURITY DEFINER functions (same owner).';
+  'P2-T2 atomic event append: dedup + per-project sequence + tamper-evident hash + object_refs, in one transaction. Failures propagate (no swallow) so the outer Risk mutation rolls back with the event. Internal helper — REVOKEd from PUBLIC/anon/authenticated/service_role (no grant); callable only by the capture_* SECURITY DEFINER functions (same owner).';
+COMMENT ON FUNCTION public._risk_refs_ok IS
+  'P2-T2 structural invariant helper: the object_refs must carry (risk focal + project context). REVOKEd from every role (no grant); called only by the capture_* SECURITY DEFINER functions.';
 COMMENT ON FUNCTION public.capture_risk_registered IS
   'P2-T2: INSERT risk + risk_registered event + object_refs in one transaction (service_role only). Idempotent via a STABLE dedup_key (operation id): a retry returns the existing event_id + risk_id without inserting another Risk. Defaults via COALESCE keep the Risk row byte-identical to the flag-OFF writer path.';
 COMMENT ON FUNCTION public.capture_risk_status_change IS
-  'P2-T2: UPDATE risk status + event + object_refs in one transaction (service_role only). Dedup is checked BEFORE the UPDATE (a retry never re-mutates nor bumps updated_at). expectedFromStatus precondition rejects stale requests without mutation. Used by risk_reopened; risk_closed is not emitted from the unvalidated closeout path (RI-05).';
+  'P2-T2: UPDATE risk status + event + object_refs in one transaction (service_role only). Concurrency-safe: SELECT … FOR UPDATE + dedup re-check after the lock + expectedFromStatus precondition + conditional UPDATE validated by ROW_COUNT. A dedup hit returns before any mutation; a stale request raises without mutation. Used by risk_reopened; risk_closed is not emitted from the unvalidated closeout path (RI-05).';
 COMMENT ON FUNCTION public.append_risk_event_atomic IS
-  'P2-T2: atomic append of a risk event that does not mutate the risk row (risk_assessed, risk_materialized, owner/response-plan). service_role only.';
+  'P2-T2: atomic append of a risk event that does not mutate the risk row (risk_assessed, risk_materialized, owner/response-plan). Verifies the REAL risk row (exists, in-scope, not deleted, project in org) before appending. service_role only.';
