@@ -459,8 +459,9 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 - **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 2 · **P2-T1** (consolidates
   S3-T1 + S3-T2); depends on PD-015/PD-016/PD-017 (Phase 1 closed, P1-M1). Source: *Stage 3 —
   Canonical Event Architecture, julio 2026* + repository audit 2026-07-11.
-- **Status: Decided** (docs-only; document **Pending Product Owner approval** — P2-T2 may not
-  begin until Approved). CAP-045.
+- **Status: Decided** (docs-only; contract **Approved** by the Product Owner — Efrain Prada,
+  2026-07-11 — including the §A.10 resolutions of open decisions #1, #2, #11 (now binding).
+  **P2-T2 is authorized** over this contract only). CAP-045.
 
 ---
 

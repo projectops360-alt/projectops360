@@ -27,10 +27,10 @@
 
 | Field | Value |
 |---|---|
-| **Approval status** | ⏳ **Pending Product Owner approval** |
-| **Approver** | Efrain Prada — Product Owner (pending) |
-| **Approval date** | — |
-| **Effect** | Approval freezes the canonical event contract and **authorizes P2-T2 (minimum event capture implementation) ONLY over this contract**. The proposed resolutions of open decisions #1, #2, #11 (§A.10) are approved or returned **individually**. |
+| **Approval status** | ✅ **Approved** |
+| **Approver** | Efrain Prada — Product Owner |
+| **Approval date** | 2026-07-11 (recorded in-session) |
+| **Effect** | The canonical event contract is frozen and **P2-T2 (minimum event capture implementation) is authorized ONLY over this contract** (§B.4 scope). The §A.10 resolutions of open decisions **#1, #2, and #11 were approved as proposed** (none returned) and are now **binding**. |
 
 ---
 
@@ -381,5 +381,7 @@ layer 4) · [00-product-constitution.md](../00-product-constitution.md) (§4 PEG
 
 ## E. Last reviewed
 
-2026-07-11 — created (P2-T1, docs-only, read-only audit). Approval pending — see Approval
-block.
+2026-07-11 — created (P2-T1, docs-only, read-only audit) and **approved by the Product Owner
+in-session the same day**, including the §A.10 resolutions of open decisions #1, #2, and #11
+(see Approval block). **P2-T2 — Implement minimum event capture is authorized** over this
+contract only.
