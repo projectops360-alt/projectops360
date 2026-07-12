@@ -24,3 +24,6 @@ Deep-dives in this folder:
 - **CAP-045 · Platform map & validation** →
   [`CAP-045-process-mining-layer-platform-map-and-validation.md`](CAP-045-process-mining-layer-platform-map-and-validation.md)
   — current vs target map, vocabulary alignment, 3-case validation (P1-T3 / PD-017).
+- **CAP-045 · Event contract & source audit** →
+  [`CAP-045-canonical-event-contract-and-source-audit.md`](CAP-045-canonical-event-contract-and-source-audit.md)
+  — canonical envelope over the PEG + 24-event source matrix (P2-T1 / PD-018).

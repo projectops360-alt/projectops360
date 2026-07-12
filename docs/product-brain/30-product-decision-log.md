@@ -425,6 +425,46 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-018 — Canonical Event Contract & Source Audit (P2-T1, opens Phase 2)
+- **Decision:** The **canonical event contract** for the Process Mining Layer pilot is frozen
+  (Part A): immutable append-only events; command ≠ action ≠ state ≠ event; object-centric
+  (OCEL 2.0 reference) with multi-object `object_refs` + roles; `snake_case` past-tense naming
+  with a read-time alias map for the 5 legacy PascalCase risk types (history never rewritten);
+  occurred_at/recorded_at temporal semantics with ordering confidence; compensating-event
+  corrections; dedup-key idempotency; normalized `capture_method` + `data_quality_flags`;
+  data-readiness scoring on the 10 quality dimensions; RBAC inheritance from source objects
+  (RI-15); and the PML projection contract (events, never current state). **The contract is
+  implemented by EXTENDING the existing PEG** (`src/lib/events/` → `project_event_log`) —
+  13/16 canonical attributes reuse it as-is; 3 additive extensions; **no second pipeline**.
+  The **source audit** (Part B, read-only) classifies the 24 canonical events: **1 Available ·
+  6 Reconstructable · 17 Missing**, with per-event sources, confidence, and RI verifiability —
+  empirically answering open decision #9 and confirming H7. Canonical text:
+  [CAP-045 event contract & source audit](capabilities/CAP-045-canonical-event-contract-and-source-audit.md).
+- **Resolved open decisions (approved with this record, individually reviewable — §A.10):**
+  - **#1 Escalated** = event + facet over active states (not a 13th exclusive state).
+  - **#2 Reopened** = event returning to Open-Assessed/Open-Unassessed (not a persistent
+    state); `reopened_count` derived.
+  - **#11** = `risk_closed` with mandatory `closure_reason ∈ {mitigated, avoided, accepted,
+    expired, materialized_transferred}` — no separate 25th terminal event; RI-05 stays a single
+    uniform closure gate.
+- **Rules (binding):**
+  - **P2-T2 is authorized ONLY over this contract** and only for the minimum capture list
+    (§B.4: 7 direct events + 3 derived from existing task events; the rest deferred).
+  - Missing events are **captured going forward — never reconstructed inventively**; derived/
+    backfilled events always marked with reduced confidence (RI-13).
+  - **Project Memory is fed by events — never replaced or renamed** (Stage 3 naming decision).
+  - Generic `record_updated` remains forbidden; technical changes enter only via explicit
+    semantic mapping rules.
+  - Open decisions #3–#8 and #10 remain open.
+- **Traceability:** plan `ProjectOps360_Import_Plan_v1` · Phase 2 · **P2-T1** (consolidates
+  S3-T1 + S3-T2); depends on PD-015/PD-016/PD-017 (Phase 1 closed, P1-M1). Source: *Stage 3 —
+  Canonical Event Architecture, julio 2026* + repository audit 2026-07-11.
+- **Status: Decided** (docs-only; contract **Approved** by the Product Owner — Efrain Prada,
+  2026-07-11 — including the §A.10 resolutions of open decisions #1, #2, #11 (now binding).
+  **P2-T2 is authorized** over this contract only). CAP-045.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery
