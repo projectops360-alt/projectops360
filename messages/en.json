@@ -2525,6 +2525,59 @@
           "description": "Something went wrong while computing execution variants. Please try again."
         }
       }
+    },
+    "rootCauses": {
+      "title": "Statistical Root Causes",
+      "subtitle": "Adverse associations between structural factors and delays, blockages and rework — evidence only.",
+      "backToExecutionMap": "Execution Map",
+      "methodNote": "Method: 2×2 contingency per factor (lift, phi association, coverage) combined into an Influence Score (0–100), penalized on small samples. These are statistical associations — never confirmed causes, never recommendations, and never about individual people.",
+      "problems": {
+        "delay": "Delay",
+        "blockage": "Blockage",
+        "rework": "Rework"
+      },
+      "findings": {
+        "title": "Adverse associations found",
+        "empty": "No relevant adverse associations with the current data.",
+        "influence": "Influence",
+        "evidence": "Evidence",
+        "sample": "Sample",
+        "confidence": "Confidence",
+        "examples": "Examples"
+      },
+      "confidence": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "You don't have access to this analysis",
+          "description": "This project is not available in your workspace or your role does not allow viewing it."
+        },
+        "error": {
+          "title": "The analysis could not be loaded",
+          "description": "Something went wrong while mining root causes. Please try again."
+        }
+      }
+    }
+  },
+  "kpiEngine": {
+    "title": "KPI Engine",
+    "subtitle": "Single-definition KPIs computed from canonical data — the same values Isabella and reports use.",
+    "backToExecutionMap": "Execution Map",
+    "scopeNote": "Computed over {tasks} tasks and {milestones} milestones of this project.",
+    "notComputable": "Not computable with the current data.",
+    "isabellaHint": "Need a custom metric? Ask Isabella (e.g. \"median duration of critical tasks\") — she translates it into a validated expression over this same engine.",
+    "empty": {
+      "unauthorized": {
+        "title": "You don't have access to these KPIs",
+        "description": "This project is not available in your workspace or your role does not allow viewing it."
+      },
+      "error": {
+        "title": "The KPIs could not be loaded",
+        "description": "Something went wrong while computing the KPIs. Please try again."
+      }
     }
   },
   "milestoneFlow": {

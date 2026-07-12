@@ -5,7 +5,7 @@ import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   Map, LayoutList, Columns3, ListTodo, Calendar,
-  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2, ArrowRight,
+  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2, ArrowRight, Gauge,
 } from "lucide-react";
 import type { Milestone, MilestoneStatus, RoadmapTask, TaskStatus, TaskPriority, Locale, TaskDependency, DependencyType } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
@@ -560,6 +560,24 @@ export function ExecutionMapClient({
         >
           <GitBranch className="h-3.5 w-3.5 rotate-90" />
           {locale === "es" ? "Variantes de Ejecución" : "Execution Variants"}
+        </button>
+        {/* Statistical Root Cause Miner lives on its own route (CAP-046 engine consumer) */}
+        <button
+          type="button"
+          onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/root-causes`))}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <GitBranch className="h-3.5 w-3.5 -rotate-90" />
+          {locale === "es" ? "Causas Raíz" : "Root Causes"}
+        </button>
+        {/* KPI Engine lives on its own route (CAP-046 engine consumer) */}
+        <button
+          type="button"
+          onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/kpis`))}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Gauge className="h-3.5 w-3.5" />
+          {locale === "es" ? "KPIs" : "KPIs"}
         </button>
       </div>
 

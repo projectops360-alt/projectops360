@@ -13,12 +13,14 @@ import type { OrgContext } from "@/lib/auth";
 import type { IsabellaProjectScope } from "@/lib/isabella/process-context/types";
 import type { ToolResult } from "./serializers";
 import {
+  evaluateKpiArgsSchema,
   executiveBriefArgsSchema,
   getProjectSummaryArgsSchema,
   processIntelligenceArgsSchema,
   queryProjectDataArgsSchema,
   queryTasksArgsSchema,
   TOOL_LIMIT_MAX,
+  type EvaluateKpiArgs,
   type ExecutiveBriefArgs,
   type GetProjectSummaryArgs,
   type ProcessIntelligenceArgs,
@@ -27,6 +29,8 @@ import {
 } from "./schemas";
 import { executeGetProjectSummary, executeQueryProjectData, executeQueryTasks } from "./executors";
 import { executeGetExecutionVariants } from "./variant-executors";
+import { executeGetStatisticalRootCauses } from "./root-cause-miner-executors";
+import { executeEvaluateKpi } from "./kpi-executors";
 import { executeGetProjectExecutiveBrief, executeGetProjectRiskOutlook } from "./executive-executors";
 import { executeGetDailyDiagnosis, executeGetRecommendationPlan, executeGetRootCauseAnalysis } from "./intelligence-executors";
 import { isIsabellaProcessIntelligenceEnabled } from "@/lib/isabella/process-intelligence-runtime/flag";
@@ -73,6 +77,22 @@ export const ISABELLA_TOOLS: Record<string, IsabellaToolDef> = {
     schema: getProjectSummaryArgsSchema,
     maxLimit: 0,
     execute: (org, scope, args) => executeGetExecutionVariants(org, scope, args as GetProjectSummaryArgs),
+  },
+  get_statistical_root_causes: {
+    name: "get_statistical_root_causes",
+    description:
+      "Read-only STATISTICAL root-cause mining (CAP-046): adverse associations between structural dimensions (milestone, priority, assignment, criticality, discipline, trade, location) and problems (delay, blockage, rework), each with an Influence Score, lift, sample size and confidence. Use for 'which factor correlates with delays / where do blockages concentrate'. Association evidence only — never confirmed causes, never recommendations, never individual people. Complements get_root_cause_analysis (qualitative).",
+    schema: getProjectSummaryArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetStatisticalRootCauses(org, scope, args as GetProjectSummaryArgs),
+  },
+  evaluate_kpi: {
+    name: "evaluate_kpi",
+    description:
+      "Read-only KPI engine (CAP-046): evaluate a built-in KPI by kpi_slug, or translate the user's metric request into a sandboxed expression using ONLY the functions SUM, AVG, COUNT, MEDIAN, PERCENTILE(x, p), CORRELATION(x, y), TREND(x), MOVING_AVERAGE(x, n), FORECAST(x, steps) over the dataset variables: estimate_hours, actual_hours, progress, completed_flag, blocked_flag, open_overdue_flag, delayed_flag, unassigned_flag, critical_flag, duration_days, milestone_completed_flag, milestone_delay_days, weekly_completed. Call with NO args to list the KPI catalog. Use for 'what percentage / average / median / trend / forecast of ...'. Expressions are validated against the allow-list; anything else is rejected.",
+    schema: evaluateKpiArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeEvaluateKpi(org, scope, args as EvaluateKpiArgs),
   },
   // ── REG-023 composite, decision-oriented tools ─────────────────────────────
   get_project_executive_brief: {

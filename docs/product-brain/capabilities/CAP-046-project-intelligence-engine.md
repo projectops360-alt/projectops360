@@ -104,6 +104,21 @@ no modification of PD-016/PD-018 vocabulary or of the Process Mining Layer plan 
 [isabella-root-cause-constraint-analysis-engine.md](../isabella-root-cause-constraint-analysis-engine.md) ·
 [18-execution-status-engine.md](../18-execution-status-engine.md) (REG-010 metric source rules)
 
+## Implementation status (2026-07-11)
+
+| Feature | Status | Code | Surfaces | Tests (guard ids) |
+|---|---|---|---|---|
+| **F1 Variants** | ✅ Phase 1 shipped | `src/lib/process-mining/variants/` | `/execution-map/variants` + Isabella `get_execution_variants` | `PROCESS-MINING-VARIANT-ENGINE`, `PROCESS-MINING-VARIANT-ISABELLA-FORMATTER` |
+| **F2 Root Cause Miner** | ✅ Phase 1 shipped | `src/lib/process-mining/root-cause/` | `/execution-map/root-causes` + Isabella `get_statistical_root_causes` | `PROCESS-MINING-ROOT-CAUSE-ENGINE`, `PROCESS-MINING-ROOT-CAUSE-FORMATTER` |
+| **F3 KPI Engine** | ✅ Phase 1 shipped | `src/lib/kpi/` (expr-eval sandbox: member access, indexing, assignment, fndef disabled; built-ins stripped to the allow-list) | `/execution-map/kpis` (12-KPI catalog) + Isabella `evaluate_kpi` (NL-to-KPI via constrained expression) | `KPI-ENGINE-SANDBOX` |
+
+**F2 dimension note (PO-10):** ownership is analyzed only as *assigned vs unassigned*;
+there is no per-person dimension anywhere in the engine (asserted by test).
+
+**F3 Phase 2 (pending):** persisted org-scoped `kpi_definitions` (custom KPIs saved from
+NL translations with human approval) + targets/alerts wiring. Needs a migration — not
+included in Phase 1 by design.
+
 ## Last reviewed
-2026-07-11 — created with the PO's in-session authorization; F1 implementation started
-the same day.
+2026-07-11 — created with the PO's in-session authorization; F1+F2+F3 Phase 1
+implemented and shipped the same day (PR #172).

@@ -103,3 +103,20 @@ export const processIntelligenceArgsSchema = z
   .strict();
 
 export type ProcessIntelligenceArgs = z.infer<typeof processIntelligenceArgsSchema>;
+
+// ── KPI Calculation Engine (CAP-046 F3) ──────────────────────────────────────
+// Either a catalog slug OR a sandboxed expression over allow-listed dataset
+// variables. The expression is validated symbol-by-symbol server-side before
+// evaluation (never eval) — an invalid symbol returns a precise error.
+
+export const evaluateKpiArgsSchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    /** Slug of a built-in catalog KPI (e.g. "overall_progress"). */
+    kpi_slug: z.string().max(80).optional(),
+    /** Ad-hoc expression, e.g. "100 * SUM(actual_hours) / SUM(estimate_hours)". */
+    expression: z.string().max(500).optional(),
+  })
+  .strict();
+
+export type EvaluateKpiArgs = z.infer<typeof evaluateKpiArgsSchema>;

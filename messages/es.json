@@ -2525,6 +2525,59 @@
           "description": "Algo salió mal al calcular las variantes de ejecución. Inténtalo de nuevo."
         }
       }
+    },
+    "rootCauses": {
+      "title": "Causas Raíz Estadísticas",
+      "subtitle": "Asociaciones adversas entre factores estructurales y retrasos, bloqueos y retrabajo — solo evidencia.",
+      "backToExecutionMap": "Mapa de Ejecución",
+      "methodNote": "Método: contingencia 2×2 por factor (lift, asociación phi, cobertura) combinadas en un Influence Score (0–100), penalizado con muestras pequeñas. Son asociaciones estadísticas — nunca causas confirmadas, nunca recomendaciones y nunca sobre personas individuales.",
+      "problems": {
+        "delay": "Retraso",
+        "blockage": "Bloqueo",
+        "rework": "Retrabajo"
+      },
+      "findings": {
+        "title": "Asociaciones adversas encontradas",
+        "empty": "Sin asociaciones adversas relevantes con los datos actuales.",
+        "influence": "Influencia",
+        "evidence": "Evidencia",
+        "sample": "Muestra",
+        "confidence": "Confianza",
+        "examples": "Ejemplos"
+      },
+      "confidence": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "No tienes acceso a este análisis",
+          "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+        },
+        "error": {
+          "title": "No se pudo cargar el análisis",
+          "description": "Algo salió mal al minar las causas raíz. Inténtalo de nuevo."
+        }
+      }
+    }
+  },
+  "kpiEngine": {
+    "title": "Motor de KPIs",
+    "subtitle": "KPIs de definición única calculados desde datos canónicos — los mismos valores que usan Isabella y los reportes.",
+    "backToExecutionMap": "Mapa de Ejecución",
+    "scopeNote": "Calculado sobre {tasks} tareas y {milestones} hitos de este proyecto.",
+    "notComputable": "No calculable con los datos actuales.",
+    "isabellaHint": "¿Necesitas una métrica personalizada? Pídesela a Isabella (p. ej. \"duración mediana de las tareas críticas\") — ella la traduce a una expresión validada sobre este mismo motor.",
+    "empty": {
+      "unauthorized": {
+        "title": "No tienes acceso a estos KPIs",
+        "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+      },
+      "error": {
+        "title": "No se pudieron cargar los KPIs",
+        "description": "Algo salió mal al calcular los KPIs. Inténtalo de nuevo."
+      }
     }
   },
   "milestoneFlow": {
