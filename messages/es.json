@@ -2482,6 +2482,51 @@
       "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo."
     }
   },
+  "processMining": {
+    "variants": {
+      "title": "Análisis de Variantes de Ejecución",
+      "subtitle": "Rutas de ejecución reales descubiertas a partir del historial de eventos del proyecto.",
+      "backToExecutionMap": "Mapa de Ejecución",
+      "truncatedNotice": "La ventana de eventos se limitó para este análisis; el historial más antiguo no está incluido.",
+      "noReference": "Aún no hay variante de referencia: ningún proyecto comparado tiene un desenlace decidido (completado o cancelado). Las comparaciones aparecerán cuando existan desenlaces — nada se infiere.",
+      "summary": {
+        "cases": "Proyectos analizados",
+        "variants": "Variantes descubiertas",
+        "eventsUsed": "Eventos de negocio usados",
+        "decidedCases": "Proyectos con desenlace"
+      },
+      "focus": {
+        "title": "Ruta de ejecución de {project}",
+        "variantShare": "Compartida por {count} proyecto(s) · {pct}% de los casos analizados",
+        "fitness": "{pct}% de ajuste frente a la variante más exitosa",
+        "skipped": "No realizado (vs referencia)",
+        "inserted": "Adicional vs referencia",
+        "noEvents": "Este proyecto aún no tiene eventos de negocio — su ruta de ejecución aparecerá a medida que se registre trabajo."
+      },
+      "catalog": {
+        "title": "Variantes descubiertas",
+        "empty": "Aún no hay variantes de ejecución — aparecen cuando los proyectos registran eventos de negocio.",
+        "sequence": "Secuencia de actividades",
+        "projects": "Proyectos",
+        "frequency": "Frecuencia",
+        "medianDuration": "Duración mediana",
+        "rework": "Retrabajo",
+        "success": "Tasa de éxito",
+        "reference": "Más exitosa",
+        "noOutcome": "Sin desenlace aún"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "No tienes acceso a este análisis",
+          "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+        },
+        "error": {
+          "title": "No se pudo cargar el análisis",
+          "description": "Algo salió mal al calcular las variantes de ejecución. Inténtalo de nuevo."
+        }
+      }
+    }
+  },
   "milestoneFlow": {
     "title": "Flujo de Proceso entre Hitos",
     "subtitle": "Flujo de ejecución entre hitos derivado por el motor — salud, fricción y evidencia.",

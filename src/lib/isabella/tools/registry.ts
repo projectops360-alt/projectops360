@@ -26,6 +26,7 @@ import {
   type QueryTasksArgs,
 } from "./schemas";
 import { executeGetProjectSummary, executeQueryProjectData, executeQueryTasks } from "./executors";
+import { executeGetExecutionVariants } from "./variant-executors";
 import { executeGetProjectExecutiveBrief, executeGetProjectRiskOutlook } from "./executive-executors";
 import { executeGetDailyDiagnosis, executeGetRecommendationPlan, executeGetRootCauseAnalysis } from "./intelligence-executors";
 import { isIsabellaProcessIntelligenceEnabled } from "@/lib/isabella/process-intelligence-runtime/flag";
@@ -64,6 +65,14 @@ export const ISABELLA_TOOLS: Record<string, IsabellaToolDef> = {
     schema: getProjectSummaryArgsSchema,
     maxLimit: 0,
     execute: (org, scope, args) => executeGetProjectSummary(org, scope, args as GetProjectSummaryArgs),
+  },
+  get_execution_variants: {
+    name: "get_execution_variants",
+    description:
+      "Read-only execution variant analysis (CAP-046): which execution path (activity sequence) the current project follows, how many projects share it, its rework rate, and how it compares (fit, skipped/extra activities) to the most successful variant when outcomes exist. Use for 'what execution path does this project follow / how does it compare to successful projects'. Never invents comparisons without outcome data.",
+    schema: getProjectSummaryArgsSchema,
+    maxLimit: 0,
+    execute: (org, scope, args) => executeGetExecutionVariants(org, scope, args as GetProjectSummaryArgs),
   },
   // ── REG-023 composite, decision-oriented tools ─────────────────────────────
   get_project_executive_brief: {

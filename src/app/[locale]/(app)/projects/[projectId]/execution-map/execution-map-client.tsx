@@ -552,6 +552,15 @@ export function ExecutionMapClient({
           <GitBranch className="h-3.5 w-3.5" />
           {locale === "es" ? "Flujo entre Hitos" : "Milestone Flow"}
         </button>
+        {/* Execution Variant Analysis lives on its own route (CAP-046 engine consumer) */}
+        <button
+          type="button"
+          onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/execution-map/variants`))}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <GitBranch className="h-3.5 w-3.5 rotate-90" />
+          {locale === "es" ? "Variantes de Ejecución" : "Execution Variants"}
+        </button>
       </div>
 
       {/* Tab content */}

@@ -58,6 +58,8 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-044 | Unified People, Roles & Stakeholder Directory | P6 | Partial (Phase 1 — read model) | 40% | `lib/people` (projection over `project_team_members` + sources) |
 | CAP-045 | Living Graph Process Mining Layer | P2/P4 | Documented | 0% | — (concept only; [foundation baseline](capabilities/CAP-045-process-mining-layer-foundation-baseline.md) approved 2026-07-10 · [Risk-to-Resolution ontology](capabilities/CAP-045-process-mining-layer-ontology-risk-to-resolution.md) approved 2026-07-11 · [platform map & validation](capabilities/CAP-045-process-mining-layer-platform-map-and-validation.md) approved 2026-07-11 — plan Phase 1 closed · [event contract & source audit](capabilities/CAP-045-canonical-event-contract-and-source-audit.md) approved 2026-07-11 — P2-T2 authorized) |
 
+| CAP-046 | Project Intelligence Engine (Variants · Root Cause Miner · KPI Engine) | P2/P4 | In progress | 10% | `lib/process-mining`, `lib/kpi` ([CAP-046](capabilities/CAP-046-project-intelligence-engine.md), PD-019 — consumes the PEG, no second pipeline) |
+
 `*` CAP-003 is "complete" only in the sense that it was fully superseded by Knowledge OS.
 
 ---

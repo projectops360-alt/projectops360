@@ -2482,6 +2482,51 @@
       "playFailed": "Could not play the audio. Please try again."
     }
   },
+  "processMining": {
+    "variants": {
+      "title": "Execution Variant Analysis",
+      "subtitle": "Real execution paths discovered from the project event history.",
+      "backToExecutionMap": "Execution Map",
+      "truncatedNotice": "The event window was capped for this analysis; older history is not included.",
+      "noReference": "No reference variant yet: no compared project has a decided outcome (completed or cancelled). Comparisons will appear once outcomes exist — nothing is inferred.",
+      "summary": {
+        "cases": "Projects analyzed",
+        "variants": "Variants discovered",
+        "eventsUsed": "Business events used",
+        "decidedCases": "Projects with outcome"
+      },
+      "focus": {
+        "title": "Execution path of {project}",
+        "variantShare": "Shared by {count} project(s) · {pct}% of analyzed cases",
+        "fitness": "{pct}% fit vs the most successful variant",
+        "skipped": "Not performed (vs reference)",
+        "inserted": "Extra vs reference",
+        "noEvents": "This project has no business events yet — its execution path will appear as work is recorded."
+      },
+      "catalog": {
+        "title": "Discovered variants",
+        "empty": "No execution variants yet — they appear as projects record business events.",
+        "sequence": "Activity sequence",
+        "projects": "Projects",
+        "frequency": "Frequency",
+        "medianDuration": "Median duration",
+        "rework": "Rework",
+        "success": "Success rate",
+        "reference": "Most successful",
+        "noOutcome": "No outcome yet"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "You don't have access to this analysis",
+          "description": "This project is not available in your workspace or your role does not allow viewing it."
+        },
+        "error": {
+          "title": "The analysis could not be loaded",
+          "description": "Something went wrong while computing execution variants. Please try again."
+        }
+      }
+    }
+  },
   "milestoneFlow": {
     "title": "Milestone Process Flow",
     "subtitle": "Engine-derived execution flow between milestones — health, friction and evidence.",
