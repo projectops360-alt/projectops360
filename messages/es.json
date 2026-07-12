@@ -2482,6 +2482,104 @@
       "playFailed": "No se pudo reproducir el audio. Inténtalo de nuevo."
     }
   },
+  "processMining": {
+    "variants": {
+      "title": "Análisis de Variantes de Ejecución",
+      "subtitle": "Rutas de ejecución reales descubiertas a partir del historial de eventos del proyecto.",
+      "backToExecutionMap": "Mapa de Ejecución",
+      "truncatedNotice": "La ventana de eventos se limitó para este análisis; el historial más antiguo no está incluido.",
+      "noReference": "Aún no hay variante de referencia: ningún proyecto comparado tiene un desenlace decidido (completado o cancelado). Las comparaciones aparecerán cuando existan desenlaces — nada se infiere.",
+      "summary": {
+        "cases": "Proyectos analizados",
+        "variants": "Variantes descubiertas",
+        "eventsUsed": "Eventos de negocio usados",
+        "decidedCases": "Proyectos con desenlace"
+      },
+      "focus": {
+        "title": "Ruta de ejecución de {project}",
+        "variantShare": "Compartida por {count} proyecto(s) · {pct}% de los casos analizados",
+        "fitness": "{pct}% de ajuste frente a la variante más exitosa",
+        "skipped": "No realizado (vs referencia)",
+        "inserted": "Adicional vs referencia",
+        "noEvents": "Este proyecto aún no tiene eventos de negocio — su ruta de ejecución aparecerá a medida que se registre trabajo."
+      },
+      "catalog": {
+        "title": "Variantes descubiertas",
+        "empty": "Aún no hay variantes de ejecución — aparecen cuando los proyectos registran eventos de negocio.",
+        "sequence": "Secuencia de actividades",
+        "projects": "Proyectos",
+        "frequency": "Frecuencia",
+        "medianDuration": "Duración mediana",
+        "rework": "Retrabajo",
+        "success": "Tasa de éxito",
+        "reference": "Más exitosa",
+        "noOutcome": "Sin desenlace aún"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "No tienes acceso a este análisis",
+          "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+        },
+        "error": {
+          "title": "No se pudo cargar el análisis",
+          "description": "Algo salió mal al calcular las variantes de ejecución. Inténtalo de nuevo."
+        }
+      }
+    },
+    "rootCauses": {
+      "title": "Causas Raíz Estadísticas",
+      "subtitle": "Asociaciones adversas entre factores estructurales y retrasos, bloqueos y retrabajo — solo evidencia.",
+      "backToExecutionMap": "Mapa de Ejecución",
+      "methodNote": "Método: contingencia 2×2 por factor (lift, asociación phi, cobertura) combinadas en un Influence Score (0–100), penalizado con muestras pequeñas. Son asociaciones estadísticas — nunca causas confirmadas, nunca recomendaciones y nunca sobre personas individuales.",
+      "problems": {
+        "delay": "Retraso",
+        "blockage": "Bloqueo",
+        "rework": "Retrabajo"
+      },
+      "findings": {
+        "title": "Asociaciones adversas encontradas",
+        "empty": "Sin asociaciones adversas relevantes con los datos actuales.",
+        "influence": "Influencia",
+        "evidence": "Evidencia",
+        "sample": "Muestra",
+        "confidence": "Confianza",
+        "examples": "Ejemplos"
+      },
+      "confidence": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      },
+      "empty": {
+        "unauthorized": {
+          "title": "No tienes acceso a este análisis",
+          "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+        },
+        "error": {
+          "title": "No se pudo cargar el análisis",
+          "description": "Algo salió mal al minar las causas raíz. Inténtalo de nuevo."
+        }
+      }
+    }
+  },
+  "kpiEngine": {
+    "title": "Motor de KPIs",
+    "subtitle": "KPIs de definición única calculados desde datos canónicos — los mismos valores que usan Isabella y los reportes.",
+    "backToExecutionMap": "Mapa de Ejecución",
+    "scopeNote": "Calculado sobre {tasks} tareas y {milestones} hitos de este proyecto.",
+    "notComputable": "No calculable con los datos actuales.",
+    "isabellaHint": "¿Necesitas una métrica personalizada? Pídesela a Isabella (p. ej. \"duración mediana de las tareas críticas\") — ella la traduce a una expresión validada sobre este mismo motor.",
+    "empty": {
+      "unauthorized": {
+        "title": "No tienes acceso a estos KPIs",
+        "description": "Este proyecto no está disponible en tu espacio de trabajo o tu rol no permite verlo."
+      },
+      "error": {
+        "title": "No se pudieron cargar los KPIs",
+        "description": "Algo salió mal al calcular los KPIs. Inténtalo de nuevo."
+      }
+    }
+  },
   "milestoneFlow": {
     "title": "Flujo de Proceso entre Hitos",
     "subtitle": "Flujo de ejecución entre hitos derivado por el motor — salud, fricción y evidencia.",

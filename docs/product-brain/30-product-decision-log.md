@@ -465,6 +465,40 @@ Status legend: **Shipped** (live in prod) · **Partial** (some of the decision s
 
 ---
 
+## PD-019 — Project Intelligence Engine (Variants · Root Cause Miner · KPI Engine), reconciled with PD-018
+- **Decision:** Three analytical features are authorized for immediate implementation:
+  **F1 Execution Variant Analysis**, **F2 Root Cause Miner (statistical, evidence-only)**,
+  **F3 KPI Calculation Engine** — all consuming the existing **Project Event Graph and
+  canonical tables only**. An external research plan proposing a parallel `event_log`
+  table + DB triggers + generic `*.changed` events + Python/PM4Py microservice was
+  reviewed and **rejected as-written** for conflicting with PD-018 (§A.1 one pipeline,
+  §0.4 object-centric, §A.3 business-event taxonomy); its methodology is adopted in
+  contract-compliant TypeScript form. Canonical text:
+  [CAP-046 Project Intelligence Engine](capabilities/CAP-046-project-intelligence-engine.md).
+- **Rules (binding):**
+  - **No second event pipeline, no DB triggers, no new event table** — PEG readers follow
+    the MPF read-only adapter pattern (RLS + deny-by-default).
+  - Only BUSINESS_EVENT lifecycle-class events feed mining; compensating events excluded
+    from sequences.
+  - **F2 outputs evidence only — never recommendations, never individual rankings** (PO-10);
+    it complements `src/lib/isabella/root-cause/`, never replaces it.
+  - **F3 never uses `eval`/`new Function`** — sandboxed parser + allow-list; NL-to-KPI is a
+    validated translation, never direct execution.
+  - Python/PM4Py microservice = **Future Research** (trigger: volume or algorithmic need
+    beyond deterministic TS).
+  - The Process Mining Layer plan sequence is **not displaced**: P2-T2 remains the next
+    plan task; this capability neither modifies PD-016/PD-018 vocabulary nor implements
+    risk capture.
+- **Conflict review:** performed pre-implementation against live repo state (open PRs,
+  merged Phase 5 Isabella engines, MPF Engine, KPI dictionary) — recorded in the CAP-046 doc.
+- **Traceability:** PO order in-session 2026-07-11 ("vamos a realizar estas 3 nuevas
+  features, las necesito ya") after the conflicting external plan was surfaced per
+  CLAUDE.md rule 4.
+- **Status: Decided** (Approved by the Product Owner — Efrain Prada, 2026-07-11;
+  implementation started same day). CAP-046.
+
+---
+
 ## Affected modules
 Living Graph (CAP-005) · Workboard/Tasks (CAP-020) · Critical Path (CAP-023) · Risk Management
 (CAP-017) · Variance/Process Intelligence · Timeline/History · What-if Simulation · Delivery
