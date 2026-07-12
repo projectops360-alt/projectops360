@@ -84,11 +84,12 @@ describe("validateProjectEvent", () => {
   });
 
   it("rejects a HIGH/CRITICAL event without evidence", () => {
-    // RiskIdentified is HIGH and needs severity; provide payload but no evidence.
+    // P2-T2/PD-018 §A.4: RiskIdentified is deprecated — the canonical
+    // risk_registered (HIGH, needs origin) now carries this evidence gate.
     const r = validateProjectEvent({
-      organizationId: ORG, projectId: PROJ, eventType: "RiskIdentified",
+      organizationId: ORG, projectId: PROJ, eventType: "risk_registered",
       subjectId: SUB, actorType: "human", sourceModule: "risks",
-      payload: { severity: "high" },
+      payload: { origin: "manual" },
     });
     expect(r.ok).toBe(false);
     expect(r.errors.join(" ")).toMatch(/requires evidence/);
@@ -96,9 +97,9 @@ describe("validateProjectEvent", () => {
 
   it("accepts a HIGH event once evidence is present (source_entity_id)", () => {
     const r = validateProjectEvent({
-      organizationId: ORG, projectId: PROJ, eventType: "RiskIdentified",
+      organizationId: ORG, projectId: PROJ, eventType: "risk_registered",
       subjectId: SUB, actorType: "human", sourceModule: "risks",
-      sourceEntityId: SUB, payload: { severity: "high" },
+      sourceEntityId: SUB, payload: { origin: "manual" },
     });
     expect(r.ok).toBe(true);
   });

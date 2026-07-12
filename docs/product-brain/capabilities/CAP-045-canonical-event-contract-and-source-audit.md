@@ -360,6 +360,20 @@ pilot requires").
 
 ---
 
+## Implementation record
+
+| Field | Value |
+|---|---|
+| **P2-T2 implemented** | 2026-07-12 — minimum event capture (PR `feat/p2-t2-risk-event-capture`) |
+| **Feature flag** | `RISK_EVENT_CAPTURE_PROJECT_IDS` (env, server-evaluated, per-project list; **default OFF — unset in production**). Flag off ⇒ risk writers behave byte-identically to pre-P2-T2. |
+| **Migration** | `20260844000000_project_event_objects.sql` — the single additive table (`project_event_objects`, RLS mirroring `project_event_log`). No columns added to `risks`. |
+| **Registry** | 13 canonical snake_case pilot types (10 direct + 3 derived) with RI-enforcing `requiredPayload`; 5 legacy PascalCase types **deprecated for new emissions** with the read-time alias map (`resolveCanonicalEventType`); `CLOSURE_REASONS`, `CAPTURE_METHODS`, `DATA_QUALITY_FLAGS` vocabularies; `isPastTenseName` extended to snake_case. |
+| **Writers instrumented** | Scribe (`memory/scribe-actions.ts`), Import (`import-intelligence/execute.ts`), Template (`execution/template-service.ts`) → `risk_registered`; Closeout (`closeout/actions.ts`) → `risk_closed` (+ the three affordance actions). All flag-gated fire-and-forget through the single PEG gateway. |
+| **Affordances (the only three, flag-gated)** | Closure-reason select · explicit **Assess** confirmation (method + current values → `risk_assessed`) · **Materialize/Reopen** panels — all inline on the Closeout risk lines (the only risk action surface today, REG-017 precedent). |
+| **Derived trail** | Ingestion-gateway hook (live task events only, never backfill) → `risk-derived-bridge.ts`: `TaskCreated/TaskStatusChanged(→in_progress)/TaskCompleted` on `risks.linked_task_id` → the three `risk_response_*` events with `capture_method=derived`, reduced confidence, recorded causation. RI-09 by construction. |
+| **Backfill** | `mapRiskToEvents` — `risk_registered` only (flag-gated scanner); actor recovered exclusively via Scribe/import chains, otherwise `missing_actor`; idempotent (dedup + backfill marker). **No other reconstruction.** |
+| **Tests** | 75 new (flag boundary, payload invariants RI-02/RI-07/#11, deprecation + aliases, builders/flags, derived mapping + RI-09, backfill guards); 2 existing ingestion tests deliberately migrated from the deprecated `RiskIdentified` to canonical `risk_registered` (same intent: HIGH-evidence gate). Suite: 171 files / 1908 tests green. |
+
 ## C. What this document is NOT
 
 No code, no migrations, no triggers/listeners, no UI. The audit was strictly read-only.

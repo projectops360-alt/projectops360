@@ -111,6 +111,28 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
   RiskMitigated: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: [], invalidationScopes: ["scope:risk"] },
   RiskMaterialized: { category: "risk", subjectType: "risk", importance: "CRITICAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [], invalidationScopes: ["scope:risk"] },
   RiskClosed: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [], invalidationScopes: ["scope:risk"] },
+  // ── Risk pilot — canonical snake_case vocabulary (P2-T2 / PD-018 §B.4) ──
+  // Frozen contract: PD-016 §4 (24-event vocabulary) + PD-018 §A.4 naming.
+  // Only the minimum pilot subset is registered; deferred events (signal,
+  // classified, trigger, review, residual, escalated, retired, invalidated,
+  // linked_object_changed) are added in their own phases. requiredPayload
+  // enforces the RI invariants each event carries (RI-02, RI-07, resolution #11).
+  risk_registered: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["origin"], invalidationScopes: ["scope:risk"] },
+  risk_assessed: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["method", "values", "assessed_at"], invalidationScopes: ["scope:risk"] },
+  risk_owner_assigned: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["new_owner"], invalidationScopes: ["scope:risk"] },
+  risk_owner_changed: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["new_owner", "previous_owner"], invalidationScopes: ["scope:risk"] },
+  risk_response_plan_approved: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["strategy"], invalidationScopes: ["scope:risk"] },
+  risk_closure_requested: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [], invalidationScopes: ["scope:risk"] },
+  risk_closure_validated: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["validator"], invalidationScopes: ["scope:risk"] },
+  risk_closed: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["closure_reason"], invalidationScopes: ["scope:risk"] },
+  risk_reopened: { category: "risk", subjectType: "risk", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["reason_code"], invalidationScopes: ["scope:risk"] },
+  risk_materialized: { category: "risk", subjectType: "risk", importance: "CRITICAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["materialization_scope"], invalidationScopes: ["scope:risk"] },
+  // Derived response trail — mapped from linked-task events under the explicit
+  // rule of PD-016 event #11 (derivable only with an explicit rule; RI-13).
+  risk_response_action_created: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: DER, requiredPayload: ["task_id"], invalidationScopes: ["scope:risk"] },
+  risk_response_started: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: DER, requiredPayload: ["task_id"], invalidationScopes: ["scope:risk"] },
+  risk_response_action_completed: { category: "risk", subjectType: "risk", importance: "NORMAL", retention: "AUDIT", lifecycleClass: DER, requiredPayload: ["task_id"], invalidationScopes: ["scope:risk"] },
+
   IssueRaised: { category: "issue", subjectType: "issue", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["severity"] },
   IssueEscalated: { category: "issue", subjectType: "issue", importance: "CRITICAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: [] },
   IssueResolved: { category: "issue", subjectType: "issue", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: [] },
@@ -173,6 +195,61 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
   ResourceContentionDetected: { category: "portfolio", subjectType: "resource", importance: "HIGH", retention: "OPERATIONAL", lifecycleClass: DER, requiredPayload: [], invalidationScopes: ["scope:capacity"] },
 };
 
+// ── Risk pilot vocabularies & legacy migration (P2-T2 / PD-018) ──────────────
+
+/** Resolution #11 (PD-018 §A.10, binding): the only valid closure reasons. */
+export const CLOSURE_REASONS = [
+  "mitigated", "avoided", "accepted", "expired", "materialized_transferred",
+] as const;
+export type ClosureReason = (typeof CLOSURE_REASONS)[number];
+
+/** PD-018 §A.1 row 12 — normalized capture methods. */
+export const CAPTURE_METHODS = ["direct", "mapped", "derived", "imported"] as const;
+export type CaptureMethod = (typeof CAPTURE_METHODS)[number];
+
+/** PD-018 §A.7 — normalized data-quality flag vocabulary (extensible, versioned). */
+export const DATA_QUALITY_FLAGS = [
+  "missing_actor", "approximate_timestamp", "late_recorded", "derived",
+  "backfilled", "imported", "single_source", "ordering_uncertain",
+  "incomplete_payload", "unknown_reason", "legacy_ambiguous_semantics",
+  "mapping_low_confidence", "unvalidated_closure", "bulk_closure",
+  "missing_prior_closure",
+] as const;
+export type DataQualityFlag = (typeof DATA_QUALITY_FLAGS)[number];
+
+/**
+ * Legacy PascalCase risk types — DEPRECATED for new emissions (PD-018 §A.4).
+ * Historical rows are never rewritten; reads resolve through the alias map.
+ */
+export const DEPRECATED_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "RiskIdentified", "RiskEscalated", "RiskMitigated", "RiskMaterialized", "RiskClosed",
+]);
+
+/** Read-time alias map: legacy type → canonical type (+ mandatory quality flags). */
+export const LEGACY_RISK_EVENT_ALIASES: Record<
+  string,
+  { canonical: string; dataQualityFlags: DataQualityFlag[] }
+> = {
+  RiskIdentified: { canonical: "risk_registered", dataQualityFlags: [] },
+  RiskEscalated: { canonical: "risk_escalated", dataQualityFlags: [] },
+  RiskMaterialized: { canonical: "risk_materialized", dataQualityFlags: [] },
+  RiskClosed: { canonical: "risk_closed", dataQualityFlags: ["unknown_reason"] },
+  // No canonical equivalent (PD-016 §12.4): conservative projection to the
+  // response trail, always flagged as ambiguous.
+  RiskMitigated: { canonical: "risk_response_action_completed", dataQualityFlags: ["legacy_ambiguous_semantics"] },
+};
+
+/** Resolve an event type for READ/projection: legacy aliases map to canonical. */
+export function resolveCanonicalEventType(eventType: string): {
+  canonical: string;
+  isLegacyAlias: boolean;
+  dataQualityFlags: DataQualityFlag[];
+} {
+  const alias = LEGACY_RISK_EVENT_ALIASES[eventType];
+  if (alias) return { canonical: alias.canonical, isLegacyAlias: true, dataQualityFlags: alias.dataQualityFlags };
+  return { canonical: eventType, isLegacyAlias: false, dataQualityFlags: [] };
+}
+
 /** Known but EPHEMERAL_EXCLUDED — must NEVER enter project_event_log. */
 export const EPHEMERAL_EXCLUDED_EVENTS: ReadonlySet<string> = new Set([
   "MouseMoved",
@@ -215,9 +292,12 @@ const IRREGULAR_PAST = new Set([
   "Written", "Known", "Shown", "Kept", "Left", "Read", "Put", "Set", "Undone",
 ]);
 
-/** Heuristic: the event name reads as a past-tense fact, not an imperative. */
+/** Heuristic: the event name reads as a past-tense fact, not an imperative.
+ *  Supports both PascalCase (legacy) and canonical snake_case (PD-018 §A.4). */
 export function isPastTenseName(name: string): boolean {
-  const words = name.match(/[A-Z][a-z0-9]*/g) ?? [];
+  const words = name.includes("_")
+    ? name.split("_").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    : name.match(/[A-Z][a-z0-9]*/g) ?? [];
   const first = words[0];
   const last = words[words.length - 1];
   if (!first || !last) return false;

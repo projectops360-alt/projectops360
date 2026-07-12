@@ -119,6 +119,24 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   RiskMitigated: sem("RiskMitigated", "risk", { healthSignal: "indicates_recovery", constraintPropagationSignal: "reduces_constraint", notes: "Risk mitigated." }),
   RiskMaterialized: sem("RiskMaterialized", "risk", { healthSignal: "degrades_health", reworkSignal: "indicates_possible_rework", constraintPropagationSignal: "intensifies_constraint", notes: "Risk materialized; may force rework." }),
   RiskClosed: sem("RiskClosed", "risk", { healthSignal: "indicates_recovery", constraintPropagationSignal: "resolves_constraint", notes: "Risk closed." }),
+
+  // ── Risk pilot — canonical snake_case types (P2-T2 / PD-018 §B.4). Same flow
+  //    semantics as their legacy counterparts; the derived response trail is
+  //    inference-capped (RI-13). ─────────────────────────────────────────────
+  risk_registered: sem("risk_registered", "risk", { healthSignal: "increases_risk", constraintPropagationSignal: "creates_constraint", notes: "Canonical risk registered (replaces RiskIdentified for new emissions)." }),
+  risk_assessed: sem("risk_assessed", "risk", { notes: "Risk assessment confirmed (method + values, RI-02). Neutral flow signal." }),
+  risk_owner_assigned: sem("risk_owner_assigned", "risk", { notes: "Risk ownership assigned. Neutral flow signal." }),
+  risk_owner_changed: sem("risk_owner_changed", "risk", { notes: "Risk ownership changed (previous owner preserved). Neutral flow signal." }),
+  risk_response_plan_approved: sem("risk_response_plan_approved", "risk", { healthSignal: "indicates_recovery", notes: "Risk response plan approved (RI-04)." }),
+  risk_closure_requested: sem("risk_closure_requested", "risk", { notes: "Risk closure requested; does not close by itself (RI-05)." }),
+  risk_closure_validated: sem("risk_closure_validated", "risk", { notes: "Risk closure validated by authority (RI-05)." }),
+  risk_closed: sem("risk_closed", "risk", { healthSignal: "indicates_recovery", constraintPropagationSignal: "resolves_constraint", notes: "Canonical risk closed with closure_reason (resolution #11; replaces RiskClosed for new emissions)." }),
+  risk_reopened: sem("risk_reopened", "risk", { healthSignal: "increases_risk", reworkSignal: "indicates_possible_rework", constraintPropagationSignal: "creates_constraint", notes: "Risk reopened (RI-07): a prior closure lost validity — rework indicator." }),
+  risk_materialized: sem("risk_materialized", "risk", { healthSignal: "degrades_health", reworkSignal: "indicates_possible_rework", constraintPropagationSignal: "intensifies_constraint", notes: "Canonical risk materialized (replaces RiskMaterialized for new emissions)." }),
+  risk_response_action_created: sem("risk_response_action_created", "risk", { evidenceKind: "inference", confidenceImpact: "cap_medium", provenanceHandling: "treat_as_derived_inference", notes: "Derived from a linked-task event (RI-13)." }),
+  risk_response_started: sem("risk_response_started", "risk", { evidenceKind: "inference", confidenceImpact: "cap_medium", provenanceHandling: "treat_as_derived_inference", notes: "Derived from a linked-task event (RI-13)." }),
+  risk_response_action_completed: sem("risk_response_action_completed", "risk", { evidenceKind: "inference", confidenceImpact: "cap_medium", provenanceHandling: "treat_as_derived_inference", notes: "Derived from a linked-task event (RI-13). Completing the action never closes the risk (RI-09)." }),
+
   IssueRaised: sem("IssueRaised", "issue", { healthSignal: "degrades_health", constraintPropagationSignal: "creates_constraint", notes: "Issue raised." }),
   IssueEscalated: sem("IssueEscalated", "issue", { healthSignal: "degrades_health", constraintPropagationSignal: "intensifies_constraint", notes: "Issue escalated (critical)." }),
   IssueResolved: sem("IssueResolved", "issue", { healthSignal: "indicates_recovery", constraintPropagationSignal: "resolves_constraint", notes: "Issue resolved." }),

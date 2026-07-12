@@ -16,6 +16,7 @@ import {
   isEphemeralExcluded,
   isPastTenseName,
   requiresEvidence,
+  DEPRECATED_EVENT_TYPES,
   VALID_ACTOR_TYPES,
   VALID_VISIBILITY,
   VALID_IMPORTANCE,
@@ -23,6 +24,20 @@ import {
   type EventImportance,
   type EventLifecycleClass,
 } from "./registry";
+
+/** PD-018 §A.1 row 9 — one event may reference multiple objects with roles
+ *  (OCEL-style). Persisted to project_event_objects; the envelope subject
+ *  remains the PRIMARY object. */
+export interface EventObjectRef {
+  objectType: string;
+  objectId: string;
+  role: string;
+}
+
+/** Task events that feed the derived risk response trail (PD-018 §B.4). */
+const DERIVABLE_TASK_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "TaskCreated", "TaskStatusChanged", "TaskCompleted",
+]);
 
 const VALID_LIFECYCLE_CLASSES: ReadonlySet<string> = new Set([
   "BUSINESS_EVENT", "SYSTEM_EVENT", "AI_EVENT",
@@ -62,6 +77,8 @@ export interface EmitEventInput {
   isCompensatingEvent?: boolean;
   compensatesEventId?: string | null;
   eventSchemaVersion?: number;
+  /** PD-018: additional object references (subject stays the primary object). */
+  objectRefs?: EventObjectRef[];
 }
 
 export interface EmitResult {
@@ -166,8 +183,16 @@ export function validateProjectEvent(input: EmitEventInput): { ok: boolean; erro
 
   if (!eventType) errors.push("event_type is required");
   else if (isEphemeralExcluded(eventType)) errors.push(`event_type ${eventType} is EPHEMERAL_EXCLUDED and must not enter the log`);
+  else if (DEPRECATED_EVENT_TYPES.has(eventType)) errors.push(`event_type ${eventType} is deprecated for new emissions — use its canonical snake_case type (PD-018 §A.4)`);
   else if (!isRegisteredEvent(eventType)) errors.push(`event_type ${eventType} is not in the Canonical Event Taxonomy registry`);
   else if (!isPastTenseName(eventType)) errors.push(`event_type ${eventType} must be a past-tense name`);
+
+  // PD-018: object refs must be complete triples (type + id + role).
+  for (const [i, ref] of (input.objectRefs ?? []).entries()) {
+    if (!ref || !ref.objectType || !ref.objectId || !ref.role) {
+      errors.push(`object_refs[${i}] must carry objectType, objectId and role`);
+    }
+  }
 
   const def = getEventDef(eventType);
   if (!input.organizationId) errors.push("organization_id is required");
@@ -400,6 +425,44 @@ export async function emitProjectEvent(input: EmitEventInput): Promise<EmitResul
       }
       console.error("[events] insert failed:", insErr.message);
       return { ok: false, error: "insert_failed" };
+    }
+
+    // PD-018 §A.1 row 9 — persist object refs (idempotent via upsert on the PK;
+    // deduped events skip this path entirely, their refs already exist).
+    const refs = input.objectRefs ?? [];
+    if (refs.length > 0) {
+      const { error: refErr } = await supabase.from("project_event_objects").upsert(
+        refs.map((r) => ({
+          event_id: inserted.event_id,
+          object_type: r.objectType,
+          object_id: r.objectId,
+          role: r.role,
+        })),
+        { onConflict: "event_id,object_type,object_id,role", ignoreDuplicates: true },
+      );
+      if (refErr) console.error("[events] object_refs insert failed:", refErr.message);
+    }
+
+    // P2-T2 derived response trail: a LIVE (non-backfill) task event may derive
+    // a risk response event when the task is linked to a risk and the pilot
+    // flag is on. Fire-and-forget; dynamic import avoids a static cycle.
+    if (
+      DERIVABLE_TASK_EVENT_TYPES.has(input.eventType) &&
+      row.event_lifecycle_class !== "SYNTHETIC_BACKFILL_EVENT"
+    ) {
+      import("./risk-derived-bridge")
+        .then(({ deriveRiskEventsForTaskEvent }) =>
+          deriveRiskEventsForTaskEvent({
+            eventId: inserted.event_id,
+            eventType: input.eventType,
+            organizationId: row.organization_id,
+            projectId: row.project_id,
+            taskId: row.subject_id,
+            toState: row.to_state,
+            occurredAt: row.occurred_at,
+          }),
+        )
+        .catch((err) => console.error("[events] derived-risk bridge error:", err));
     }
 
     return { ok: true, eventId: inserted.event_id };

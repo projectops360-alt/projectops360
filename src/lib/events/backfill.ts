@@ -119,6 +119,61 @@ export function mapTaskToEvents(
   return out;
 }
 
+/**
+ * P2-T2 / PD-018 §B.4 — the ONLY authorized risk reconstruction:
+ * `risk_registered` from the risk row's created_at (high confidence). The
+ * actor is recovered exclusively through the Scribe/import provenance chains
+ * (`actorHint`); otherwise the event carries `missing_actor`. No other risk
+ * transition is ever reconstructed (frozen guardrail: no invented history).
+ */
+export function mapRiskToEvents(
+  row: OwnerRowBase & {
+    origin?: string | null;
+    title?: string | null;
+    linked_task_id?: string | null;
+    linked_milestone_id?: string | null;
+  },
+  batchId: string,
+  actorHint?: { actorId: string; source: "scribe" | "import" } | null,
+): EmitEventInput[] {
+  if (!row.created_at) return [];
+  const flags = ["backfilled", ...(actorHint ? [] : ["missing_actor"])];
+  return [{
+    organizationId: row.organization_id,
+    projectId: row.project_id,
+    eventType: "risk_registered",
+    subjectId: row.id,
+    actorType: "system",
+    actorId: actorHint?.actorId ?? null,
+    occurredAt: row.created_at,
+    sourceModule: "risks",
+    sourceEntityType: "risks",
+    sourceEntityId: row.id,
+    lifecycleClassOverride: SYNTH,
+    confidence: BACKFILL_CONFIDENCE.OWNER_TIMESTAMP,
+    payload: { origin: row.origin ?? "manual", ...(row.title ? { title: row.title } : {}) },
+    provenance: {
+      ...backfillProvenance({
+        sourceTable: "risks", sourceRecordId: row.id, sourceField: "created_at",
+        inferenceMethod: "owner_timestamp",
+        confidenceReason: actorHint
+          ? `record creation timestamp; actor recovered via ${actorHint.source} chain`
+          : "record creation timestamp; registering actor not recorded on risks",
+        batchId,
+      }),
+      capture_method: "derived",
+      data_quality_flags: flags,
+      ...(actorHint ? { actor_recovered_via: actorHint.source } : {}),
+    },
+    objectRefs: [
+      { objectType: "risk", objectId: row.id, role: "focal" },
+      { objectType: "project", objectId: row.project_id, role: "context" },
+      ...(row.linked_milestone_id ? [{ objectType: "milestone", objectId: row.linked_milestone_id, role: "impacted" }] : []),
+      ...(row.linked_task_id ? [{ objectType: "task", objectId: row.linked_task_id, role: "response" }] : []),
+    ],
+  }];
+}
+
 export function mapDependencyToEvents(
   row: { id?: string | null; organization_id: string; project_id: string; predecessor_id: string; successor_id: string; created_at?: string | null },
   batchId: string,
@@ -271,6 +326,39 @@ export async function backfillProject(
     { module: "drawing_files", run: async () => {
       const { data } = await q("drawing_files", "id, organization_id, project_id, created_at").is("deleted_at", null);
       return ((data ?? []) as unknown as OwnerRowBase[]).flatMap((r) => mapDrawingToEvents(r, batchId));
+    } },
+    // P2-T2 / PD-018 §B.4 — risk_registered only, and ONLY for pilot projects
+    // (same flag as live capture; with the flag off no risk events exist at all).
+    { module: "risks", run: async () => {
+      const { isRiskEventCaptureEnabled } = await import("./risk-capture-flag");
+      if (!isRiskEventCaptureEnabled(projectId)) return [];
+      const { data } = await q("risks", "id, organization_id, project_id, created_at, updated_at, origin, title, linked_task_id, linked_milestone_id").is("deleted_at", null);
+      const rows = (data ?? []) as unknown as Parameters<typeof mapRiskToEvents>[0][];
+      if (rows.length === 0) return [];
+
+      // Actor recovery — exclusively via the Scribe/import provenance chains.
+      const riskIds = rows.map((r) => r.id);
+      const actorByRisk = new Map<string, { actorId: string; source: "scribe" | "import" }>();
+      const { data: scribeRows } = await supabase
+        .from("project_scribe_items")
+        .select("created_entity_id, created_by")
+        .eq("created_entity_type", "risk")
+        .in("created_entity_id", riskIds);
+      for (const s of (scribeRows ?? []) as { created_entity_id: string | null; created_by: string | null }[]) {
+        if (s.created_entity_id && s.created_by) actorByRisk.set(s.created_entity_id, { actorId: s.created_by, source: "scribe" });
+      }
+      const { data: importRows } = await supabase
+        .from("project_import_created_records")
+        .select("entity_id, project_import_jobs(created_by)")
+        .eq("entity_table", "risks")
+        .in("entity_id", riskIds);
+      for (const r of (importRows ?? []) as { entity_id: string; project_import_jobs: { created_by: string | null } | { created_by: string | null }[] | null }[]) {
+        const job = Array.isArray(r.project_import_jobs) ? r.project_import_jobs[0] : r.project_import_jobs;
+        if (r.entity_id && job?.created_by && !actorByRisk.has(r.entity_id)) {
+          actorByRisk.set(r.entity_id, { actorId: job.created_by, source: "import" });
+        }
+      }
+      return rows.flatMap((r) => mapRiskToEvents(r, batchId, actorByRisk.get(r.id) ?? null));
     } },
   ];
 

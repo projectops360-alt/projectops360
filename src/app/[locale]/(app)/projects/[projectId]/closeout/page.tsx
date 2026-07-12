@@ -6,6 +6,7 @@ import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { computeCloseoutMetrics, computeCloseoutReadiness, computeMilestoneDurations, computeArchive } from "@/lib/rhythm/closeout";
+import { isRiskEventCaptureEnabled } from "@/lib/events/risk-capture-flag";
 import type { CloseoutNarrative } from "@/lib/rhythm/closeout";
 import { CloseoutReportClient } from "./closeout-client";
 
@@ -77,6 +78,7 @@ export default async function CloseoutPage({
       closingMeetingStatus={closingMeetingStatus}
       closingMeetingId={latestClosing?.id ?? null}
       canRunCloseout={org.role !== "viewer"}
+      riskEventCapture={isRiskEventCaptureEnabled(projectId)}
     />
   );
 }
