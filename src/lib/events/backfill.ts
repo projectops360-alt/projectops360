@@ -257,6 +257,57 @@ function recordConfidence(report: BackfillReport, c: number | null | undefined) 
   s.count++; s.sum += v; s.min = Math.min(s.min, v); s.max = Math.max(s.max, v);
 }
 
+// ── Risk backfill — shared infra (P2-T2 remediation: decoupled from the runner) ─
+// PD-018 §B.4 authorizes `risk_registered` reconstruction from the risk row's
+// created_at. P2-T2 remediation moved this out of the shared backfillProject
+// runner so it cannot run accidentally and is not counted as a P2-T2
+// deliverable. This collector is shared infrastructure for a FUTURE explicit,
+// separately-gated risk-backfill invocation only — it is NOT called by
+// backfillProject (no active scanners). It reuses mapRiskToEvents and the
+// Scribe/import actor-recovery chain.
+
+export async function collectRiskBackfillEvents(
+  supabase: ReturnType<typeof createAdminClient>,
+  projectId: string,
+  organizationId: string,
+  batchId: string,
+): Promise<EmitEventInput[]> {
+  const { isRiskEventCaptureEnabled } = await import("./risk-capture-flag");
+  if (!isRiskEventCaptureEnabled(projectId)) return [];
+  const { data } = await supabase
+    .from("risks")
+    .select("id, organization_id, project_id, created_at, updated_at, origin, title, linked_task_id, linked_milestone_id")
+    .eq("project_id", projectId)
+    .eq("organization_id", organizationId)
+    .is("deleted_at", null);
+  const rows = (data ?? []) as unknown as Parameters<typeof mapRiskToEvents>[0][];
+  if (rows.length === 0) return [];
+
+  // Actor recovery — exclusively via the Scribe/import provenance chains.
+  const riskIds = rows.map((r) => r.id);
+  const actorByRisk = new Map<string, { actorId: string; source: "scribe" | "import" }>();
+  const { data: scribeRows } = await supabase
+    .from("project_scribe_items")
+    .select("created_entity_id, created_by")
+    .eq("created_entity_type", "risk")
+    .in("created_entity_id", riskIds);
+  for (const s of (scribeRows ?? []) as { created_entity_id: string | null; created_by: string | null }[]) {
+    if (s.created_entity_id && s.created_by) actorByRisk.set(s.created_entity_id, { actorId: s.created_by, source: "scribe" });
+  }
+  const { data: importRows } = await supabase
+    .from("project_import_created_records")
+    .select("entity_id, project_import_jobs(created_by)")
+    .eq("entity_table", "risks")
+    .in("entity_id", riskIds);
+  for (const r of (importRows ?? []) as { entity_id: string; project_import_jobs: { created_by: string | null } | { created_by: string | null }[] | null }[]) {
+    const job = Array.isArray(r.project_import_jobs) ? r.project_import_jobs[0] : r.project_import_jobs;
+    if (r.entity_id && job?.created_by && !actorByRisk.has(r.entity_id)) {
+      actorByRisk.set(r.entity_id, { actorId: job.created_by, source: "import" });
+    }
+  }
+  return rows.flatMap((r) => mapRiskToEvents(r, batchId, actorByRisk.get(r.id) ?? null));
+}
+
 // ── Runner ───────────────────────────────────────────────────────────────────
 
 type Scanner = { module: string; run: () => Promise<EmitEventInput[]> };
@@ -327,39 +378,12 @@ export async function backfillProject(
       const { data } = await q("drawing_files", "id, organization_id, project_id, created_at").is("deleted_at", null);
       return ((data ?? []) as unknown as OwnerRowBase[]).flatMap((r) => mapDrawingToEvents(r, batchId));
     } },
-    // P2-T2 / PD-018 §B.4 — risk_registered only, and ONLY for pilot projects
-    // (same flag as live capture; with the flag off no risk events exist at all).
-    { module: "risks", run: async () => {
-      const { isRiskEventCaptureEnabled } = await import("./risk-capture-flag");
-      if (!isRiskEventCaptureEnabled(projectId)) return [];
-      const { data } = await q("risks", "id, organization_id, project_id, created_at, updated_at, origin, title, linked_task_id, linked_milestone_id").is("deleted_at", null);
-      const rows = (data ?? []) as unknown as Parameters<typeof mapRiskToEvents>[0][];
-      if (rows.length === 0) return [];
-
-      // Actor recovery — exclusively via the Scribe/import provenance chains.
-      const riskIds = rows.map((r) => r.id);
-      const actorByRisk = new Map<string, { actorId: string; source: "scribe" | "import" }>();
-      const { data: scribeRows } = await supabase
-        .from("project_scribe_items")
-        .select("created_entity_id, created_by")
-        .eq("created_entity_type", "risk")
-        .in("created_entity_id", riskIds);
-      for (const s of (scribeRows ?? []) as { created_entity_id: string | null; created_by: string | null }[]) {
-        if (s.created_entity_id && s.created_by) actorByRisk.set(s.created_entity_id, { actorId: s.created_by, source: "scribe" });
-      }
-      const { data: importRows } = await supabase
-        .from("project_import_created_records")
-        .select("entity_id, project_import_jobs(created_by)")
-        .eq("entity_table", "risks")
-        .in("entity_id", riskIds);
-      for (const r of (importRows ?? []) as { entity_id: string; project_import_jobs: { created_by: string | null } | { created_by: string | null }[] | null }[]) {
-        const job = Array.isArray(r.project_import_jobs) ? r.project_import_jobs[0] : r.project_import_jobs;
-        if (r.entity_id && job?.created_by && !actorByRisk.has(r.entity_id)) {
-          actorByRisk.set(r.entity_id, { actorId: job.created_by, source: "import" });
-        }
-      }
-      return rows.flatMap((r) => mapRiskToEvents(r, batchId, actorByRisk.get(r.id) ?? null));
-    } },
+    // NOTE: the risk scanner is deliberately NOT part of this runner. P2-T2
+    // remediation (PD-018) decoupled risk backfill from the shared backfillProject
+    // runner so it can never run accidentally and is not counted as a P2-T2
+    // deliverable. The shared-infra collector (collectRiskBackfillEvents below)
+    // remains available for a future EXPLICIT, separately-gated risk backfill
+    // invocation; it is flag-gated and not wired here (no active scanners).
   ];
 
   const events: EmitEventInput[] = [];

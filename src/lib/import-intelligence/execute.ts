@@ -12,7 +12,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emitProcessNode, emitProcessEdge } from "@/lib/graph/emit-event";
-import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
+import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
 import { recalculateCriticalPath } from "@/lib/execution/critical-path-service";
 import { generateImportRecommendations } from "./validate";
 import type {
@@ -375,43 +375,34 @@ export async function executeImport(params: {
   }
 
   // ── 8. Risks ───────────────────────────────────────────────────────────────
-  for (const risk of canonical.risks) {
+  for (const [riskIndex, risk] of canonical.risks.entries()) {
     const lvl = (v: string, allowCritical = true): string =>
       ["low", "medium", "high"].includes(v) ? v : allowCritical && v === "critical" ? "critical" : "medium";
-    const { data: row } = await supabase
-      .from("risks")
-      .insert({
-        organization_id: organizationId,
-        project_id: projectId,
-        title: risk.title,
-        description: risk.description || null,
-        category: "other",
-        probability: lvl(risk.probability, false),
-        impact: lvl(risk.impact),
-        severity: lvl(risk.severity),
-        status: "open",
-        mitigation_plan: risk.mitigation || null,
-        linked_task_id: risk.linked_task_source_id ? taskIdBySourceId.get(risk.linked_task_source_id) ?? null : null,
-        origin: "import",
-        confidence_score: risk.confidence_score,
-        needs_review: risk.confidence_score < 0.7,
-        evidence_json: { source_reference: risk.source_reference, import_job_id: jobId },
-      })
-      .select("id")
-      .single();
-    if (row) {
-      await track(supabase, organizationId, jobId, "risks", row.id);
-      bump("risks");
-      // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): the
-      // import job's user is the actor; the import trail is the evidence.
-      if (projectId) {
-        emitRiskEventSafe(buildRiskRegistered({
-          risk: {
-            riskId: row.id as string,
-            organizationId,
-            projectId,
-            linkedTaskId: risk.linked_task_source_id ? taskIdBySourceId.get(risk.linked_task_source_id) ?? null : null,
-          },
+    const riskFields = {
+      organization_id: organizationId,
+      project_id: projectId,
+      title: risk.title,
+      description: risk.description || null,
+      category: "other",
+      probability: lvl(risk.probability, false),
+      impact: lvl(risk.impact),
+      severity: lvl(risk.severity),
+      status: "open",
+      mitigation_plan: risk.mitigation || null,
+      linked_task_id: risk.linked_task_source_id ? taskIdBySourceId.get(risk.linked_task_source_id) ?? null : null,
+      origin: "import",
+      confidence_score: risk.confidence_score,
+      needs_review: risk.confidence_score < 0.7,
+      evidence_json: { source_reference: risk.source_reference, import_job_id: jobId },
+    };
+    // P2-T2 remediation (PD-018): with the pilot flag ON, the risk + its
+    // risk_registered event are written in ONE transaction (capture_risk_registered
+    // RPC) — no fire-and-forget, no silent divergence. With the flag OFF the
+    // helper returns flag_off before any DB call and we fall back to the
+    // pre-P2-T2 direct INSERT (byte-identical row, no event).
+    const captured = projectId
+      ? await captureRiskRegisteredAtomic({
+          riskFields,
           actor: { actorType: "human", actorId: params.userId },
           captureMethod: "imported",
           origin: "import",
@@ -419,8 +410,25 @@ export async function executeImport(params: {
           title: risk.title,
           evidenceRef: { type: "project_import_job", id: jobId },
           extraProvenance: risk.source_reference ? { source_reference: risk.source_reference } : undefined,
-        }));
-      }
+          // Stable per import job + source identity: a retry of the SAME import
+          // run dedupes each risk to the first row + event (no second Risk).
+          // Prefer the parsed source_reference (intrinsic per-row id); fall back
+          // to the deterministic parse position, which is stable for a given job.
+          operationId: `import:${jobId}:${risk.source_reference ?? `idx${riskIndex}`}`,
+        })
+      : ({ ok: false, error: "flag_off" } as { ok: false; error: string; errors?: string[] });
+    let riskId: string | null = null;
+    if (captured.ok && captured.riskId) {
+      riskId = captured.riskId;
+    } else if (captured.error === "flag_off") {
+      const { data: row } = await supabase.from("risks").insert(riskFields).select("id").single();
+      riskId = row ? (row.id as string) : null;
+    } else {
+      console.error("[import] atomic risk_registered capture failed:", captured.error, captured.errors ?? "");
+    }
+    if (riskId) {
+      await track(supabase, organizationId, jobId, "risks", riskId);
+      bump("risks");
     }
   }
 

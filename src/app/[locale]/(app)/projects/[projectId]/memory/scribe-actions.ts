@@ -13,7 +13,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { emitRiskEventSafe, buildRiskRegistered } from "@/lib/events/risk-events";
+import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
 import type { Locale } from "@/types/database";
 import { analyzeScribeCapture, type ScribeAnalysis } from "@/lib/scribe/ai";
 
@@ -128,6 +128,13 @@ async function createEntityForItem(
   resolveOwner: (owner: string | null) => OwnerMatch | null,
   frameworkId: string | null,
   memoryItemId: string,
+  /** Stable operation id for the originating Scribe capture (client-generated,
+   *  reused on retries). Combined with `itemIndex` below to give each approved
+   *  risk a UNIQUE, retry-stable identity: a Scribe note with N risk items must
+   *  produce N distinct risks, and a retry of the same note must dedup to the
+   *  SAME N risks — not collapse to one (BLOCKER 1). */
+  captureOperationId: string,
+  itemIndex: number,
 ): Promise<{ type: string; id: string } | null> {
   const title = it.description.slice(0, 300);
   if (it.item_type === "action_item") {
@@ -169,7 +176,7 @@ async function createEntityForItem(
     return data ? { type: "decision", id: String(data.id) } : null;
   }
   if (it.item_type === "risk") {
-    const { data } = await supabase.from("risks").insert({
+    const riskFields = {
       organization_id: org.organizationId, project_id: projectId,
       title, category: "other",
       probability: lvl(it.extra?.probability, PROBABILITY, "medium"),
@@ -177,22 +184,41 @@ async function createEntityForItem(
       severity: lvl(it.extra?.impact, SEVERITY, "medium"),
       status: "open", origin: "ai_suggested",
       confidence_score: it.confidence ?? null, needs_review: true,
-    }).select("id").single();
-    if (data) {
-      // RISK-EVENT-CAPTURE (P2-T2/PD-018, flag-gated no-op by default): the
-      // approving user is the real actor; the Scribe source chain is evidence.
-      emitRiskEventSafe(buildRiskRegistered({
-        risk: { riskId: String(data.id), organizationId: org.organizationId, projectId },
-        actor: { actorType: "human", actorId: org.userId },
-        captureMethod: "direct",
-        origin: "ai_suggested",
-        sourceModule: "scribe",
-        title,
-        evidenceRef: { type: "project_memory_item", id: memoryItemId },
-        extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
-      }));
+    };
+    // P2-T2 remediation (PD-018): with the pilot flag ON, the risk + its
+    // risk_registered event + object_refs are written in ONE PostgreSQL
+    // transaction (capture_risk_registered RPC) — a failed event can never
+    // leave a risk without its registration evidence (no fire-and-forget). With
+    // the flag OFF the helper returns flag_off BEFORE any DB call and we fall
+    // back to the pre-P2-T2 direct INSERT (byte-identical: same fields, same
+    // DDL defaults, no event). Scribe is REG-009 — behavior preserved.
+    const captured = await captureRiskRegisteredAtomic({
+      riskFields,
+      actor: { actorType: "human", actorId: org.userId },
+      captureMethod: "direct",
+      origin: "ai_suggested",
+      sourceModule: "scribe",
+      title,
+      evidenceRef: { type: "project_memory_item", id: memoryItemId },
+      extraProvenance: it.source_excerpt ? { source_excerpt: it.source_excerpt.slice(0, 500) } : undefined,
+      // Stable per (captureOperationId, itemIndex): each approved risk in a note
+      // gets a UNIQUE identity, so two risks from the same note do NOT share a
+      // dedup key (BLOCKER 1 #1). A retry of the whole Scribe capture reuses the
+      // same captureOperationId + the same item ordering, so each risk dedupes
+      // to its first row + event — even though a retry creates a NEW
+      // project_memory_item with a different memoryItemId (BLOCKER 1 #2).
+      operationId: `${captureOperationId}:item:${itemIndex}`,
+    });
+    if (captured.ok && captured.riskId) return { type: "risk", id: captured.riskId };
+    if (captured.error === "flag_off") {
+      // flag OFF → pre-P2-T2 behavior: direct INSERT, no event.
+      const { data } = await supabase.from("risks").insert(riskFields).select("id").single();
+      return data ? { type: "risk", id: String(data.id) } : null;
     }
-    return data ? { type: "risk", id: String(data.id) } : null;
+    // Atomic capture failed (flag ON, validation/DB error) → the risk was NOT
+    // created (rolled back with the event). Fail loudly — no silent divergence.
+    console.error("[scribe] atomic risk_registered capture failed:", captured.error, captured.errors ?? "");
+    return null;
   }
   return null; // issue/blocker/dependency/project_impact/open_question/follow_up → memory-only in MVP
 }
@@ -355,10 +381,25 @@ export async function saveScribeEntryAction(input: {
   items: ScribeItemInput[];
   createApproved: boolean;
   locale: string;
+  /** Stable id for the originating capture interaction (BLOCKER 1). MUST be
+   *  generated ONCE by the client and reused across retries of the same save.
+   *  It is the idempotency anchor for every risk this capture creates:
+   *  `${captureOperationId}:item:${itemIndex}`. Never derived inside this action
+   *  (no timestamp / no server uuid / not the memoryItemId alone). */
+  captureOperationId: string;
 }): Promise<{ error?: string; memoryItemId?: string; created?: { workItems: number; decisions: number; risks: number } }> {
   const c = await ctx(input.projectId);
   if ("error" in c) return { error: c.error };
   const { org, supabase } = c;
+  // BLOCKER 1: a stable captureOperationId is REQUIRED when entities are
+  // created — it is the idempotency anchor for every approved risk. Without it
+  // two risks from the same note would share a dedup key, and a retry would not
+  // dedup (it would create duplicate risks). Reject early rather than silently
+  // fall back to an unstable identity.
+  if (input.createApproved && !input.captureOperationId?.trim()) {
+    return { error: "invalid" };
+  }
+  const captureOperationId = input.captureOperationId.trim();
   const lang = input.locale === "es" ? "es" : "en";
   const sourceType = ALLOWED_SOURCE_TYPES.has(input.sourceType) ? input.sourceType : "manual_note";
   const title = (input.title?.trim() || input.content.trim().slice(0, 80) || "ProjectOps Scribe").slice(0, 200);
@@ -403,12 +444,15 @@ export async function saveScribeEntryAction(input: {
   // work-item provenance is kept on the backlog row's source/source_reference.
   const LINKABLE = new Set(["decision", "risk", "task", "milestone"]);
 
-  // 2. Persist every extracted item (rejected ones too, for audit).
-  for (const it of input.items) {
+  // 2. Persist every extracted item (rejected ones too, for audit). The index is
+  //    part of each risk's idempotency identity (BLOCKER 1): the same capture
+  //    retry presents the items in the same order, so item N always maps to the
+  //    same risk.
+  for (const [itemIndex, it] of input.items.entries()) {
     let createdRef: { type: string; id: string } | null = null;
     const approved = it.status === "approved" || it.status === "edited";
     if (input.createApproved && approved) {
-      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner, frameworkId, memoryItemId);
+      createdRef = await createEntityForItem(supabase, org, input.projectId, lang, it, resolveOwner, frameworkId, memoryItemId, captureOperationId, itemIndex);
       if (createdRef) {
         if (createdRef.type === "work_item") created.workItems++;
         else if (createdRef.type === "decision") created.decisions++;
