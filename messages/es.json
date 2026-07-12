@@ -2569,6 +2569,25 @@
     "scopeNote": "Calculado sobre {tasks} tareas y {milestones} hitos de este proyecto.",
     "notComputable": "No calculable con los datos actuales.",
     "isabellaHint": "¿Necesitas una métrica personalizada? Pídesela a Isabella (p. ej. \"duración mediana de las tareas críticas\") — ella la traduce a una expresión validada sobre este mismo motor.",
+    "custom": {
+      "title": "KPIs personalizados",
+      "create": "Nuevo KPI",
+      "empty": "Aún no hay KPIs personalizados. Crea uno desde una expresión validada — Isabella puede traducir tu petición a una.",
+      "delete": "Eliminar KPI",
+      "onTarget": "En objetivo ({target})",
+      "offTarget": "Fuera de objetivo ({target})",
+      "form": {
+        "nameEs": "Nombre (español)",
+        "nameEn": "Nombre (inglés)",
+        "expression": "Expresión — p. ej. 100 * SUM(open_overdue_flag) / COUNT(completed_flag)",
+        "unit": "Unidad (opcional)",
+        "target": "Objetivo (opcional)",
+        "atOrAbove": "Objetivo: igual o superior",
+        "atOrBelow": "Objetivo: igual o inferior",
+        "hint": "Funciones permitidas: SUM, AVG, COUNT, MEDIAN, PERCENTILE, CORRELATION, TREND, MOVING_AVERAGE, FORECAST. La expresión se valida contra la allow-list antes de guardar.",
+        "save": "Guardar KPI"
+      }
+    },
     "empty": {
       "unauthorized": {
         "title": "No tienes acceso a estos KPIs",

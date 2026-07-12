@@ -115,10 +115,16 @@ no modification of PD-016/PD-018 vocabulary or of the Process Mining Layer plan 
 **F2 dimension note (PO-10):** ownership is analyzed only as *assigned vs unassigned*;
 there is no per-person dimension anywhere in the engine (asserted by test).
 
-**F3 Phase 2 (pending):** persisted org-scoped `kpi_definitions` (custom KPIs saved from
-NL translations with human approval) + targets/alerts wiring. Needs a migration — not
-included in Phase 1 by design.
+**F3 Phase 2 (shipped 2026-07-11):** persisted `kpi_definitions` (migration
+`20260843000000`, applied to prod) — org-scoped custom KPIs with optional project
+scope, target + `target_direction` (on/off-target display), `nl_source` provenance,
+soft delete, RLS by `is_org_member`. Server actions guard roles (viewers never write;
+delete = creator or org owner/admin) and re-validate the expression against the
+sandbox allow-list before persisting (`KPI-ENGINE-CUSTOM-DEFINITIONS` tests). Custom
+slugs resolve in Isabella's `evaluate_kpi` through the same sandbox. Alert wiring on
+targets remains future work.
 
 ## Last reviewed
 2026-07-11 — created with the PO's in-session authorization; F1+F2+F3 Phase 1
-implemented and shipped the same day (PR #172).
+implemented and shipped the same day (PR #172); F3 Phase 2 (persisted custom KPIs)
+shipped the same day.
