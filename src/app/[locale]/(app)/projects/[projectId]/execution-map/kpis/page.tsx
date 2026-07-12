@@ -12,8 +12,12 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import { AlertTriangle, ArrowLeft, Gauge, ShieldAlert } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/types/database";
+import { getOrgContext } from "@/lib/auth";
 import { loadKpiDataset } from "@/lib/kpi/load-dataset";
-import { KPI_CATALOG, evaluateCatalogKpi } from "@/lib/kpi";
+import { KPI_CATALOG, evaluateCatalogKpi, evaluateKpi } from "@/lib/kpi";
+import { isOnTarget } from "@/lib/kpi/custom";
+import { listCustomKpiDefinitions } from "@/lib/kpi/custom-actions";
+import { CustomKpiSection, type EvaluatedCustomKpi } from "@/components/process-mining/custom-kpi-section";
 
 export default async function KpiEnginePage({
   params,
@@ -51,6 +55,32 @@ export default async function KpiEnginePage({
     definition,
     result: evaluateCatalogKpi(definition, load.dataset),
   }));
+
+  // Persisted custom KPIs — evaluated against the SAME dataset + sandbox as
+  // the built-in catalog (single engine, no metric drift).
+  const customDefinitions = await listCustomKpiDefinitions(projectId);
+  const customKpis: EvaluatedCustomKpi[] = customDefinitions.map((definition) => {
+    const result = evaluateKpi({ expression: definition.expression }, load.dataset);
+    const value = result.status === "ok" ? result.value : NaN;
+    return {
+      id: definition.id,
+      name: es ? definition.nameEs : definition.nameEn,
+      description: es ? definition.descriptionEs : definition.descriptionEn,
+      expression: definition.expression,
+      unit: definition.unit,
+      formatted: result.status === "ok" ? value.toFixed(definition.precision) : null,
+      target: definition.target,
+      onTarget: isOnTarget(value, definition.target, definition.targetDirection),
+    };
+  });
+
+  let canCreate = false;
+  try {
+    const org = await getOrgContext();
+    canCreate = org.role !== "viewer";
+  } catch {
+    canCreate = false;
+  }
 
   return (
     <div className="space-y-4">
@@ -98,6 +128,8 @@ export default async function KpiEnginePage({
           </div>
         ))}
       </div>
+
+      <CustomKpiSection projectId={projectId} kpis={customKpis} canCreate={canCreate} />
 
       <p className="text-[11px] text-muted-foreground">{t("isabellaHint")}</p>
     </div>

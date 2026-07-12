@@ -13,11 +13,13 @@ import type { OrgContext } from "@/lib/auth";
 import type { IsabellaProjectScope } from "@/lib/isabella/process-context/types";
 import type { Locale } from "@/types/database";
 import { loadKpiDataset } from "@/lib/kpi/load-dataset";
-import { evaluateKpi, KPI_CATALOG } from "@/lib/kpi";
+import { evaluateKpi, findKpiDefinition, KPI_CATALOG } from "@/lib/kpi";
+import { listCustomKpiDefinitions } from "@/lib/kpi/custom-actions";
+import type { CustomKpiDefinition } from "@/lib/kpi/custom";
 import { toolFailure, type ToolResult } from "./serializers";
 import type { EvaluateKpiArgs } from "./schemas";
 
-function catalogText(lang: "en" | "es"): string {
+function catalogText(lang: "en" | "es", custom: CustomKpiDefinition[]): string {
   const es = lang === "es";
   const header = es
     ? "KPIs disponibles (usa kpi_slug, o una expresión con SUM/AVG/COUNT/MEDIAN/PERCENTILE/CORRELATION/TREND/MOVING_AVERAGE/FORECAST sobre las variables del catálogo):"
@@ -26,7 +28,11 @@ function catalogText(lang: "en" | "es"): string {
     (definition) =>
       `- ${definition.slug}: ${es ? definition.nameEs : definition.nameEn} (${definition.unit}) — ${definition.expression}`,
   );
-  return [header, ...rows].join("\n");
+  const customRows = custom.map(
+    (definition) =>
+      `- ${definition.slug}: ${es ? definition.nameEs : definition.nameEn}${definition.unit ? ` (${definition.unit})` : ""} — ${definition.expression} ${es ? "[personalizado]" : "[custom]"}`,
+  );
+  return [header, ...rows, ...customRows].join("\n");
 }
 
 /** evaluate_kpi → loadKpiDataset + sandboxed evaluation (read-only). */
@@ -57,16 +63,30 @@ export async function executeEvaluateKpi(
 
   // No slug and no expression → return the catalog so the model can choose.
   if (!args.kpi_slug && !args.expression) {
+    const custom = await listCustomKpiDefinitions(scope.projectId);
     return {
       status: "success",
       entity: "kpi_catalog",
-      rowCount: KPI_CATALOG.length,
+      rowCount: KPI_CATALOG.length + custom.length,
       truncated: false,
-      message: catalogText(lang),
+      message: catalogText(lang, custom),
     };
   }
 
-  const result = evaluateKpi({ kpiSlug: args.kpi_slug, expression: args.expression }, load.dataset);
+  // A slug outside the built-in catalog may be a persisted custom KPI —
+  // resolved to its stored expression and run through the same sandbox.
+  let input: { kpiSlug?: string; expression?: string } = {
+    kpiSlug: args.kpi_slug,
+    expression: args.expression,
+  };
+  let customMatch: CustomKpiDefinition | null = null;
+  if (args.kpi_slug && !findKpiDefinition(args.kpi_slug)) {
+    const custom = await listCustomKpiDefinitions(scope.projectId);
+    customMatch = custom.find((definition) => definition.slug === args.kpi_slug) ?? null;
+    if (customMatch) input = { expression: customMatch.expression };
+  }
+
+  const result = evaluateKpi(input, load.dataset);
 
   if (result.status === "invalid") {
     return toolFailure("invalid_args", result.error);
@@ -86,8 +106,16 @@ export async function executeEvaluateKpi(
   }
 
   const definition = result.slug ? KPI_CATALOG.find((d) => d.slug === result.slug) : null;
-  const name = definition ? (lang === "es" ? definition.nameEs : definition.nameEn) : result.expression;
-  const unit = result.unit ? ` ${result.unit}` : "";
+  const name = customMatch
+    ? lang === "es"
+      ? customMatch.nameEs
+      : customMatch.nameEn
+    : definition
+      ? lang === "es"
+        ? definition.nameEs
+        : definition.nameEn
+      : result.expression;
+  const unit = customMatch?.unit ? ` ${customMatch.unit}` : result.unit ? ` ${result.unit}` : "";
   return {
     status: "success",
     entity: "kpi",
