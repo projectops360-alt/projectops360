@@ -24,6 +24,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { computeDedupKey } from "@/lib/events/ingestion";
 
 function loadEnvTest(): void {
   const p = resolve(process.cwd(), ".env.test");
@@ -41,7 +42,7 @@ describe.runIf(RUN)("P2-T2 BLOCKER 3 — concurrency + reopen idempotency (local
   let supabase: any;
   let atomic: any;
   let builders: any;
-  const ids = { org: "", project: "", risk: "", owner: "" };
+  const ids = { org: "", project: "", risk: "", owner: "", reopenOpId: "", reopenEventId: "" };
 
   beforeAll(async () => {
     loadEnvTest();
@@ -133,6 +134,11 @@ describe.runIf(RUN)("P2-T2 BLOCKER 3 — concurrency + reopen idempotency (local
     expect(dedups.length).toBe(1);
     expect(await currentStatus()).toBe("open");
     expect(await reopenedCount()).toBe(1);
+    // Capture the EXACT operationId + event id of this cycle so test 4 can reuse
+    // them (NOT the stored dedup_key — passing it back as an operationId would
+    // hash the hash and fail to dedup).
+    ids.reopenOpId = opId;
+    ids.reopenEventId = winners[0].eventId!;
   }, 120_000);
 
   it("2. two CONCURRENT different-command calls from the same state → ONE valid transition", async () => {
@@ -161,32 +167,39 @@ describe.runIf(RUN)("P2-T2 BLOCKER 3 — concurrency + reopen idempotency (local
   }, 120_000);
 
   it("4. retry of an EXISTING reopen command does NOT create a new event nor affect state", async () => {
-    // Take an existing risk_reopened dedup_key from the log; re-resolve the risk
-    // so the state WOULD otherwise allow a transition; call with the EXISTING
-    // opId. It MUST dedup (no new event) and NOT transition (state stays resolved,
-    // because dedup returns BEFORE the UPDATE — proving the retry of a past
-    // cycle cannot re-open the risk nor create a duplicate event).
-    const { data: priorRow } = await supabase.from("project_event_log")
-      .select("dedup_key").eq("project_id", ids.project).eq("event_type", "risk_reopened")
-      .order("sequence_number", { ascending: true }).limit(1).single();
-    const existingOpId = priorRow?.dedup_key as string | undefined;
+    // Reuse the EXACT operationId from cycle 1 (ids.reopenOpId) — NOT the stored
+    // dedup_key. The dedup_key is sha256(project|type|opId); passing it back as an
+    // operationId would produce sha256(project|type|sha256(...)) — a DIFFERENT key
+    // that does NOT match the stored row, so the RPC would NOT dedup and would
+    // instead transition + append a duplicate event. Reusing the original opId is
+    // the only correct retry.
+    const existingOpId = ids.reopenOpId;
     expect(existingOpId).toBeTruthy();
-    await setStatus("resolved"); // would allow a transition if the id were new
+    // Invariant: computeDedupKey(opId) MUST equal the stored dedup_key of cycle 1.
+    const expectedDedup = computeDedupKey({
+      organizationId: ids.org, projectId: ids.project, eventType: "risk_reopened",
+      actorType: "human", sourceModule: "conc-test", idempotencyKey: existingOpId,
+    } as never);
+    const { data: stored } = await supabase.from("project_event_log")
+      .select("event_id, dedup_key, subject_id, updated_at").eq("project_id", ids.project)
+      .eq("event_type", "risk_reopened").eq("subject_id", ids.risk)
+      .order("sequence_number", { ascending: true }).limit(1).single();
+    expect(stored?.dedup_key).toBe(expectedDedup);
+    const storedEventId = stored?.event_id as string;
+    const storedUpdatedAt = (stored as { updated_at?: string } | null)?.updated_at ?? null;
+    // Re-resolve so the state WOULD allow a transition if the id were new.
+    await setStatus("resolved");
     const before = await reopenedCount();
-    const retry = await atomic.captureRiskStatusChangeAtomic({
-      riskId: ids.risk, newStatus: "open", expectedFromStatus: "resolved",
-      organizationId: ids.org, projectId: ids.project, operationId: existingOpId,
-      input: builders.buildRiskReopened({
-        risk: { riskId: ids.risk, organizationId: ids.org, projectId: ids.project },
-        actor: { actorType: "human", actorId: ids.owner },
-        sourceModule: "conc-test", reasonCode: "risk_resurfaced",
-        priorClosureEventId: null, fromState: "resolved", toState: "open",
-      }),
-    });
+    const retry = await reopenInput(existingOpId);
     expect(retry.ok).toBe(true);
     expect(retry.deduped).toBe(true);
+    expect(retry.eventId).toBe(storedEventId); // same event id as cycle 1
     expect(await reopenedCount()).toBe(before); // no new event
     expect(await currentStatus()).toBe("resolved"); // NOT transitioned back to open
+    // No mutation: the stored row's updated_at is unchanged by a dedup hit.
+    const { data: after } = await supabase.from("project_event_log")
+      .select("updated_at").eq("event_id", storedEventId).single();
+    expect((after as { updated_at?: string } | null)?.updated_at ?? null).toBe(storedUpdatedAt);
   }, 120_000);
 
   it("5. a dedup hit NEVER returns success leaving the state wrong", async () => {

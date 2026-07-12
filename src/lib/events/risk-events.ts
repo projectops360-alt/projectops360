@@ -358,6 +358,26 @@ export async function captureRiskRegisteredAtomic(params: {
     linkedMilestoneId: (params.riskFields.linked_milestone_id as string | null | undefined) ?? null,
     linkedTaskId: (params.riskFields.linked_task_id as string | null | undefined) ?? null,
   };
+  // P2-T2 BLOCKER 3 — the fingerprint of a risk_registered represents the LOGICAL
+  // Risk the writer intends to create + its source item, NOT the per-attempt
+  // attemptRiskId nor the new memoryItemId. Pick the stable risk fields only
+  // (exclude id / organization_id / project_id — already in the base fingerprint
+  // — and evidence_json / metadata, which may carry per-attempt memory item ids).
+  const idempotencyRiskLogicalFields: Record<string, unknown> = {
+    title: params.riskFields.title,
+    description: params.riskFields.description,
+    category: params.riskFields.category,
+    probability: params.riskFields.probability,
+    impact: params.riskFields.impact,
+    severity: params.riskFields.severity,
+    status: params.riskFields.status,
+    origin: params.riskFields.origin,
+    mitigation_plan: params.riskFields.mitigation_plan,
+    linked_task_id: params.riskFields.linked_task_id,
+    linked_milestone_id: params.riskFields.linked_milestone_id,
+    confidence_score: params.riskFields.confidence_score,
+    needs_review: params.riskFields.needs_review,
+  };
   const input: EmitEventInput = {
     ...buildRiskRegistered({
       risk,
@@ -370,6 +390,7 @@ export async function captureRiskRegisteredAtomic(params: {
       extraProvenance: params.extraProvenance,
     }),
     idempotencyKey: params.operationId,
+    idempotencyRiskLogicalFields,
   };
   const prepared = prepareAtomicEvent(input);
   if (!prepared.ok) return { ok: false, error: "validation_failed", errors: prepared.errors };

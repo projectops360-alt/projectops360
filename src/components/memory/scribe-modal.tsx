@@ -7,7 +7,7 @@
 // Project Memory (and optionally create approved tasks/decisions/risks).
 // ============================================================================
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Mic, MicOff, X, Loader2, Sparkles, Check, Pencil, Ban, ClipboardCheck,
@@ -37,15 +37,53 @@ interface UiItem extends ScribeItemInput { id: number }
 
 /** Generate a stable capture operation id ONCE per Scribe interaction (BLOCKER 1).
  *  The client owns it: the server never derives it (no timestamp / no server uuid
- *  inside the action). It persists across retries of the same save (the modal
- *  stays mounted on failure) so the server dedups each approved risk to its first
- *  row + event. A fresh capture (modal re-open = remount) generates a new id, so
- *  an intentional second capture creates new risks. */
+ *  inside the action). */
 function genCaptureOperationId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
   return `scribe-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+
+/** Deterministic signature of the snapshot the user is about to save (BLOCKER 1,
+ *  round-4 command lifecycle): the captured text + the CONTENT of the reviewed
+ *  items (item_type, description, owner, due date, status, source excerpt,
+ *  confidence, proposed action, needs_review, extra) — NOT the per-analysis
+ *  numeric `id` (which is reassigned on every Analyze). Two structurally-equal
+ *  snapshots produce the same signature; any edit / re-analyze / re-order that
+ *  changes the content produces a different one. */
+function snapshotSignature(text: string, items: UiItem[] | null): string {
+  const its = (items ?? [])
+    .map((it) => [
+      it.item_type, it.description ?? "", it.suggested_owner ?? "", it.suggested_due_date ?? "",
+      it.status ?? "", it.source_excerpt ?? "", it.confidence ?? "", it.proposed_action ?? "",
+      it.needs_review ?? "", JSON.stringify(it.extra ?? null),
+    ].join("§"))
+    .join("|");
+  return `${text}§§${its}`;
+}
+
+/** Per-snapshot capture operation id (BLOCKER 1 + round-4 lifecycle). `get(sig)`
+ *  returns a STABLE id for the current snapshot: a retry of the SAME save (same
+ *  snapshot, e.g. after a failure) reuses the id so the server dedups each
+ *  approved risk to its first row + event (even a full-capture retry that creates
+ *  a new project_memory_item — the id is the idempotency anchor, not the
+ *  memoryItemId). A CHANGE in the snapshot (re-analyze, re-order, edit after a
+ *  failure) generates a NEW id, so the new capture is a fresh operation — the
+ *  old captureOperationId:item:index is never reused with different content
+ *  (which the server would reject as `idempotency_payload_conflict`). A fresh
+ *  capture (modal re-open = remount) starts with no id, so an intentional second
+ *  capture creates new risks. */
+function useSnapshotOperationId() {
+  const ref = useRef<{ id: string; sig: string } | null>(null);
+  return {
+    get: (sig: string) => {
+      if (!ref.current || ref.current.sig !== sig) {
+        ref.current = { id: genCaptureOperationId(), sig };
+      }
+      return ref.current.id;
+    },
+  };
 }
 
 export function ScribeModal({ projectId, locale, onClose }: { projectId: string; locale: string; onClose: () => void }) {
@@ -61,10 +99,11 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
   const [err, setErr] = useState<string | null>(null);
 
   const [dictLang, setDictLang] = useState(locale === "es" ? "es" : "en");
-  // BLOCKER 1: stable across retries of the same save (lazy init, persists for
-  // the modal's lifetime). Passed to saveScribeEntryAction as the idempotency
-  // anchor for every approved risk this capture creates.
-  const [captureOperationId] = useState(genCaptureOperationId);
+  // BLOCKER 1 (round-4 lifecycle): the capture operation id is anchored to the
+  // SNAPSHOT being saved, not to the modal's lifetime. A retry of the same
+  // snapshot reuses it (server dedups); a changed snapshot (re-analyze / re-order
+  // / edit after a failure) yields a fresh id.
+  const captureOp = useSnapshotOperationId();
   const dictation = useDictation(dictLang, (t) => setText((prev) => (prev ? `${prev} ${t}` : t)));
 
   const analyze = () => {
@@ -84,6 +123,9 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
 
   const save = (createApproved: boolean) => {
     if (dictation.listening) dictation.stop();
+    // Anchor the operation id to the snapshot being saved: a retry of the SAME
+    // snapshot reuses the id (dedup); a changed snapshot gets a new id.
+    const captureOperationId = captureOp.get(snapshotSignature(text, items));
     start(async () => {
       const r = await saveScribeEntryAction({
         projectId, sourceType: "manual_note",

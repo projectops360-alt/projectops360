@@ -32,15 +32,32 @@
 -- role. Each public RPC additionally guards auth.role() <> 'service_role'
 -- (defense in depth — do NOT rely on the grants alone).
 --
--- Idempotency (BLOCKER 2/3): the dedup_key is computed in TS from a STABLE
--- operation id supplied by the originating workflow (never a fresh timestamp
--- or a per-retry uuid). capture_risk_registered checks dedup BEFORE inserting
--- the Risk and returns the existing risk_id on a hit. capture_risk_status_change
--- locks the risk row (SELECT ... FOR UPDATE), re-checks dedup AFTER the lock,
--- enforces an expectedFromStatus precondition, and applies a conditional
--- UPDATE (status = expected) validated by ROW_COUNT — so two concurrent
--- transitions can never both succeed and a dedup hit never leaves the state
--- wrong (BLOCKER 3).
+-- Idempotency (BLOCKER 2/3 + round-4 scope & fingerprint): the dedup_key is
+-- computed in TS from a STABLE operation id supplied by the originating workflow
+-- (never a fresh timestamp or a per-retry uuid). The key intentionally collides
+-- for the same (projectId, eventType, commandId) — it does NOT embed the riskId
+-- — so a commandId reused on another Risk of the same project is DETECTED in the
+-- dedup hit. Every dedup hit enforces:
+--   * SCOPE CHECK (BLOCKER 2): event_type / organization_id / project_id, and —
+--     for events on an EXISTING risk (assess/materialize/reopen/owner/response/
+--     closed) — subject_id = request.riskId. A mismatch raises
+--     `idempotency_scope_conflict` (never a silent false success; p_risk_id is
+--     never returned as the event's Risk without checking). For risk_registered
+--     the subject check is SKIPPED: the stored subject_id is the canonical risk
+--     id, not the per-attempt attemptRiskId.
+--   * FINGERPRINT CHECK (BLOCKER 3): provenance.idempotency_fingerprint (a stable
+--     hash of the significative request fields, excluding occurredAt/sequence/
+--     event_hash/attemptRiskId/memoryItemId) must match. A mismatch raises
+--     `idempotency_payload_conflict` (a reused idempotency key with a DIFFERENT
+--     request is never silently accepted).
+-- capture_risk_registered checks dedup BEFORE inserting the Risk and returns
+-- the canonical risk_id on a hit; if a concurrent peer committed first, the
+-- just-inserted Risk is removed and the peer's risk_id is returned.
+-- capture_risk_status_change locks the risk row (SELECT ... FOR UPDATE), re-
+-- checks dedup AFTER the lock (scope + fingerprint), enforces an
+-- expectedFromStatus precondition, and applies a conditional UPDATE
+-- (status = expected) validated by ROW_COUNT — so two concurrent transitions can
+-- never both succeed and a dedup hit never leaves the state wrong (BLOCKER 3).
 --
 -- Invariants (BLOCKER 4): append_risk_event_atomic verifies the REAL risk row
 -- before appending — subject_type/source_entity_type, subject_id =
@@ -67,7 +84,14 @@ CREATE OR REPLACE FUNCTION public._append_event_atomic(
   p_event          jsonb,
   p_payload_text   text,
   p_refs           jsonb,
-  p_allowed_types  text[] DEFAULT '{}'
+  p_allowed_types  text[] DEFAULT '{}',
+  -- P2-T2 BLOCKER 2 — when TRUE (default; assess/materialize/reopen/owner/
+  -- response-plan/closed), the dedup hit verifies the stored event's subject_id
+  -- equals the request's subject_id (the stable riskId). When FALSE
+  -- (risk_registered), the subject check is SKIPPED: the stored subject_id is
+  -- the canonical risk id while the request's is the per-attempt attemptRiskId,
+  -- which differs on every retry by construction.
+  p_subject_stable boolean DEFAULT true
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -77,6 +101,12 @@ DECLARE
   v_project_id         uuid  := (p_event->>'project_id')::uuid;
   v_dedup_key          text  := p_event->>'dedup_key';
   v_existing_event_id  uuid;
+  v_existing_subject_id text;
+  v_existing_org       text;
+  v_existing_project   text;
+  v_existing_type      text;
+  v_existing_fp        text;
+  v_req_fp             text  := p_event->'provenance'->>'idempotency_fingerprint';
   v_seq                bigint;
   v_prev_hash          text;
   v_event_id           uuid  := gen_random_uuid();
@@ -91,12 +121,31 @@ BEGIN
   -- Idempotency: a retry with the same dedup_key returns the existing event
   -- WITHOUT writing anything (no second event, no second ref).
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id INTO v_existing_event_id
+    SELECT event_id, subject_id::text, organization_id::text, project_id::text,
+           event_type, provenance->>'idempotency_fingerprint'
+      INTO v_existing_event_id, v_existing_subject_id, v_existing_org,
+           v_existing_project, v_existing_type, v_existing_fp
     FROM public.project_event_log
     WHERE project_id = v_project_id AND dedup_key = v_dedup_key
     LIMIT 1;
     IF v_existing_event_id IS NOT NULL THEN
-      RETURN jsonb_build_object('ok', true, 'deduped', true, 'event_id', v_existing_event_id);
+      -- P2-T2 BLOCKER 2 — scope check: the existing event must belong to the
+      -- same operation scope (event_type / org / project, and — when the subject
+      -- is stable — the same riskId). A reused idempotency key on another Risk
+      -- raises instead of being silently deduped (no false success).
+      IF v_existing_type <> (p_event->>'event_type')
+         OR v_existing_org <> (p_event->>'organization_id')
+         OR v_existing_project <> v_project_id::text
+         OR (p_subject_stable AND v_existing_subject_id <> COALESCE(p_event->>'subject_id', '')) THEN
+        RAISE EXCEPTION 'idempotency_scope_conflict';
+      END IF;
+      -- P2-T2 BLOCKER 3 — fingerprint check: the request must match the
+      -- original request. A reused idempotency key with a DIFFERENT request
+      -- raises instead of being silently accepted.
+      IF COALESCE(v_existing_fp, '') <> COALESCE(v_req_fp, '') THEN
+        RAISE EXCEPTION 'idempotency_payload_conflict';
+      END IF;
+      RETURN jsonb_build_object('ok', true, 'deduped', true, 'event_id', v_existing_event_id, 'subject_id', v_existing_subject_id);
     END IF;
   END IF;
 
@@ -242,9 +291,16 @@ DECLARE
   v_event_org          text  := p_event->>'organization_id';
   v_event_project      text  := p_event->>'project_id';
   v_dedup_key          text  := p_event->>'dedup_key';
+  v_req_fp             text  := p_event->'provenance'->>'idempotency_fingerprint';
   v_existing_event_id  uuid;
   v_existing_risk_id   uuid;
+  v_existing_subject_id text;
+  v_existing_org       text;
+  v_existing_project   text;
+  v_existing_type      text;
+  v_existing_fp        text;
   v_project_ok         boolean;
+  v_append             jsonb;
 BEGIN
   -- BLOCKER 1 — defense in depth: only the service role (admin client) may call.
   IF auth.role() <> 'service_role' THEN
@@ -273,14 +329,27 @@ BEGIN
     RAISE EXCEPTION 'invariant_project_not_in_org';
   END IF;
 
-  -- BLOCKER 2 — idempotency FIRST: a retry with the same (stable) dedup_key
-  -- returns the existing event + risk id and does NOT insert another Risk.
+  -- BLOCKER 2/3 — idempotency FIRST: a retry with the same (stable) dedup_key
+  -- returns the existing event + canonical risk id and does NOT insert another
+  -- Risk. Scope check (NO subject_id check: the stored subject_id is the
+  -- canonical risk id, not the per-attempt attemptRiskId) + fingerprint check.
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id, subject_id INTO v_existing_event_id, v_existing_risk_id
+    SELECT event_id, subject_id, organization_id::text, project_id::text, event_type,
+           provenance->>'idempotency_fingerprint'
+      INTO v_existing_event_id, v_existing_risk_id, v_existing_org,
+           v_existing_project, v_existing_type, v_existing_fp
     FROM public.project_event_log
     WHERE project_id = v_risk_project AND dedup_key = v_dedup_key
     LIMIT 1;
     IF v_existing_event_id IS NOT NULL THEN
+      IF v_existing_type <> 'risk_registered'
+         OR v_existing_org <> v_risk_org::text
+         OR v_existing_project <> v_risk_project::text THEN
+        RAISE EXCEPTION 'idempotency_scope_conflict';
+      END IF;
+      IF COALESCE(v_existing_fp, '') <> COALESCE(v_req_fp, '') THEN
+        RAISE EXCEPTION 'idempotency_payload_conflict';
+      END IF;
       RETURN jsonb_build_object(
         'ok', true, 'deduped', true,
         'event_id', v_existing_event_id,
@@ -311,8 +380,28 @@ BEGIN
   )
   RETURNING id INTO v_risk_id;
 
-  RETURN public._append_event_atomic(p_event, p_payload_text, p_refs, ARRAY['risk_registered'])
-    || jsonb_build_object('risk_id', v_risk_id);
+  -- P2-T2 BLOCKER 2 — never return p_risk_id as the Risk of the event without
+  -- checking. p_subject_stable := FALSE: the stored subject_id is the canonical
+  -- risk id, not this attempt's id. If a concurrent peer with the same dedup_key
+  -- committed first, _append dedups; our just-inserted Risk is an ORPHAN — remove
+  -- it and return the peer's canonical risk_id (read from the stored event's
+  -- subject_id). The unique dedup_key constraint covers the race where the peer
+  -- commits during our _append INSERT (23505 → whole tx rolls back, including the
+  -- Risk; the client retries and the pre-check above returns deduped).
+  v_append := public._append_event_atomic(p_event, p_payload_text, p_refs, ARRAY['risk_registered'], false);
+  IF (v_append->>'deduped')::boolean THEN
+    DELETE FROM public.risks WHERE id = v_risk_id;
+    SELECT subject_id INTO v_existing_risk_id
+    FROM public.project_event_log
+    WHERE project_id = v_risk_project AND dedup_key = v_dedup_key
+    LIMIT 1;
+    RETURN jsonb_build_object(
+      'ok', true, 'deduped', true,
+      'event_id', v_append->>'event_id',
+      'risk_id', v_existing_risk_id
+    );
+  END IF;
+  RETURN v_append || jsonb_build_object('risk_id', v_risk_id);
 END;
 $$;
 
@@ -350,7 +439,13 @@ SET search_path = public
 AS $$
 DECLARE
   v_dedup_key          text  := p_event->>'dedup_key';
+  v_req_fp             text  := p_event->'provenance'->>'idempotency_fingerprint';
   v_existing_event_id  uuid;
+  v_existing_subject_id text;
+  v_existing_org       text;
+  v_existing_project   text;
+  v_existing_type      text;
+  v_existing_fp        text;
   v_current            text;
   v_updated            int;
 BEGIN
@@ -374,17 +469,29 @@ BEGIN
   END IF;
 
   -- (1) Fast-path dedup pre-check (before locking). Avoids a row lock when the
-  --     request is an obvious retry.
+  --     request is an obvious retry. Scope + fingerprint checks guard the hit.
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id INTO v_existing_event_id
+    SELECT event_id, subject_id::text, organization_id::text, project_id::text,
+           event_type, provenance->>'idempotency_fingerprint'
+      INTO v_existing_event_id, v_existing_subject_id, v_existing_org,
+           v_existing_project, v_existing_type, v_existing_fp
     FROM public.project_event_log
     WHERE project_id = p_project_id AND dedup_key = v_dedup_key
     LIMIT 1;
     IF v_existing_event_id IS NOT NULL THEN
+      IF v_existing_type <> (p_event->>'event_type')
+         OR v_existing_org <> p_organization_id::text
+         OR v_existing_project <> p_project_id::text
+         OR v_existing_subject_id <> p_risk_id::text THEN
+        RAISE EXCEPTION 'idempotency_scope_conflict';
+      END IF;
+      IF COALESCE(v_existing_fp, '') <> COALESCE(v_req_fp, '') THEN
+        RAISE EXCEPTION 'idempotency_payload_conflict';
+      END IF;
       RETURN jsonb_build_object(
         'ok', true, 'deduped', true,
         'event_id', v_existing_event_id,
-        'risk_id', p_risk_id
+        'risk_id', v_existing_subject_id
       );
     END IF;
   END IF;
@@ -403,17 +510,30 @@ BEGIN
 
   -- (3) Re-check dedup AFTER acquiring the lock: a concurrent peer with the
   --     SAME command id that committed while we waited now shows up here → we
-  --     return deduped WITHOUT touching the row.
+  --     return deduped WITHOUT touching the row. Scope + fingerprint checks guard
+  --     the hit.
   IF v_dedup_key IS NOT NULL THEN
-    SELECT event_id INTO v_existing_event_id
+    SELECT event_id, subject_id::text, organization_id::text, project_id::text,
+           event_type, provenance->>'idempotency_fingerprint'
+      INTO v_existing_event_id, v_existing_subject_id, v_existing_org,
+           v_existing_project, v_existing_type, v_existing_fp
     FROM public.project_event_log
     WHERE project_id = p_project_id AND dedup_key = v_dedup_key
     LIMIT 1;
     IF v_existing_event_id IS NOT NULL THEN
+      IF v_existing_type <> (p_event->>'event_type')
+         OR v_existing_org <> p_organization_id::text
+         OR v_existing_project <> p_project_id::text
+         OR v_existing_subject_id <> p_risk_id::text THEN
+        RAISE EXCEPTION 'idempotency_scope_conflict';
+      END IF;
+      IF COALESCE(v_existing_fp, '') <> COALESCE(v_req_fp, '') THEN
+        RAISE EXCEPTION 'idempotency_payload_conflict';
+      END IF;
       RETURN jsonb_build_object(
         'ok', true, 'deduped', true,
         'event_id', v_existing_event_id,
-        'risk_id', p_risk_id
+        'risk_id', v_existing_subject_id
       );
     END IF;
   END IF;
@@ -557,12 +677,12 @@ REVOKE ALL ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) FROM 
 GRANT EXECUTE ON FUNCTION public.append_risk_event_atomic(jsonb, text, jsonb) TO service_role;
 
 COMMENT ON FUNCTION public._append_event_atomic IS
-  'P2-T2 atomic event append: dedup + per-project sequence + tamper-evident hash + object_refs, in one transaction. Failures propagate (no swallow) so the outer Risk mutation rolls back with the event. Internal helper — REVOKEd from PUBLIC/anon/authenticated/service_role (no grant); callable only by the capture_* SECURITY DEFINER functions (same owner).';
+  'P2-T2 atomic event append: dedup + per-project sequence + tamper-evident hash + object_refs, in one transaction. Failures propagate (no swallow) so the outer Risk mutation rolls back with the event. Dedup hit enforces a scope check (event_type/org/project, and — when p_subject_stable — subject_id=riskId) raising idempotency_scope_conflict, and a request-fingerprint check (provenance.idempotency_fingerprint) raising idempotency_payload_conflict. Internal helper — REVOKEd from PUBLIC/anon/authenticated/service_role (no grant); callable only by the capture_* SECURITY DEFINER functions (same owner).';
 COMMENT ON FUNCTION public._risk_refs_ok IS
   'P2-T2 structural invariant helper: the object_refs must carry (risk focal + project context). REVOKEd from every role (no grant); called only by the capture_* SECURITY DEFINER functions.';
 COMMENT ON FUNCTION public.capture_risk_registered IS
-  'P2-T2: INSERT risk + risk_registered event + object_refs in one transaction (service_role only). Idempotent via a STABLE dedup_key (operation id): a retry returns the existing event_id + risk_id without inserting another Risk. Defaults via COALESCE keep the Risk row byte-identical to the flag-OFF writer path.';
+  'P2-T2: INSERT risk + risk_registered event + object_refs in one transaction (service_role only). Idempotent via a STABLE dedup_key (operation id): a retry returns the existing event_id + canonical risk_id without inserting another Risk. Dedup hit enforces a scope check (org/project; NO subject_id — the stored subject is the canonical risk id, not the per-attempt id) raising idempotency_scope_conflict, and a fingerprint check (the logical Risk + source item) raising idempotency_payload_conflict. If a concurrent peer committed first, the just-inserted Risk is removed and the peer''s canonical risk_id is returned. Defaults via COALESCE keep the Risk row byte-identical to the flag-OFF writer path.';
 COMMENT ON FUNCTION public.capture_risk_status_change IS
-  'P2-T2: UPDATE risk status + event + object_refs in one transaction (service_role only). Concurrency-safe: SELECT … FOR UPDATE + dedup re-check after the lock + expectedFromStatus precondition + conditional UPDATE validated by ROW_COUNT. A dedup hit returns before any mutation; a stale request raises without mutation. Used by risk_reopened; risk_closed is not emitted from the unvalidated closeout path (RI-05).';
+  'P2-T2: UPDATE risk status + event + object_refs in one transaction (service_role only). Concurrency-safe: SELECT … FOR UPDATE + dedup re-check after the lock + expectedFromStatus precondition + conditional UPDATE validated by ROW_COUNT. Each dedup hit enforces a scope check (event_type/org/project/subject_id=riskId) raising idempotency_scope_conflict and a fingerprint check raising idempotency_payload_conflict; it returns the stored subject_id (never p_risk_id unchecked). A dedup hit returns before any mutation; a stale request raises without mutation. Used by risk_reopened; risk_closed is not emitted from the unvalidated closeout path (RI-05).';
 COMMENT ON FUNCTION public.append_risk_event_atomic IS
-  'P2-T2: atomic append of a risk event that does not mutate the risk row (risk_assessed, risk_materialized, owner/response-plan). Verifies the REAL risk row (exists, in-scope, not deleted, project in org) before appending. service_role only.';
+  'P2-T2: atomic append of a risk event that does not mutate the risk row (risk_assessed, risk_materialized, owner/response-plan). Verifies the REAL risk row (exists, in-scope, not deleted, project in org) before appending. service_role only. Dedup hit (via _append_event_atomic with p_subject_stable=true) enforces the scope + fingerprint checks.';

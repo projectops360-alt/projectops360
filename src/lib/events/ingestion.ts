@@ -86,8 +86,28 @@ export interface EmitEventInput {
    *  attempt — no second Risk, no second event, no second ref set. The idempotency
    *  key MUST be a stable, persisted identity from the originating workflow
    *  (Scribe memory item id, import job+source id, or a command operationId) —
-   *  NEVER a fresh timestamp, a per-retry uuid, or an unpersisted random. */
+   *  NEVER a fresh timestamp, a per-retry uuid, or an unpersisted random.
+   *
+   *  P2-T2 BLOCKER 2 (scope) + BLOCKER 3 (fingerprint): the dedup_key INTENTIONALLY
+   *  collides for the same (projectId, eventType, idempotencyKey) — it does NOT
+   *  embed the riskId — so a commandId reused on another Risk of the same project
+   *  is DETECTED in the dedup hit and rejected with `idempotency_scope_conflict`
+   *  rather than silently producing a second event. The riskId is enforced as
+   *  part of the operation identity via the RPC scope check (event.subject_id =
+   *  request.riskId), NOT via the hash. The request fingerprint
+   *  (provenance.idempotency_fingerprint) is then compared on every dedup hit:
+   *  a mismatch raises `idempotency_payload_conflict` (a reused idempotency key
+   *  with a DIFFERENT request is never silently accepted). */
   idempotencyKey?: string;
+  /** P2-T2 BLOCKER 3 — for risk_registered ONLY: the logical risk fields the
+   *  writer intends to create (title/category/probability/impact/severity/
+   *  status/origin/links/…), WITHOUT id / organization_id / project_id /
+   *  evidence_json / metadata (those are already in the base fingerprint or are
+   *  per-attempt variables). The fingerprint of a risk_registered represents the
+   *  logical Risk + its source item, so a full-capture retry (which generates a
+   *  new attempt riskId) dedupes, while a DIFFERENT logical Risk with the same
+   *  captureOperationId:item:index raises `idempotency_payload_conflict`. */
+  idempotencyRiskLogicalFields?: Record<string, unknown>;
 }
 
 export interface EmitResult {
@@ -145,8 +165,14 @@ export function generateProjectionInvalidationTags(input: EmitEventInput): strin
  *  When `idempotencyKey` is set (P2-T2 BLOCKER 2/3), the key is derived ONLY from
  *  (projectId, eventType, idempotencyKey) — stable across retries regardless of
  *  occurredAt / subjectId / sourceEntityId — so the atomic capture RPCs can
- *  dedup a retry of the same operation. Without it, the legacy shape (which
- *  includes occurredAt) is used, preserving the existing derived-trail behavior. */
+ *  dedup a retry of the same operation. The riskId is INTENTIONALLY NOT part of
+ *  the hash: the key collides for the same (projectId, eventType, commandId) so
+ *  a commandId reused on another Risk of the same project is caught in the dedup
+ *  hit and rejected with `idempotency_scope_conflict` (the RPC scope check
+ *  validates event.subject_id = request.riskId). Embedding riskId in the hash
+ *  would make such reuse undetectable (a distinct key → a silent second event).
+ *  Without idempotencyKey, the legacy shape (which includes occurredAt) is used,
+ *  preserving the existing derived-trail behavior. */
 export function computeDedupKey(input: EmitEventInput): string | null {
   if (input.isCompensatingEvent) return null;
   if (input.idempotencyKey) {
@@ -171,6 +197,101 @@ export function computeDedupKey(input: EmitEventInput): string | null {
     payloadHash,
   ];
   return createHash("sha256").update(parts.join("|")).digest("hex");
+}
+
+/** Deterministic JSON serialization: object keys sorted recursively, so two
+ *  structurally-equal payloads with different key order produce the SAME string.
+ *  Primitives, arrays and plain objects are handled; anything else is coerced
+ *  via String() (no Date/class instances reach this path — the fingerprint is
+ *  computed from plain EmitEventInput fields). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value ?? null);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`)
+    .join(",")}}`;
+}
+
+/** Keys dropped from the payload before fingerprinting: regenerated timestamps
+ *  (occurred_at / assessed_at / recorded_at …) and DB-assigned / per-attempt
+ *  values (sequence_number, event_hash, the attempt risk id, the new
+ *  memoryItemId a full-capture retry creates). They are NOT significative — a
+ *  retry regenerates them — so keeping them would make the fingerprint unstable. */
+const FINGERPRINT_PAYLOAD_DROP_KEYS = new Set([
+  "occurred_at", "assessed_at", "recorded_at", "updated_at", "created_at",
+  "occurredAt", "assessedAt", "recordedAt", "updatedAt", "createdAt",
+  "sequence_number", "event_hash", "attempt_risk_id", "attemptRiskId",
+  "memory_item_id", "memoryItemId",
+]);
+
+/** Returns a canonical copy of `payload` with the regenerated/audit keys
+ *  removed, recursing into nested objects/arrays. Preserves every significative
+ *  field (method, scope, reason_code, values, origin, title, …). */
+function canonicalizePayload(payload: unknown): unknown {
+  if (payload === null || typeof payload !== "object") return payload ?? {};
+  if (Array.isArray(payload)) return payload.map(canonicalizePayload);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
+    if (FINGERPRINT_PAYLOAD_DROP_KEYS.has(k)) continue;
+    out[k] = typeof v === "object" && v !== null ? canonicalizePayload(v) : v;
+  }
+  return out;
+}
+
+/** P2-T2 BLOCKER 3 — stable request fingerprint for idempotent captures.
+ *  Covers the SIGNIFICATIVE request fields (org, project, event_type,
+ *  subject_type, actor, source_module, from/to state, payload, object_refs, and
+ *  — for risk_registered only — the logical risk fields). EXCLUDES the
+ *  naturally-variable values: subject_id (the per-attempt attemptRiskId for
+ *  risk_registered; validated via the scope check for events on an existing
+ *  risk), occurred_at, the per-attempt uuid inside the risk-focal ref, the
+ *  recorded_at / sequence_number / event_hash assigned by the DB, and the new
+ *  memoryItemId created by a full-capture retry. Persisted by
+ *  `prepareAtomicEvent` into `provenance.idempotency_fingerprint` and compared
+ *  on every dedup hit: a mismatch raises `idempotency_payload_conflict`. */
+export function computeIdempotencyFingerprint(
+  input: EmitEventInput,
+  riskLogicalFields?: Record<string, unknown>,
+): string {
+  // Canonical refs: keep object_type + role + id, but DROP the object_id of the
+  // risk-focal ref (for risk_registered that id is the per-attempt uuid; for
+  // events on an existing risk it is the stable riskId already validated via the
+  // RPC scope check). Other refs (project context, milestone, task, actor,
+  // decision) keep their ids — they are stable across retries.
+  const refsCanonical = (input.objectRefs ?? [])
+    .map((r) => ({
+      t: r.objectType,
+      r: r.role,
+      id: r.objectType === "risk" ? null : r.objectId,
+    }))
+    .sort((a, b) =>
+      `${a.t}|${a.r}|${a.id ?? ""}`.localeCompare(`${b.t}|${b.r}|${b.id ?? ""}`),
+    );
+  const canonical = {
+    organization_id: input.organizationId,
+    project_id: input.projectId,
+    event_type: input.eventType,
+    subject_type: getEventDef(input.eventType)?.subjectType ?? null,
+    // subject_id EXCLUDED (see above).
+    actor_type: input.actorType,
+    actor_id: input.actorId ?? null,
+    source_module: input.sourceModule,
+    from_state: input.fromState ?? null,
+    to_state: input.toState ?? null,
+    payload: canonicalizePayload(input.payload ?? {}),
+    refs: refsCanonical,
+    // risk_registered only: the logical risk the writer intends to create, so a
+    // DIFFERENT logical Risk with the same captureOperationId:item:index is
+    // detected as `idempotency_payload_conflict` while a full-capture retry of
+    // the SAME logical Risk dedupes.
+    risk_logical: riskLogicalFields ?? null,
+  };
+  return createHash("sha256").update(stableStringify(canonical)).digest("hex");
 }
 
 /** Deterministic tamper-evident hash from stable fields + the previous hash. */
@@ -392,6 +513,14 @@ export function prepareAtomicEvent(
   const { ok, errors } = validateProjectEvent(input);
   if (!ok) return { ok: false, errors };
   const row = normalizeProjectEvent(input);
+  // P2-T2 BLOCKER 3 — persist the request fingerprint into provenance so the
+  // RPC can compare it on a dedup hit (a reused idempotency key with a DIFFERENT
+  // request raises `idempotency_payload_conflict`). Only when the capture is
+  // idempotent (idempotencyKey set) — the non-atomic / legacy path is untouched.
+  if (input.idempotencyKey) {
+    const fp = computeIdempotencyFingerprint(input, input.idempotencyRiskLogicalFields);
+    (row.provenance as Record<string, unknown>).idempotency_fingerprint = fp;
+  }
   const payloadText = JSON.stringify(input.payload ?? {});
   const refs = (input.objectRefs ?? []).map((r) => ({
     object_type: r.objectType,

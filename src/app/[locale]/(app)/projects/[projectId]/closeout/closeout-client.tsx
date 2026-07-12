@@ -41,13 +41,25 @@ function genCommandId(): string {
   return `cmd-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
 }
 
-/** Per-intent command id: `get()` returns a stable id (generating one lazily) and
- *  `reset()` clears it on success, so a LATER, legitimate action gets a fresh id
- *  while a RETRY of a failed action reuses the same one. */
+/** Per-intent command id (BLOCKER 2/3 + round-4 command lifecycle). `get(sig)`
+ *  returns a stable id for the CURRENT intent signature: a retry of the SAME
+ *  request (same `sig`) reuses the id so the RPC dedups; a CHANGE in the
+ *  significative input (`sig`) generates a NEW id so the new intent is a fresh
+ *  operation (the old idempotency key is never reused with a different request,
+ *  which the server would reject as `idempotency_payload_conflict`). `reset()`
+ *  clears it on success, so a LATER, legitimate action after a success gets a
+ *  fresh id regardless of `sig`. `sig` is the minimal, stable fingerprint of the
+ *  intent (e.g. the assessment method, the materialization scope+note, the
+ *  reopen reason) — NOT a value that changes on every render. */
 function useCommandId() {
-  const ref = useRef<string | null>(null);
+  const ref = useRef<{ id: string; sig: string } | null>(null);
   return {
-    get: () => (ref.current ?? (ref.current = genCommandId())),
+    get: (sig: string) => {
+      if (!ref.current || ref.current.sig !== sig) {
+        ref.current = { id: genCommandId(), sig };
+      }
+      return ref.current.id;
+    },
     reset: () => { ref.current = null; },
   };
 }
@@ -623,7 +635,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => assessRiskAction(projectId, risk.id, assessMethod, assessCmd.get()), isEs ? "Evaluado" : "Assessed", assessCmd.reset)}
+            onClick={() => run(() => assessRiskAction(projectId, risk.id, assessMethod, assessCmd.get(assessMethod)), isEs ? "Evaluado" : "Assessed", assessCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
@@ -647,7 +659,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => materializeRiskAction(projectId, risk.id, matScope, matNote, materializeCmd.get()), isEs ? "Materializado" : "Materialized", materializeCmd.reset)}
+            onClick={() => run(() => materializeRiskAction(projectId, risk.id, matScope, matNote, materializeCmd.get(`${matScope}|${matNote}`)), isEs ? "Materializado" : "Materialized", materializeCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <AlertTriangle className="h-3 w-3" />}
@@ -664,7 +676,7 @@ function RiskLine({ risk, isEs, projectId, locale, canResolve, riskEventCapture 
           <button
             type="button"
             disabled={pending}
-            onClick={() => run(() => reopenRiskAction(projectId, risk.id, reopenReason, locale as Locale, reopenCmd.get()), isEs ? "Reabierto" : "Reopened", reopenCmd.reset)}
+            onClick={() => run(() => reopenRiskAction(projectId, risk.id, reopenReason, locale as Locale, reopenCmd.get(reopenReason)), isEs ? "Reabierto" : "Reopened", reopenCmd.reset)}
             className={actionBtn}
           >
             {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
