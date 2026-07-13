@@ -84,7 +84,7 @@ describe("CAP-045 discrimination helpers (analysis isolation)", () => {
   it("isCanonicalEventNode identifies a canonical event node, not a process node", () => {
     expect(isCanonicalEventNode({ eventId: "e1" })).toBe(true);
     const processNode: LivingGraphNode = {
-      id: "n1", projectId: PROJECT, nodeType: "task_event", sourceEntityType: "roadmap_tasks",
+      id: "n1", projectId: PROJECT, nodeType: "task_transition", sourceEntityType: "roadmap_tasks",
       sourceEntityId: "t1", label: "T", description: null, status: "todo", progress: null,
       startDate: null, endDate: null, durationDays: null, occurredAt: "", createdAt: "", updatedAt: "",
       riskLevel: null, isBlocked: false, isCritical: false, milestoneId: null, milestoneLabel: null,
@@ -100,7 +100,7 @@ function makeBaselineData(): LivingGraphData {
   return {
     nodes: [
       {
-        id: "n1", projectId: PROJECT, nodeType: "task_event", sourceEntityType: "roadmap_tasks",
+        id: "n1", projectId: PROJECT, nodeType: "task_transition", sourceEntityType: "roadmap_tasks",
         sourceEntityId: "t1", label: "Task 1", description: null, status: "todo", progress: null,
         startDate: null, endDate: null, durationDays: null, occurredAt: "2026-01-01T00:00:00.000Z",
         createdAt: "", updatedAt: "", riskLevel: null, isBlocked: false, isCritical: false,
@@ -216,14 +216,14 @@ describe("CAP-045 events view + analysis isolation", () => {
     // operational edges, and the event relationship must not influence it.
     const opNodes: LivingGraphNode[] = [
       {
-        id: "n1", projectId: PROJECT, nodeType: "task_event", sourceEntityType: "roadmap_tasks",
+        id: "n1", projectId: PROJECT, nodeType: "task_transition", sourceEntityType: "roadmap_tasks",
         sourceEntityId: "t1", label: "A", description: null, status: "done", progress: 100,
         startDate: null, endDate: null, durationDays: 1, occurredAt: "2026-01-01T00:00:00.000Z",
         createdAt: "", updatedAt: "", riskLevel: null, isBlocked: false, isCritical: true,
         milestoneId: null, milestoneLabel: null, milestoneOrder: null, traceabilityScore: null, metadata: {},
       },
       {
-        id: "n2", projectId: PROJECT, nodeType: "task_event", sourceEntityType: "roadmap_tasks",
+        id: "n2", projectId: PROJECT, nodeType: "task_transition", sourceEntityType: "roadmap_tasks",
         sourceEntityId: "t2", label: "B", description: null, status: "todo", progress: 0,
         startDate: null, endDate: null, durationDays: 2, occurredAt: "2026-01-02T00:00:00.000Z",
         createdAt: "", updatedAt: "", riskLevel: null, isBlocked: false, isCritical: false,
