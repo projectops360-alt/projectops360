@@ -4,7 +4,7 @@
 // ProjectOps360° — Living Graph detail panel (selected node / edge)
 // ============================================================================
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import {
   X,
@@ -22,6 +22,8 @@ import {
   ClipboardCheck,
   ExternalLink,
   Ban,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getI18nValue } from "@/types/database";
@@ -33,6 +35,8 @@ import type {
   LivingGraphOverlay,
   LivingGraphSimulationState,
   LivingGraphSimulationScenario,
+  LivingGraphCanonicalEvent,
+  LivingGraphEventRelationship,
 } from "@/types/living-graph";
 import {
   buildNodeInsight,
@@ -91,6 +95,14 @@ export interface LivingGraphDetailPanelProps {
   ownerNames?: Record<string, string>;
   /** Open the project team member roster from the map context. */
   onOpenTeam?: () => void;
+  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
+  /** When present, the panel renders the canonical-event detail block instead
+   *  of the operational node/edge blocks. Read-only. */
+  selectedCanonicalEvent?: LivingGraphCanonicalEvent | null;
+  /** All projected relationships (used to show this event's related events). */
+  canonicalEventRelationships?: LivingGraphEventRelationship[];
+  /** Whether the event log read was truncated. Surfaced as a note. */
+  eventsTruncated?: boolean;
 }
 
 /** Tasks and milestones can be edited in place via the roadmap dialogs. */
@@ -129,6 +141,9 @@ function LivingGraphDetailPanelComponent({
   onClose,
   ownerNames,
   onOpenTeam,
+  selectedCanonicalEvent,
+  canonicalEventRelationships,
+  eventsTruncated,
 }: LivingGraphDetailPanelProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale();
@@ -174,7 +189,24 @@ function LivingGraphDetailPanelComponent({
   const actionButton =
     "inline-flex w-full items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted transition-colors";
 
-  if (!selectedNode && !selectedEdge) return null;
+  if (!selectedNode && !selectedEdge && !selectedCanonicalEvent) return null;
+
+  // ── Canonical-event detail (CAP-045 extension) ─────────────────────────────
+  // When a canonical event is selected, render its read-only detail block and
+  // skip the operational node/edge blocks. Every field is read straight from
+  // the event store projection — none is invented. Payload/provenance are
+  // behind collapsible sections so they don't dump raw JSON by default.
+  if (selectedCanonicalEvent) {
+    return (
+      <CanonicalEventDetail
+        event={selectedCanonicalEvent}
+        relationships={canonicalEventRelationships ?? []}
+        eventsTruncated={eventsTruncated ?? false}
+        onClose={onClose}
+        formatDate={formatDate}
+      />
+    );
+  }
 
   return (
     <aside
@@ -647,7 +679,250 @@ function LivingGraphDetailPanelComponent({
 export const LivingGraphDetailPanel = memo(LivingGraphDetailPanelComponent);
 LivingGraphDetailPanel.displayName = "LivingGraphDetailPanel";
 
-// ── Labor Risk Detail Block ───────────────────────────────────────────────────
+// ============================================================================
+// Canonical-event detail block (CAP-045 extension)
+// ============================================================================
+// Read-only inspector for a single canonical event (project_event_log row) and
+// its projected relationships. Every field is read straight from the projection
+// — nothing is invented. Payload + provenance are behind collapsible sections
+// so the panel doesn't dump raw JSON by default.
+// ============================================================================
+
+function CanonicalEventDetail({
+  event,
+  relationships,
+  eventsTruncated,
+  onClose,
+  formatDate,
+}: {
+  event: LivingGraphCanonicalEvent;
+  relationships: LivingGraphEventRelationship[];
+  eventsTruncated: boolean;
+  onClose: () => void;
+  formatDate: (value: string | null) => string;
+}) {
+  const t = useTranslations("livingGraph.canonicalEvents");
+  const [showPayload, setShowPayload] = useState(false);
+  const [showProvenance, setShowProvenance] = useState(false);
+
+  // This event's relationships (excluding object_reference noise from the list).
+  const related = relationships.filter(
+    (r) => r.sourceEventId === event.eventId || r.targetEventId === event.eventId,
+  );
+  const causes = related.filter((r) => r.relationshipType === "caused_by" && r.targetEventId === event.eventId);
+  const compensates = related.find((r) => r.relationshipType === "compensates" && r.sourceEventId === event.eventId);
+
+  const classLabel: Record<string, string> = {
+    temporal: t("classTemporal"),
+    causal: t("classCausal"),
+    compensation: t("classCompensation"),
+    object_reference: t("classObjectReference"),
+  };
+
+  return (
+    <aside
+      aria-label={t("viewTitle")}
+      className="flex h-full w-80 shrink-0 flex-col overflow-y-auto border-l border-border bg-card/95 backdrop-blur-sm"
+    >
+      {/* Header */}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-2">
+        <h3 className="text-xs font-semibold text-foreground">{t("viewTitle")}</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("viewTitle")}
+          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="space-y-3 p-3">
+        <div>
+          <p className="break-all font-mono text-sm font-semibold leading-tight text-foreground">
+            {event.eventType}
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            #{event.sequenceNumber} · {event.eventCategory}
+          </p>
+        </div>
+
+        <dl className="divide-y divide-border/60 rounded-md border border-border px-2.5 py-1">
+          <Field label={t("occurredAt")}>{formatDate(event.occurredAt)}</Field>
+          <Field label={t("recordedAt")}>
+            <span className="flex items-center gap-1">
+              {formatDate(event.recordedAt)}
+              {event.lateRecorded && (
+                <span className="rounded-sm bg-amber-500/15 px-1 text-[9px] font-bold text-amber-700 dark:text-amber-400">
+                  {t("lateRecorded")}
+                </span>
+              )}
+            </span>
+          </Field>
+          <Field label={t("sequence")}>{event.sequenceNumber}</Field>
+          <Field label={t("actor")}>
+            {event.actorType ? `${event.actorType}${event.actorId ? ` · ${event.actorId.slice(0, 8)}` : ""}` : t("noActor")}
+          </Field>
+          <Field label={t("source")}>
+            {event.sourceEntityType
+              ? `${event.sourceEntityType}${event.sourceEntityId ? ` · ${event.sourceEntityId.slice(0, 8)}` : ""}`
+              : t("noSource")}
+          </Field>
+          <Field label={t("stateTransition")}>
+            {event.fromState || event.toState
+              ? `${event.fromState ?? "—"} → ${event.toState ?? "—"}`
+              : "—"}
+          </Field>
+          <Field label={t("captureMethod")}>{event.captureMethod ?? "—"}</Field>
+          <Field label={t("confidence")}>
+            {event.confidence != null ? `${Math.round(event.confidence * 100)}%` : "—"}
+          </Field>
+          <Field label={t("importance")}>{event.eventImportance ?? "—"}</Field>
+          <Field label={t("lifecycle")}>{event.lifecycleClass ?? "—"}</Field>
+        </dl>
+
+        {/* Caused by — explicit only. When absent, surface the no-inference note. */}
+        <div className="rounded-md border border-border px-2.5 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("causedBy")}
+          </p>
+          {causes.length > 0 ? (
+            <ul className="mt-1 space-y-1">
+              {causes.map((c) => (
+                <li key={c.id} className="flex items-center gap-1 text-[10px] text-foreground">
+                  <ArrowRight className="h-3 w-3 text-red-600" aria-hidden />
+                  <span className="font-mono break-all">{c.sourceEventId.slice(0, 8)}</span>
+                  <span className="text-muted-foreground">· {t("classCausal")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[10px] italic text-muted-foreground">{t("noCause")}</p>
+          )}
+        </div>
+
+        {/* Compensates — explicit only. */}
+        {compensates && (
+          <div className="rounded-md border border-border px-2.5 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("compensates")}
+            </p>
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-foreground">
+              <ArrowRight className="h-3 w-3 text-purple-600" aria-hidden />
+              <span className="font-mono break-all">{compensates.targetEventId?.slice(0, 8)}</span>
+            </p>
+          </div>
+        )}
+
+        {/* Object references (type / id / role) — secondary. */}
+        {event.objectRefs.length > 0 && (
+          <div className="rounded-md border border-border px-2.5 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("objectRefs")}
+            </p>
+            <ul className="mt-1 space-y-1">
+              {event.objectRefs.map((ref, i) => (
+                <li key={`${ref.object_type}-${ref.object_id}-${ref.role}-${i}`} className="text-[10px] text-foreground">
+                  <span className="font-mono break-all">{ref.object_type} · {ref.object_id.slice(0, 8)}</span>
+                  <span className="ml-1 rounded-sm bg-muted px-1 text-[9px] text-muted-foreground">{ref.role}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Data quality flags. */}
+        {event.dataQualityFlags.length > 0 && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-2.5 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              {t("dataQualityFlags")}
+            </p>
+            <ul className="mt-1 flex flex-wrap gap-1">
+              {event.dataQualityFlags.map((f) => (
+                <li key={f} className="rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:text-amber-400">
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Collapsible: Provenance. */}
+        <div className="rounded-md border border-border">
+          <button
+            type="button"
+            onClick={() => setShowProvenance((v) => !v)}
+            className="flex w-full items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted"
+            aria-expanded={showProvenance}
+          >
+            {showProvenance ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {t("provenance")}
+          </button>
+          {showProvenance && event.provenance && (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all border-t border-border px-2.5 py-2 text-[9px] text-muted-foreground">
+              {JSON.stringify(event.provenance, null, 2)}
+            </pre>
+          )}
+        </div>
+
+        {/* Collapsible: Payload. */}
+        <div className="rounded-md border border-border">
+          <button
+            type="button"
+            onClick={() => setShowPayload((v) => !v)}
+            className="flex w-full items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:bg-muted"
+            aria-expanded={showPayload}
+          >
+            {showPayload ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {t("payload")}
+          </button>
+          {showPayload && event.payload && (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all border-t border-border px-2.5 py-2 text-[9px] text-muted-foreground">
+              {JSON.stringify(event.payload, null, 2)}
+            </pre>
+          )}
+        </div>
+
+        {/* Tamper-evident chain (read-only display). */}
+        <dl className="divide-y divide-border/60 rounded-md border border-border px-2.5 py-1">
+          <Field label={t("eventHash")}>
+            <span className="break-all font-mono text-[9px]">{event.eventHash?.slice(0, 12) ?? "—"}…</span>
+          </Field>
+          <Field label={t("previousEventHash")}>
+            <span className="break-all font-mono text-[9px]">
+              {event.previousEventHash ? `${event.previousEventHash.slice(0, 12)}…` : "— (genesis)"}
+            </span>
+          </Field>
+        </dl>
+
+        {/* Related relationships summary. */}
+        {related.filter((r) => r.relationshipType !== "relates_to_object").length > 0 && (
+          <div className="rounded-md border border-border px-2.5 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("classTemporal")} / {t("classCausal")} / {t("classCompensation")}
+            </p>
+            <ul className="mt-1 space-y-1">
+              {related
+                .filter((r) => r.relationshipType !== "relates_to_object")
+                .map((r) => (
+                  <li key={r.id} className="flex items-center gap-1 text-[10px] text-foreground">
+                    <span className="font-mono break-all">
+                      {r.sourceEventId === event.eventId ? r.targetEventId?.slice(0, 8) : r.sourceEventId.slice(0, 8)}
+                    </span>
+                    <span className="text-muted-foreground">· {classLabel[r.relationshipClass]}</span>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+
+        {eventsTruncated && (
+          <p className="text-[9px] italic text-muted-foreground">{t("truncated", { count: 1000 })}</p>
+        )}
+      </div>
+    </aside>
+  );
+}
 
 function LaborRiskDetailBlock({ laborRisk: lr }: { laborRisk: LaborRiskNodeData }) {
   const t = useTranslations("livingGraph");

@@ -48,6 +48,8 @@ import { classifyAllVarianceCauses } from "@/lib/labor/variance-cause-classifica
 import type { VarianceCauseResult } from "@/lib/labor/variance-cause-classification";
 import { computeResourceCapacity } from "@/lib/capacity/service";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
+import { isEventRelationshipsEnabled } from "@/lib/graph/event-relationships-flag";
+import { loadCanonicalEventProjection } from "@/lib/graph/event-relationship-loader";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -411,6 +413,35 @@ export default async function LivingGraphPage({
     events,
     generatedAt: new Date().toISOString(),
   };
+
+  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────────
+  // A READ-ONLY PROJECTION over the canonical event store. Gated by
+  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS (server-side, default OFF).
+  // When OFF, `data` stays exactly as above (byte-identical) and the "events"
+  // view keeps its current timeline/process behavior — no new controls.
+  //
+  // Coexists with the operational projection: process_nodes/process_edges are
+  // NOT substituted and the milestones/activities views are untouched. The
+  // events read uses the AUTHENTICATED client (RLS) — never the admin/service
+  // role for an ordinary read — and is scoped to this project + organization.
+  // Failure is non-fatal: the events view simply stays on its current behavior.
+  if (isEventRelationshipsEnabled(projectId)) {
+    try {
+      // Uses the AUTHENTICATED client (RLS) via the extracted loader — never an
+      // admin/service role for this ordinary read. Scoped to org + project.
+      const projection = await loadCanonicalEventProjection(
+        supabase,
+        org.organizationId,
+        projectId,
+      );
+      data.canonicalEvents = projection.canonicalEvents;
+      data.eventRelationships = projection.eventRelationships;
+      data.eventsTruncated = projection.eventsTruncated;
+    } catch (err) {
+      // Non-fatal: the events view falls back to its current behavior.
+      console.error("Living Graph canonical-event projection failed:", err);
+    }
+  }
 
   // Compute labor capacity (non-fatal — errors just mean no labor overlay)
   let laborCapacity: LaborCapacityResult | undefined;

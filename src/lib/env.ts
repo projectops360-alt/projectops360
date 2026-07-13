@@ -79,6 +79,22 @@ export const env = {
    * docs/product-brain/capabilities/CAP-045-canonical-event-contract-and-source-audit.md.
    */
   RISK_EVENT_CAPTURE_PROJECT_IDS: process.env.RISK_EVENT_CAPTURE_PROJECT_IDS ?? "",
+  /**
+   * Feature flag — Living Graph canonical-event Relationships view (server-side
+   * only, DEFAULT OFF). Comma-separated list of project IDs, or the literal
+   * "all" (local testing only). When OFF, the Living Graph is byte-identical to
+   * before: no canonical-events view, no event-relationship edges, no new
+   * controls. When ON for a project, the Living Graph additionally exposes a
+   * read-only "events" view built as a PROJECTION over the canonical event
+   * store (project_event_log + project_event_objects) — it never writes, never
+   * copies events into process_nodes/process_edges, and never touches the
+   * milestones/activities views, saved layouts, or any operational analysis.
+   * Rollback = unset this flag (no migration needed; the projection is pure).
+   * Independent of RISK_EVENT_CAPTURE_PROJECT_IDS. See
+   * docs/product-brain/capabilities/CAP-045-canonical-event-contract-and-source-audit.md.
+   */
+  LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS:
+    process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

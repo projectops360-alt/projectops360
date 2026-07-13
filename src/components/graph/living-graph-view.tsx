@@ -34,7 +34,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ExecutiveSummaryPanel } from "./executive-summary-panel";
-import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users, ListTree } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users, ListTree, Info } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -104,12 +104,16 @@ import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { LivingGraphNode } from "./living-graph-node";
 import { LivingGraphMilestoneNode } from "./living-graph-milestone-node";
 import { LivingGraphEdge } from "./living-graph-edge";
+import { CanonicalEventNode } from "./canonical-event-node";
+import { CanonicalObjectNode } from "./canonical-object-node";
+import { CanonicalEventEdge } from "./canonical-event-edge";
 import { LivingGraphToolbar } from "./living-graph-toolbar";
 import { LivingGraphTimeline } from "./living-graph-timeline";
 import { LivingGraphDetailPanel } from "./living-graph-detail-panel";
 import { LivingGraphMetricsHeader } from "./living-graph-metrics-header";
 import { LivingGraphLegend } from "./living-graph-legend";
 import { OverlayInfo } from "./overlay-info";
+import { buildCanonicalFlow, canonicalEventNodeId } from "@/lib/graph/canonical-event-flow";
 import {
   ADVANCED_OVERLAYS,
   resolveOverlayState,
@@ -141,8 +145,13 @@ import type {
   TimelinePlaybackState,
 } from "./living-graph-flow-types";
 
-const NODE_TYPES = { living: LivingGraphNode, milestoneCard: LivingGraphMilestoneNode };
-const EDGE_TYPES = { living: LivingGraphEdge };
+const NODE_TYPES = {
+  living: LivingGraphNode,
+  milestoneCard: LivingGraphMilestoneNode,
+  canonicalEvent: CanonicalEventNode,
+  canonicalObject: CanonicalObjectNode,
+};
+const EDGE_TYPES = { living: LivingGraphEdge, canonicalEventEdge: CanonicalEventEdge };
 
 const SIDE_TO_POSITION: Record<SnakeSide, Position> = {
   left: Position.Left,
@@ -445,6 +454,29 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       : graph;
   }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus]);
 
+  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
+  // Active ONLY when the "events" view level is selected AND the loader
+  // populated canonicalEvents (which happens only when the server-side flag
+  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS is ON for this project). When
+  // inactive, every memo below falls through to the operational path and the
+  // graph is byte-identical to before (milestones/activities never populate
+  // canonicalEvents). The canonical flow is a READ-ONLY projection — it never
+  // feeds the operational analysis (critical path / bottleneck / cycles …).
+  const canonicalEvents = data.canonicalEvents ?? [];
+  const canonicalEventsActive =
+    viewLevel === "events" && canonicalEvents.length > 0;
+  const canonicalFlow = useMemo(
+    () =>
+      canonicalEventsActive
+        ? buildCanonicalFlow(
+            canonicalEvents,
+            data.eventRelationships ?? [],
+            selectedNodeId,
+          )
+        : null,
+    [canonicalEventsActive, canonicalEvents, data.eventRelationships, selectedNodeId],
+  );
+
   // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
   //    with capacity status so at-risk work lights up. No resource nodes are
   //    injected into the flow — the per-person roster lives in a side panel,
@@ -668,13 +700,16 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // key below), so the global layout never leaks in but drag-to-rearrange still
   // persists — exactly like the rest of the Living Graph.
   const positions = useMemo(() => {
+    // Canonical-events view uses its own deterministic layout (project sequence
+    // order); saved/manual arrangements belong to the operational contexts.
+    if (canonicalEventsActive && canonicalFlow) return canonicalFlow.positions;
     if (manualPositions.size === 0) return layoutPositions;
     const merged = new Map(layoutPositions);
     for (const [id, pos] of manualPositions) {
       if (merged.has(id)) merged.set(id, pos);
     }
     return merged;
-  }, [layoutPositions, manualPositions]);
+  }, [canonicalEventsActive, canonicalFlow, layoutPositions, manualPositions]);
 
   // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
   // The context a saved arrangement is scoped to (level + layout mode). Switching
@@ -899,6 +934,15 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const isMilestoneLevel = viewLevel === "milestones";
 
   const rfNodes = useMemo<LivingFlowNode[]>(() => {
+    // Canonical-events view: render the projected event/object nodes. The
+    // operational node-mapping path below is skipped entirely, so it never
+    // sees (and never mutates) canonical data.
+    if (canonicalEventsActive && canonicalFlow) {
+      return canonicalFlow.nodes.map((n) => ({
+        ...n,
+        position: canonicalFlow.positions.get(n.id) ?? { x: 0, y: 0 },
+      })) as unknown as LivingFlowNode[];
+    }
     const total = withSubtasks.nodes.length;
     return withSubtasks.nodes.map((node, index) => {
       const metrics = analysis.metrics.get(node.id) ?? null;
@@ -957,6 +1001,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       };
     });
   }, [
+    canonicalEventsActive,
+    canonicalFlow,
     withSubtasks.nodes,
     positions,
     analysis,
@@ -1015,6 +1061,12 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [rfNodes]);
 
   const rfEdges = useMemo<LivingFlowEdge[]>(() => {
+    // Canonical-events view: render the projected relationship edges (dashed
+    // temporal / solid causal / dotted compensation / thin object-ref). The
+    // operational edge-mapping path below is skipped entirely.
+    if (canonicalEventsActive && canonicalFlow) {
+      return canonicalFlow.edges as unknown as LivingFlowEdge[];
+    }
     // In milestone focus mode, add synthetic hub edges (milestone → each task) so
     // no task floats disconnected. They render like normal edges but are marked
     // presentation-only and never drive dependency logic.
@@ -1088,6 +1140,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
     return edges;
   }, [
+    canonicalEventsActive,
+    canonicalFlow,
     withSubtasks.edges,
     focusHubEdges,
     analysis,
@@ -1119,6 +1173,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         : null,
     [selectedEdgeId, displayGraph.edges],
   );
+
+  // Selected canonical event (events view). The selectedNodeId is the flow node
+  // id `ev:<eventId>`; map it back to the canonical event view-model.
+  const selectedCanonicalEvent = useMemo(() => {
+    if (!canonicalEventsActive || !selectedNodeId) return null;
+    const eventId = selectedNodeId.startsWith("ev:")
+      ? selectedNodeId.slice(3)
+      : null;
+    if (!eventId) return null;
+    return canonicalEvents.find((e) => e.eventId === eventId) ?? null;
+  }, [canonicalEventsActive, selectedNodeId, canonicalEvents]);
 
   // ── Handlers ──
   const clientFindPath = useCallback(
@@ -1180,6 +1245,13 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const onNodeClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
     (_event, node) => {
+      // Canonical-event/object nodes: selection only — no milestone pick, no
+      // path mode, no in-graph editing (the events view is read-only).
+      if ((node.type as string) === "canonicalEvent" || (node.type as string) === "canonicalObject") {
+        setSelectedNodeId(node.id);
+        setSelectedEdgeId(null);
+        return;
+      }
       if (pathModeFromId && pathModeFromId !== node.id) {
         void resolvePath(pathModeFromId, node.id);
         setPathModeFromId(null);
@@ -1288,7 +1360,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   );
 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
-    (_event, node) => handleEditNode(node.data.node),
+    (_event, node) => {
+      // Canonical nodes are read-only — double-click does not open an editor.
+      if ((node.type as string) === "canonicalEvent" || (node.type as string) === "canonicalObject") return;
+      handleEditNode(node.data.node);
+    },
     [handleEditNode],
   );
 
@@ -1923,6 +1999,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             onReset={() => setSimulation(null)}
           />
         )}
+        {canonicalEventsActive && (data.eventsTruncated || canonicalEvents.length === 0) && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {canonicalEvents.length === 0
+              ? t("canonicalEvents.empty")
+              : t("canonicalEvents.truncated", { count: canonicalEvents.length })}
+          </div>
+        )}
+        {canonicalEventsActive && canonicalEvents.length > 0 && (
+          <p className="text-[10px] text-muted-foreground">
+            {t("canonicalEvents.viewTitle")} — {t("canonicalEvents.viewHint")}
+          </p>
+        )}
         <div className="min-w-0 flex-1">
           <ReactFlow
             nodes={rfNodes}
@@ -1951,9 +2043,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               position="bottom-right"
               pannable
               zoomable
-              nodeColor={(n) =>
-                minimapNodeColor((n as LivingFlowNode).data.node.nodeType)
-              }
+              nodeColor={(n) => {
+                // Canonical event/object nodes have their own colors.
+                if (n.type === "canonicalEvent") {
+                  const imp = (n.data as { event?: { eventImportance?: string } }).event?.eventImportance;
+                  return imp === "CRITICAL" || imp === "HIGH"
+                    ? "#dc2626"
+                    : imp === "MEDIUM"
+                      ? "#d97706"
+                      : "#0891b2";
+                }
+                if (n.type === "canonicalObject") return "#94a3b8";
+                return minimapNodeColor((n as LivingFlowNode).data.node.nodeType);
+              }}
               className="!bg-card"
             />
           </ReactFlow>
@@ -1978,6 +2080,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               onEditEntity={handleEditNode}
               ownerNames={subtaskOwnerNames}
               onOpenTeam={() => router.push(localizedHref(locale, `/projects/${projectId}/team`))}
+              selectedCanonicalEvent={selectedCanonicalEvent}
+              canonicalEventRelationships={data.eventRelationships ?? []}
+              eventsTruncated={data.eventsTruncated ?? false}
               onClose={() => {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);

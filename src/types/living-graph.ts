@@ -82,12 +82,195 @@ export interface LivingGraphEvent {
   metadata: Record<string, unknown>;
 }
 
+// ============================================================================
+// Canonical-event Relationships view (CAP-045 extension)
+// ============================================================================
+// A read-only PROJECTION over the canonical event store (project_event_log +
+// project_event_objects). These types mirror the event store 1:1 — they never
+// invent fields and never duplicate the operational `process_nodes`/`process_edges`
+// projection. Causality is only represented when EXPLICITLY recorded (caused_by /
+// compensates_event_id); temporal order is order alone, never implied causality.
+// ============================================================================
+
+/** Lifecycle class of a canonical event (mirrors project_event_log CHECK). */
+export type CanonicalEventLifecycleClass =
+  | "BUSINESS_EVENT"
+  | "SYSTEM_EVENT"
+  | "AI_EVENT"
+  | "DERIVED_EVENT"
+  | "EXTERNAL_EVENT"
+  | "SYNTHETIC_BACKFILL_EVENT";
+
+/** Actor that produced the event (mirrors project_event_log CHECK). */
+export type CanonicalEventActorType = "human" | "system" | "ai" | "external";
+
+/** Importance of a canonical event (mirrors project_event_log CHECK). */
+export type CanonicalEventImportance = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
+/** Role an object plays relative to an event (mirrors project_event_objects). */
+export type CanonicalEventObjectRole =
+  | "focal"
+  | "context"
+  | "evidence"
+  | "actor"
+  | "other";
+
+/** A single object reference attached to a canonical event. */
+export interface CanonicalEventObjectRef {
+  object_type: string;
+  object_id: string;
+  role: CanonicalEventObjectRole;
+}
+
+/** How the event was captured (mirrors provenance.capture_method). */
+export type CanonicalEventCaptureMethod =
+  | "direct"
+  | "scribe"
+  | "import"
+  | "system"
+  | "ai_extracted"
+  | "backfill"
+  | string;
+
+/**
+ * Canonical event projected 1:1 from a project_event_log row plus its
+ * project_event_objects refs. Every field is read straight from the log — none
+ * is invented, recalculated, or merged across the two timestamps.
+ */
+export interface LivingGraphCanonicalEvent {
+  /** project_event_log.event_id (uuid). */
+  eventId: string;
+  organizationId: string;
+  projectId: string;
+  /** project_event_log.event_type (canonical event_type, NOT ProcessNodeType). */
+  eventType: string;
+  /** project_event_log.event_category (e.g. risk). */
+  eventCategory: string;
+  /** project_event_log.event_schema_version. */
+  eventSchemaVersion: number | null;
+  /** project_event_log.event_importance (CRITICAL/HIGH/MEDIUM/LOW). */
+  eventImportance: CanonicalEventImportance | null;
+  /** project_event_log.event_lifecycle_class. */
+  lifecycleClass: CanonicalEventLifecycleClass | null;
+  /** project_event_log.subject_type / subject_id. */
+  subjectType: string | null;
+  subjectId: string | null;
+  /** project_event_log.actor_type / actor_id. */
+  actorType: CanonicalEventActorType | null;
+  actorId: string | null;
+  /** Business time (occurred_at) — the moment the thing happened. */
+  occurredAt: string | null;
+  /** Recording time (recorded_at) — the moment it entered the log. */
+  recordedAt: string | null;
+  /** Authoritative per-project order (project_event_log.sequence_number). */
+  sequenceNumber: number;
+  /** project_event_log.source_module / source_entity_type / source_entity_id. */
+  sourceModule: string | null;
+  sourceEntityType: string | null;
+  sourceEntityId: string | null;
+  /** State transition carried by the event, if any. */
+  fromState: string | null;
+  toState: string | null;
+  /** Explicitly recorded cause(s) — uuid[] pointing at earlier events. ONLY
+   *  present when the source registered it; never inferred from proximity. */
+  causedBy: string[];
+  /** Whether this event compensates a prior one, and which. */
+  isCompensatingEvent: boolean;
+  compensatesEventId: string | null;
+  /** Tamper-evident chain fields (read-only display). */
+  eventHash: string | null;
+  previousEventHash: string | null;
+  /** Provenance blob (capture_method, evidenceRefs, flags, idempotency_fingerprint…). */
+  provenance: Record<string, unknown> | null;
+  /** project_event_log.confidence (0–1) if recorded. */
+  confidence: number | null;
+  /** project_event_log.payload (opaque; rendered behind a collapsible section). */
+  payload: Record<string, unknown> | null;
+  /** project_event_log.visibility. */
+  visibility: string | null;
+  /** Object refs from project_event_objects (grouped by event_id). */
+  objectRefs: CanonicalEventObjectRef[];
+  /** Recorded data-quality flags from provenance (e.g. missing_prior_closure). */
+  dataQualityFlags: string[];
+  /** capture_method extracted from provenance for quick display. */
+  captureMethod: CanonicalEventCaptureMethod | null;
+  /** True iff recorded_at lags occurred_at beyond a nominal threshold. FLAGGED
+   *  ONLY from the recorded values — never recalculated or invented. */
+  lateRecorded: boolean;
+}
+
+/** Class of a projected event relationship. Drives edge styling. */
+export type EventRelationshipClass =
+  | "temporal"
+  | "causal"
+  | "compensation"
+  | "object_reference";
+
+/** The five relationship types produced by the projection. */
+export type EventRelationshipType =
+  | "project_sequence_next"
+  | "object_sequence_next"
+  | "caused_by"
+  | "compensates"
+  | "relates_to_object";
+
+/** Whether a relationship is backed by an explicit record or deterministic
+ *  projection. Causal/compensation are `explicit` (read from the log); temporal
+ *  adjacency and object-reference are `deterministic_projection` (derived from
+ *  order). This field is the audit trail that proves we never infer causality. */
+export type EventRelationshipEvidence = "explicit" | "deterministic_projection";
+
+/** A deterministic relationship between two canonical events, or between an
+ *  event and an object. Built purely from project_event_log +
+ *  project_event_objects — never written, never persisted. */
+export interface LivingGraphEventRelationship {
+  /** Deterministic id (stable across runs for the same inputs). */
+  id: string;
+  projectId: string;
+  /** Source canonical event (eventId). */
+  sourceEventId: string;
+  /** Target canonical event (eventId) for event↔event relationships. */
+  targetEventId: string | null;
+  /** Target object (object_id) for relates_to_object relationships. */
+  objectId: string | null;
+  relationshipType: EventRelationshipType;
+  relationshipClass: EventRelationshipClass;
+  /** For relates_to_object: the object_type of the referenced object. */
+  objectType: string | null;
+  /** For relates_to_object: the role the object plays relative to the event. */
+  objectRole: CanonicalEventObjectRole | null;
+  /** Sequence distance between source and target event (≥1 for temporal/causal). */
+  sequenceDistance: number;
+  /** Wall-clock lag between the two events' occurred_at (ms). Null if either
+   *  occurred_at is absent. */
+  occurredLagMs: number | null;
+  /** explicit (recorded cause/compensation) vs deterministic_projection
+   *  (derived order/object-ref). */
+  evidence: EventRelationshipEvidence;
+  metadata: Record<string, unknown>;
+}
+
 /** Full payload passed from the server page to the client view. */
 export interface LivingGraphData {
   nodes: LivingGraphNode[];
   edges: LivingGraphEdge[];
   events: LivingGraphEvent[];
   generatedAt: string;
+  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
+  // ALL OPTIONAL and backward-compatible: when the feature flag
+  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS is OFF (default), these are
+  // absent/empty and the Living Graph behaves byte-identically to before. When
+  // ON, the "events" view renders a read-only PROJECTION over the canonical
+  // event store (project_event_log + project_event_objects) — never a second
+  // event store, never a write path.
+  /** Canonical events projected from project_event_log (1:1 with log rows). */
+  canonicalEvents?: LivingGraphCanonicalEvent[];
+  /** Deterministic relationships between events / events↔objects. */
+  eventRelationships?: LivingGraphEventRelationship[];
+  /** True when the event log exceeded the explicit read limit and was
+   *  truncated. Surfaced in the view so the user knows the projection is
+   *  bounded — never silently truncated. */
+  eventsTruncated?: boolean;
 }
 
 export type LivingGraphOverlay =
