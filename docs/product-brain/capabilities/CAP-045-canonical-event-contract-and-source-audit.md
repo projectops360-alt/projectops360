@@ -399,3 +399,102 @@ layer 4) · [00-product-constitution.md](../00-product-constitution.md) (§4 PEG
 in-session the same day**, including the §A.10 resolutions of open decisions #1, #2, and #11
 (see Approval block). **P2-T2 — Implement minimum event capture is authorized** over this
 contract only.
+
+---
+
+## F. Extension — Living Graph consumes the canonical event store as a projection (2026-07-12)
+
+This section registers an **extension** of the approved CAP-045 contract (no
+decision in §A is changed). It records how the Living Graph adds an "events"
+view that is a **read-only projection** over the canonical event store — and the
+binding semantic separation between temporal adjacency and explicit causality.
+
+### F.1 What the Living Graph consumes
+
+The Living Graph already renders an **operational projection**
+(`process_nodes` / `process_edges`). The new "events" view adds a **second,
+independent projection** built from the canonical event store:
+
+```
+Canonical Event Store ──► Event Relationship Projection ──► LivingGraphData ──► Living Graph events view
+(project_event_log +       (pure, in-memory, read-only)       (canonicalEvents +       (React Flow nodes/
+ project_event_objects)                                       eventRelationships)       edges, flag-gated)
+```
+
+- `project_event_log` remains the **canonical, append-only source of truth**.
+- `project_event_objects` supplies the event↔object relationships.
+- The projection is **pure and in-memory** (`src/lib/graph/event-relationship-projection.ts`):
+  no Supabase, no I/O, no mutation of inputs, deterministic ids. It is **never
+  persisted** — there is no second event store and no copy of events into
+  `process_nodes` / `process_edges`.
+- The loader (`src/lib/graph/event-relationship-loader.ts`) reads through the
+  **authenticated, RLS-governed client** scoped by `organization_id` +
+  `project_id`; it **never constructs an admin/service-role client** for an
+  ordinary read. The read is bounded by an explicit documented limit and reports
+  truncation (never silently truncated).
+
+### F.2 Temporal adjacency ≠ causality (binding)
+
+This is the core semantic rule of the extension, and it is enforced in code:
+
+- **Temporal relationships** (`project_sequence_next`, `object_sequence_next`)
+  encode **ORDER ONLY**. They are `evidence = deterministic_projection`.
+- **Causal relationships** (`caused_by`) are emitted **ONLY when the source
+  explicitly recorded them** in `project_event_log.caused_by`. They are
+  `evidence = explicit`.
+- **Compensation** (`compensates`) is emitted **ONLY when
+  `is_compensating_event` + `compensates_event_id` are recorded**. `evidence = explicit`.
+- **We NEVER infer causality from temporal proximity.** Two adjacent events with
+  no recorded `caused_by` produce a **temporal** edge only, never a causal one.
+  The `evidence` field on every relationship is the audit trail that proves this.
+- **Nothing is invented**: no events, actors, causes, confidence, or data-quality
+  flags are synthesized. Fields absent from the log stay null/empty. The
+  `late_recorded` flag is derived from the **recorded** `occurred_at` /
+  `recorded_at` values only — it is never recalculated or invented.
+
+### F.3 Isolation from the operational analyses (binding)
+
+The event-relationship layer is **isolated by construction** from the operational
+analyses the Living Graph already runs (critical path, bottleneck, cycle
+detection, milestone metrics, task/blocker counts, workforce/labor capacity,
+readiness, variance, simulation). Three discrimination helpers enforce it:
+
+- `isExecutionRelationship(edge)` — true for a `process_edges`-sourced edge
+  (carries `edgeType`, never `relationshipClass`).
+- `isTemporalRelationship(rel)` — true for an event relationship (carries
+  `relationshipClass`, never `edgeType`).
+- `isCanonicalEventNode(node)` — true for a canonical-event node (carries
+  `eventId`, never an operational `nodeType`).
+
+Operational analyses run over `process_nodes` / `process_edges` **only**. The
+event layer feeds **only** the "events" view (and a future timeline overlay that
+declares it supports canonical events). Milestones and activities views are
+**untouched** — the three projections coexist.
+
+### F.4 Feature flag
+
+`LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS` (server-side, **default OFF**,
+CSV of project IDs or `all`). **Independent** of `RISK_EVENT_CAPTURE_PROJECT_IDS`
+— capturing events and rendering them as a graph projection are two separate
+concerns. Flag OFF ⇒ the Living Graph is **byte-identical** to before: the
+"events" view keeps its current timeline/process behavior, no canonical-events
+view, no event-relationship edges, no new controls. The flag gates only the
+read-only projection; it never gates event capture and never writes to the log.
+
+### F.5 What this extension does NOT do
+
+No new tables, no migrations, no writes to `project_event_log` /
+`project_event_objects` / `process_nodes` / `process_edges`, no backfill, no
+Process Mining metrics / Variant Analysis / Root Cause Miner, no new UI outside
+the Living Graph, no change to RI-05, no enabling of `risk_closed`, no redesign of
+the event store, no change to any approved §A decision.
+
+### F.6 Regression protection
+
+Row `LG-EVENT-RELATIONSHIPS / CAP-045 §C` in
+[regression-test-map.md](../regression-test-map.md), protected by:
+`src/lib/graph/__tests__/event-relationship-projection.test.ts` (projection
+contract, 13 cases), `src/lib/graph/__tests__/event-relationships-view.test.ts`
+(flag + discrimination + analysis isolation), and
+`src/lib/graph/__tests__/event-relationship-loader.test.ts` (read-scope +
+no-admin-client). CI green (typecheck + `test:run` + build).

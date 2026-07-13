@@ -6,7 +6,12 @@
 // ============================================================================
 
 import type { Node, Edge } from "@xyflow/react";
-import type { LivingGraphNode, LivingGraphEdge } from "@/types/living-graph";
+import type {
+  LivingGraphNode,
+  LivingGraphEdge,
+  LivingGraphCanonicalEvent,
+  LivingGraphEventRelationship,
+} from "@/types/living-graph";
 import type { NodeMetrics, OverlayEmphasis } from "@/lib/graph/living-graph-analysis";
 
 /** Visual state derived from timeline playback. */
@@ -37,6 +42,36 @@ export type LivingNodeData = {
 };
 
 export type LivingFlowNode = Node<LivingNodeData, "living" | "milestoneCard">;
+
+// ── Canonical-event Relationships view (CAP-045 extension) ───────────────────
+// A distinct node type so canonical-event nodes never collide with the
+// operational "living"/"milestoneCard" nodes — the analyses and the
+// milestones/activities views are isolated by construction.
+export type CanonicalEventNodeData = {
+  event: LivingGraphCanonicalEvent;
+  /** True when this node is the current selection. */
+  selected: boolean;
+};
+
+export type CanonicalEventFlowNode = Node<CanonicalEventNodeData, "canonicalEvent">;
+
+/** Secondary object node (event↔object reference). Visually muted/smaller. */
+export type CanonicalObjectNodeData = {
+  objectType: string;
+  objectId: string;
+  label: string;
+  selected: boolean;
+};
+
+export type CanonicalObjectFlowNode = Node<CanonicalObjectNodeData, "canonicalObject">;
+
+export type CanonicalEventEdgeData = {
+  relationship: LivingGraphEventRelationship;
+  /** temporal | causal | compensation | object_reference — drives styling. */
+  relationshipClass: LivingGraphEventRelationship["relationshipClass"];
+};
+
+export type CanonicalEventFlowEdge = Edge<CanonicalEventEdgeData, "canonicalEventEdge">;
 
 export type LivingEdgeData = {
   edge: LivingGraphEdge;
