@@ -36,6 +36,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Cap the event window read for one projection run (newest-first, then replayed in order). */
 const MAX_EVENTS = 5000;
+const OBJECT_REF_BATCH_SIZE = 250;
 
 export type MilestoneFlowLoadResult =
   | {
@@ -65,7 +66,13 @@ interface EventLogRow {
   payload: Record<string, unknown> | null;
 }
 
-function toEventRef(row: EventLogRow): MilestoneFlowEventRef {
+interface EventObjectRow {
+  event_id: string;
+  object_id: string;
+  role: string;
+}
+
+function toEventRef(row: EventLogRow, milestoneFromRef: string | null): MilestoneFlowEventRef {
   const payloadMilestoneId = row.payload?.["milestone_id"];
   return {
     eventId: row.event_id,
@@ -79,8 +86,33 @@ function toEventRef(row: EventLogRow): MilestoneFlowEventRef {
     lifecycleClass: row.event_lifecycle_class,
     confidence: row.confidence,
     isCompensatingEvent: row.is_compensating_event,
-    milestoneId: typeof payloadMilestoneId === "string" ? payloadMilestoneId : null,
+    milestoneId: milestoneFromRef ?? (typeof payloadMilestoneId === "string" ? payloadMilestoneId : null),
   };
+}
+
+async function loadMilestoneRefsByEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventIds: string[],
+): Promise<Map<string, string>> {
+  const byEvent = new Map<string, string>();
+  for (let offset = 0; offset < eventIds.length; offset += OBJECT_REF_BATCH_SIZE) {
+    const batch = eventIds.slice(offset, offset + OBJECT_REF_BATCH_SIZE);
+    const result = await supabase
+      .from("project_event_objects")
+      .select("event_id, object_id, role")
+      .in("event_id", batch)
+      .eq("object_type", "milestone");
+    if (result.error) continue;
+    for (const ref of (result.data ?? []) as EventObjectRow[]) {
+      // A task's current milestone is the `phase` ref. Milestone lifecycle
+      // events use the milestone itself as `focal`. Previous-phase refs never
+      // override either current relation.
+      if (ref.role === "phase" || (ref.role === "focal" && !byEvent.has(ref.event_id))) {
+        byEvent.set(ref.event_id, ref.object_id);
+      }
+    }
+  }
+  return byEvent;
 }
 
 function toMilestoneRef(m: Milestone, predecessorId: string | null): MilestoneFlowMilestoneRef {
@@ -160,7 +192,11 @@ export async function loadMilestoneFlowProjection(
   const milestoneRefs = milestones.map((m, i) =>
     toMilestoneRef(m, i > 0 ? milestones[i - 1].id : null),
   );
-  const events = eventRows.map(toEventRef);
+  const milestoneRefsByEvent = await loadMilestoneRefsByEvent(
+    supabase,
+    eventRows.map((row) => row.event_id),
+  );
+  const events = eventRows.map((row) => toEventRef(row, milestoneRefsByEvent.get(row.event_id) ?? null));
 
   // Engine-side access gate (deny-by-default, tenant-isolated). The project was
   // validated against the caller's org above, so its id is the authorized set.

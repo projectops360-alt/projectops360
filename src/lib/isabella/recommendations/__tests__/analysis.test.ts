@@ -56,6 +56,9 @@ describe("category mapping", () => {
     expect(mapFindingToRecommendationCategory(finding({ constraintType: "milestone_assignment_gap" }))).toBe("assign_milestone");
     expect(mapFindingToRecommendationCategory(finding({ constraintType: "overdue_constraint" }))).toBe("recover_overdue_work");
     expect(mapFindingToRecommendationCategory(finding({ constraintType: "stalled_progress" }))).toBe("reduce_execution_uncertainty");
+    expect(mapFindingToRecommendationCategory(finding({ constraintType: "process_delay" }))).toBe("review_process_friction");
+    expect(mapFindingToRecommendationCategory(finding({ constraintType: "rework_signal" }))).toBe("review_process_friction");
+    expect(mapFindingToRecommendationCategory(finding({ constraintType: "bottleneck_signal" }))).toBe("review_process_friction");
     // future / unsupported → null (no fabrication)
     for (const t of ["sequencing_gap", "decision_delay", "approval_delay", "external_dependency", "capacity_signal", "evidence_gap"] as const) {
       expect(mapFindingToRecommendationCategory(finding({ constraintType: t }))).toBeNull();

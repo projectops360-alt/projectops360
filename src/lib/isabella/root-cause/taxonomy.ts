@@ -23,6 +23,9 @@ const LABELS: Record<ConstraintType, { en: string; es: string }> = {
   approval_delay: { en: "Approval delay", es: "Retraso de aprobación" },
   external_dependency: { en: "External dependency", es: "Dependencia externa" },
   capacity_signal: { en: "Capacity signal", es: "Señal de capacidad" },
+  process_delay: { en: "Process delay", es: "Retraso de proceso" },
+  rework_signal: { en: "Rework signal", es: "Señal de retrabajo" },
+  bottleneck_signal: { en: "Bottleneck candidate", es: "Candidato a cuello de botella" },
   evidence_gap: { en: "Evidence gap", es: "Gap de evidencia" },
 };
 

@@ -32,7 +32,7 @@ async function loadContext(scope: IsabellaProjectScope, args: ProcessIntelligenc
   return buildIsabellaProcessContext({
     projectId: scope.projectId,
     locale: lang(scope),
-    include: ["project", "tasks", "milestones", "blockers"],
+    include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"],
     focus: args.task_id ? { taskId: args.task_id } : args.milestone_id ? { milestoneId: args.milestone_id } : undefined,
   });
 }

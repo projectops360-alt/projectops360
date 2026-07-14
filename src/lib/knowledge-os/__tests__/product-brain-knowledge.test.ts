@@ -36,6 +36,12 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
 
   // ── Seed QA facts (TASK 10): the corpus must state the correct answers ──────
   const facts: Array<[string, RegExp]> = [
+    ["pi-process-mining-layer-truth", /one case per task/i],
+    ["pi-process-mining-layer-truth", /causality exists only.*caused_by/i],
+    ["pi-process-mining-reading-views", /Statistical Root Cause reports association/i],
+    ["pi-process-mining-reading-views", /not computable/i],
+    ["pi-isabella-process-mining-sources", /three governed sources/i],
+    ["pi-isabella-process-mining-sources", /screen layout.*never business truth/i],
     ["pi-critical-path-source-of-truth", /Living Graph/i],
     ["pi-critical-path-source-of-truth", /must NOT maintain a separate Critical Path engine/i],
     ["pi-workboard-task-cards", /avatar.*initials|initials/i],

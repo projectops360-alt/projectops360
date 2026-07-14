@@ -163,7 +163,7 @@ export async function buildIsabellaRecommendationPlan(request: RecommendationReq
   const language: RecommendationLanguage = request.locale === "es" ? "es" : "en";
   const context =
     request.context ??
-    (await buildIsabellaProcessContext({ projectId: request.projectId, locale: language, include: ["project", "tasks", "milestones", "blockers"] }));
+    (await buildIsabellaProcessContext({ projectId: request.projectId, locale: language, include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"] }));
   const actionable = context.status === "ready" || context.status === "partial";
   const diagnosis =
     request.dailyDiagnosis ?? (actionable ? assembleDailyDiagnosis(context, language) : undefined);

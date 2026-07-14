@@ -13,7 +13,8 @@ import { getOrgContext } from "@/lib/auth";
 import { resolveIsabellaProjectAccess } from "./access";
 import { getIsabellaTaskEvidence } from "./task-evidence";
 import { getIsabellaMilestoneEvidence } from "./milestone-evidence";
-import { buildProcessSignals } from "./process-signals";
+import { getIsabellaProcessMiningEvidence } from "./process-mining-evidence";
+import { buildProcessSignals, mergeProcessMiningSignals } from "./process-signals";
 import { buildIsabellaCitation, safeRef } from "./evidence-builder";
 import type {
   IsabellaContextInclude,
@@ -25,8 +26,6 @@ const DEFAULT_INCLUDES: IsabellaContextInclude[] = ["project", "tasks", "milesto
 
 // Includes recognized by the contract but not wired to a source yet → disclosed.
 const FUTURE_INCLUDES: Record<string, { en: string; es: string }> = {
-  living_graph_summary: { en: "Living Graph summary is not wired into this layer yet.", es: "El resumen del Living Graph aún no está conectado a esta capa." },
-  milestone_flow_summary: { en: "Milestone Process Flow summary is not wired yet.", es: "El resumen del Milestone Process Flow aún no está conectado." },
   risks: { en: "Risk evidence is not available in this layer yet.", es: "La evidencia de riesgos aún no está disponible en esta capa." },
   decisions: { en: "Decision evidence is not available yet.", es: "La evidencia de decisiones aún no está disponible." },
   approvals: { en: "Approval evidence is not available yet.", es: "La evidencia de aprobaciones aún no está disponible." },
@@ -71,6 +70,7 @@ export async function buildIsabellaProcessContext(
   }
 
   const limitations: string[] = [];
+  let requestedSourcePartial = false;
   const ctx: IsabellaProcessContext = {
     scope,
     project: null,
@@ -122,6 +122,26 @@ export async function buildIsabellaProcessContext(
     }
   }
 
+  // ── Process Mining Layer: approved PEG summaries + MPF derived findings ──
+  if (
+    included.includes("process_mining_summary")
+    || included.includes("living_graph_summary")
+    || included.includes("milestone_flow_summary")
+  ) {
+    try {
+      const mining = await getIsabellaProcessMiningEvidence(scope);
+      ctx.processMiningContext = mining.context;
+      ctx.processSignals = mergeProcessMiningSignals(ctx.processSignals, mining.signals);
+      ctx.evidencePackets.push(...mining.packets);
+      ctx.citations.push(...mining.citations);
+      limitations.push(...mining.limitations);
+      requestedSourcePartial = mining.context.status !== "ready";
+    } catch {
+      requestedSourcePartial = true;
+      limitations.push(es ? "No pude cargar la capa de Process Mining." : "Could not load the Process Mining Layer.");
+    }
+  }
+
   // ── Project summary fallback (if tasks were not requested) ──────────────────
   if (!ctx.project) {
     ctx.project = { projectId: scope.projectId, name: es ? "Proyecto" : "Project", citationRef: safeRef("project", scope.projectId) };
@@ -148,12 +168,14 @@ export async function buildIsabellaProcessContext(
   // ── Status resolution ──────────────────────────────────────────────────────
   const noTasks = !ctx.taskContext || ctx.taskContext.totalVisibleTasks === 0;
   const noMilestones = !ctx.milestoneContext || ctx.milestoneContext.totalVisibleMilestones === 0;
+  const noProcessMining = !ctx.processMiningContext
+    || (ctx.processMiningContext.eventCount === 0 && ctx.processMiningContext.transitionCount === 0);
   if (limitations.some((l) => l.includes("Could not load") || l.includes("No pude cargar"))) {
     ctx.status = "partial";
-  } else if (noTasks && noMilestones) {
+  } else if (noTasks && noMilestones && noProcessMining) {
     ctx.status = "empty";
     ctx.message = es ? "Este proyecto no tiene datos visibles para ti todavía." : "This project has no data visible to you yet.";
-  } else if (requestedFuture) {
+  } else if (requestedFuture || requestedSourcePartial) {
     ctx.status = "partial";
   } else {
     ctx.status = "ready";

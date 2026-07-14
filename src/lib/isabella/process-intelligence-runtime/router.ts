@@ -17,6 +17,9 @@ import type { IsabellaRoute, IsabellaScreenContext, IsabellaSelectedNode } from 
 const RE_WANTS_RECOMMENDATION = /\brecommend|recomien|next (action|step)|pr[oó]ximos pasos|qu[eé] (debo|deber[ií]a) (hacer|revisar|priorizar|atender|empezar|abordar)|what should i (do|review|check|look at)|revisar primero|review first|check first/i;
 const RE_WANTS_STATUS_OR_CAUSE = /what.*happen|qu[eé] .*(pasa|pasando|atenci[oó]n)|needs? attention|necesita atenci[oó]n|\bwhy\b|por qu[eé]|\bcaus/i;
 
+const RE_PROCESS_MINING_SUBJECT = /process mining|min(?:er[ií]a|ado) de procesos|capa de procesos|canonical events?|eventos? can[oó]nicos?|event history|historial de eventos|milestone (?:process )?flow|flujo de hitos|task cases?|casos? de tarea/i;
+const RE_PROCESS_MINING_FACT = /\bsummary|resumen|status|estado|how many|cu[aá]nt|count|conteo|events?|eventos?|cases?|casos?|transitions?|transiciones?|integrity|integridad|history|historial|findings?|hallazgos?|delay|retraso|rework|retrabajo|bottleneck|cuello de botella/i;
+
 export interface IsabellaRouteDecision {
   route: IsabellaRoute;
   scope: { milestoneId?: string; taskId?: string };
@@ -58,11 +61,19 @@ export function routeIsabellaQuestion(
     // We have deterministic content for Resources/participants and task surfaces;
     // unknown/ambiguous screens still route here so the runtime can ask a safe
     // clarification instead of guessing another screen.
-    if (area === "resources" || area === "task" || area === "unknown") {
+    if (area === "resources" || area === "task" || area === "process_mining" || area === "unknown") {
       return { route: "screen_context_explanation", scope, needsClarification: false };
     }
     // A known-but-uncovered screen → RAG (product knowledge), never an engine.
     return { route: "product_help", scope, needsClarification: false };
+  }
+
+  // Current-project Process Mining facts are deterministic aggregates from the
+  // authorized Project Event Graph + Milestone Process Flow adapters. Keep
+  // conceptual questions ("what is Process Mining?") in Product Brain/RAG by
+  // requiring both a mining subject and an explicit data/status noun.
+  if (RE_PROCESS_MINING_SUBJECT.test(q) && RE_PROCESS_MINING_FACT.test(q)) {
+    return decide("process_mining_summary", scope, hasScope);
   }
 
   // `mixed`: a recommendation ask joined with a status/attention/why ask.

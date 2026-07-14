@@ -23,6 +23,7 @@ function tt(es: boolean, en: string, esT: string): string {
 }
 
 const RATIONALE: Record<string, { en: string; es: string }> = {
+  review_process_friction: { en: "the Process Mining Layer found evidenced delay, rework, or bottleneck friction that still needs human validation", es: "la capa de Process Mining detecto friccion de retraso, retrabajo o cuello de botella que aun requiere validacion humana" },
   resolve_explicit_blocker: { en: "an explicit blocker is recorded on the affected work", es: "hay un bloqueo explícito registrado en el trabajo afectado" },
   assign_owner: { en: "the analysis found an ownership gap on active tasks", es: "el análisis detectó una brecha de responsable en tareas activas" },
   assign_milestone: { en: "tasks sit outside the milestone/execution structure", es: "hay tareas fuera de la estructura de hitos/ejecución" },
@@ -34,6 +35,7 @@ const RATIONALE: Record<string, { en: string; es: string }> = {
 };
 
 const OUTCOME: Record<string, { en: string; es: string }> = {
+  review_process_friction: { en: "Expected impact: confirm the affected flow and evidence before selecting a corrective action.", es: "Impacto esperado: confirmar el flujo afectado y su evidencia antes de elegir una accion correctiva." },
   resolve_explicit_blocker: { en: "Expected impact: unblock execution once the impediment is cleared.", es: "Impacto esperado: desbloquear la ejecución al resolver el impedimento." },
   assign_owner: { en: "Expected impact: improve accountability so the work can move.", es: "Impacto esperado: mejorar la accountability para que el trabajo avance." },
   assign_milestone: { en: "Expected impact: increase clarity on where the work belongs.", es: "Impacto esperado: aumentar la claridad sobre dónde pertenece el trabajo." },
@@ -45,6 +47,7 @@ const OUTCOME: Record<string, { en: string; es: string }> = {
 };
 
 const VERB: Record<string, { en: string; es: string }> = {
+  review_process_friction: { en: "Review the evidenced process friction for", es: "Revisar la friccion de proceso evidenciada de" },
   resolve_explicit_blocker: { en: "Review and resolve the active blocker on", es: "Revisar y resolver el bloqueo activo en" },
   assign_owner: { en: "Assign or confirm an accountable owner for", es: "Asignar o confirmar un responsable para" },
   assign_milestone: { en: "Attach to the correct milestone or confirm out-of-scope for", es: "Asociar al hito correcto o confirmar fuera de alcance para" },

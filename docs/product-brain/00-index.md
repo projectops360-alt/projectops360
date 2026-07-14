@@ -70,6 +70,8 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [32-product-ux-contracts.md](32-product-ux-contracts.md) | **Product UX Contracts** — approved, test-protected UX behaviors (UX-001 Isabella Welcome Hero Lifecycle) |
 | [regression-test-map.md](regression-test-map.md) | **Regression → Test Map** — each protected REG-###/UX contract ↔ the test that fails if it returns (executable governance) |
 
+| [isabella-process-mining-layer-training.md](isabella-process-mining-layer-training.md) | **Isabella × Process Mining** — governed three-source training contract: deterministic project/event data, vectorized Product Brain, and screen/program context |
+
 ### Sub-repositories
 
 | Folder | Purpose |

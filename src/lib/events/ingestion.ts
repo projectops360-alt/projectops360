@@ -658,6 +658,52 @@ export async function emitProjectEvents(batch: EmitEventInput[]): Promise<EmitRe
   return out;
 }
 
+interface AtomicAppendRpcResult {
+  ok?: boolean;
+  deduped?: boolean;
+  event_id?: string;
+  error?: string;
+}
+
+/**
+ * Append one mining-ready task/milestone/dependency event through the generic
+ * atomic PEG RPC. The database owns sequence allocation, previous-hash lookup,
+ * event insert and OCEL refs in one transaction, so concurrent writers cannot
+ * split the tamper-evident chain.
+ */
+export async function emitProcessMiningEventAtomic(input: EmitEventInput): Promise<EmitResult> {
+  const prepared = prepareAtomicEvent(input);
+  if (!prepared.ok) return { ok: false, error: "validation_failed", errors: prepared.errors };
+
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc("append_process_event_atomic", {
+      p_event: prepared.data.event,
+      p_payload_text: prepared.data.payloadText,
+      p_refs: prepared.data.refs,
+    });
+    if (error) {
+      console.error("[events] atomic process append failed:", error.message);
+      return { ok: false, error: error.message || "atomic_append_failed" };
+    }
+    const result = data as AtomicAppendRpcResult | null;
+    if (!result?.ok || !result.event_id) {
+      return { ok: false, error: result?.error ?? "atomic_append_failed" };
+    }
+    return { ok: true, eventId: result.event_id, deduped: result.deduped === true };
+  } catch (error) {
+    console.error("[events] atomic process append exception:", error);
+    return { ok: false, error: "exception" };
+  }
+}
+
+/** Append a mining-ready batch sequentially through the atomic RPC. */
+export async function emitProcessMiningEventsAtomic(batch: EmitEventInput[]): Promise<EmitResult[]> {
+  const results: EmitResult[] = [];
+  for (const input of batch) results.push(await emitProcessMiningEventAtomic(input));
+  return results;
+}
+
 /** Emit a compensating event that corrects a prior event (never an edit). */
 export async function emitCompensatingEvent(
   input: Omit<EmitEventInput, "isCompensatingEvent"> & { compensatesEventId: string },

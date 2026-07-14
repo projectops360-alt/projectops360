@@ -14,6 +14,7 @@ import {
 
 const RESOURCES = { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" };
 const TASK = { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" };
+const PROCESS_MINING = { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" };
 
 describe("intent detection", () => {
   it("detects UI-meaning questions (EN + ES, typos, seeded token)", () => {
@@ -52,6 +53,11 @@ describe("area resolution", () => {
   });
   it("resolves task/workboard surfaces to task", () => {
     expect(resolveScreenArea(TASK)).toBe("task");
+  });
+  it("resolves Execution Map process surfaces to process_mining", () => {
+    expect(resolveScreenArea(PROCESS_MINING)).toBe("process_mining");
+    expect(resolveScreenArea({ pathname: "/projects/p1/execution-map/milestone-flow" })).toBe("process_mining");
+    expect(resolveScreenArea({ pathname: "/projects/p1/execution-map/root-causes" })).toBe("process_mining");
   });
   it("missing context → unknown", () => {
     expect(resolveScreenArea(undefined)).toBe("unknown");
@@ -105,6 +111,35 @@ describe("Task owner unassigned (D) — distinct domain", () => {
     expect(r.confident).toBe(true);
     expect(r.answer.toLowerCase()).toMatch(/tarea/);
     expect(r.answer.toLowerCase()).toContain("owner");
+  });
+});
+
+describe("Process Mining screen/program context", () => {
+  it("explains the three readable levels and preserves the causality boundary", () => {
+    const result = answerScreenHelp("Explain this screen", PROCESS_MINING, "en");
+    expect(result.area).toBe("process_mining");
+    expect(result.confident).toBe(true);
+    expect(result.answer).toMatch(/Task cases/);
+    expect(result.answer).toMatch(/Process/);
+    expect(result.answer).toMatch(/Full audit/);
+    expect(result.answer).toMatch(/temporal order is not causality/i);
+  });
+
+  it("explains full audit from canonical events, not visual layout", () => {
+    const result = answerScreenHelp("What does Full audit mean?", PROCESS_MINING, "en");
+    expect(result.term).toBe("full_audit");
+    expect(result.answer).toMatch(/canonical event ledger/i);
+    expect(result.answer).toMatch(/caused_by/);
+  });
+
+  it("describes statistical root cause as association, not confirmed cause", () => {
+    const result = answerScreenHelp(
+      "Explain this screen",
+      { module: "process_mining", screen: "root_causes", pathname: "/projects/p1/execution-map/root-causes" },
+      "en",
+    );
+    expect(result.answer).toMatch(/statistical associations/i);
+    expect(result.answer).toMatch(/not a confirmed cause/i);
   });
 });
 

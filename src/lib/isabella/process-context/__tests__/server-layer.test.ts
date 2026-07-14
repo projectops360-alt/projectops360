@@ -159,7 +159,7 @@ describe("executeDeterministicProjectDataRequest", () => {
 describe("import boundaries (read-only)", () => {
   const dir = fileURLToPath(new URL("../", import.meta.url));
   it("no module writes the event log / process graph or mutates", () => {
-    for (const f of ["access.ts", "context-builder.ts", "task-evidence.ts", "milestone-evidence.ts", "process-signals.ts", "evidence-builder.ts", "query-executor.ts"]) {
+    for (const f of ["access.ts", "context-builder.ts", "task-evidence.ts", "milestone-evidence.ts", "process-signals.ts", "process-mining-evidence.ts", "evidence-builder.ts", "query-executor.ts"]) {
       const src = readFileSync(dir + f, "utf8");
       expect(src, f).not.toMatch(/\.from\(["'](?:project_event_log|process_nodes|process_edges)["']\)/);
       expect(src, f).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);

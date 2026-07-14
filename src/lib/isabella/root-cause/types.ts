@@ -25,6 +25,9 @@ export type ConstraintType =
   | "approval_delay"
   | "external_dependency"
   | "capacity_signal"
+  | "process_delay"
+  | "rework_signal"
+  | "bottleneck_signal"
   | "evidence_gap";
 
 export type RootCauseClassification =
@@ -42,6 +45,9 @@ export type SymptomType =
   | "missing_milestone"
   | "stalled"
   | "partial_context"
+  | "process_delay"
+  | "rework"
+  | "bottleneck"
   | "unknown";
 
 export interface AffectedEntity {
@@ -145,5 +151,8 @@ export const SUPPORTED_CONSTRAINT_TYPES: ConstraintType[] = [
   "ownership_gap",
   "milestone_assignment_gap",
   "overdue_constraint",
+  "process_delay",
+  "rework_signal",
+  "bottleneck_signal",
   "evidence_gap",
 ];

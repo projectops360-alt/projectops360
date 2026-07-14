@@ -26,6 +26,14 @@ function taskRefs(context: IsabellaProcessContext, type: "task" | "subtask" | "m
     .slice(0, 12) as string[];
 }
 
+function processRefs(context: IsabellaProcessContext, type: "delay_finding" | "rework_finding" | "bottleneck_finding"): string[] {
+  return context.evidencePackets
+    .filter((packet) => packet.evidenceType === type)
+    .map((packet) => packet.citationRef ?? packet.evidenceId)
+    .filter(Boolean)
+    .slice(0, 12) as string[];
+}
+
 // ── Progress ─────────────────────────────────────────────────────────────────
 export function buildProgressSection(context: IsabellaProcessContext, language: DiagnosisLanguage): DiagnosisSection {
   const es = language === "es";
@@ -91,6 +99,9 @@ export function buildRisksOrAttentionSection(context: IsabellaProcessContext, la
   if (s.blockedTasks > 0) items.push({ label: tt(es, "Blocked tasks", "Tareas bloqueadas"), detail: `${s.blockedTasks}`, severity: "blocked", confidence: conf, evidenceRefs: taskRefs(context, "blocker") });
   if (s.withoutMilestoneTasks > 0) items.push({ label: tt(es, "Tasks without milestone", "Tareas sin hito"), detail: `${s.withoutMilestoneTasks}`, severity: "watch", confidence: conf, evidenceRefs: [] });
   if (s.withoutOwnerTasks > 0) items.push({ label: tt(es, "Tasks without owner", "Tareas sin responsable"), detail: `${s.withoutOwnerTasks}`, severity: "watch", confidence: conf, evidenceRefs: [] });
+  if (s.delayFindingCount > 0) items.push({ label: tt(es, "Process delay findings", "Hallazgos de retraso de proceso"), detail: `${s.delayFindingCount}`, severity: "at_risk", confidence: "medium", evidenceRefs: processRefs(context, "delay_finding") });
+  if (s.reworkFindingCount > 0) items.push({ label: tt(es, "Rework findings", "Hallazgos de retrabajo"), detail: `${s.reworkFindingCount}`, severity: "at_risk", confidence: "medium", evidenceRefs: processRefs(context, "rework_finding") });
+  if (s.bottleneckFindingCount > 0) items.push({ label: tt(es, "Bottleneck candidates", "Candidatos a cuello de botella"), detail: `${s.bottleneckFindingCount}`, severity: "watch", confidence: "medium", evidenceRefs: processRefs(context, "bottleneck_finding") });
 
   const sev = items.some((i) => i.severity === "blocked" || i.severity === "at_risk") ? "at_risk" : items.length > 0 ? "watch" : "ok";
   return {
@@ -101,8 +112,11 @@ export function buildRisksOrAttentionSection(context: IsabellaProcessContext, la
         ? tt(es, `${items.length} attention signal(s) detected.`, `${items.length} señal(es) de atención detectada(s).`)
         : tt(es, "No attention signals detected from available evidence.", "No se detectan señales de atención en la evidencia disponible."),
     items,
-    // "Attention signal" ≠ a formal risk record — no risk evidence source exists here.
-    limitations: [tt(es, "Formal risk evidence is not available in this context (attention signals only).", "La evidencia formal de riesgos no está disponible en este contexto (solo señales de atención).")],
+    // Process findings are derived signals, not formal risks or causal proof.
+    limitations: [
+      tt(es, "Formal risk evidence is not available in this context (attention signals only).", "La evidencia formal de riesgos no está disponible en este contexto (solo señales de atención)."),
+      tt(es, "Process findings are derived signals, not formal risks or confirmed causes.", "Los hallazgos de proceso son señales derivadas, no riesgos formales ni causas confirmadas."),
+    ],
   };
 }
 
@@ -187,6 +201,9 @@ export function buildTodayFocusSection(context: IsabellaProcessContext, language
   if (s.overdueTasks > 0) area(tt(es, "Review overdue tasks", "Revisar tareas vencidas"), `${s.overdueTasks}`, "at_risk");
   if (s.withoutOwnerTasks > 0) area(tt(es, "Assign owners to unassigned tasks", "Asignar responsables a tareas sin owner"), `${s.withoutOwnerTasks}`, "watch");
   if (s.withoutMilestoneTasks > 0) area(tt(es, "Validate tasks without milestone", "Validar tareas sin hito"), `${s.withoutMilestoneTasks}`, "watch");
+  if (s.delayFindingCount > 0) area(tt(es, "Review process delays", "Revisar retrasos de proceso"), `${s.delayFindingCount}`, "at_risk", processRefs(context, "delay_finding"));
+  if (s.reworkFindingCount > 0) area(tt(es, "Review rework loops", "Revisar ciclos de retrabajo"), `${s.reworkFindingCount}`, "at_risk", processRefs(context, "rework_finding"));
+  if (s.bottleneckFindingCount > 0) area(tt(es, "Validate bottleneck candidates", "Validar candidatos a cuello de botella"), `${s.bottleneckFindingCount}`, "watch", processRefs(context, "bottleneck_finding"));
 
   return {
     title: tt(es, "Today's focus", "Foco de hoy"),

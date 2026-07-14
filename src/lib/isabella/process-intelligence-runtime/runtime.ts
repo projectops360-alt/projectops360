@@ -26,6 +26,8 @@ import type {
   RuntimeLanguage,
 } from "./types";
 
+const PROCESS_MINING_SOURCE_KINDS = new Set(["project_event_graph", "milestone_process_flow"]);
+
 function runtimeStatusFromContext(status: string): IsabellaRuntimeStatus {
   switch (status) {
     case "ready":
@@ -116,7 +118,7 @@ export async function runIsabellaProcessIntelligence(
     context = await build({
       projectId: request.projectId,
       locale: language,
-      include: ["project", "tasks", "milestones", "blockers"],
+      include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"],
       focus: decision.scope.taskId ? { taskId: decision.scope.taskId } : decision.scope.milestoneId ? { milestoneId: decision.scope.milestoneId } : undefined,
     });
   } catch {
@@ -145,6 +147,10 @@ function synthesize(
   audit: (over: Partial<IsabellaProcessIntelligenceAudit>) => IsabellaProcessIntelligenceAudit,
   started: number,
 ): IsabellaProcessIntelligenceResult {
+  if (route === "process_mining_summary") {
+    return synthesizeProcessMiningSummary(context, language, audit, started);
+  }
+
   const diagnosis = assembleDailyDiagnosis(context, language);
 
   if (route === "daily_diagnosis") {
@@ -198,6 +204,87 @@ function synthesize(
     structuredResult: { diagnosis, analysis, plan },
     evidenceRefs, citations: plan.citations, limitations: plan.limitations,
     audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: analysis.confidence, evidenceRefCount: evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
+  };
+}
+
+function synthesizeProcessMiningSummary(
+  context: IsabellaProcessContext,
+  language: RuntimeLanguage,
+  audit: (over: Partial<IsabellaProcessIntelligenceAudit>) => IsabellaProcessIntelligenceAudit,
+  started: number,
+): IsabellaProcessIntelligenceResult {
+  const es = language === "es";
+  const mining = context.processMiningContext;
+  if (!mining || mining.status === "unavailable") {
+    return {
+      status: "unavailable",
+      route: "process_mining_summary",
+      answer: es
+        ? "La capa de Process Mining no está disponible para este proyecto en este momento."
+        : "The Process Mining Layer is not available for this project right now.",
+      limitations: context.limitations,
+      audit: audit({
+        resultStatus: mining?.status ?? "unavailable",
+        confidence: "unavailable",
+        limitationsCount: context.limitations.length,
+        executionMs: Date.now() - started,
+      }),
+    };
+  }
+
+  const processPackets = context.evidencePackets.filter((packet) => PROCESS_MINING_SOURCE_KINDS.has(packet.sourceKind));
+  const processRefs = [...new Set(
+    processPackets.map((packet) => packet.citationRef ?? packet.evidenceId).filter(Boolean),
+  )] as string[];
+  const safeRefs = new Set(processRefs);
+  const citations = context.citations.filter((citation) => citation.safeRef && safeRefs.has(citation.safeRef));
+  const integrity = mining.integrityValid == null
+    ? (es ? "no evaluada" : "not evaluated")
+    : mining.integrityValid
+      ? (es ? "válida" : "valid")
+      : es
+        ? `${mining.integrityIssueCount} incidencia(s)`
+        : `${mining.integrityIssueCount} issue(s)`;
+  const window = mining.firstOccurredAt && mining.lastOccurredAt
+    ? `${mining.firstOccurredAt} → ${mining.lastOccurredAt}`
+    : (es ? "sin eventos observados" : "no observed events");
+  const answer = es
+    ? [
+        "**Process Mining Layer — resumen verificado**",
+        `- Eventos canónicos minables: **${mining.eventCount}** (tareas ${mining.taskEventCount}, hitos ${mining.milestoneEventCount}, dependencias ${mining.dependencyEventCount}).`,
+        `- Casos: **${mining.caseCount}**. Transiciones observadas: **${mining.transitionCount}**.`,
+        `- Integridad de la ventana canónica: **${integrity}**.`,
+        `- Hallazgos derivados: retrasos ${mining.delayFindingCount}, bloqueos ${mining.blockerFindingCount}, retrabajo ${mining.reworkFindingCount}, cuellos de botella ${mining.bottleneckFindingCount}.`,
+        `- Ventana observada: ${window}.`,
+        "La sucesión temporal muestra qué ocurrió después; no demuestra causalidad. Los hallazgos derivados requieren corroboración antes de afirmar una causa.",
+      ].join("\n")
+    : [
+        "**Process Mining Layer — verified summary**",
+        `- Mineable canonical events: **${mining.eventCount}** (tasks ${mining.taskEventCount}, milestones ${mining.milestoneEventCount}, dependencies ${mining.dependencyEventCount}).`,
+        `- Cases: **${mining.caseCount}**. Observed transitions: **${mining.transitionCount}**.`,
+        `- Canonical-window integrity: **${integrity}**.`,
+        `- Derived findings: delays ${mining.delayFindingCount}, blockers ${mining.blockerFindingCount}, rework ${mining.reworkFindingCount}, bottlenecks ${mining.bottleneckFindingCount}.`,
+        `- Observed window: ${window}.`,
+        "Temporal succession shows what happened next; it does not prove causality. Derived findings require corroboration before asserting a cause.",
+      ].join("\n");
+
+  return {
+    status: "answered",
+    route: "process_mining_summary",
+    answer,
+    structuredResult: mining,
+    evidenceRefs: processRefs,
+    citations,
+    limitations: context.limitations,
+    audit: audit({
+      enginesUsed: ["process_mining_summary"],
+      resultStatus: mining.status,
+      confidence: mining.integrityValid === true && mining.status === "ready" ? "verified" : "medium",
+      evidenceRefCount: processRefs.length,
+      citationCount: citations.length,
+      limitationsCount: context.limitations.length,
+      executionMs: Date.now() - started,
+    }),
   };
 }
 

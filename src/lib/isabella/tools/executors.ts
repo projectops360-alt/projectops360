@@ -162,7 +162,7 @@ export async function executeGetProjectSummary(_org: OrgContext, scope: Isabella
   const ctx = await buildIsabellaProcessContext({
     projectId: scope.projectId,
     locale: lang(scope),
-    include: ["project", "tasks", "milestones", "blockers"],
+    include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"],
   });
   const status = CTX_STATUS_MAP[ctx.status] ?? "unavailable";
   if (status !== "success" && status !== "empty") {

@@ -118,6 +118,11 @@ export function assembleDailyDiagnosis(context: IsabellaProcessContext, language
       withoutMilestoneTasks: s.withoutMilestoneTasks,
       withoutOwnerTasks: s.withoutOwnerTasks,
       milestonesTotal: s.milestonesTotal,
+      processEventCount: s.processEventCount,
+      processTransitionCount: s.processTransitionCount,
+      delayFindingCount: s.delayFindingCount,
+      reworkFindingCount: s.reworkFindingCount,
+      bottleneckFindingCount: s.bottleneckFindingCount,
     },
     evidenceRefs: evidence.evidenceRefs,
     citations: evidence.citations,
@@ -147,7 +152,7 @@ export async function buildIsabellaDailyProcessDiagnosis(request: DailyDiagnosis
     (await buildIsabellaProcessContext({
       projectId: request.projectId,
       locale: language,
-      include: ["project", "tasks", "milestones", "blockers"],
+      include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"],
     }));
   return assembleDailyDiagnosis(context, language);
 }
