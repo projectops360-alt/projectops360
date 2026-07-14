@@ -124,7 +124,7 @@ describe("CAP-045 LivingGraphData view-model contract", () => {
   it("flag ON → data carries canonicalEvents + eventRelationships (backward-compatible)", () => {
     const logRows: CanonicalEventLogRow[] = [
       {
-        event_id: "e1", organization_id: "org-1", project_id: PROJECT, event_category: "risk",
+        event_id: "e1", organization_id: "org-1", project_id: PROJECT, case_id: PROJECT, event_category: "risk",
         event_type: "risk_registered", event_schema_version: 1, event_importance: "MEDIUM",
         event_lifecycle_class: "BUSINESS_EVENT", subject_type: "risk", subject_id: "r1",
         actor_type: "human", actor_id: "u1", occurred_at: "2026-01-01T10:00:00.000Z",
@@ -159,7 +159,7 @@ describe("CAP-045 events view + analysis isolation", () => {
   it("buildCanonicalFlow renders every canonical event as a node + relationships as edges", () => {
     const events: LivingGraphCanonicalEvent[] = [
       {
-        eventId: "e1", organizationId: "org-1", projectId: PROJECT, eventType: "risk_registered",
+        eventId: "e1", organizationId: "org-1", projectId: PROJECT, caseId: PROJECT, eventType: "risk_registered",
         eventCategory: "risk", eventSchemaVersion: 1, eventImportance: "HIGH",
         lifecycleClass: "BUSINESS_EVENT", subjectType: "risk", subjectId: "r1", actorType: "human",
         actorId: "u1", occurredAt: "2026-01-01T10:00:00.000Z", recordedAt: "2026-01-01T10:00:01.000Z",

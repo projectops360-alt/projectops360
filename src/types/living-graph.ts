@@ -142,6 +142,8 @@ export interface LivingGraphCanonicalEvent {
   eventId: string;
   organizationId: string;
   projectId: string;
+  /** project_event_log.case_id — canonical process case framing. */
+  caseId: string;
   /** project_event_log.event_type (canonical event_type, NOT ProcessNodeType). */
   eventType: string;
   /** project_event_log.event_category (e.g. risk). */

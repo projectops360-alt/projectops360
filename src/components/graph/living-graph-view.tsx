@@ -34,7 +34,7 @@ import {
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { ExecutiveSummaryPanel } from "./executive-summary-panel";
-import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users, ListTree, Info } from "lucide-react";
+import { Share2, MonitorSmartphone, Route, Sparkles, X, RefreshCw, Loader2, BarChart3, Users, ListTree, Info, ListChecks, GitFork, ScrollText, Workflow } from "lucide-react";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import type { Milestone, RoadmapTask, LaborResource, ConstructionActivity, TradeTaxonomy, Locale } from "@/types/database";
 import type {
@@ -107,6 +107,10 @@ import { LivingGraphEdge } from "./living-graph-edge";
 import { CanonicalEventNode } from "./canonical-event-node";
 import { CanonicalObjectNode } from "./canonical-object-node";
 import { CanonicalEventEdge } from "./canonical-event-edge";
+import { ProcessActivityNode } from "./process-activity-node";
+import { ProcessTransitionEdge } from "./process-transition-edge";
+import { TaskCaseExplorer } from "./task-case-explorer";
+import { TaskProcessExplorerPanel } from "./task-process-explorer-panel";
 import { LivingGraphToolbar } from "./living-graph-toolbar";
 import { LivingGraphTimeline } from "./living-graph-timeline";
 import { LivingGraphDetailPanel } from "./living-graph-detail-panel";
@@ -114,6 +118,18 @@ import { LivingGraphMetricsHeader } from "./living-graph-metrics-header";
 import { LivingGraphLegend } from "./living-graph-legend";
 import { OverlayInfo } from "./overlay-info";
 import { buildCanonicalFlow, canonicalEventNodeId } from "@/lib/graph/canonical-event-flow";
+import {
+  buildTaskCaseSummaries,
+  type TaskAttachmentRef,
+} from "@/lib/graph/task-case-analysis";
+import {
+  aggregateTaskProcess,
+  assessTaskProcessDiscovery,
+  buildTaskProcessModel,
+  variantForId,
+} from "@/lib/graph/task-process-analysis";
+import { buildTaskProcessFlow } from "@/lib/graph/task-process-flow";
+import { isCompletedStatus } from "@/lib/execution/task-activity";
 import {
   ADVANCED_OVERLAYS,
   resolveOverlayState,
@@ -141,7 +157,11 @@ import {
 } from "./living-graph-edit-dialogs";
 import {
   analyzeBetween,
+  assessBetweenAnalysis,
   getBetweenAnalysisLayoutKey,
+  type BetweenAnalysisInput,
+  type BetweenAnalysisPreflight,
+  type BetweenPreflightBlockingReason,
   type BetweenEndpoint,
   type BetweenAnalysisResult,
 } from "@/lib/graph/between-analysis";
@@ -158,8 +178,41 @@ const NODE_TYPES = {
   milestoneCard: LivingGraphMilestoneNode,
   canonicalEvent: CanonicalEventNode,
   canonicalObject: CanonicalObjectNode,
+  processActivity: ProcessActivityNode,
 };
-const EDGE_TYPES = { living: LivingGraphEdge, canonicalEventEdge: CanonicalEventEdge };
+const EDGE_TYPES = {
+  living: LivingGraphEdge,
+  canonicalEventEdge: CanonicalEventEdge,
+  processTransition: ProcessTransitionEdge,
+};
+
+type CanonicalEventExperience = "cases" | "process" | "audit";
+
+function betweenPreflightReason(
+  reason: BetweenPreflightBlockingReason,
+  locale: string,
+): string {
+  const es = locale === "es";
+  const copy: Record<BetweenPreflightBlockingReason, [string, string]> = {
+    same_endpoint: [
+      "Choose two different endpoints.",
+      "Elige dos puntos diferentes.",
+    ],
+    cross_project_rejected: [
+      "The endpoints do not belong to the same project.",
+      "Los puntos no pertenecen al mismo proyecto.",
+    ],
+    start_has_no_canonical_history: [
+      "The first endpoint has no canonical event history.",
+      "El primer punto no tiene historial canónico.",
+    ],
+    end_has_no_canonical_history: [
+      "The second endpoint has no canonical event history.",
+      "El segundo punto no tiene historial canónico.",
+    ],
+  };
+  return copy[reason][es ? 1 : 0];
+}
 
 const SIDE_TO_POSITION: Record<SnakeSide, Position> = {
   left: Position.Left,
@@ -199,11 +252,13 @@ export interface LivingGraphViewProps {
   subtasks?: SubtaskLayerRow[];
   /** Subtask owner id → display name (read-only team context for the inspector). */
   subtaskOwnerNames?: Record<string, string>;
+  /** Safe attachment display metadata for task-case evidence context. */
+  taskAttachments?: TaskAttachmentRef[];
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -282,6 +337,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             resourceCapacity={resourceCapacity}
             subtasks={subtasks}
             subtaskOwnerNames={subtaskOwnerNames}
+            taskAttachments={taskAttachments}
           />
         </ReactFlowProvider>
       </div>
@@ -291,7 +347,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -323,10 +379,15 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (typeof window === "undefined") return;
     const o = new URLSearchParams(window.location.search).get("overlay");
     if (o === "criticalPath") setOverlay("criticalPath");
-  }, []);
+  }, [setOverlay]);
   const [layoutMode, setLayoutMode] = useGraphUiPref<LivingGraphLayoutMode>("layoutMode", "hierarchical");
   // High-level milestone flowchart by default; drill into activities/events
   const [viewLevel, setViewLevel] = useGraphUiPref<LivingGraphViewLevel>("viewLevel", "milestones");
+  const [eventExperience, setEventExperience] = useGraphUiPref<CanonicalEventExperience>("eventExperience", "cases");
+  const [selectedTaskCaseId, setSelectedTaskCaseId] = useState<string | null>(null);
+  const [processVariantId, setProcessVariantId] = useState<string | null>(null);
+  const [activityCoverage, setActivityCoverage] = useGraphUiPref<number>("processActivityCoverage", 100);
+  const [connectionCoverage, setConnectionCoverage] = useGraphUiPref<number>("processConnectionCoverage", 100);
   // Milestones picked for drill-down (max 2)
   const [milestonePicks, setMilestonePicks] = useState<string[]>([]);
   // Drill-down filter: only show activities of these milestones
@@ -452,7 +513,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       nodes: [...enrichedNodes, ...riskNodes],
       edges: [...projectScopedData.edges, ...constraintEdges],
     };
-  }, [projectScopedData, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities]);
+  }, [projectScopedData, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities, laborVariance, varianceResult, varianceCauses]);
 
   // ── Task → capacity-resource map (for the Workforce Intelligence Layer) ──
   const taskResourceKey = useMemo(() => {
@@ -488,10 +549,100 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // fallback. The canonical flow is a READ-ONLY projection — it never feeds the
   // operational analysis (critical path / bottleneck / cycles …).
   const projectionStatus = data.canonicalEventProjectionStatus;
-  const canonicalEvents = projectScopedData.canonicalEvents ?? [];
+  const canonicalEvents = useMemo(
+    () => projectScopedData.canonicalEvents ?? [],
+    [projectScopedData.canonicalEvents],
+  );
   const canonicalEventsActive =
     viewLevel === "events" &&
     (projectionStatus === "ready" || projectionStatus === "truncated");
+  const taskCases = useMemo(
+    () =>
+      buildTaskCaseSummaries({
+        tasks,
+        milestones,
+        events: canonicalEvents,
+        subtasks,
+        attachments: taskAttachments,
+      }),
+    [tasks, milestones, canonicalEvents, subtasks, taskAttachments],
+  );
+  const taskProcessModel = useMemo(
+    () => buildTaskProcessModel({ tasks, events: canonicalEvents }),
+    [tasks, canonicalEvents],
+  );
+  const selectedVariantStillExists = taskProcessModel.variants.variants.some(
+    (variant) => variant.variantId === processVariantId,
+  );
+  const effectiveProcessVariantId =
+    processVariantId === "all" || selectedVariantStillExists
+      ? processVariantId!
+      : taskProcessModel.variants.variants[0]?.variantId ?? "all";
+  const selectedProcessVariant = variantForId(taskProcessModel, effectiveProcessVariantId);
+  const taskProcessAggregate = useMemo(
+    () =>
+      aggregateTaskProcess(taskProcessModel, {
+        caseIds: selectedProcessVariant ? new Set(selectedProcessVariant.caseIds) : null,
+        activityCoveragePct: activityCoverage,
+        connectionCoveragePct: connectionCoverage,
+      }),
+    [taskProcessModel, selectedProcessVariant, activityCoverage, connectionCoverage],
+  );
+  const taskProcessDiscovery = useMemo(
+    () =>
+      assessTaskProcessDiscovery(
+        aggregateTaskProcess(taskProcessModel, {
+          caseIds: selectedProcessVariant ? new Set(selectedProcessVariant.caseIds) : null,
+          activityCoveragePct: 100,
+          connectionCoveragePct: 100,
+        }),
+      ),
+    [taskProcessModel, selectedProcessVariant],
+  );
+  const caseExplorerActive = canonicalEventsActive && eventExperience === "cases";
+  const processExplorerActive = canonicalEventsActive && eventExperience === "process";
+  const canonicalAuditActive = canonicalEventsActive && eventExperience === "audit";
+
+  const suggestedPlannedMilestoneId = useMemo(() => {
+    const orderedMilestones = [...milestones].sort(
+      (left, right) => left.order_index - right.order_index,
+    );
+    const firstIncomplete = orderedMilestones.find((milestone) =>
+      tasks.some(
+        (task) =>
+          task.milestone_id === milestone.id && !isCompletedStatus(task.status),
+      ),
+    );
+    return firstIncomplete?.id ?? orderedMilestones[orderedMilestones.length - 1]?.id ?? null;
+  }, [milestones, tasks]);
+
+  const openPlannedFlow = useCallback(() => {
+    setViewLevel("activities");
+    setLayoutMode("timeline");
+    setMilestoneFocus(
+      suggestedPlannedMilestoneId
+        ? new Set([suggestedPlannedMilestoneId])
+        : null,
+    );
+    setMilestonePicks([]);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setBetweenMode(false);
+    setBetweenEndpoints([]);
+    setBetweenResult(null);
+  }, [setLayoutMode, setViewLevel, suggestedPlannedMilestoneId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const taskId = new URLSearchParams(window.location.search).get("task");
+    if (!taskId || !tasks.some((task) => task.id === taskId)) return;
+    const timeoutId = window.setTimeout(() => {
+      setViewLevel("events");
+      setEventExperience("cases");
+      setSelectedTaskCaseId(taskId);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [tasks, setViewLevel, setEventExperience]);
 
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   // Part B — the "events" view level NEVER falls back to operational
@@ -519,14 +670,21 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const canonicalFlow = useMemo(
     () =>
-      canonicalEventsActive
+      canonicalAuditActive
         ? buildCanonicalFlow(
             canonicalEvents,
             projectScopedData.eventRelationships ?? [],
             selectedNodeId,
           )
         : null,
-    [canonicalEventsActive, canonicalEvents, projectScopedData.eventRelationships, selectedNodeId],
+    [canonicalAuditActive, canonicalEvents, projectScopedData.eventRelationships, selectedNodeId],
+  );
+  const taskProcessFlow = useMemo(
+    () =>
+      processExplorerActive
+        ? buildTaskProcessFlow(taskProcessAggregate, selectedNodeId, selectedEdgeId, locale)
+        : null,
+    [processExplorerActive, taskProcessAggregate, selectedNodeId, selectedEdgeId, locale],
   );
 
   // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
@@ -641,11 +799,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     );
     return { nodes, edges };
   }, [
-    displayGraph,
     baseNodes,
     baseEdges,
     workforceGraph,
-    overlayNodes,
     analysis,
     nodeTypeFilter,
     edgeTypeFilter,
@@ -761,14 +917,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const positions = useMemo(() => {
     // Canonical-events view uses its own deterministic layout (project sequence
     // order); saved/manual arrangements belong to the operational contexts.
-    if (canonicalEventsActive && canonicalFlow) return canonicalFlow.positions;
+    if (canonicalAuditActive && canonicalFlow) return canonicalFlow.positions;
     if (manualPositions.size === 0) return layoutPositions;
     const merged = new Map(layoutPositions);
     for (const [id, pos] of manualPositions) {
       if (merged.has(id)) merged.set(id, pos);
     }
     return merged;
-  }, [canonicalEventsActive, canonicalFlow, layoutPositions, manualPositions]);
+  }, [canonicalAuditActive, canonicalFlow, layoutPositions, manualPositions]);
 
   // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
   // The context a saved arrangement is scoped to (level + layout mode). Switching
@@ -836,7 +992,6 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // saved arrangement and unsaved drags survive filtering — only a context switch
   // reloads. The setState here is the intended effect, not a cascading render.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadContextLayout(projectId, layoutKey);
   }, [projectId, layoutKey, loadContextLayout]);
 
@@ -972,7 +1127,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       setPlaybackIndex(-1);
     }
     if (next !== "simulation") setSimulation(null);
-  }, []);
+  }, [setOverlay]);
 
   // ── Path edges lookup ──
   const pathEdgeIds = useMemo(() => {
@@ -1018,10 +1173,13 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const isMilestoneLevel = viewLevel === "milestones";
 
   const rfNodes = useMemo<LivingFlowNode[]>(() => {
+    if (processExplorerActive && taskProcessFlow) {
+      return taskProcessFlow.nodes as unknown as LivingFlowNode[];
+    }
     // Canonical-events view: render the projected event/object nodes. The
     // operational node-mapping path below is skipped entirely, so it never
     // sees (and never mutates) canonical data.
-    if (canonicalEventsActive && canonicalFlow) {
+    if (canonicalAuditActive && canonicalFlow) {
       return canonicalFlow.nodes.map((n) => {
         const isEventMember =
           n.id.startsWith("ev:") && betweenEventIds.has(n.id.slice(3));
@@ -1101,7 +1259,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       };
     });
   }, [
-    canonicalEventsActive,
+    processExplorerActive,
+    taskProcessFlow,
+    canonicalAuditActive,
     canonicalFlow,
     withSubtasks.nodes,
     positions,
@@ -1180,13 +1340,40 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // Run the pure analysis for the current pair of endpoints (or an explicit
   // pair passed in — used by the two-milestone "Analyze what happened" button).
+  const selectedBetweenInput = useMemo<BetweenAnalysisInput | null>(
+    () =>
+      betweenEndpoints.length === 2
+        ? {
+            requestedProjectId,
+            startEndpoint: betweenEndpoints[0],
+            endEndpoint: betweenEndpoints[1],
+            nodes: projectScopedData.nodes,
+            edges: projectScopedData.edges,
+            canonicalEvents,
+            eventRelationships: projectScopedData.eventRelationships ?? [],
+          }
+        : null,
+    [
+      betweenEndpoints,
+      requestedProjectId,
+      projectScopedData.nodes,
+      projectScopedData.edges,
+      projectScopedData.eventRelationships,
+      canonicalEvents,
+    ],
+  );
+  const betweenPreflight = useMemo<BetweenAnalysisPreflight | null>(
+    () => (selectedBetweenInput ? assessBetweenAnalysis(selectedBetweenInput) : null),
+    [selectedBetweenInput],
+  );
+
   const runBetweenAnalysis = useCallback(
     (endpoints: BetweenEndpoint[]) => {
       if (endpoints.length !== 2) {
         setBetweenResult(null);
         return;
       }
-      const result = analyzeBetween({
+      const input: BetweenAnalysisInput = {
         requestedProjectId,
         startEndpoint: endpoints[0],
         endEndpoint: endpoints[1],
@@ -1194,8 +1381,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         edges: projectScopedData.edges,
         canonicalEvents,
         eventRelationships: projectScopedData.eventRelationships ?? [],
-      });
-      setBetweenResult(result);
+      };
+      const preflight = assessBetweenAnalysis(input);
+      setBetweenResult(preflight.canAnalyze ? analyzeBetween(input) : null);
     },
     [requestedProjectId, projectScopedData.nodes, projectScopedData.edges, canonicalEvents, projectScopedData.eventRelationships],
   );
@@ -1265,10 +1453,13 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [rfNodes]);
 
   const rfEdges = useMemo<LivingFlowEdge[]>(() => {
+    if (processExplorerActive && taskProcessFlow) {
+      return taskProcessFlow.edges as unknown as LivingFlowEdge[];
+    }
     // Canonical-events view: render the projected relationship edges (dashed
     // temporal / solid causal / dotted compensation / thin object-ref). The
     // operational edge-mapping path below is skipped entirely.
-    if (canonicalEventsActive && canonicalFlow) {
+    if (canonicalAuditActive && canonicalFlow) {
       return canonicalFlow.edges as unknown as LivingFlowEdge[];
     }
     // In milestone focus mode, add synthetic hub edges (milestone → each task) so
@@ -1318,7 +1509,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     // Analysis) alongside "View flow" (drill-down) — see the two-milestone banner.
     return edges;
   }, [
-    canonicalEventsActive,
+    processExplorerActive,
+    taskProcessFlow,
+    canonicalAuditActive,
     canonicalFlow,
     withSubtasks.edges,
     focusHubEdges,
@@ -1360,6 +1553,12 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (!eventId) return null;
     return canonicalEvents.find((e) => e.eventId === eventId) ?? null;
   }, [canonicalEventsActive, selectedNodeId, canonicalEvents]);
+  const selectedProcessActivity = processExplorerActive
+    ? taskProcessAggregate.activities.find((activity) => activity.id === selectedNodeId) ?? null
+    : null;
+  const selectedProcessTransition = processExplorerActive
+    ? taskProcessAggregate.transitions.find((transition) => transition.id === selectedEdgeId) ?? null
+    : null;
 
   // ── Handlers ──
   const clientFindPath = useCallback(
@@ -1421,6 +1620,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const onNodeClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
     (_event, node) => {
+      if ((node.type as string) === "processActivity") {
+        setSelectedNodeId(node.id);
+        setSelectedEdgeId(null);
+        return;
+      }
       // ── Between-analysis mode: pick endpoints (max 2, toggle off if
       //    re-picked) for ALL node types, including canonical events. This is
       //    the ONLY path that lets canonical-event nodes participate in an
@@ -1562,7 +1766,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const onNodeDoubleClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
     (_event, node) => {
       // Canonical nodes are read-only — double-click does not open an editor.
-      if ((node.type as string) === "canonicalEvent" || (node.type as string) === "canonicalObject") return;
+      if (
+        (node.type as string) === "canonicalEvent" ||
+        (node.type as string) === "canonicalObject" ||
+        (node.type as string) === "processActivity"
+      ) return;
       handleEditNode(node.data.node);
     },
     [handleEditNode],
@@ -1685,28 +1893,53 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // for this context carries a viewport and the user is not in a focus/drill
   // subset, restore that viewport instead of fitting (TASK 6).
   useEffect(() => {
+    if (caseExplorerActive) return;
     const id = setTimeout(() => {
       const saved = loadSavedLayout(projectId, layoutKey);
-      if (saved?.viewport && !focusIds && !milestoneFocus) {
+      if (
+        !processExplorerActive &&
+        !canonicalAuditActive &&
+        saved?.viewport &&
+        !focusIds &&
+        !milestoneFocus
+      ) {
         void setViewport(saved.viewport, { duration: 300 });
       } else {
         void fitView({ padding: 0.15, duration: 300 });
       }
     }, 80);
     return () => clearTimeout(id);
-  }, [layoutMode, viewLevel, focusIds, milestoneFocus, fitView, setViewport, projectId, layoutKey]);
+  }, [
+    layoutMode,
+    viewLevel,
+    eventExperience,
+    effectiveProcessVariantId,
+    activityCoverage,
+    connectionCoverage,
+    caseExplorerActive,
+    processExplorerActive,
+    canonicalAuditActive,
+    focusIds,
+    milestoneFocus,
+    fitView,
+    setViewport,
+    projectId,
+    layoutKey,
+  ]);
 
-  const showPanel = selectedNode != null || selectedEdge != null;
+  const showPanel =
+    selectedNode != null || selectedEdge != null || selectedCanonicalEvent != null;
 
   // Progressive disclosure: never dump the full flat activity/event graph. When
   // there are many nodes and no phase is focused, guide the user to drill into
   // one milestone (one layer at a time → narrowing to detail). The curated
   // Workforce view manages its own density, so it's exempt.
-  const tooManyNodes =
-    viewLevel !== "milestones" &&
+  const tooManyOperationalNodes =
+    viewLevel === "activities" &&
     !milestoneFocus &&
     !workforceGraph &&
     filtered.nodes.length > 24;
+  const tooManyAuditEvents = canonicalAuditActive && canonicalEvents.length > 24;
 
   // Executive Insights are scoped to what's currently visible (level + phase
   // focus + filters + overlay). Drill into a phase → the KPIs reflect that phase.
@@ -1827,11 +2060,65 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           totalEdgeTypes: ALL_EDGE_TYPES.length,
         })}
         summary={analysis.summary}
-        largeGraphWarning={filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null}
+        largeGraphWarning={
+          canonicalAuditActive
+            ? canonicalEvents.length > LARGE_GRAPH_THRESHOLD
+            : viewLevel !== "events" && filtered.nodes.length > LARGE_GRAPH_THRESHOLD && focusIds == null
+        }
       />
 
+      {canonicalEventsActive && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card/70 px-2.5 py-2" role="navigation" aria-label={locale === "es" ? "Lectura de eventos" : "Event reading mode"}>
+          <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-border bg-background p-0.5">
+            {([
+              { id: "cases" as const, icon: ListChecks, en: "Task cases", es: "Casos de tarea", count: taskCases.length },
+              { id: "process" as const, icon: GitFork, en: "Observed process", es: "Proceso observado", count: taskProcessModel.variants.variants.length },
+              { id: "audit" as const, icon: ScrollText, en: "Full audit", es: "Auditoría", count: canonicalEvents.length },
+            ]).map((item) => {
+              const Icon = item.icon;
+              const active = eventExperience === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setEventExperience(item.id);
+                    setSelectedNodeId(null);
+                    setSelectedEdgeId(null);
+                    setBetweenMode(false);
+                    setBetweenEndpoints([]);
+                    setBetweenResult(null);
+                  }}
+                  aria-current={active ? "page" : undefined}
+                  className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${active ? "bg-brand-600 text-white shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  <Icon className="h-3.5 w-3.5" aria-hidden />
+                  {locale === "es" ? item.es : item.en}
+                  <span className={`rounded px-1 text-[9px] ${active ? "bg-white/20" : "bg-muted"}`}>{item.count}</span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={openPlannedFlow}
+            className="inline-flex items-center gap-1.5 rounded-md border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-500/20 dark:text-brand-300"
+          >
+            <Workflow className="h-3.5 w-3.5" aria-hidden />
+            {locale === "es" ? "Flujo planificado" : "Planned flow"}
+          </button>
+          <p className="text-[10px] text-muted-foreground">
+            {eventExperience === "cases"
+              ? (locale === "es" ? "Proyecto › fase › tarea › evento/evidencia" : "Project › phase › task › event/evidence")
+              : eventExperience === "process"
+                ? (locale === "es" ? "Orden observado entre actividades; no son dependencias planificadas" : "Observed activity order; not planned dependencies")
+                : (locale === "es" ? "Registro canónico completo para auditoría avanzada" : "Complete canonical ledger for advanced audit")}
+          </p>
+        </div>
+      )}
+
       {/* Progressive disclosure: too many nodes → drill into a phase (layers) */}
-      {tooManyNodes && (
+      {tooManyOperationalNodes && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
           <span>
             {locale === "es"
@@ -1864,13 +2151,36 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           </button>
         </div>
       )}
+      {tooManyAuditEvents && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <span>
+            {locale === "es"
+              ? `${canonicalEvents.length} eventos no son legibles como un mapa de auditoría completo. Reduce el alcance:`
+              : `${canonicalEvents.length} events are not readable as one raw audit map. Narrow the scope:`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEventExperience("cases")}
+            className="rounded-md border border-amber-500/40 px-2 py-1 font-medium hover:bg-amber-500/10"
+          >
+            {locale === "es" ? "Casos de tarea" : "Task cases"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEventExperience("process")}
+            className="rounded-md border border-amber-500/40 px-2 py-1 font-medium hover:bg-amber-500/10"
+          >
+            {locale === "es" ? "Proceso agregado" : "Aggregate process"}
+          </button>
+        </div>
+      )}
 
       {/* Subtask visibility controls (NotebookLM-style). Shown only where task
           nodes exist (activities/events level) and a VISIBLE task has subtasks.
           The graph starts collapsed; Expand all is an explicit user action and
           is SCOPED to the current view (the drilled-into milestone) — it never
           reveals other milestones' tasks. */}
-      {!isMilestoneLevel && visibleTaskIdsWithSubtasks.length > 0 && (
+      {viewLevel === "activities" && visibleTaskIdsWithSubtasks.length > 0 && (
         <div
           className="flex flex-wrap items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 px-3 py-1.5 text-xs text-violet-700 dark:text-violet-300"
           data-testid="graph-subtask-controls"
@@ -1910,7 +2220,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       {/* Between-analysis toggle (CAP-045 §C.2). Available across all view
           levels except the curated Workforce view. When ON, the next two node
           clicks become the analysis endpoints. */}
-      {!workforceActive && !betweenMode && !isMilestoneFocusMode && (
+      {!workforceActive && !betweenMode && !isMilestoneFocusMode && (viewLevel !== "events" || canonicalAuditActive) && (
         <button
           type="button"
           onClick={() => {
@@ -1939,7 +2249,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               <button
                 type="button"
                 onClick={() => runBetweenAnalysis(betweenEndpoints)}
-                className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+                disabled={betweenPreflight?.canAnalyze === false}
+                className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {t("between.analyze")}
               </button>
@@ -1954,6 +2265,43 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           </div>
         </div>
       )}
+      {betweenMode &&
+        betweenEndpoints.length === 2 &&
+        betweenPreflight &&
+        (!betweenPreflight.canAnalyze || betweenPreflight.warnings.length > 0) && (
+          <div
+            role={betweenPreflight.canAnalyze ? "status" : "alert"}
+            className={`flex items-start gap-2 rounded-md border px-3 py-2 text-[11px] ${
+              betweenPreflight.canAnalyze
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                : "border-red-500/40 bg-red-500/10 text-red-800 dark:text-red-300"
+            }`}
+          >
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <div>
+              {!betweenPreflight.canAnalyze ? (
+                <>
+                  <p className="font-semibold">
+                    {locale === "es"
+                      ? "Esta comparación no produciría una lectura verificable."
+                      : "This comparison would not produce a verifiable reading."}
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {betweenPreflight.blockingReasons.map((reason) => (
+                      <li key={reason}>{betweenPreflightReason(reason, locale)}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p>
+                  {locale === "es"
+                    ? "Hay historial canónico para comparar, pero no existe una ruta operativa registrada entre estos puntos. La secuencia temporal no implica causalidad."
+                    : "Canonical history is available, but no operational path is recorded between these endpoints. Temporal sequence does not imply causality."}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       {/* Sprint #2 — overlay discoverability: the people + assignment-edges view
           renders in the Activities level (not the default Milestones level). */}
       {workforceActive && viewLevel === "milestones" && (
@@ -2057,29 +2405,31 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
       {/* Canvas + detail panel */}
       <div
-        className="relative flex min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card/30"
+        className={`relative flex min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-card/30 ${processExplorerActive ? "flex-col lg:flex-row" : ""}`}
         style={{
           backgroundImage:
             "radial-gradient(1100px 420px at 50% -10%, rgba(99,102,241,0.07), transparent), radial-gradient(700px 300px at 100% 100%, rgba(16,185,129,0.05), transparent)",
         }}
       >
-        <LivingGraphLegend />
+        {!caseExplorerActive && !processExplorerActive && <LivingGraphLegend />}
 
         {/* UX-007 — Saved Layouts: compact floating controls (works in normal,
             fullscreen and Focus Mode). Save node positions + reset/clear. */}
-        <LivingGraphLayoutControls
-          locale={locale}
-          hasUnsaved={hasUnsavedLayout}
-          hasSaved={savedLayout != null}
-          saving={savingLayout}
-          onSave={handleSaveLayout}
-          onResetSaved={handleResetToSaved}
-          onResetAuto={handleResetToAuto}
-          onClear={handleClearSavedLayout}
-        />
+        {viewLevel !== "events" && (
+          <LivingGraphLayoutControls
+            locale={locale}
+            hasUnsaved={hasUnsavedLayout}
+            hasSaved={savedLayout != null}
+            saving={savingLayout}
+            onSave={handleSaveLayout}
+            onResetSaved={handleResetToSaved}
+            onResetAuto={handleResetToAuto}
+            onClear={handleClearSavedLayout}
+          />
+        )}
 
         {/* Transient confirmation (acts as the "Layout saved" toast). */}
-        {layoutNotice && (
+        {viewLevel !== "events" && layoutNotice && (
           <div
             role="status"
             className={
@@ -2102,7 +2452,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         )}
 
         {/* TASK 7 — graph changed since the save: positions partially applied. */}
-        {layoutPartiallyApplied && !layoutNotice && (
+        {viewLevel !== "events" && layoutPartiallyApplied && !layoutNotice && (
           <div
             role="status"
             className="absolute left-1/2 top-14 z-20 -translate-x-1/2 max-w-[min(92%,30rem)] rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-center text-[11px] text-amber-700 dark:text-amber-400"
@@ -2115,7 +2465,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* Sprint #3 — overlay clarity: what am I looking at, why are nodes here,
             what to do next + empty/incomplete state, for the advanced overlays. */}
-        {ADVANCED_OVERLAYS.includes(overlay) && (
+        {viewLevel !== "events" && ADVANCED_OVERLAYS.includes(overlay) && (
           <OverlayInfo
             key={overlay}
             overlay={overlay}
@@ -2129,7 +2479,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* Floating Insights (executive KPIs + summary) — hidden while a node
             detail panel occupies the right side. Graph keeps full height. */}
-        {!showPanel && !insightsOpen && (
+        {viewLevel !== "events" && !showPanel && !insightsOpen && (
           <button
             type="button"
             onClick={() => setInsightsOpen(true)}
@@ -2148,7 +2498,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             </span>
           </button>
         )}
-        {!showPanel && insightsOpen && (
+        {viewLevel !== "events" && !showPanel && insightsOpen && (
           <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
             <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2193,7 +2543,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {/* Workforce roster — per-person utilization, shown with the Workforce
             overlay. Works on the readable Milestones view; at-risk cards light
             up in the graph while this lists who is overloaded. */}
-        {workforceActive && resourceCapacity && (
+        {viewLevel !== "events" && workforceActive && resourceCapacity && (
           <div className="absolute left-3 top-14 z-20 flex max-h-[calc(100%-4.5rem)] w-[256px] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
             <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <Users className="h-3.5 w-3.5 text-brand-500" aria-hidden />
@@ -2235,7 +2585,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           </div>
         )}
 
-        {overlay === "simulation" && selectedNode && (
+        {viewLevel !== "events" && overlay === "simulation" && selectedNode && (
           <LivingGraphSimulationPanel
             selectedNode={selectedNode}
             simulation={simulation}
@@ -2264,7 +2614,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {viewLevel === "events" && projectionStatus === "disabled" && (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur"
           >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {t("canonicalEvents.status.disabled.title")}
@@ -2273,7 +2623,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {viewLevel === "events" && projectionStatus === "empty" && (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-amber-500/40 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-amber-700 shadow-sm backdrop-blur dark:text-amber-300"
           >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {t("canonicalEvents.status.empty.title")}
@@ -2282,71 +2632,167 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {viewLevel === "events" && projectionStatus === "error" && (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-[11px] font-medium text-red-700 dark:text-red-300"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-red-500/40 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-red-700 shadow-sm backdrop-blur dark:text-red-300"
           >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {t("canonicalEvents.status.error.title")}
           </div>
         )}
-        {canonicalEventsActive && projectionStatus === "truncated" && (
+        {canonicalAuditActive && projectionStatus === "truncated" && (
           <div
             role="status"
-            className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-amber-500/40 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-amber-700 shadow-sm backdrop-blur dark:text-amber-300"
           >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {t("canonicalEvents.status.truncated.title", { count: canonicalEvents.length })}
           </div>
         )}
-        {canonicalEventsActive && canonicalEvents.length > 0 && (
-          <p className="text-[10px] text-muted-foreground">
+        {canonicalAuditActive && canonicalEvents.length > 0 && (
+          <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
             {t("canonicalEvents.viewTitle")} — {t("canonicalEvents.viewHint")}
           </p>
         )}
-        <div className="min-w-0 flex-1">
-          <ReactFlow
-            nodes={rfNodes}
-            edges={rfEdges}
-            nodeTypes={NODE_TYPES}
-            edgeTypes={EDGE_TYPES}
-            onNodeClick={onNodeClick}
-            onNodeDoubleClick={onNodeDoubleClick}
-            onEdgeClick={onEdgeClick}
-            onPaneClick={onPaneClick}
-            onNodesChange={onNodesChange}
-            onNodeDrag={onNodeDrag}
-            onNodeDragStop={onNodeDragStop}
-            fitView
-            minZoom={0.1}
-            maxZoom={2}
-            nodesDraggable
-            nodesConnectable={false}
-            edgesFocusable
-            proOptions={{ hideAttribution: true }}
-            aria-label={t("title")}
-          >
-            <Background gap={24} size={1} />
-            <Controls position="bottom-left" showInteractive={false} />
-            <MiniMap
-              position="bottom-right"
-              pannable
-              zoomable
-              nodeColor={(n) => {
-                // Canonical event/object nodes have their own colors.
-                if (n.type === "canonicalEvent") {
-                  const imp = (n.data as { event?: { eventImportance?: string } }).event?.eventImportance;
-                  return imp === "CRITICAL" || imp === "HIGH"
-                    ? "#dc2626"
-                    : imp === "MEDIUM"
-                      ? "#d97706"
-                      : "#0891b2";
-                }
-                if (n.type === "canonicalObject") return "#94a3b8";
-                return minimapNodeColor((n as LivingFlowNode).data.node.nodeType);
+        {caseExplorerActive ? (
+          <div className="min-h-0 min-w-0 flex-1">
+            <TaskCaseExplorer
+              locale={locale}
+              cases={taskCases}
+              eventsTruncated={projectScopedData.eventsTruncated ?? false}
+              selectedTaskId={selectedTaskCaseId}
+              onSelectTask={(taskId) => {
+                setSelectedTaskCaseId(taskId);
+                setSelectedNodeId(null);
+                setSelectedEdgeId(null);
               }}
-              className="!bg-card"
+              onSelectEvent={(eventId) => {
+                setSelectedNodeId(canonicalEventNodeId(eventId));
+                setSelectedEdgeId(null);
+              }}
+              onOpenTask={(taskId) =>
+                router.push(localizedHref(locale, `/projects/${projectId}/workboard?task=${taskId}`))
+              }
             />
-          </ReactFlow>
-        </div>
+          </div>
+        ) : (
+          <>
+            {processExplorerActive && (
+              <TaskProcessExplorerPanel
+                locale={locale}
+                model={taskProcessModel}
+                aggregate={taskProcessAggregate}
+                eventsTruncated={projectScopedData.eventsTruncated ?? false}
+                selectedVariantId={effectiveProcessVariantId}
+                onVariantChange={(variantId) => {
+                  setProcessVariantId(variantId);
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(null);
+                }}
+                activityCoverage={activityCoverage}
+                connectionCoverage={connectionCoverage}
+                onActivityCoverageChange={setActivityCoverage}
+                onConnectionCoverageChange={setConnectionCoverage}
+                selectedActivity={selectedProcessActivity}
+                selectedTransition={selectedProcessTransition}
+              />
+            )}
+            <div className="relative min-h-0 min-w-0 flex-1">
+              {processExplorerActive && !taskProcessDiscovery.isDiscoverable && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-4">
+                  <div
+                    role="status"
+                    className="pointer-events-auto max-w-md rounded-xl border border-amber-500/40 bg-card/95 p-5 text-center shadow-xl backdrop-blur"
+                  >
+                    <GitFork className="mx-auto h-6 w-6 text-amber-600" aria-hidden />
+                    <h2 className="mt-2 text-sm font-semibold text-foreground">
+                      {locale === "es"
+                        ? "Aún no hay un flujo observado distinguible"
+                        : "No distinct observed flow yet"}
+                    </h2>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                      {taskProcessDiscovery.status === "single_activity"
+                        ? locale === "es"
+                          ? `Los ${taskProcessAggregate.visibleEventCount} eventos visibles se reducen a un solo tipo de actividad. No existe una transición entre actividades diferentes que dibujar.`
+                          : `All ${taskProcessAggregate.visibleEventCount} visible events reduce to one activity type. There is no transition between distinct activities to draw.`
+                        : taskProcessDiscovery.status === "no_direct_follow"
+                          ? locale === "es"
+                            ? "Hay varios tipos de evento, pero todavía no existe una secuencia directa entre ellos."
+                            : "Multiple event types exist, but no direct-follow sequence connects them yet."
+                          : locale === "es"
+                            ? "No hay eventos de negocio vinculados a tareas para descubrir el proceso."
+                            : "No task-linked business events are available for process discovery."}
+                    </p>
+                    <p className="mt-2 text-[10px] text-muted-foreground">
+                      {locale === "es"
+                        ? "El flujo de dependencias planificadas sí está disponible y se mantiene separado de la evidencia observada."
+                        : "The planned dependency flow is available and remains separate from observed evidence."}
+                    </p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={openPlannedFlow}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+                      >
+                        <Workflow className="h-3.5 w-3.5" aria-hidden />
+                        {locale === "es" ? "Abrir fase planificada" : "Open planned phase"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEventExperience("cases")}
+                        className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                      >
+                        {locale === "es" ? "Revisar casos" : "Review task cases"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <ReactFlow
+                nodes={rfNodes}
+                edges={rfEdges}
+                nodeTypes={NODE_TYPES}
+                edgeTypes={EDGE_TYPES}
+                onNodeClick={onNodeClick}
+                onNodeDoubleClick={onNodeDoubleClick}
+                onEdgeClick={onEdgeClick}
+                onPaneClick={onPaneClick}
+                onNodesChange={onNodesChange}
+                onNodeDrag={onNodeDrag}
+                onNodeDragStop={onNodeDragStop}
+                fitView
+                minZoom={0.1}
+                maxZoom={2}
+                nodesDraggable={!processExplorerActive}
+                nodesConnectable={false}
+                edgesFocusable
+                proOptions={{ hideAttribution: true }}
+                aria-label={t("title")}
+              >
+                <Background gap={24} size={1} />
+                <Controls position="bottom-left" showInteractive={false} />
+                <MiniMap
+                  position="bottom-right"
+                  pannable
+                  zoomable
+                  nodeColor={(n) => {
+                    if (n.type === "processActivity") return "#10b981";
+                    // Canonical event/object nodes have their own colors.
+                    if (n.type === "canonicalEvent") {
+                      const imp = (n.data as { event?: { eventImportance?: string } }).event?.eventImportance;
+                      return imp === "CRITICAL" || imp === "HIGH"
+                        ? "#dc2626"
+                        : imp === "MEDIUM"
+                          ? "#d97706"
+                          : "#0891b2";
+                    }
+                    if (n.type === "canonicalObject") return "#94a3b8";
+                    return minimapNodeColor((n as LivingFlowNode).data.node.nodeType);
+                  }}
+                  className="!bg-card"
+                />
+              </ReactFlow>
+            </div>
+          </>
+        )}
 
         {showPanel && (
           <div className="absolute inset-y-0 right-0 z-20 lg:relative lg:inset-auto">

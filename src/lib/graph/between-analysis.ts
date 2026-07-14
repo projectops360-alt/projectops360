@@ -80,6 +80,26 @@ export interface BetweenAnalysisInput {
   eventRelationships: LivingGraphEventRelationship[];
 }
 
+export type BetweenPreflightBlockingReason =
+  | "same_endpoint"
+  | "cross_project_rejected"
+  | "start_has_no_canonical_history"
+  | "end_has_no_canonical_history";
+
+export type BetweenPreflightWarning = "no_recorded_operational_path";
+
+/** Fast compatibility check used before opening a between-analysis. It never
+ * substitutes operational timestamps for canonical history and never infers a
+ * path or causal relationship. */
+export interface BetweenAnalysisPreflight {
+  canAnalyze: boolean;
+  blockingReasons: BetweenPreflightBlockingReason[];
+  warnings: BetweenPreflightWarning[];
+  startHistoryCount: number;
+  endHistoryCount: number;
+  hasOperationalPath: boolean;
+}
+
 /** A status transition recorded by a canonical event. */
 export interface BetweenStatusChange {
   eventId: string;
@@ -312,6 +332,89 @@ export function getBetweenAnalysisLayoutKey(
 }
 
 // ── Main entry ─────────────────────────────────────────────────────────────────
+
+function endpointProjectIds(
+  endpoint: BetweenEndpoint,
+  nodes: LivingGraphNode[],
+  events: LivingGraphCanonicalEvent[],
+): Set<string> {
+  const projectIds = new Set<string>();
+  const directNode = nodes.find((node) => node.id === endpoint.nodeId);
+  if (directNode) projectIds.add(directNode.projectId);
+  const operationalNodeId = resolveOperationalNodeId(endpoint, nodes);
+  const operationalNode = operationalNodeId
+    ? nodes.find((node) => node.id === operationalNodeId)
+    : null;
+  if (operationalNode) projectIds.add(operationalNode.projectId);
+  if (endpoint.kind === "canonical_event" && endpoint.eventId) {
+    const event = events.find((candidate) => candidate.eventId === endpoint.eventId);
+    if (event) projectIds.add(event.projectId);
+  }
+  if (endpoint.sourceEntityId) {
+    for (const event of events) {
+      if (
+        event.sourceEntityId === endpoint.sourceEntityId ||
+        event.objectRefs.some((ref) => ref.object_id === endpoint.sourceEntityId)
+      ) {
+        projectIds.add(event.projectId);
+      }
+    }
+  }
+  return projectIds;
+}
+
+/** Determine whether two endpoints have enough canonical evidence to produce a
+ * meaningful interval. Missing operational paths are disclosed but do not
+ * block a canonical-history comparison. */
+export function assessBetweenAnalysis(
+  input: BetweenAnalysisInput,
+): BetweenAnalysisPreflight {
+  const projectEvents = input.canonicalEvents.filter(
+    (event) => event.projectId === input.requestedProjectId,
+  );
+  const startSequences = endpointSequenceNumbers(input.startEndpoint, projectEvents);
+  const endSequences = endpointSequenceNumbers(input.endEndpoint, projectEvents);
+  const blockingReasons: BetweenPreflightBlockingReason[] = [];
+  const warnings: BetweenPreflightWarning[] = [];
+
+  const sameEndpoint =
+    input.startEndpoint.nodeId === input.endEndpoint.nodeId ||
+    (input.startEndpoint.eventId != null &&
+      input.startEndpoint.eventId === input.endEndpoint.eventId);
+  if (sameEndpoint) blockingReasons.push("same_endpoint");
+
+  const endpointProjects = [
+    ...endpointProjectIds(input.startEndpoint, input.nodes, input.canonicalEvents),
+    ...endpointProjectIds(input.endEndpoint, input.nodes, input.canonicalEvents),
+  ];
+  if (endpointProjects.some((projectId) => projectId !== input.requestedProjectId)) {
+    blockingReasons.push("cross_project_rejected");
+  }
+  if (startSequences.length === 0) {
+    blockingReasons.push("start_has_no_canonical_history");
+  }
+  if (endSequences.length === 0) {
+    blockingReasons.push("end_has_no_canonical_history");
+  }
+
+  const startOperationalId = resolveOperationalNodeId(input.startEndpoint, input.nodes);
+  const endOperationalId = resolveOperationalNodeId(input.endEndpoint, input.nodes);
+  const hasOperationalPath = Boolean(
+    startOperationalId &&
+      endOperationalId &&
+      bfsPath(input.edges, startOperationalId, endOperationalId),
+  );
+  if (!hasOperationalPath) warnings.push("no_recorded_operational_path");
+
+  return {
+    canAnalyze: blockingReasons.length === 0,
+    blockingReasons,
+    warnings,
+    startHistoryCount: startSequences.length,
+    endHistoryCount: endSequences.length,
+    hasOperationalPath,
+  };
+}
 
 /**
  * Analyze "what happened between" two endpoints in ONE project. PURE: no I/O,

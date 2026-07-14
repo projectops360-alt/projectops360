@@ -1917,7 +1917,9 @@
       "limitations": "Limitations",
       "summaryFacts": "Summary",
       "noPath": "No recorded operational path between these endpoints.",
-      "noEvents": "No canonical events in this interval."
+      "noEvents": "No canonical events in this interval.",
+      "emptyTitle": "There is not enough recorded history to compare these endpoints",
+      "emptyDescription": "Choose endpoints with canonical events. Zero-value metrics would not explain what happened."
     },
     "drill": {
       "selected": "Selected milestones: {names}",

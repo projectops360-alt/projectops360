@@ -13,6 +13,10 @@ import type {
   LivingGraphEventRelationship,
 } from "@/types/living-graph";
 import type { NodeMetrics, OverlayEmphasis } from "@/lib/graph/living-graph-analysis";
+import type {
+  ProcessActivityAggregate,
+  ProcessTransitionAggregate,
+} from "@/lib/graph/task-process-analysis";
 
 /** Visual state derived from timeline playback. */
 export type TimelinePlaybackState =
@@ -93,3 +97,21 @@ export type LivingEdgeData = {
 };
 
 export type LivingFlowEdge = Edge<LivingEdgeData, "living">;
+
+// ── Task-lifecycle Process Explorer (aggregate, order-only) ──
+
+export type ProcessActivityNodeData = {
+  activity: ProcessActivityAggregate;
+  selected: boolean;
+  locale: string;
+};
+
+export type ProcessActivityFlowNode = Node<ProcessActivityNodeData, "processActivity">;
+
+export type ProcessTransitionEdgeData = {
+  transition: ProcessTransitionAggregate;
+  selected: boolean;
+  locale: string;
+};
+
+export type ProcessTransitionFlowEdge = Edge<ProcessTransitionEdgeData, "processTransition">;

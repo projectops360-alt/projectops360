@@ -45,7 +45,7 @@ export interface CanonicalEventLoadResult {
 export const EVENT_LOG_LIMIT = 1000; // explicit, documented bound
 
 const EVENT_LOG_COLUMNS =
-  "event_id, organization_id, project_id, event_category, event_type, "
+  "event_id, organization_id, project_id, case_id, event_category, event_type, "
   + "event_schema_version, event_importance, event_lifecycle_class, "
   + "subject_type, subject_id, actor_type, actor_id, occurred_at, recorded_at, "
   + "sequence_number, source_module, source_entity_type, source_entity_id, "
