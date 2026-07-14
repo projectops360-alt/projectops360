@@ -169,6 +169,25 @@ describe("CAP-045 loader — read security / scope", () => {
     expect(res.canonicalEvents).toEqual([]);
     expect(res.eventRelationships).toEqual([]);
     expect(res.eventsTruncated).toBe(false);
+    // Part B — explicit status channel: the page maps "error" → status "error"
+    // (never a silent fallback to operational nodes).
+    expect(res.status).toBe("error");
+    expect(res.errorCode).toBe("log_read_failed");
+  });
+
+  it("status 'ok' on a successful read (even with 0 events)", async () => {
+    const { client } = makeMockClient({ logRows: [], objRows: [] });
+    const res = await loadCanonicalEventProjection(client, ORG, PROJECT);
+    expect(res.status).toBe("ok");
+    expect(res.canonicalEvents).toEqual([]);
+    // The page maps "ok" + 0 events → canonicalEventProjectionStatus "empty".
+  });
+
+  it("status 'missing-input' when org/project absent (no query issued)", async () => {
+    const { client } = makeMockClient({ logRows: [] });
+    const res = await loadCanonicalEventProjection(client, "", PROJECT);
+    expect(res.status).toBe("missing-input");
+    expect(res.errorCode).toBe("missing-input");
   });
 
   it("truncation is detected and reported (limit + 1 read, never silently truncated)", async () => {

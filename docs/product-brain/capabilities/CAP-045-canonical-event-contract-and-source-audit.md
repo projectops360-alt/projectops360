@@ -498,3 +498,49 @@ contract, 13 cases), `src/lib/graph/__tests__/event-relationships-view.test.ts`
 (flag + discrimination + analysis isolation), and
 `src/lib/graph/__tests__/event-relationship-loader.test.ts` (read-scope +
 no-admin-client). CI green (typecheck + `test:run` + build).
+
+### F.7 Extension — Project isolation + "What happened between?" (2026-07-13)
+
+A view-layer fix on top of §F (no §A change, no new tables, no backfill).
+
+**Part B — eliminate the misleading fallback.** The "events" view level never
+silently falls back to operational `process_nodes`/`process_edges`. The page
+always sets `canonicalEventProjectionStatus` (`disabled`/`empty`/`ready`/
+`error`/`truncated`) and `requestedProjectId`; the view is active only for
+`ready`/`truncated`, and renders an explicit status banner (not operational
+nodes) in every other state. The byte-identical invariant for flag-OFF is
+preserved (the three canonical arrays stay `undefined`; only the new scalar
+`status` + `requestedProjectId` are set). Project switches remount the canvas
+(`<LivingGraphCanvas key={projectId}>`), and `scopeLivingGraphDataToProject`
+filters every layer to `projectId === requestedProjectId` (defense-in-depth).
+The synthetic `__pick-link` edge is removed; two-milestone pick now offers
+"View flow" (drill, unchanged) AND "Analyze what happened".
+
+**Part C — pure motor `src/lib/graph/between-analysis.ts`.** `analyzeBetween`
+answers "what happened between?" for two endpoints in ONE project: BFS shortest
+path over `process_edges` (operational) + canonical events ordered by
+`sequence_number`, interval `[seqStart, seqEnd]` inclusive. `occurred_at` and
+`recorded_at` are kept separate (`elapsedBusinessMs` wall-clock — declared in
+`limitations`, never business-hour pruned; `recordedElapsedMs` separate).
+Temporal order ≠ causality: `temporalRelationships` = ORDER only;
+`explicitCausalRelationships` only from `relationshipClass === "causal"`
+(caused_by explicit) — never inferred. Blockers/risks/decisions/approvals/
+rework are deterministic `eventType` keyword buckets (NO LLM); `summaryFacts`
+are deterministic. An endpoint with no canonical history is a limitation
+(`updated_at` is never substituted). Cross-project endpoints are rejected.
+Inputs are never mutated; output is deterministic (idempotent).
+
+**What this extension does NOT do (cumulative with F.5):** no new tables, no
+second event store, no backfill, no Process-Mining metrics outside the
+between-analysis motor, no Variant Analysis, no Root Cause Miner, no RI-05
+change, no invented causality, no silent fallback. The analysis READS both
+layers but never FEEDS the operational analyses (isolated by construction).
+The flag is unchanged and independent of `RISK_EVENT_CAPTURE_PROJECT_IDS`.
+
+Row `LG-BETWEEN-ANALYSIS / CAP-045 §C.2` in
+[regression-test-map.md](../regression-test-map.md), protected by
+`src/lib/graph/__tests__/between-analysis.test.ts` (12 cases),
+`src/lib/graph/__tests__/project-isolation.test.ts` (isolation filter + status
+contract), `src/components/graph/__tests__/between-analysis-panel.render.test.tsx`
+(read-only panel render), and the extended
+`src/lib/graph/__tests__/event-relationship-loader.test.ts` (status channel).

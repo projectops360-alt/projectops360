@@ -210,21 +210,6 @@ function LivingGraphEdgeComponent({
     );
   }
 
-  // Selection link drawn between two picked/connected milestones
-  if (edge.metadata.pick_link === true) {
-    return (
-      <BaseEdge
-        path={path}
-        style={{
-          stroke: "#6366f1",
-          strokeWidth: 2.5,
-          strokeDasharray: "6 4",
-          opacity: 0.95,
-        }}
-      />
-    );
-  }
-
   // Milestone flowchart connector: single roadmap line + info callout
   if (edge.metadata.milestone_chain === true) {
     return (

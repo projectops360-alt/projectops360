@@ -32,6 +32,14 @@ export interface CanonicalEventLoadResult {
   canonicalEvents: LivingGraphCanonicalEvent[];
   eventRelationships: LivingGraphEventRelationship[];
   eventsTruncated: boolean;
+  /** Explicit load status so the caller (page) can map to
+   *  `CanonicalEventProjectionStatus` without guessing from emptiness.
+   *  - "ok": projection computed (possibly with 0 events → caller maps to "empty").
+   *  - "error": the log read itself failed (caller maps to "error").
+   *  - "missing-input": org/project absent (caller maps to "disabled"/"error"). */
+  status: "ok" | "error" | "missing-input";
+  /** Machine-readable failure code when status !== "ok". */
+  errorCode?: "log_read_failed" | "object_read_partial" | "missing-input";
 }
 
 export const EVENT_LOG_LIMIT = 1000; // explicit, documented bound
@@ -60,8 +68,11 @@ export async function loadCanonicalEventProjection(
     canonicalEvents: [],
     eventRelationships: [],
     eventsTruncated: false,
+    status: "ok",
   };
-  if (!organizationId || !projectId) return empty;
+  if (!organizationId || !projectId) {
+    return { ...empty, status: "missing-input", errorCode: "missing-input" };
+  }
 
   // +1 to detect truncation without a second query.
   const logResult = await client
@@ -72,7 +83,9 @@ export async function loadCanonicalEventProjection(
     .order("sequence_number", { ascending: true })
     .limit(EVENT_LOG_LIMIT + 1);
 
-  if (logResult.error || !logResult.data) return empty;
+  if (logResult.error || !logResult.data) {
+    return { ...empty, status: "error", errorCode: "log_read_failed" };
+  }
 
   const logRowsAll = logResult.data as unknown as CanonicalEventLogRow[];
   const eventsTruncated = logRowsAll.length > EVENT_LOG_LIMIT;
@@ -80,6 +93,7 @@ export async function loadCanonicalEventProjection(
 
   // Fetch object refs ONLY for the recovered event_ids (bounded by the log read).
   let objectRows: CanonicalEventObjectRow[] = [];
+  let objectReadPartial = false;
   if (logRows.length > 0) {
     const eventIds = logRows.map((r) => r.event_id);
     const objsResult = await client
@@ -88,6 +102,10 @@ export async function loadCanonicalEventProjection(
       .in("event_id", eventIds);
     if (!objsResult.error && objsResult.data) {
       objectRows = objsResult.data as unknown as CanonicalEventObjectRow[];
+    } else {
+      // Non-fatal: events still render, just without their object refs. Surface
+      // the partial failure via errorCode so the page can flag degraded data.
+      objectReadPartial = true;
     }
   }
 
@@ -96,5 +114,7 @@ export async function loadCanonicalEventProjection(
     canonicalEvents: projection.canonicalEvents,
     eventRelationships: projection.eventRelationships,
     eventsTruncated,
+    status: "ok",
+    ...(objectReadPartial ? { errorCode: "object_read_partial" } : {}),
   };
 }

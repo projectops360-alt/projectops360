@@ -139,6 +139,14 @@ import {
   LivingGraphEditDialogs,
   type EditingEntity,
 } from "./living-graph-edit-dialogs";
+import {
+  analyzeBetween,
+  getBetweenAnalysisLayoutKey,
+  type BetweenEndpoint,
+  type BetweenAnalysisResult,
+} from "@/lib/graph/between-analysis";
+import { scopeLivingGraphDataToProject } from "@/lib/graph/project-scoped-data";
+import { BetweenAnalysisPanel } from "./between-analysis-panel";
 import type {
   LivingFlowNode,
   LivingFlowEdge,
@@ -204,7 +212,15 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
     [demoMode, data, projectId],
   );
 
-  if (effectiveData.nodes.length === 0) {
+  // Part B — never block the canvas when canonical events ARE available even if
+  // the operational graph is empty. A project with 0 process_nodes but a ready
+  // canonical-event projection must still reach the "events" view (the user
+  // switches level); only a TRULY empty project (no operational nodes AND no
+  // ready/truncated canonical projection) shows the empty / "Try demo" state.
+  const canonicalReady =
+    data.canonicalEventProjectionStatus === "ready" ||
+    data.canonicalEventProjectionStatus === "truncated";
+  if (effectiveData.nodes.length === 0 && !canonicalReady) {
     return (
       <div
         role="status"
@@ -250,6 +266,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
       <div className="hidden md:block">
         <ReactFlowProvider>
           <LivingGraphCanvas
+            key={projectId}
             projectId={projectId}
             data={effectiveData}
             milestones={milestones}
@@ -314,6 +331,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const [milestonePicks, setMilestonePicks] = useState<string[]>([]);
   // Drill-down filter: only show activities of these milestones
   const [milestoneFocus, setMilestoneFocus] = useState<Set<string> | null>(null);
+  // ── Between-analysis (CAP-045 §C.2 / Part C) ────────────────────────────────
+  // "What happened between?" mode: the user picks two endpoints (milestones /
+  // tasks / canonical events) and runs a read-only analysis. Distinct from
+  // milestone-focus (drill-down) — selecting two milestones shows BOTH a
+  // "View flow" button (drill, unchanged) and an "Analyze what happened" button.
+  const [betweenMode, setBetweenMode] = useState(false);
+  const [betweenEndpoints, setBetweenEndpoints] = useState<BetweenEndpoint[]>([]);
+  const [betweenResult, setBetweenResult] = useState<BetweenAnalysisResult | null>(null);
   // User-dragged node positions (override the computed layout)
   const [manualPositions, setManualPositions] = useState<Map<string, { x: number; y: number }>>(
     () => new Map(),
@@ -379,10 +404,24 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     [subtasks],
   );
 
+  // ── B3 — Project isolation filter (defense-in-depth) ──────────────────────────
+  // The page stamps `requestedProjectId` on the payload and scopes every query
+  // by project_id. As defense-in-depth, filter EVERY layer here so a row whose
+  // projectId does not match the requested project can NEVER render — even if a
+  // payload were ever reused across mounts. The status/requestedProjectId
+  // scalars are carried through unchanged. Canonical layers (which the new
+  // projection introduces) are filtered strictly; operational layers keep their
+  // required `projectId` field too, so the filter is uniform.
+  const requestedProjectId = data.requestedProjectId ?? projectId;
+  const projectScopedData = useMemo<LivingGraphData>(
+    () => scopeLivingGraphDataToProject(data, requestedProjectId),
+    [data, requestedProjectId],
+  );
+
   // ── Labor-enriched graph (inject risk nodes + edges, enrich existing nodes) ──
   const laborEnrichedData = useMemo(() => {
-    if (!laborCapacity || !laborActivities || !tradeTaxonomy) return data;
-    let enrichedNodes = enrichExistingNodesWithLaborData(data.nodes, laborCapacity);
+    if (!laborCapacity || !laborActivities || !tradeTaxonomy) return projectScopedData;
+    let enrichedNodes = enrichExistingNodesWithLaborData(projectScopedData.nodes, laborCapacity);
 
     // Enrich construction activity nodes with readiness data
     if (lookaheadActivities && lookaheadActivities.length > 0) {
@@ -397,7 +436,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
     // Only inject synthetic risk nodes at activities/events level (not milestones)
     if (viewLevel === "milestones") {
-      return { ...data, nodes: enrichedNodes };
+      return { ...projectScopedData, nodes: enrichedNodes };
     }
 
     const { riskNodes } = mapLaborRisksToGraphNodes(laborCapacity, tradeTaxonomy, (typeof window !== "undefined" ? document.documentElement.lang : "en") as Locale);
@@ -409,11 +448,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     );
 
     return {
-      ...data,
+      ...projectScopedData,
       nodes: [...enrichedNodes, ...riskNodes],
-      edges: [...data.edges, ...constraintEdges],
+      edges: [...projectScopedData.edges, ...constraintEdges],
     };
-  }, [data, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities]);
+  }, [projectScopedData, laborCapacity, laborActivities, tradeTaxonomy, viewLevel, projectId, lookaheadActivities]);
 
   // ── Task → capacity-resource map (for the Workforce Intelligence Layer) ──
   const taskResourceKey = useMemo(() => {
@@ -440,10 +479,34 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // the Workboard ("different views, same truth").
   const milestoneCensus = useMemo(() => computeMilestoneTaskCensus(tasks), [tasks]);
 
+  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
+  // Status contract (Part B): the page ALWAYS sets
+  // `canonicalEventProjectionStatus` ("disabled"|"empty"|"ready"|"error"|
+  // "truncated"). The events view is active ONLY when the projection is "ready"
+  // or "truncated" (canonical events exist to render). Any other state renders
+  // an empty events graph + an explicit status banner — NEVER the operational
+  // fallback. The canonical flow is a READ-ONLY projection — it never feeds the
+  // operational analysis (critical path / bottleneck / cycles …).
+  const projectionStatus = data.canonicalEventProjectionStatus;
+  const canonicalEvents = projectScopedData.canonicalEvents ?? [];
+  const canonicalEventsActive =
+    viewLevel === "events" &&
+    (projectionStatus === "ready" || projectionStatus === "truncated");
+
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
+  // Part B — the "events" view level NEVER falls back to operational
+  // process_nodes/process_edges. When the canonical-event projection is not
+  // active (flag OFF / empty / error), the events view renders an EMPTY graph
+  // + a status banner below — NOT the operational node dump. The rfNodes/
+  // rfEdges memos short-circuit on `canonicalEventsActive` and otherwise
+  // consume this `displayGraph`, so an empty displayGraph means no operational
+  // nodes ever render under "events".
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
       return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges, milestoneCensus);
+    }
+    if (viewLevel === "events" && !canonicalEventsActive) {
+      return { nodes: [], edges: [] };
     }
     const graph =
       viewLevel === "activities"
@@ -452,29 +515,18 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive]);
 
-  // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
-  // Active ONLY when the "events" view level is selected AND the loader
-  // populated canonicalEvents (which happens only when the server-side flag
-  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS is ON for this project). When
-  // inactive, every memo below falls through to the operational path and the
-  // graph is byte-identical to before (milestones/activities never populate
-  // canonicalEvents). The canonical flow is a READ-ONLY projection — it never
-  // feeds the operational analysis (critical path / bottleneck / cycles …).
-  const canonicalEvents = data.canonicalEvents ?? [];
-  const canonicalEventsActive =
-    viewLevel === "events" && canonicalEvents.length > 0;
   const canonicalFlow = useMemo(
     () =>
       canonicalEventsActive
         ? buildCanonicalFlow(
             canonicalEvents,
-            data.eventRelationships ?? [],
+            projectScopedData.eventRelationships ?? [],
             selectedNodeId,
           )
         : null,
-    [canonicalEventsActive, canonicalEvents, data.eventRelationships, selectedNodeId],
+    [canonicalEventsActive, canonicalEvents, projectScopedData.eventRelationships, selectedNodeId],
   );
 
   // ── Workforce overlay: enrich the DISPLAYED nodes (milestone cards + tasks)
@@ -535,15 +587,15 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       case "timeline": {
         // Real history = events spread across ≥2 distinct days. A single-day
         // (one-shot import) project has no evolution to replay → empty state.
-        const distinctDays = countDistinctEventDays(data.events.map((e) => e.occurredAt));
-        return { totalCount: distinctDays >= 2 ? data.events.length : 0, disconnectedCount: 0 };
+        const distinctDays = countDistinctEventDays(projectScopedData.events.map((e) => e.occurredAt));
+        return { totalCount: distinctDays >= 2 ? projectScopedData.events.length : 0, disconnectedCount: 0 };
       }
       case "simulation":
         return { totalCount: simulation ? 1 : 0, disconnectedCount: 0 };
       default:
         return { totalCount: 1, disconnectedCount: 0 };
     }
-  }, [overlay, analysis, data.events, simulation]);
+  }, [overlay, analysis, projectScopedData.events, simulation]);
 
   // Executive metrics for the premium dashboard header
   const health = useMemo(() => computeGraphHealth(analysis), [analysis]);
@@ -658,6 +710,13 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const isMilestoneFocusMode =
     milestoneFocus != null && milestoneFocus.size === 1 && viewLevel !== "milestones" && !workforceGraph;
 
+  // ── Between-analysis mode (CAP-045 §C.2) ───────────────────────────────────
+  // Active when the user has toggled between-mode AND picked exactly two
+  // endpoints. Separate from milestone-focus (which stays size===1 drill-down).
+  // Never active on the curated Workforce view (it manages its own geometry).
+  const isBetweenAnalysisMode =
+    betweenMode && betweenEndpoints.length === 2 && !workforceGraph;
+
   // The visible milestone/root node (the hub the tasks radiate from), if present.
   const focusRootNode = useMemo(
     () =>
@@ -718,11 +777,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // own key), so dragging persists per focused milestone and the global layout is
   // never applied to — nor overwritten by — the focus map.
   const layoutKey = useMemo(
-    () =>
-      isMilestoneFocusMode && milestoneFocus
+    () => {
+      // Between-analysis: scope the saved arrangement to the pair of endpoints
+      // (sorted so START/END share one layout) — never collides with milestones
+      // or milestone-focus contexts (UX-007/PD-008 safe).
+      if (isBetweenAnalysisMode) {
+        return getBetweenAnalysisLayoutKey(
+          projectId,
+          betweenEndpoints[0].nodeId,
+          betweenEndpoints[1].nodeId,
+        );
+      }
+      return isMilestoneFocusMode && milestoneFocus
         ? getMilestoneFocusLayoutKey(projectId, [...milestoneFocus][0])
-        : buildLayoutKey(viewLevel, layoutMode),
-    [isMilestoneFocusMode, milestoneFocus, projectId, viewLevel, layoutMode],
+        : buildLayoutKey(viewLevel, layoutMode);
+    },
+    [isBetweenAnalysisMode, betweenEndpoints, isMilestoneFocusMode, milestoneFocus, projectId, viewLevel, layoutMode],
   );
   // Keep the live node IDs fresh for the context loader without re-running the
   // context-load on every filter change (refs must not be set during render).
@@ -873,7 +943,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   // ── Timeline playback ──
   const timelineActive = overlay === "timeline";
-  const currentEvent = playbackIndex >= 0 ? data.events[playbackIndex] : null;
+  const currentEvent = playbackIndex >= 0 ? projectScopedData.events[playbackIndex] : null;
   const currentTime = currentEvent ? new Date(currentEvent.occurredAt).getTime() : null;
 
   const playbackStateFor = useCallback(
@@ -917,6 +987,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [pathResult, analysis]);
   const pathNodeIds = useMemo(() => new Set(pathResult ?? []), [pathResult]);
 
+  // ── Between-analysis highlight sets (CAP-045 §C.2 / Part C) ───────────────
+  // Read-only visual signals derived from `betweenResult`. Presentation only —
+  // they never feed operational analyses.
+  const betweenPathNodeIds = useMemo(
+    () => new Set((betweenResult?.operationalPath ?? []).map((p) => p.nodeId)),
+    [betweenResult],
+  );
+  const betweenEventIds = useMemo(
+    () => new Set(betweenResult?.canonicalEventIds ?? []),
+    [betweenResult],
+  );
+  const betweenStartNodeId = betweenResult?.startEndpoint.nodeId ?? null;
+  const betweenEndNodeId = betweenResult?.endEndpoint.nodeId ?? null;
+
   // Deterministic path summary (PI-008 upgrades this to an AI narrative)
   const pathNarrative = useMemo(
     () => (pathResult ? buildPathNarrative(analysis, pathResult) : null),
@@ -938,10 +1022,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     // operational node-mapping path below is skipped entirely, so it never
     // sees (and never mutates) canonical data.
     if (canonicalEventsActive && canonicalFlow) {
-      return canonicalFlow.nodes.map((n) => ({
-        ...n,
-        position: canonicalFlow.positions.get(n.id) ?? { x: 0, y: 0 },
-      })) as unknown as LivingFlowNode[];
+      return canonicalFlow.nodes.map((n) => {
+        const isEventMember =
+          n.id.startsWith("ev:") && betweenEventIds.has(n.id.slice(3));
+        const isStart = n.id === betweenStartNodeId;
+        const isEnd = n.id === betweenEndNodeId;
+        return {
+          ...n,
+          position: canonicalFlow.positions.get(n.id) ?? { x: 0, y: 0 },
+          data: {
+            ...n.data,
+            ...(isEventMember ? { isBetweenEventMember: true } : {}),
+            ...(isStart ? { isBetweenStart: true } : {}),
+            ...(isEnd ? { isBetweenEnd: true } : {}),
+          },
+        };
+      }) as unknown as LivingFlowNode[];
     }
     const total = withSubtasks.nodes.length;
     return withSubtasks.nodes.map((node, index) => {
@@ -990,6 +1086,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           isFocusNode: focusIds != null && node.id === selectedNodeId,
           isDropTarget: node.id === dropTargetId,
           clusterSize,
+          // Between-analysis highlighting (read-only presentation signals).
+          isBetweenStart: node.id === betweenStartNodeId || undefined,
+          isBetweenEnd: node.id === betweenEndNodeId || undefined,
+          isBetweenPathMember: betweenPathNodeIds.has(node.id) || undefined,
           // Only task nodes that actually have subtasks get the toggle affordance.
           onToggleSubtasks:
             node.sourceEntityType === "roadmap_tasks" &&
@@ -1022,6 +1122,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     dropTargetId,
     subtasksByTask,
     toggleSubtaskParent,
+    betweenEventIds,
+    betweenStartNodeId,
+    betweenEndNodeId,
+    betweenPathNodeIds,
   ]);
 
   // Drill-down: show only the picked milestones' activities. Flow the tasks
@@ -1038,6 +1142,106 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     setLayoutMode("timeline");
     setViewLevel("activities");
   }, [milestonePicks, setLayoutMode, setViewLevel]);
+
+  // ── Between-analysis helpers (CAP-045 §C.2) ────────────────────────────────
+  // Map any rendered node (operational milestone/task/process node OR canonical
+  // event `ev:<id>`) to a BetweenEndpoint the pure motor understands.
+  const nodeToBetweenEndpoint = useCallback(
+    (nodeId: string): BetweenEndpoint | null => {
+      // Canonical-event node id: `ev:<eventId>`.
+      if (nodeId.startsWith("ev:")) {
+        const eventId = nodeId.slice(3);
+        const ev = canonicalEvents.find((e) => e.eventId === eventId);
+        return {
+          nodeId,
+          label: ev?.eventType ?? eventId,
+          kind: "canonical_event",
+          eventId,
+          sourceEntityId: ev?.sourceEntityId ?? null,
+        };
+      }
+      const node = withSubtasks.nodes.find((n) => n.id === nodeId);
+      if (!node) return null;
+      const kind: BetweenEndpoint["kind"] =
+        node.sourceEntityType === "milestones" || node.nodeType === "milestone_gate"
+          ? "milestone"
+          : node.sourceEntityType === "roadmap_tasks"
+            ? "task"
+            : "process_node";
+      return {
+        nodeId,
+        label: node.milestoneLabel ?? node.label,
+        kind,
+        sourceEntityId: node.sourceEntityId,
+      };
+    },
+    [canonicalEvents, withSubtasks.nodes],
+  );
+
+  // Run the pure analysis for the current pair of endpoints (or an explicit
+  // pair passed in — used by the two-milestone "Analyze what happened" button).
+  const runBetweenAnalysis = useCallback(
+    (endpoints: BetweenEndpoint[]) => {
+      if (endpoints.length !== 2) {
+        setBetweenResult(null);
+        return;
+      }
+      const result = analyzeBetween({
+        requestedProjectId,
+        startEndpoint: endpoints[0],
+        endEndpoint: endpoints[1],
+        nodes: projectScopedData.nodes,
+        edges: projectScopedData.edges,
+        canonicalEvents,
+        eventRelationships: projectScopedData.eventRelationships ?? [],
+      });
+      setBetweenResult(result);
+    },
+    [requestedProjectId, projectScopedData.nodes, projectScopedData.edges, canonicalEvents, projectScopedData.eventRelationships],
+  );
+
+  // Two-milestone pick → "Analyze what happened" (keeps the picked milestones as
+  // the endpoints). Independent of "View flow" (drill-down), which stays separate
+  // and does NOT auto-run.
+  const handleAnalyzeBetweenMilestones = useCallback(() => {
+    if (milestonePicks.length !== 2) return;
+    const endpoints: BetweenEndpoint[] = [];
+    for (const milestoneId of milestonePicks) {
+      const node =
+        displayGraph.nodes.find((n) => n.milestoneId === milestoneId) ??
+        withSubtasks.nodes.find((n) => n.milestoneId === milestoneId);
+      if (!node) continue;
+      endpoints.push({
+        nodeId: node.id,
+        label: node.milestoneLabel ?? node.label,
+        kind: "milestone",
+        sourceEntityId: node.sourceEntityId,
+      });
+    }
+    if (endpoints.length !== 2) return;
+    setBetweenEndpoints(endpoints);
+    setBetweenMode(true);
+    setMilestonePicks([]);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    runBetweenAnalysis(endpoints);
+  }, [milestonePicks, displayGraph.nodes, withSubtasks.nodes, runBetweenAnalysis]);
+
+  const handleClearBetween = useCallback(() => {
+    setBetweenMode(false);
+    setBetweenEndpoints([]);
+    setBetweenResult(null);
+  }, []);
+
+  const handleSwapBetween = useCallback(() => {
+    setBetweenEndpoints((prev) => {
+      if (prev.length !== 2) return prev;
+      const swapped = [prev[1], prev[0]];
+      // Re-run on the swapped pair so the panel reflects the new direction.
+      queueMicrotask(() => runBetweenAnalysis(swapped));
+      return swapped;
+    });
+  }, [runBetweenAnalysis]);
 
   const pickedLabels = useMemo(
     () =>
@@ -1109,35 +1313,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       };
     });
 
-    // Celonis-style selection link between the two picked milestones
-    if (isMilestoneLevel && milestonePicks.length === 2) {
-      const [a, b] = milestonePicks;
-      edges.push({
-        id: "__pick-link",
-        type: "living" as const,
-        source: `milestone:${a}`,
-        target: `milestone:${b}`,
-        data: {
-          edge: {
-            id: "__pick-link",
-            projectId: "",
-            sourceNodeId: `milestone:${a}`,
-            targetNodeId: `milestone:${b}`,
-            edgeType: "informed",
-            weight: 1,
-            lagDays: null,
-            isCritical: false,
-            riskLevel: null,
-            metadata: { pick_link: true },
-          },
-          emphasis: "normal" as OverlayEmphasis,
-          isCritical: false,
-          isPathMember: false,
-          playbackHidden: false,
-        },
-      });
-    }
-
+    // Part C — the synthetic `__pick-link` edge between two picked milestones is
+    // GONE. Picking two milestones now offers "Analyze what happened" (Between
+    // Analysis) alongside "View flow" (drill-down) — see the two-milestone banner.
     return edges;
   }, [
     canonicalEventsActive,
@@ -1151,8 +1329,6 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     pathEdgeIds,
     timelineActive,
     currentTime,
-    isMilestoneLevel,
-    milestonePicks,
   ]);
 
   // ── Selection helpers ──
@@ -1245,6 +1421,30 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const onNodeClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
     (_event, node) => {
+      // ── Between-analysis mode: pick endpoints (max 2, toggle off if
+      //    re-picked) for ALL node types, including canonical events. This is
+      //    the ONLY path that lets canonical-event nodes participate in an
+      //    analysis (otherwise they stay selection-only — the events view is
+      //    read-only). Endpoint picking does NOT mutate the graph.
+      if (betweenMode) {
+        const ep = nodeToBetweenEndpoint(node.id);
+        if (ep) {
+          setBetweenEndpoints((prev) => {
+            if (prev.some((p) => p.nodeId === ep.nodeId)) {
+              return prev.filter((p) => p.nodeId !== ep.nodeId);
+            }
+            const next = [...prev.slice(-1), ep];
+            if (next.length === 2) {
+              // Auto-run as soon as the second endpoint is picked.
+              queueMicrotask(() => runBetweenAnalysis(next));
+            }
+            return next;
+          });
+        }
+        setSelectedNodeId(node.id);
+        setSelectedEdgeId(null);
+        return;
+      }
       // Canonical-event/object nodes: selection only — no milestone pick, no
       // path mode, no in-graph editing (the events view is read-only).
       if ((node.type as string) === "canonicalEvent" || (node.type as string) === "canonicalObject") {
@@ -1271,7 +1471,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       setSelectedEdgeId(null);
       setSelectedNodeId(node.id);
     },
-    [pathModeFromId, resolvePath, viewLevel],
+    [betweenMode, nodeToBetweenEndpoint, runBetweenAnalysis, pathModeFromId, resolvePath, viewLevel],
   );
 
   const onEdgeClick = useCallback<EdgeMouseHandler<LivingFlowEdge>>(
@@ -1704,8 +1904,55 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       )}
 
       {/* Status hints (hidden in Focus Mode to maximize the canvas) */}
-      {!focusMode && isMilestoneLevel && milestonePicks.length === 0 && (
+      {!focusMode && isMilestoneLevel && milestonePicks.length === 0 && !betweenMode && (
         <p className="text-[11px] text-muted-foreground">{t("drill.hint")}</p>
+      )}
+      {/* Between-analysis toggle (CAP-045 §C.2). Available across all view
+          levels except the curated Workforce view. When ON, the next two node
+          clicks become the analysis endpoints. */}
+      {!workforceActive && !betweenMode && !isMilestoneFocusMode && (
+        <button
+          type="button"
+          onClick={() => {
+            setBetweenMode(true);
+            setBetweenEndpoints([]);
+            setBetweenResult(null);
+            setMilestonePicks([]);
+          }}
+          className="inline-flex items-center gap-1.5 rounded-md border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-[11px] font-medium text-brand-600 transition-colors hover:bg-brand-500/20 dark:text-brand-400"
+        >
+          <Route className="h-3.5 w-3.5" aria-hidden />
+          {t("between.toggle")}
+        </button>
+      )}
+      {betweenMode && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-brand-500/40 bg-brand-500/10 px-3 py-1.5">
+          <span className="text-xs text-brand-600 dark:text-brand-400">
+            {betweenEndpoints.length === 2
+              ? t("between.selected", {
+                  names: betweenEndpoints.map((e) => e.label).join(" + "),
+                })
+              : t("between.pickHint")}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {betweenEndpoints.length === 2 && (
+              <button
+                type="button"
+                onClick={() => runBetweenAnalysis(betweenEndpoints)}
+                className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+              >
+                {t("between.analyze")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClearBetween}
+              className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+              {t("between.clear")}
+            </button>
+          </div>
+        </div>
       )}
       {/* Sprint #2 — overlay discoverability: the people + assignment-edges view
           renders in the Activities level (not the default Milestones level). */}
@@ -1727,13 +1974,24 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           <span className="text-xs text-brand-600 dark:text-brand-400">
             {t("drill.selected", { names: pickedLabels })}
           </span>
-          <button
-            type="button"
-            onClick={handleDrillIntoPicks}
-            className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
-          >
-            {t("drill.viewFlow")}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {milestonePicks.length === 2 && (
+              <button
+                type="button"
+                onClick={handleAnalyzeBetweenMilestones}
+                className="rounded-md border border-brand-500/50 px-2.5 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-500/20 dark:text-brand-400"
+              >
+                {t("between.analyze")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleDrillIntoPicks}
+              className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+            >
+              {t("drill.viewFlow")}
+            </button>
+          </div>
         </div>
       )}
       {pathNarrative && (
@@ -1999,15 +2257,44 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             onReset={() => setSimulation(null)}
           />
         )}
-        {canonicalEventsActive && (data.eventsTruncated || canonicalEvents.length === 0) && (
+        {/* Part B — explicit status banner for the "events" view. The view NEVER
+            silently falls back to operational nodes; each non-ready state renders
+            its own banner so the user can distinguish disabled / empty / error /
+            truncated. Only "ready"/"truncated" render the canonical graph. */}
+        {viewLevel === "events" && projectionStatus === "disabled" && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {t("canonicalEvents.status.disabled.title")}
+          </div>
+        )}
+        {viewLevel === "events" && projectionStatus === "empty" && (
           <div
             role="status"
             className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
           >
             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {canonicalEvents.length === 0
-              ? t("canonicalEvents.empty")
-              : t("canonicalEvents.truncated", { count: canonicalEvents.length })}
+            {t("canonicalEvents.status.empty.title")}
+          </div>
+        )}
+        {viewLevel === "events" && projectionStatus === "error" && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-[11px] font-medium text-red-700 dark:text-red-300"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {t("canonicalEvents.status.error.title")}
+          </div>
+        )}
+        {canonicalEventsActive && projectionStatus === "truncated" && (
+          <div
+            role="status"
+            className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-300"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {t("canonicalEvents.status.truncated.title", { count: canonicalEvents.length })}
           </div>
         )}
         {canonicalEventsActive && canonicalEvents.length > 0 && (
@@ -2081,12 +2368,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
               ownerNames={subtaskOwnerNames}
               onOpenTeam={() => router.push(localizedHref(locale, `/projects/${projectId}/team`))}
               selectedCanonicalEvent={selectedCanonicalEvent}
-              canonicalEventRelationships={data.eventRelationships ?? []}
-              eventsTruncated={data.eventsTruncated ?? false}
+              canonicalEventRelationships={projectScopedData.eventRelationships ?? []}
+              eventsTruncated={projectScopedData.eventsTruncated ?? false}
               onClose={() => {
                 setSelectedNodeId(null);
                 setSelectedEdgeId(null);
               }}
+            />
+          </div>
+        )}
+        {betweenResult && (
+          <div className="absolute inset-y-0 right-0 z-20 w-[320px] max-w-[80vw] lg:relative lg:inset-auto lg:w-[360px]">
+            <BetweenAnalysisPanel
+              result={betweenResult}
+              onClose={handleClearBetween}
+              onSwap={handleSwapBetween}
+              onClear={handleClearBetween}
             />
           </div>
         )}
@@ -2095,7 +2392,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       {/* Timeline playback (visible in timeline overlay) */}
       {timelineActive && (
         <LivingGraphTimeline
-          events={data.events}
+          events={projectScopedData.events}
           currentIndex={playbackIndex}
           playing={playing}
           speed={speed}

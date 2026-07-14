@@ -1867,12 +1867,62 @@
       "importance": "Importance",
       "lifecycle": "Lifecycle class",
       "category": "Category",
-      "objectNodeLabel": "Object"
+      "objectNodeLabel": "Object",
+      "status": {
+        "disabled": {
+          "title": "Canonical event view is disabled for this project. Ask an admin to enable it via the LIVING_GRAPH_EVENT_RELATIONSHIPS flag."
+        },
+        "empty": {
+          "title": "No canonical events captured for this project yet. The events view shows canonical history — not operational tasks."
+        },
+        "error": {
+          "title": "The canonical event projection could not be loaded. The events view is unavailable (not a fallback to operational tasks)."
+        },
+        "truncated": {
+          "title": "Showing the first {count} canonical events. The log was truncated to keep the view readable."
+        }
+      }
+    },
+    "between": {
+      "toggle": "What happened between?",
+      "analyze": "Analyze what happened",
+      "clear": "Clear",
+      "swap": "Swap direction",
+      "start": "Start",
+      "end": "End",
+      "selected": "Endpoints: {names}",
+      "panelTitle": "What happened between?",
+      "pickHint": "Pick two endpoints (milestones, tasks, or events) on the graph.",
+      "twoEndpointsRequired": "Pick two endpoints to run the analysis.",
+      "operationalPath": "Operational path",
+      "canonicalEvents": "Canonical events (chronology)",
+      "relatedObjects": "Related objects",
+      "elapsedBusiness": "Elapsed (occurred_at)",
+      "recordedElapsed": "Recording span (recorded_at)",
+      "eventCount": "Events",
+      "transitionCount": "Transitions",
+      "largestWaitingGap": "Largest waiting gap",
+      "statusChanges": "Status changes",
+      "blockers": "Blockers",
+      "risks": "Risks",
+      "decisions": "Decisions",
+      "approvals": "Approvals",
+      "reworkSignals": "Rework signals",
+      "actors": "Actors",
+      "sourceModules": "Source modules",
+      "evidenceRefs": "Evidence refs",
+      "dataQualityFlags": "Data quality flags",
+      "explicitCausal": "Explicit causal links",
+      "temporalRelationships": "Temporal relationships",
+      "limitations": "Limitations",
+      "summaryFacts": "Summary",
+      "noPath": "No recorded operational path between these endpoints.",
+      "noEvents": "No canonical events in this interval."
     },
     "drill": {
       "selected": "Selected milestones: {names}",
       "viewFlow": "View flow",
-      "hint": "Tip: drag one milestone onto another (or click two) to connect them and view the flow between them. Drag cards freely to rearrange the layout."
+      "hint": "Tip: pick two milestones to \"View flow\" (drill-down) or \"Analyze what happened\" (between-analysis). Drag cards freely to rearrange the layout."
     },
     "milestoneFocus": {
       "title": "Milestone Focus",

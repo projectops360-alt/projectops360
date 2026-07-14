@@ -412,20 +412,33 @@ export default async function LivingGraphPage({
     edges,
     events,
     generatedAt: new Date().toISOString(),
+    // Always record the project this payload was built for so the client view
+    // can scope every layer to it (defense-in-depth against cross-project leaks
+    // when data is reused across mounts).
+    requestedProjectId: projectId,
   };
 
   // ── Canonical-event Relationships view (CAP-045 extension) ───────────────────
   // A READ-ONLY PROJECTION over the canonical event store. Gated by
   // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS (server-side, default OFF).
-  // When OFF, `data` stays exactly as above (byte-identical) and the "events"
-  // view keeps its current timeline/process behavior — no new controls.
+  //
+  // Status contract (Part B): the page ALWAYS sets `canonicalEventProjectionStatus`
+  // so the "events" view can render an explicit banner instead of silently
+  // falling back to operational process_nodes/process_edges:
+  //   * flag OFF            → "disabled"  (the three projection arrays stay
+  //                                    UNDEFINED — preserves the byte-identical
+  //                                    invariant for flag-OFF behavior).
+  //   * flag ON, 0 events   → "empty".
+  //   * flag ON, ≥1 event    → "ready" (or "truncated" if the log exceeded the limit).
+  //   * loader error/throw   → "error".
   //
   // Coexists with the operational projection: process_nodes/process_edges are
   // NOT substituted and the milestones/activities views are untouched. The
   // events read uses the AUTHENTICATED client (RLS) — never the admin/service
   // role for an ordinary read — and is scoped to this project + organization.
-  // Failure is non-fatal: the events view simply stays on its current behavior.
-  if (isEventRelationshipsEnabled(projectId)) {
+  if (!isEventRelationshipsEnabled(projectId)) {
+    data.canonicalEventProjectionStatus = "disabled";
+  } else {
     try {
       // Uses the AUTHENTICATED client (RLS) via the extracted loader — never an
       // admin/service role for this ordinary read. Scoped to org + project.
@@ -434,12 +447,26 @@ export default async function LivingGraphPage({
         org.organizationId,
         projectId,
       );
-      data.canonicalEvents = projection.canonicalEvents;
-      data.eventRelationships = projection.eventRelationships;
-      data.eventsTruncated = projection.eventsTruncated;
+      if (projection.status === "error") {
+        // Log read failed — surface explicitly, do not fall back silently.
+        data.canonicalEventProjectionStatus = "error";
+      } else {
+        data.canonicalEvents = projection.canonicalEvents;
+        data.eventRelationships = projection.eventRelationships;
+        data.eventsTruncated = projection.eventsTruncated;
+        if (projection.eventsTruncated) {
+          data.canonicalEventProjectionStatus = "truncated";
+        } else if (projection.canonicalEvents.length === 0) {
+          data.canonicalEventProjectionStatus = "empty";
+        } else {
+          data.canonicalEventProjectionStatus = "ready";
+        }
+      }
     } catch (err) {
-      // Non-fatal: the events view falls back to its current behavior.
+      // Non-fatal to the page, but EXPLICIT in the status — the events view
+      // shows an error banner rather than falling back to operational nodes.
       console.error("Living Graph canonical-event projection failed:", err);
+      data.canonicalEventProjectionStatus = "error";
     }
   }
 

@@ -39,6 +39,13 @@ export type LivingNodeData = {
   /** Toggle progressive subtask expansion for a task node (NotebookLM-style).
    *  Present only for task nodes that have subtasks; undefined otherwise. */
   onToggleSubtasks?: (taskId: string) => void;
+  // ── Between-analysis highlighting (CAP-045 §C.2 / Part C) ─────────────────
+  // Read-only visual signals set from `BetweenAnalysisResult`. They never feed
+  // operational analyses — presentation only.
+  isBetweenStart?: boolean;
+  isBetweenEnd?: boolean;
+  isBetweenPathMember?: boolean;
+  isBetweenEventMember?: boolean;
 };
 
 export type LivingFlowNode = Node<LivingNodeData, "living" | "milestoneCard">;
@@ -51,6 +58,10 @@ export type CanonicalEventNodeData = {
   event: LivingGraphCanonicalEvent;
   /** True when this node is the current selection. */
   selected: boolean;
+  // ── Between-analysis highlighting (CAP-045 §C.2 / Part C) ─────────────────
+  isBetweenEventMember?: boolean;
+  isBetweenStart?: boolean;
+  isBetweenEnd?: boolean;
 };
 
 export type CanonicalEventFlowNode = Node<CanonicalEventNodeData, "canonicalEvent">;
