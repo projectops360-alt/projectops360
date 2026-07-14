@@ -21,11 +21,12 @@ import type {
   LivingGraphCanonicalEvent,
   LivingGraphEventRelationship,
 } from "@/types/living-graph";
+import type { ProcessNodeSourceType } from "@/types/database";
 
 const PROJECT = "00000000-0000-0000-0000-000000000010";
 const OTHER_PROJECT = "00000000-0000-0000-0000-000000000099";
 
-function node(id: string, projectId = PROJECT, sourceEntityType = "roadmap_tasks", sourceEntityId = id, milestoneId: string | null = null): LivingGraphNode {
+function node(id: string, projectId = PROJECT, sourceEntityType: ProcessNodeSourceType = "roadmap_tasks", sourceEntityId = id, milestoneId: string | null = null): LivingGraphNode {
   return {
     id, projectId, nodeType: "task_transition", sourceEntityType, sourceEntityId,
     label: id, description: null, status: "todo", progress: null, startDate: null,
@@ -55,7 +56,7 @@ function event(
     fromState?: string | null;
     toState?: string | null;
     causedBy?: string[];
-    objectRefId?: string;
+    objectRefId?: string | null;
     recordedAt?: string;
     sourceEntityId?: string | null;
     importance?: string;
