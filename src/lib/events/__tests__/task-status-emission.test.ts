@@ -45,4 +45,11 @@ describe("Workboard task move → canonical TaskStatusChanged event", () => {
   it("TaskStatusChanged carries the schedule invalidation scope (LGRE recalc trigger)", () => {
     expect(EVENT_REGISTRY.TaskStatusChanged.invalidationScopes).toContain("scope:schedule");
   });
+
+  it("skips the generic dual-write when semantic capture already succeeded", () => {
+    expect(mapProcessNodeToEvent({
+      ...nodeInput,
+      metadata: { ...nodeInput.metadata, canonical_event_emitted: true },
+    })).toBeNull();
+  });
 });

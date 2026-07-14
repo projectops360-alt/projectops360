@@ -11,6 +11,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ProjectTemplate } from "./templates";
 import { calculateCriticalPath } from "./critical-path";
+import {
+  buildMilestoneCreatedEvents,
+  buildTaskCreatedEvents,
+  buildTaskDependencyEvent,
+  captureProcessMiningEvents,
+  type ProcessMiningCaptureSource,
+} from "@/lib/events/process-mining-capture";
 
 export interface InstantiateTemplateResult {
   milestonesCreated: number;
@@ -36,6 +43,13 @@ export async function instantiateTemplate(params: {
   const { organizationId, projectId, template } = params;
   const supabase = createAdminClient();
   const anchor = params.startDate ?? new Date().toISOString().slice(0, 10);
+  const captureSource: ProcessMiningCaptureSource = {
+    actorType: params.createdBy ? "human" : "system",
+    actorId: params.createdBy ?? null,
+    sourceModule: "project-template",
+    captureMethod: "direct",
+    provenance: { template_project_type: template.project_type },
+  };
 
   // ── Schedule the template graph with the CPM engine ───────────────────────
   const templateTasks = template.phases.flatMap((p) => p.tasks);
@@ -85,11 +99,21 @@ export async function instantiateTemplate(params: {
   const { data: milestones, error: msError } = await supabase
     .from("milestones")
     .insert(milestoneRows)
-    .select("id, order_index");
+    .select("id, title, status, order_index");
   if (msError) throw new Error(`Template milestones failed: ${msError.message}`);
 
   const milestoneIdByPhaseIdx = new Map<number, string>();
   for (const m of milestones ?? []) milestoneIdByPhaseIdx.set(m.order_index, m.id);
+  await captureProcessMiningEvents((milestones ?? []).flatMap((milestone) => buildMilestoneCreatedEvents({
+    milestone: {
+      milestoneId: milestone.id,
+      organizationId,
+      projectId,
+      title: milestone.title,
+      status: milestone.status,
+    },
+    source: captureSource,
+  })));
 
   // ── Tasks ─────────────────────────────────────────────────────────────────
   const taskRows = template.phases.flatMap((phase, phaseIdx) =>
@@ -126,13 +150,31 @@ export async function instantiateTemplate(params: {
   const { data: tasks, error: taskError } = await supabase
     .from("roadmap_tasks")
     .insert(taskRows)
-    .select("id, external_key");
+    .select("id, title, status, milestone_id, assigned_to, assigned_resource_id, project_team_member_id, priority, estimate_hours, start_date, end_date, external_key");
   if (taskError) throw new Error(`Template tasks failed: ${taskError.message}`);
 
   const taskIdByKey = new Map<string, string>();
   for (const t of tasks ?? []) {
     if (t.external_key) taskIdByKey.set(t.external_key, t.id);
   }
+  await captureProcessMiningEvents((tasks ?? []).flatMap((task) => buildTaskCreatedEvents({
+    task: {
+      taskId: task.id,
+      organizationId,
+      projectId,
+      title: task.title,
+      status: task.status,
+      milestoneId: task.milestone_id,
+      assignedTo: task.assigned_to,
+      assignedResourceId: task.assigned_resource_id,
+      projectTeamMemberId: task.project_team_member_id,
+      priority: task.priority,
+      estimateHours: task.estimate_hours,
+      startDate: task.start_date,
+      endDate: task.end_date,
+    },
+    source: captureSource,
+  })));
 
   // ── Dependencies ──────────────────────────────────────────────────────────
   const depRows = templateTasks.flatMap((t) =>
@@ -150,9 +192,25 @@ export async function instantiateTemplate(params: {
 
   let dependenciesCreated = 0;
   if (depRows.length > 0) {
-    const { error: depError } = await supabase.from("task_dependencies").insert(depRows);
+    const { data: dependencies, error: depError } = await supabase
+      .from("task_dependencies")
+      .insert(depRows)
+      .select("id, predecessor_id, successor_id, dependency_type, lag_days");
     if (depError) throw new Error(`Template dependencies failed: ${depError.message}`);
-    dependenciesCreated = depRows.length;
+    dependenciesCreated = dependencies?.length ?? 0;
+    await captureProcessMiningEvents((dependencies ?? []).map((dependency) => buildTaskDependencyEvent({
+      dependency: {
+        dependencyId: dependency.id,
+        organizationId,
+        projectId,
+        predecessorId: dependency.predecessor_id,
+        successorId: dependency.successor_id,
+        dependencyType: dependency.dependency_type,
+        lagDays: dependency.lag_days,
+      },
+      change: "added",
+      source: captureSource,
+    })));
   }
 
   // ── Resources ─────────────────────────────────────────────────────────────

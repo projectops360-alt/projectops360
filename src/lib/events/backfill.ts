@@ -43,6 +43,8 @@ function backfillProvenance(p: {
 }): Record<string, unknown> {
   return {
     backfilled: true,
+    capture_method: "mapped",
+    data_quality_flags: ["backfilled"],
     source_table: p.sourceTable,
     source_record_id: p.sourceRecordId,
     source_field: p.sourceField,
@@ -75,19 +77,29 @@ export function mapMilestoneToEvents(row: OwnerRowBase & { status?: string | nul
   if (row.created_at) {
     out.push({ organizationId: org, projectId: proj, eventType: "MilestoneCreated", subjectId: row.id,
       actorType: "system", occurredAt: row.created_at, sourceModule: "roadmap", sourceEntityType: "milestones", sourceEntityId: row.id,
+      caseId: row.id,
+      objectRefs: [
+        { objectType: "milestone", objectId: row.id, role: "focal" },
+        { objectType: "project", objectId: proj, role: "context" },
+      ],
       lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.OWNER_TIMESTAMP,
       provenance: backfillProvenance({ sourceTable: "milestones", sourceRecordId: row.id, sourceField: "created_at", inferenceMethod: "owner_timestamp", confidenceReason: "record creation timestamp", batchId }) });
   }
   if (row.status === "completed" && row.updated_at) {
     out.push({ organizationId: org, projectId: proj, eventType: "MilestoneAchieved", subjectId: row.id,
       actorType: "system", occurredAt: row.updated_at, sourceModule: "roadmap", sourceEntityType: "milestones", sourceEntityId: row.id,
+      caseId: row.id,
+      objectRefs: [
+        { objectType: "milestone", objectId: row.id, role: "focal" },
+        { objectType: "project", objectId: proj, role: "context" },
+      ],
       lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.INFERRED_CURRENT_STATE,
       provenance: backfillProvenance({ sourceTable: "milestones", sourceRecordId: row.id, sourceField: "status", inferenceMethod: "inferred_from_current_status", confidenceReason: "current terminal status; exact achievement time unknown", batchId }) });
   }
   return out;
 }
 
-const TASK_TERMINAL = new Set(["done", "tested"]);
+const TASK_TERMINAL = new Set(["done"]);
 
 export function mapTaskToEvents(
   row: OwnerRowBase & { status?: string | null; assigned_to?: string | null; assigned_resource_id?: string | null; title?: string | null; milestone_id?: string | null },
@@ -95,24 +107,42 @@ export function mapTaskToEvents(
 ): EmitEventInput[] {
   const out: EmitEventInput[] = [];
   const org = row.organization_id, proj = row.project_id;
+  const responsibility = row.assigned_to
+    ? { objectType: "user", objectId: row.assigned_to, role: "responsibility" }
+    : row.assigned_resource_id
+      ? { objectType: "resource", objectId: row.assigned_resource_id, role: "responsibility" }
+      : null;
+  const objectRefs = [
+    { objectType: "task", objectId: row.id, role: "focal" },
+    { objectType: "project", objectId: proj, role: "context" },
+    ...(row.milestone_id ? [{ objectType: "milestone", objectId: row.milestone_id, role: "phase" }] : []),
+    ...(responsibility ? [responsibility] : []),
+  ];
   if (row.created_at) {
     out.push({ organizationId: org, projectId: proj, eventType: "TaskCreated", subjectId: row.id,
       actorType: "system", occurredAt: row.created_at, sourceModule: "roadmap", sourceEntityType: "roadmap_tasks", sourceEntityId: row.id,
+      caseId: row.id, objectRefs,
       payload: { title: row.title ?? "(untitled)", ...(row.milestone_id ? { milestone_id: row.milestone_id } : {}) },
       lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.OWNER_TIMESTAMP,
       provenance: backfillProvenance({ sourceTable: "roadmap_tasks", sourceRecordId: row.id, sourceField: "created_at", inferenceMethod: "owner_timestamp", confidenceReason: "record creation timestamp", batchId }) });
   }
-  const assignee = row.assigned_to ?? row.assigned_resource_id ?? null;
-  if (assignee) {
+  const assigneeRef = row.assigned_to
+    ? `user:${row.assigned_to}`
+    : row.assigned_resource_id
+      ? `resource:${row.assigned_resource_id}`
+      : null;
+  if (assigneeRef) {
     out.push({ organizationId: org, projectId: proj, eventType: "TaskAssigned", subjectId: row.id,
       actorType: "system", occurredAt: row.updated_at ?? row.created_at ?? undefined, sourceModule: "roadmap", sourceEntityType: "roadmap_tasks", sourceEntityId: row.id,
-      payload: { assignee_ref: assignee },
+      caseId: row.id, objectRefs,
+      payload: { assignee_ref: assigneeRef },
       lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.INFERRED_CURRENT_STATE,
-      provenance: backfillProvenance({ sourceTable: "roadmap_tasks", sourceRecordId: row.id, sourceField: "assigned_to", inferenceMethod: "inferred_from_current_assignee", confidenceReason: "current assignee; assignment time unknown", batchId }) });
+      provenance: backfillProvenance({ sourceTable: "roadmap_tasks", sourceRecordId: row.id, sourceField: row.assigned_to ? "assigned_to" : "assigned_resource_id", inferenceMethod: "inferred_from_current_assignee", confidenceReason: "current assignee; assignment time unknown", batchId }) });
   }
   if (row.status && TASK_TERMINAL.has(row.status) && row.updated_at) {
     out.push({ organizationId: org, projectId: proj, eventType: "TaskCompleted", subjectId: row.id,
       actorType: "system", occurredAt: row.updated_at, sourceModule: "roadmap", sourceEntityType: "roadmap_tasks", sourceEntityId: row.id,
+      caseId: row.id, objectRefs,
       lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.INFERRED_CURRENT_STATE,
       provenance: backfillProvenance({ sourceTable: "roadmap_tasks", sourceRecordId: row.id, sourceField: "status", inferenceMethod: "inferred_from_current_status", confidenceReason: "current terminal status; exact completion time unknown", batchId }) });
   }
@@ -175,7 +205,7 @@ export function mapRiskToEvents(
 }
 
 export function mapDependencyToEvents(
-  row: { id?: string | null; organization_id: string; project_id: string; predecessor_id: string; successor_id: string; created_at?: string | null },
+  row: { id?: string | null; organization_id: string; project_id: string; predecessor_id: string; successor_id: string; dependency_type?: string | null; lag_days?: number | null; created_at?: string | null },
   batchId: string,
 ): EmitEventInput[] {
   if (!row.created_at) return [];
@@ -183,7 +213,18 @@ export function mapDependencyToEvents(
     organizationId: row.organization_id, projectId: row.project_id, eventType: "TaskDependencyAdded",
     subjectId: row.successor_id, actorType: "system", occurredAt: row.created_at,
     sourceModule: "roadmap", sourceEntityType: "task_dependencies", sourceEntityId: row.id ?? row.successor_id,
-    payload: { dependency_id: row.predecessor_id },
+    caseId: row.successor_id,
+    payload: {
+      dependency_id: row.id ?? `${row.predecessor_id}->${row.successor_id}`,
+      dependency_type: row.dependency_type ?? "unknown",
+      lag_days: row.lag_days ?? 0,
+    },
+    objectRefs: [
+      { objectType: "task", objectId: row.successor_id, role: "focal" },
+      { objectType: "task", objectId: row.predecessor_id, role: "predecessor" },
+      ...(row.id ? [{ objectType: "dependency", objectId: row.id, role: "relation" }] : []),
+      { objectType: "project", objectId: row.project_id, role: "context" },
+    ],
     lifecycleClassOverride: SYNTH, confidence: BACKFILL_CONFIDENCE.OWNER_TIMESTAMP,
     provenance: backfillProvenance({ sourceTable: "task_dependencies", sourceRecordId: row.id ?? `${row.predecessor_id}->${row.successor_id}`, sourceField: "created_at", inferenceMethod: "owner_timestamp", confidenceReason: "dependency creation timestamp", batchId }),
   }];
@@ -363,7 +404,7 @@ export async function backfillProject(
       return ((data ?? []) as unknown as Parameters<typeof mapTaskToEvents>[0][]).flatMap((r) => mapTaskToEvents(r, batchId));
     } },
     { module: "task_dependencies", run: async () => {
-      const { data } = await q("task_dependencies", "id, organization_id, project_id, predecessor_id, successor_id, created_at");
+      const { data } = await q("task_dependencies", "id, organization_id, project_id, predecessor_id, successor_id, dependency_type, lag_days, created_at");
       return ((data ?? []) as unknown as Parameters<typeof mapDependencyToEvents>[0][]).flatMap((r) => mapDependencyToEvents(r, batchId));
     } },
     { module: "decisions", run: async () => {

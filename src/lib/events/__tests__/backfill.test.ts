@@ -35,6 +35,16 @@ describe("task backfill mappers", () => {
     expect((created.provenance as { backfilled?: boolean }).backfilled).toBe(true);
     expect((created.provenance as { source_table?: string }).source_table).toBe("roadmap_tasks");
     expect(created.occurredAt).toBe("2026-06-01T00:00:00Z"); // preserves business time
+    expect(created.caseId).toBe(T);
+    expect(created.objectRefs).toEqual(expect.arrayContaining([
+      { objectType: "task", objectId: T, role: "focal" },
+      { objectType: "project", objectId: PROJ, role: "context" },
+      { objectType: "user", objectId: taskRow.assigned_to, role: "responsibility" },
+    ]));
+    expect(created.provenance).toMatchObject({
+      capture_method: "mapped",
+      data_quality_flags: ["backfilled"],
+    });
   });
 
   it("emits TaskAssigned and TaskCompleted as INFERRED (lower confidence)", () => {
@@ -60,12 +70,18 @@ describe("task backfill mappers", () => {
     const evs = mapTaskToEvents({ ...taskRow, status: "in_progress", assigned_to: null }, B);
     expect(evs.map((e) => e.eventType)).toEqual(["TaskCreated"]);
   });
+
+  it("does not invent completion from the non-terminal tested state", () => {
+    const evs = mapTaskToEvents({ ...taskRow, status: "tested", assigned_to: null }, B);
+    expect(evs.map((e) => e.eventType)).toEqual(["TaskCreated"]);
+  });
 });
 
 describe("milestone backfill mapper", () => {
   it("emits MilestoneAchieved only for completed milestones", () => {
     const done = mapMilestoneToEvents({ id: "m1", organization_id: ORG, project_id: PROJ, created_at: "2026-06-01T00:00:00Z", updated_at: "2026-06-05T00:00:00Z", status: "completed" }, B);
     expect(done.map((e) => e.eventType)).toContain("MilestoneAchieved");
+    expect(done.every((event) => event.caseId === "m1")).toBe(true);
     const open = mapMilestoneToEvents({ id: "m2", organization_id: ORG, project_id: PROJ, created_at: "2026-06-01T00:00:00Z", status: "in_progress" }, B);
     expect(open.map((e) => e.eventType)).toEqual(["MilestoneCreated"]);
   });
@@ -78,10 +94,16 @@ describe("backfill governance guards", () => {
     expect(validateProjectEvent({ ...created, confidence: undefined }).ok).toBe(false);
   });
 
-  it("dependency backfill sets subject to the successor and payload.dependency_id to the predecessor", () => {
+  it("dependency backfill frames the successor case and preserves relation objects", () => {
     const [dep] = mapDependencyToEvents({ id: "d1", organization_id: ORG, project_id: PROJ, predecessor_id: "pre", successor_id: "suc", created_at: "2026-06-02T00:00:00Z" }, B);
     expect(dep.subjectId).toBe("suc");
-    expect((dep.payload as { dependency_id?: string }).dependency_id).toBe("pre");
+    expect(dep.caseId).toBe("suc");
+    expect((dep.payload as { dependency_id?: string }).dependency_id).toBe("d1");
+    expect(dep.objectRefs).toEqual(expect.arrayContaining([
+      { objectType: "task", objectId: "suc", role: "focal" },
+      { objectType: "task", objectId: "pre", role: "predecessor" },
+      { objectType: "dependency", objectId: "d1", role: "relation" },
+    ]));
   });
 });
 

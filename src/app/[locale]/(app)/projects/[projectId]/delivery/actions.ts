@@ -9,6 +9,21 @@ import {
 } from "@/lib/delivery/service";
 import { recommendFramework, type FrameworkInputs } from "@/lib/delivery/recommend";
 import { BOARD_TEMPLATES, boardTemplateFor, MEETING_RHYTHM, type DeliveryMethod } from "@/lib/delivery/config";
+import {
+  buildMilestoneCreatedEvents,
+  buildTaskCreatedEvents,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+  type ProcessMiningCaptureSource,
+} from "@/lib/events/process-mining-capture";
+
+function deliveryCaptureSource(
+  userId: string,
+  provenance?: Record<string, unknown>,
+): ProcessMiningCaptureSource {
+  return { actorType: "human", actorId: userId, sourceModule: "delivery", captureMethod: "direct", provenance };
+}
 
 async function authed() {
   try { return await getOrgContext(); } catch { return null; }
@@ -171,15 +186,24 @@ export async function promoteBacklogItemAction(input: { projectId: string; id: s
   if (!item) return { error: "not_found" };
   const it = item as Record<string, unknown>;
 
-  const { error } = await c.supabase.from("roadmap_tasks").insert({
-    organization_id: c.org.organizationId, project_id: input.projectId,
-    title: String(it.title), description: (it.description as string) || null,
-    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
-    milestone_id: (it.linked_milestone_id as string) || null,
-    acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: 0, external_key: `backlog:${input.id}`,
-  });
-  if (error) return { error: "unexpected" };
+  const { data: task, error } = await c.supabase
+    .from("roadmap_tasks")
+    .insert({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: String(it.title), description: (it.description as string) || null,
+      status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+      milestone_id: (it.linked_milestone_id as string) || null,
+      acceptance_criteria: (it.acceptance_criteria as string) || null,
+      order_index: 0, external_key: `backlog:${input.id}`,
+    })
+    .select(TASK_CAPTURE_SELECT)
+    .single();
+  if (error || !task) return { error: "unexpected" };
+
+  await captureProcessMiningEvents(buildTaskCreatedEvents({
+    task: taskCaptureSnapshotFromRow(task, c.org.organizationId, input.projectId),
+    source: deliveryCaptureSource(c.org.userId, { promoted_from_backlog_item_id: input.id }),
+  }));
 
   // Mark the backlog item as promoted (kept for traceability).
   await c.supabase.from("project_backlog_items").update({ status: "promoted" }).eq("id", input.id).eq("organization_id", c.org.organizationId);
@@ -201,15 +225,23 @@ export async function promoteBacklogItemsAction(input: { projectId: string; ids?
   const rows = (items ?? []) as Record<string, unknown>[];
   if (rows.length === 0) return { count: 0 };
 
-  const { error } = await c.supabase.from("roadmap_tasks").insert(rows.map((it, i) => ({
-    organization_id: c.org.organizationId, project_id: input.projectId,
-    title: String(it.title), description: (it.description as string) || null,
-    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
-    milestone_id: (it.linked_milestone_id as string) || null,
-    acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: i, external_key: `backlog:${it.id}`,
+  const { data: tasks, error } = await c.supabase
+    .from("roadmap_tasks")
+    .insert(rows.map((it, i) => ({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: String(it.title), description: (it.description as string) || null,
+      status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+      milestone_id: (it.linked_milestone_id as string) || null,
+      acceptance_criteria: (it.acceptance_criteria as string) || null,
+      order_index: i, external_key: `backlog:${it.id}`,
+    })))
+    .select(TASK_CAPTURE_SELECT);
+  if (error || !tasks) return { error: "unexpected" };
+
+  await captureProcessMiningEvents(tasks.flatMap((task) => buildTaskCreatedEvents({
+    task: taskCaptureSnapshotFromRow(task, c.org.organizationId, input.projectId),
+    source: deliveryCaptureSource(c.org.userId, { promoted_from_backlog: true }),
   })));
-  if (error) return { error: "unexpected" };
 
   await c.supabase.from("project_backlog_items").update({ status: "promoted" })
     .in("id", rows.map((r) => String(r.id))).eq("organization_id", c.org.organizationId);
@@ -259,10 +291,20 @@ export async function generateMilestonesAction(input: { projectId: string; local
       organization_id: c.org.organizationId, project_id: input.projectId,
       title: m.title, description: m.description || null, status: "planned",
       icon_key: safeIcon(m.icon_key, i, ms.length), order_index: base + i, progress_percent: 0,
-    }).select("id").single();
+    }).select("id, title, status").single();
     if (error || !row) continue;
     created++;
     const milestoneId = String((row as { id: string }).id);
+    await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+      milestone: {
+        milestoneId,
+        organizationId: c.org.organizationId,
+        projectId: input.projectId,
+        title: row.title,
+        status: row.status,
+      },
+      source: deliveryCaptureSource(c.org.userId, { generated_by: "delivery_ai" }),
+    }));
     const ids = m.item_titles.map((t) => byTitle.get(t.trim().toLowerCase())).filter((x): x is string => Boolean(x));
     if (ids.length > 0) {
       await c.supabase.from("project_backlog_items").update({ linked_milestone_id: milestoneId }).in("id", ids).eq("organization_id", c.org.organizationId);
@@ -280,11 +322,26 @@ export async function createMilestoneInlineAction(input: { projectId: string; ti
   if (!c) return { error: "not_authenticated" };
   if (!input.title.trim()) return { error: "title_required" };
   const order = await nextMilestoneOrder(c, input.projectId);
-  const { error } = await c.supabase.from("milestones").insert({
-    organization_id: c.org.organizationId, project_id: input.projectId,
-    title: input.title.trim(), status: "planned", icon_key: "setup", order_index: order, progress_percent: 0,
-  });
-  return error ? { error: "unexpected" } : {};
+  const { data: milestone, error } = await c.supabase
+    .from("milestones")
+    .insert({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: input.title.trim(), status: "planned", icon_key: "setup", order_index: order, progress_percent: 0,
+    })
+    .select("id, title, status")
+    .single();
+  if (error || !milestone) return { error: "unexpected" };
+  await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+    milestone: {
+      milestoneId: milestone.id,
+      organizationId: c.org.organizationId,
+      projectId: input.projectId,
+      title: milestone.title,
+      status: milestone.status,
+    },
+    source: deliveryCaptureSource(c.org.userId),
+  }));
+  return {};
 }
 
 /** Assign or clear a backlog item's milestone inline (from the backlog table). */
@@ -375,15 +432,23 @@ export async function promoteCycleAction(input: { projectId: string; cycleId: st
   const rows = (items ?? []) as Record<string, unknown>[];
   if (rows.length === 0) return { count: 0 };
 
-  const { error } = await c.supabase.from("roadmap_tasks").insert(rows.map((it, i) => ({
-    organization_id: c.org.organizationId, project_id: input.projectId,
-    title: String(it.title), description: (it.description as string) || null,
-    status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
-    milestone_id: (it.linked_milestone_id as string) || null, sprint_name: sprintName,
-    acceptance_criteria: (it.acceptance_criteria as string) || null,
-    order_index: i, external_key: `backlog:${it.id}`,
+  const { data: tasks, error } = await c.supabase
+    .from("roadmap_tasks")
+    .insert(rows.map((it, i) => ({
+      organization_id: c.org.organizationId, project_id: input.projectId,
+      title: String(it.title), description: (it.description as string) || null,
+      status: "not_started", priority: PRIORITY_MAP[String(it.priority)] ?? "p2",
+      milestone_id: (it.linked_milestone_id as string) || null, sprint_name: sprintName,
+      acceptance_criteria: (it.acceptance_criteria as string) || null,
+      order_index: i, external_key: `backlog:${it.id}`,
+    })))
+    .select(TASK_CAPTURE_SELECT);
+  if (error || !tasks) return { error: "unexpected" };
+
+  await captureProcessMiningEvents(tasks.flatMap((task) => buildTaskCreatedEvents({
+    task: taskCaptureSnapshotFromRow(task, c.org.organizationId, input.projectId),
+    source: deliveryCaptureSource(c.org.userId, { promoted_from_cycle_id: input.cycleId }),
   })));
-  if (error) return { error: "unexpected" };
 
   await c.supabase.from("project_backlog_items").update({ status: "promoted" }).in("id", rows.map((r) => String(r.id))).eq("organization_id", c.org.organizationId);
   await saveFrameworkEvent(c.supabase, c.org, input.projectId, c.frameworkId, "cycle_promoted", `Cycle "${sprintName}" promoted ${rows.length} item(s) to the Workboard`);

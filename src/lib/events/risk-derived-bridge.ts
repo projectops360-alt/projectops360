@@ -40,7 +40,10 @@ export function mapTaskEventToDerivedRiskInput(
   let derivedType: string | null = null;
   if (taskEvent.eventType === "TaskCreated") derivedType = "risk_response_action_created";
   else if (taskEvent.eventType === "TaskCompleted") derivedType = "risk_response_action_completed";
-  else if (taskEvent.eventType === "TaskStatusChanged" && taskEvent.toState === "in_progress") {
+  else if (
+    taskEvent.eventType === "TaskStarted" ||
+    (taskEvent.eventType === "TaskStatusChanged" && taskEvent.toState === "in_progress")
+  ) {
     derivedType = "risk_response_started";
   }
   if (!derivedType) return null;

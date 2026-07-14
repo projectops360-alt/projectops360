@@ -162,14 +162,20 @@ describe("CAP-045 event-relationship projection", () => {
       objRow("e1", "risk", "risk-1", "focal"),
       objRow("e1", "project_memory_item", "mem-9", "evidence"),
       objRow("e1", "project", "proj-1", "context"),
+      objRow("e1", "milestone", "milestone-1", "phase"),
+      objRow("e1", "user", "user-1", "responsibility"),
+      objRow("e1", "task", "task-0", "predecessor"),
     ];
     const { eventRelationships } = projectEventRelationships(rows, objs, PROJECT);
     const refs = eventRelationships.filter((r) => r.relationshipType === "relates_to_object");
-    expect(refs).toHaveLength(3);
+    expect(refs).toHaveLength(6);
     const byTriple = new Map(refs.map((r) => [`${r.objectType}:${r.objectId}:${r.objectRole}`, r]));
     expect(byTriple.get("risk:risk-1:focal")).toBeDefined();
     expect(byTriple.get("project_memory_item:mem-9:evidence")).toBeDefined();
     expect(byTriple.get("project:proj-1:context")).toBeDefined();
+    expect(byTriple.get("milestone:milestone-1:phase")).toBeDefined();
+    expect(byTriple.get("user:user-1:responsibility")).toBeDefined();
+    expect(byTriple.get("task:task-0:predecessor")).toBeDefined();
   });
 
   it("8. cross-project rows are REJECTED (no links form across projects)", () => {

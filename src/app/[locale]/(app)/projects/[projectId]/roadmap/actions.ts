@@ -6,6 +6,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitAndAutoLink, emitProcessNode } from "@/lib/graph/emit-event";
+import {
+  buildMilestoneCreatedEvents,
+  buildMilestoneDeletedEvent,
+  buildMilestoneStatusTransitionEvent,
+  buildTaskCreatedEvents,
+  buildTaskDeletedEvent,
+  buildTaskDependencyEvent,
+  buildTaskMutationEvents,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+  type ProcessMiningCaptureSource,
+} from "@/lib/events/process-mining-capture";
 import { getComputedMilestoneStatus, computeMilestoneProgress } from "@/lib/roadmap/progress";
 import { computeMilestoneReorder } from "@/lib/roadmap/milestone-reorder";
 import {
@@ -15,6 +28,10 @@ import {
   taskStatusValues,
 } from "@/lib/workboard/task-schemas";
 import type { AuditAction, Milestone, RoadmapTask } from "@/types/database";
+
+function humanCaptureSource(userId: string, sourceModule = "roadmap"): ProcessMiningCaptureSource {
+  return { actorType: "human", actorId: userId, sourceModule, captureMethod: "direct" };
+}
 
 // ── Zod Schemas ──────────────────────────────────────────────────────────────────
 // Task create/update schemas + the preserve-on-absent update patch live in
@@ -134,6 +151,7 @@ async function syncTaskPlanning(
   organizationId: string,
   projectId: string,
   taskId: string,
+  source: ProcessMiningCaptureSource,
   planning: {
     predecessorIds?: string[];
     materialIds?: string[];
@@ -146,7 +164,7 @@ async function syncTaskPlanning(
 
     const { data: allDeps } = await supabase
       .from("task_dependencies")
-      .select("id, predecessor_id, successor_id, dependency_type")
+      .select("id, predecessor_id, successor_id, dependency_type, lag_days")
       .eq("project_id", projectId)
       .eq("organization_id", organizationId);
 
@@ -157,10 +175,25 @@ async function syncTaskPlanning(
     // Remove deselected
     const toRemove = currentFs.filter((d) => !wanted.has(d.predecessor_id));
     if (toRemove.length > 0) {
-      await supabase
+      const { error: removeError } = await supabase
         .from("task_dependencies")
         .delete()
         .in("id", toRemove.map((d) => d.id));
+      if (!removeError) {
+        await captureProcessMiningEvents(toRemove.map((dependency) => buildTaskDependencyEvent({
+          dependency: {
+            dependencyId: dependency.id,
+            organizationId,
+            projectId,
+            predecessorId: dependency.predecessor_id,
+            successorId: dependency.successor_id,
+            dependencyType: dependency.dependency_type,
+            lagDays: dependency.lag_days,
+          },
+          change: "removed",
+          source,
+        })));
+      }
     }
 
     // Add new ones, skipping anything that would create a cycle
@@ -172,15 +205,34 @@ async function syncTaskPlanning(
     for (const predecessorId of wanted) {
       if (currentSet.has(predecessorId)) continue;
       if (wouldCreateDependencyCycle(graph, predecessorId, taskId)) continue;
-      const { error } = await supabase.from("task_dependencies").insert({
-        organization_id: organizationId,
-        project_id: projectId,
-        predecessor_id: predecessorId,
-        successor_id: taskId,
-        dependency_type: "finish_to_start",
-        lag_days: 0,
-      });
-      if (!error) graph.push({ predecessor_id: predecessorId, successor_id: taskId });
+      const { data: dependency, error } = await supabase
+        .from("task_dependencies")
+        .insert({
+          organization_id: organizationId,
+          project_id: projectId,
+          predecessor_id: predecessorId,
+          successor_id: taskId,
+          dependency_type: "finish_to_start",
+          lag_days: 0,
+        })
+        .select("id, predecessor_id, successor_id, dependency_type, lag_days")
+        .single();
+      if (!error && dependency) {
+        graph.push({ predecessor_id: predecessorId, successor_id: taskId });
+        await captureProcessMiningEvents([buildTaskDependencyEvent({
+          dependency: {
+            dependencyId: dependency.id,
+            organizationId,
+            projectId,
+            predecessorId: dependency.predecessor_id,
+            successorId: dependency.successor_id,
+            dependencyType: dependency.dependency_type,
+            lagDays: dependency.lag_days,
+          },
+          change: "added",
+          source,
+        })]);
+      }
     }
   }
 
@@ -458,7 +510,7 @@ export async function createMilestoneAction(input: {
       project_id: data.projectId,
       organization_id: org.organizationId,
     })
-    .select("id")
+    .select("id, title, status")
     .single();
 
   if (insertError || !milestone) {
@@ -474,6 +526,17 @@ export async function createMilestoneAction(input: {
     entityId: milestone.id,
     metadata: { title: data.title, status: data.status },
   });
+
+  const milestoneCapture = await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+    milestone: {
+      milestoneId: milestone.id,
+      organizationId: org.organizationId,
+      projectId: data.projectId,
+      title: milestone.title,
+      status: milestone.status,
+    },
+    source: humanCaptureSource(org.userId),
+  }));
 
   // Materialize the milestone into the Living Graph projection via the APPROVED
   // path (emit-event). The classic Living Graph / Project Execution Map derives
@@ -491,7 +554,11 @@ export async function createMilestoneAction(input: {
     sourceEntityType: "milestones",
     sourceEntityId: milestone.id,
     title: data.title,
-    metadata: { status: data.status, progress: data.progress_percent },
+    metadata: {
+      status: data.status,
+      progress: data.progress_percent,
+      canonical_event_emitted: milestoneCapture.complete,
+    },
   });
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
@@ -531,6 +598,20 @@ export async function updateMilestoneAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  const { data: currentMilestone, error: currentMilestoneError } = await supabase
+    .from("milestones")
+    .select("id, title, status")
+    .eq("id", data.milestoneId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .is("deleted_at", null)
+    .single();
+
+  if (currentMilestoneError || !currentMilestone) {
+    console.error("Failed to load milestone before update:", currentMilestoneError);
+    return { error: "unexpected" };
+  }
+
   const updateData: Record<string, unknown> = {
     title: data.title,
     description: data.description || null,
@@ -544,15 +625,17 @@ export async function updateMilestoneAction(input: {
   if (data.order_index !== undefined) updateData.order_index = data.order_index;
   if (data.progress_percent !== undefined) updateData.progress_percent = data.progress_percent;
 
-  const { error: updateError } = await supabase
+  const { data: updatedMilestone, error: updateError } = await supabase
     .from("milestones")
     .update(updateData)
     .eq("id", data.milestoneId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("id, title, status")
+    .single();
 
-  if (updateError) {
+  if (updateError || !updatedMilestone) {
     console.error("Failed to update milestone:", updateError);
     return { error: "unexpected" };
   }
@@ -565,6 +648,20 @@ export async function updateMilestoneAction(input: {
     entityId: data.milestoneId,
     metadata: { title: data.title, status: data.status },
   });
+
+  const milestoneStatusEvent = buildMilestoneStatusTransitionEvent({
+    milestone: {
+      milestoneId: updatedMilestone.id,
+      organizationId: org.organizationId,
+      projectId: data.projectId,
+      title: updatedMilestone.title,
+      status: updatedMilestone.status,
+    },
+    fromStatus: currentMilestone.status,
+    toStatus: updatedMilestone.status,
+    source: humanCaptureSource(org.userId),
+  });
+  if (milestoneStatusEvent) await captureProcessMiningEvents([milestoneStatusEvent]);
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
@@ -742,7 +839,7 @@ export async function createTaskAction(input: {
       project_id: data.projectId,
       organization_id: org.organizationId,
     })
-    .select("id")
+    .select(TASK_CAPTURE_SELECT)
     .single();
 
   if (insertError || !task) {
@@ -750,8 +847,15 @@ export async function createTaskAction(input: {
     return { error: "unexpected" };
   }
 
+  const taskSource = humanCaptureSource(org.userId);
+  const taskCapture = await captureProcessMiningEvents(buildTaskCreatedEvents({
+    task: taskCaptureSnapshotFromRow(task, org.organizationId, data.projectId),
+    source: taskSource,
+    blockerReason: data.blocker_reason,
+  }));
+
   // Predecessors + required materials chosen in the form
-  await syncTaskPlanning(supabase, org.organizationId, data.projectId, task.id, {
+  await syncTaskPlanning(supabase, org.organizationId, data.projectId, task.id, taskSource, {
     predecessorIds: data.predecessor_ids,
     materialIds: data.material_ids,
     newMaterials: data.new_materials,
@@ -781,7 +885,11 @@ export async function createTaskAction(input: {
     sourceEntityType: "roadmap_tasks",
     sourceEntityId: task.id,
     title: data.title,
-    metadata: { status: data.status, priority: data.priority },
+    metadata: {
+      status: data.status,
+      priority: data.priority,
+      canonical_event_emitted: taskCapture.complete,
+    },
   });
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
@@ -855,6 +963,20 @@ export async function updateTaskAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  const { data: currentTask, error: currentTaskError } = await supabase
+    .from("roadmap_tasks")
+    .select(TASK_CAPTURE_SELECT)
+    .eq("id", data.taskId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .is("deleted_at", null)
+    .single();
+
+  if (currentTaskError || !currentTask) {
+    console.error("Failed to load roadmap task before update:", currentTaskError);
+    return { error: "unexpected" };
+  }
+
   // Preserve-on-absent for EVERY optional field (UX-014 pattern, generalized):
   // only columns the caller explicitly sent are written — an omitted field
   // (collapsed section, partial caller, gated AI Execution) keeps its stored
@@ -869,21 +991,31 @@ export async function updateTaskAction(input: {
     updateData.assignment_type = await resolveAssignmentType(supabase, own.assignedTo, own.assignedResourceId);
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedTask, error: updateError } = await supabase
     .from("roadmap_tasks")
     .update(updateData)
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select(TASK_CAPTURE_SELECT)
+    .single();
 
-  if (updateError) {
+  if (updateError || !updatedTask) {
     console.error("Failed to update roadmap task:", updateError);
     return { error: "unexpected" };
   }
 
+  const taskSource = humanCaptureSource(org.userId);
+  await captureProcessMiningEvents(buildTaskMutationEvents({
+    before: taskCaptureSnapshotFromRow(currentTask, org.organizationId, data.projectId),
+    after: taskCaptureSnapshotFromRow(updatedTask, org.organizationId, data.projectId),
+    source: taskSource,
+    note: data.blocker_reason,
+  }));
+
   // Predecessors + required materials chosen in the form
-  await syncTaskPlanning(supabase, org.organizationId, data.projectId, data.taskId, {
+  await syncTaskPlanning(supabase, org.organizationId, data.projectId, data.taskId, taskSource, {
     predecessorIds: data.predecessor_ids,
     materialIds: data.material_ids,
     newMaterials: data.new_materials,
@@ -961,15 +1093,17 @@ export async function updateTaskStatusAction(input: {
   // Fetch current status for audit before/after
   const { data: currentTask } = await supabase
     .from("roadmap_tasks")
-    .select("status, title, execution_notes")
+    .select(`${TASK_CAPTURE_SELECT}, execution_notes`)
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
     .is("deleted_at", null)
     .single();
 
-  const previousStatus = (currentTask as { status: string } | null)?.status ?? "unknown";
-  const taskTitle = (currentTask as { title: string } | null)?.title ?? "";
+  if (!currentTask) return { error: "unexpected" };
+
+  const previousStatus = currentTask.status;
+  const taskTitle = currentTask.title;
 
   // Skip if status unchanged
   if (previousStatus === data.status) return {};
@@ -1015,7 +1149,7 @@ export async function updateTaskStatusAction(input: {
     const trimmedNote = data.note.trim();
     if (data.status === "done") {
       // Append to execution_notes for completed tasks
-      const existingNotes = (currentTask as { execution_notes: string | null } | null)?.execution_notes || "";
+      const existingNotes = currentTask.execution_notes || "";
       updatePayload.execution_notes = existingNotes
         ? existingNotes + "\n\n" + trimmedNote
         : trimmedNote;
@@ -1025,7 +1159,7 @@ export async function updateTaskStatusAction(input: {
       updatePayload.is_blocked = true;
     } else {
       // Append to execution_notes for other status changes
-      const existingNotes = (currentTask as { execution_notes: string | null } | null)?.execution_notes || "";
+      const existingNotes = currentTask.execution_notes || "";
       updatePayload.execution_notes = existingNotes
         ? existingNotes + "\n\n" + trimmedNote
         : trimmedNote;
@@ -1044,15 +1178,17 @@ export async function updateTaskStatusAction(input: {
     updatePayload.blocker_reason = null;
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedTask, error: updateError } = await supabase
     .from("roadmap_tasks")
     .update(updatePayload)
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select(TASK_CAPTURE_SELECT)
+    .single();
 
-  if (updateError) {
+  if (updateError || !updatedTask) {
     console.error("Failed to update roadmap task status:", updateError);
     return { error: "unexpected" };
   }
@@ -1079,6 +1215,13 @@ export async function updateTaskStatusAction(input: {
     },
   });
 
+  const taskCapture = await captureProcessMiningEvents(buildTaskMutationEvents({
+    before: taskCaptureSnapshotFromRow(currentTask, org.organizationId, data.projectId),
+    after: taskCaptureSnapshotFromRow(updatedTask, org.organizationId, data.projectId),
+    source: humanCaptureSource(org.userId),
+    note: data.note,
+  }));
+
   // Fire-and-forget: emit Living Graph event for task status change
   emitAndAutoLink({
     organizationId: org.organizationId,
@@ -1090,6 +1233,7 @@ export async function updateTaskStatusAction(input: {
     metadata: {
       old_status: previousStatus,
       new_status: data.status,
+      canonical_event_emitted: taskCapture.complete,
       ...(data.note ? { note: data.note.trim() } : {}),
     },
   });
@@ -1207,6 +1351,20 @@ export async function recordPromptSentAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  const { data: currentTask, error: currentTaskError } = await supabase
+    .from("roadmap_tasks")
+    .select(TASK_CAPTURE_SELECT)
+    .eq("id", data.taskId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .is("deleted_at", null)
+    .single();
+
+  if (currentTaskError || !currentTask) {
+    console.error("Failed to load task before recording prompt sent:", currentTaskError);
+    return { error: "unexpected" };
+  }
+
   const updateData: Record<string, unknown> = {
     last_prompt_sent_at: new Date().toISOString(),
   };
@@ -1215,15 +1373,17 @@ export async function recordPromptSentAction(input: {
     updateData.status = "sent_to_ai";
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedTask, error: updateError } = await supabase
     .from("roadmap_tasks")
     .update(updateData)
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select(TASK_CAPTURE_SELECT)
+    .single();
 
-  if (updateError) {
+  if (updateError || !updatedTask) {
     console.error("Failed to record prompt sent:", updateError);
     return { error: "unexpected" };
   }
@@ -1242,6 +1402,12 @@ export async function recordPromptSentAction(input: {
       // Note: we deliberately do NOT log prompt_body content here to avoid secrets exposure
     },
   });
+
+  await captureProcessMiningEvents(buildTaskMutationEvents({
+    before: taskCaptureSnapshotFromRow(currentTask, org.organizationId, data.projectId),
+    after: taskCaptureSnapshotFromRow(updatedTask, org.organizationId, data.projectId),
+    source: humanCaptureSource(org.userId),
+  }));
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
 
@@ -1313,26 +1479,27 @@ async function recalculateMilestoneStatus(
   projectId: string,
   organizationId: string,
   supabase: ReturnType<typeof createAdminClient>,
+  milestoneIdOverride?: string | null,
 ): Promise<void> {
   try {
-    // Fetch the task to find its milestone_id
-    const { data: task } = await supabase
-      .from("roadmap_tasks")
-      .select("milestone_id")
-      .eq("id", taskId)
-      .eq("organization_id", organizationId)
-      .eq("project_id", projectId)
-      .is("deleted_at", null)
-      .single();
-
-    if (!task || !(task as { milestone_id: string | null }).milestone_id) return;
-
-    const milestoneId = (task as { milestone_id: string }).milestone_id;
+    let milestoneId = milestoneIdOverride ?? null;
+    if (!milestoneId) {
+      const { data: task } = await supabase
+        .from("roadmap_tasks")
+        .select("milestone_id")
+        .eq("id", taskId)
+        .eq("organization_id", organizationId)
+        .eq("project_id", projectId)
+        .is("deleted_at", null)
+        .single();
+      milestoneId = (task as { milestone_id: string | null } | null)?.milestone_id ?? null;
+    }
+    if (!milestoneId) return;
 
     // Fetch the milestone
     const { data: milestone } = await supabase
       .from("milestones")
-      .select("id, status, progress_percent, status_override_enabled, status_override_value")
+      .select("id, title, status, progress_percent, status_override_enabled, status_override_value")
       .eq("id", milestoneId)
       .eq("organization_id", organizationId)
       .eq("project_id", projectId)
@@ -1342,7 +1509,7 @@ async function recalculateMilestoneStatus(
     if (!milestone) return;
 
     // Skip recalculation if manual override is enabled
-    const m = milestone as { id: string; status: string; progress_percent: number; status_override_enabled: boolean; status_override_value: string | null };
+    const m = milestone as { id: string; title: string; status: string; progress_percent: number; status_override_enabled: boolean; status_override_value: string | null };
     if (m.status_override_enabled) return;
 
     // Fetch all active tasks for this milestone
@@ -1371,7 +1538,7 @@ async function recalculateMilestoneStatus(
 
     // Only update if status or progress actually changed
     if (computedStatus !== m.status || computedProgress.progressPercent !== m.progress_percent) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("milestones")
         .update({
           status: computedStatus,
@@ -1379,6 +1546,26 @@ async function recalculateMilestoneStatus(
         })
         .eq("id", milestoneId)
         .eq("organization_id", organizationId);
+      if (!updateError && computedStatus !== m.status) {
+        const statusEvent = buildMilestoneStatusTransitionEvent({
+          milestone: {
+            milestoneId,
+            organizationId,
+            projectId,
+            title: m.title,
+            status: computedStatus,
+          },
+          fromStatus: m.status,
+          toStatus: computedStatus,
+          source: {
+            actorType: "system",
+            sourceModule: "roadmap-rollup",
+            captureMethod: "derived",
+            provenance: { derivation_rule: "milestone_status_from_task_rollup" },
+          },
+        });
+        if (statusEvent) await captureProcessMiningEvents([statusEvent]);
+      }
     }
   } catch (err) {
     // Non-critical: log but don't fail the task status update
@@ -1400,6 +1587,20 @@ export async function archiveTaskAction(
   }
 
   const supabase = createAdminClient();
+
+  const { data: currentTask, error: currentTaskError } = await supabase
+    .from("roadmap_tasks")
+    .select(TASK_CAPTURE_SELECT)
+    .eq("id", taskId)
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null)
+    .single();
+
+  if (currentTaskError || !currentTask) {
+    console.error("Failed to load task before archive:", currentTaskError);
+    return { error: "unexpected" };
+  }
 
   // Soft-delete the task
   const { error: deleteError } = await supabase
@@ -1424,15 +1625,19 @@ export async function archiveTaskAction(
     metadata: { soft_delete: true },
   });
 
-  // Re-calculate milestone status since a task was removed
-  const { data: task } = await supabase
-    .from("roadmap_tasks")
-    .select("milestone_id")
-    .eq("id", taskId)
-    .single();
+  await captureProcessMiningEvents([buildTaskDeletedEvent({
+    task: taskCaptureSnapshotFromRow(currentTask, org.organizationId, projectId),
+    source: humanCaptureSource(org.userId),
+  })]);
 
-  if (task?.milestone_id) {
-    await recalculateMilestoneStatus(task.milestone_id, projectId, org.organizationId, supabase);
+  if (currentTask.milestone_id) {
+    await recalculateMilestoneStatus(
+      taskId,
+      projectId,
+      org.organizationId,
+      supabase,
+      currentTask.milestone_id,
+    );
   }
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
@@ -1454,6 +1659,31 @@ export async function archiveMilestoneAction(
 
   const supabase = createAdminClient();
 
+  const [{ data: currentMilestone, error: milestoneFetchError }, { data: currentTasks, error: taskFetchError }] = await Promise.all([
+    supabase
+      .from("milestones")
+      .select("id, title, status")
+      .eq("id", milestoneId)
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .single(),
+    supabase
+      .from("roadmap_tasks")
+      .select(TASK_CAPTURE_SELECT)
+      .eq("milestone_id", milestoneId)
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null),
+  ]);
+
+  if (milestoneFetchError || !currentMilestone || taskFetchError) {
+    console.error("Failed to load milestone before archive:", milestoneFetchError ?? taskFetchError);
+    return { error: "unexpected" };
+  }
+
+  const captureSource = humanCaptureSource(org.userId);
+
   // First, soft-delete all tasks belonging to this milestone
   const { error: taskDeleteError } = await supabase
     .from("roadmap_tasks")
@@ -1467,6 +1697,11 @@ export async function archiveMilestoneAction(
     console.error("Failed to archive milestone tasks:", taskDeleteError);
     return { error: "unexpected" };
   }
+
+  await captureProcessMiningEvents((currentTasks ?? []).map((task) => buildTaskDeletedEvent({
+    task: taskCaptureSnapshotFromRow(task, org.organizationId, projectId),
+    source: captureSource,
+  })));
 
   // Then, soft-delete the milestone itself
   const { error: milestoneDeleteError } = await supabase
@@ -1490,6 +1725,17 @@ export async function archiveMilestoneAction(
     entityId: milestoneId,
     metadata: { soft_delete: true, cascaded_to_tasks: true },
   });
+
+  await captureProcessMiningEvents([buildMilestoneDeletedEvent({
+    milestone: {
+      milestoneId: currentMilestone.id,
+      organizationId: org.organizationId,
+      projectId,
+      title: currentMilestone.title,
+      status: currentMilestone.status,
+    },
+    source: captureSource,
+  })]);
 
   revalidatePath("/[locale]/(app)/projects/[projectId]", "layout");
   return {};

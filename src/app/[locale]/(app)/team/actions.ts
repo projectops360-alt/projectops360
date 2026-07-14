@@ -14,6 +14,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { planMerge, type MergeableResource } from "@/lib/team/merge";
+import {
+  buildTaskMutationEvents,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+  type TaskCaptureRow,
+} from "@/lib/events/process-mining-capture";
 
 const ASSIGNABLE_TYPES = ["person", "crew", "team", "role", "vendor", "subcontractor"] as const;
 
@@ -24,6 +31,42 @@ const RESOURCE_REF_TABLES: { table: string; column: string }[] = [
   { table: "material_requirements", column: "resource_id" },
   { table: "cost_actuals", column: "resource_id" },
 ];
+
+interface TeamTaskCaptureRow extends TaskCaptureRow {
+  project_id: string;
+}
+
+async function captureResourceAssignmentChanges(input: {
+  rows: TeamTaskCaptureRow[];
+  organizationId: string;
+  actorId: string;
+  nextResourceId: string | null;
+  provenance: Record<string, unknown>;
+}): Promise<void> {
+  const eventsByProject = new Map<string, ReturnType<typeof buildTaskMutationEvents>>();
+  for (const row of input.rows) {
+    const before = taskCaptureSnapshotFromRow(row, input.organizationId, row.project_id);
+    const events = buildTaskMutationEvents({
+      before,
+      after: { ...before, assignedResourceId: input.nextResourceId },
+      source: {
+        actorType: "human",
+        actorId: input.actorId,
+        sourceModule: "team",
+        captureMethod: "direct",
+        provenance: input.provenance,
+      },
+    });
+    if (events.length === 0) continue;
+    eventsByProject.set(row.project_id, [
+      ...(eventsByProject.get(row.project_id) ?? []),
+      ...events,
+    ]);
+  }
+  for (const events of eventsByProject.values()) {
+    await captureProcessMiningEvents(events);
+  }
+}
 
 // ── Create ───────────────────────────────────────────────────────────────────
 
@@ -135,7 +178,11 @@ export async function mergeTeamResourcesAction(input: { resourceIds: string[] })
   const usage = new Map<string, number>();
   for (const id of rows.map((r) => r.id)) usage.set(id, 0);
   const { data: taskRefs } = await supabase
-    .from("roadmap_tasks").select("assigned_resource_id").in("assigned_resource_id", rows.map((r) => r.id)).is("deleted_at", null);
+    .from("roadmap_tasks")
+    .select(`${TASK_CAPTURE_SELECT}, project_id`)
+    .in("assigned_resource_id", rows.map((r) => r.id))
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
   for (const t of taskRefs ?? []) if (t.assigned_resource_id) usage.set(t.assigned_resource_id, (usage.get(t.assigned_resource_id) ?? 0) + 1);
 
   const mergeable: MergeableResource[] = rows.map((r) => ({ id: r.id, linkedUserId: r.linked_user_id, usage: usage.get(r.id) ?? 0 }));
@@ -143,8 +190,21 @@ export async function mergeTeamResourcesAction(input: { resourceIds: string[] })
   if (!plan) return { error: "need_two" };
 
   // Reassign every reference from merged ids → kept id.
+  let taskAssignmentsUpdated = false;
   for (const { table, column } of RESOURCE_REF_TABLES) {
-    await supabase.from(table).update({ [column]: plan.keepId }).in(column, plan.mergeIds).eq("organization_id", org.organizationId);
+    const { error } = await supabase.from(table).update({ [column]: plan.keepId }).in(column, plan.mergeIds).eq("organization_id", org.organizationId);
+    if (table === "roadmap_tasks") taskAssignmentsUpdated = !error;
+  }
+  if (taskAssignmentsUpdated) {
+    await captureResourceAssignmentChanges({
+      rows: ((taskRefs ?? []) as TeamTaskCaptureRow[]).filter((task) => (
+        task.assigned_resource_id != null && plan.mergeIds.includes(task.assigned_resource_id)
+      )),
+      organizationId: org.organizationId,
+      actorId: org.userId,
+      nextResourceId: plan.keepId,
+      provenance: { resource_merge_keep_id: plan.keepId, merged_resource_ids: plan.mergeIds },
+    });
   }
   // Soft-delete the folded-in resources.
   await supabase.from("resources").update({ deleted_at: new Date().toISOString() }).in("id", plan.mergeIds).eq("organization_id", org.organizationId);
@@ -161,9 +221,26 @@ export async function archiveTeamResourceAction(input: { resourceId: string }): 
   try { org = await getOrgContext(); } catch { return { error: "not_authenticated" }; }
   if (!z.string().uuid().safeParse(input.resourceId).success) return { error: "validation_error" };
   const supabase = createAdminClient();
+  const { data: taskRefs } = await supabase
+    .from("roadmap_tasks")
+    .select(`${TASK_CAPTURE_SELECT}, project_id`)
+    .eq("assigned_resource_id", input.resourceId)
+    .eq("organization_id", org.organizationId)
+    .is("deleted_at", null);
   // Detach references so tasks don't point at an archived resource.
+  let taskAssignmentsUpdated = false;
   for (const { table, column } of RESOURCE_REF_TABLES) {
-    await supabase.from(table).update({ [column]: null }).eq(column, input.resourceId).eq("organization_id", org.organizationId);
+    const { error } = await supabase.from(table).update({ [column]: null }).eq(column, input.resourceId).eq("organization_id", org.organizationId);
+    if (table === "roadmap_tasks") taskAssignmentsUpdated = !error;
+  }
+  if (taskAssignmentsUpdated) {
+    await captureResourceAssignmentChanges({
+      rows: (taskRefs ?? []) as TeamTaskCaptureRow[],
+      organizationId: org.organizationId,
+      actorId: org.userId,
+      nextResourceId: null,
+      provenance: { archived_resource_id: input.resourceId },
+    });
   }
   const { error } = await supabase
     .from("resources").update({ deleted_at: new Date().toISOString(), status: "retired" })

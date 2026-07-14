@@ -13,6 +13,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emitProcessNode, emitProcessEdge } from "@/lib/graph/emit-event";
 import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
+import {
+  buildMilestoneCreatedEvents,
+  buildTaskCreatedEvents,
+  buildTaskDependencyEvent,
+  captureProcessMiningEvents,
+  type ProcessMiningCaptureSource,
+} from "@/lib/events/process-mining-capture";
 import { recalculateCriticalPath } from "@/lib/execution/critical-path-service";
 import { generateImportRecommendations } from "./validate";
 import type {
@@ -107,6 +114,14 @@ export async function executeImport(params: {
   const created: Record<string, number> = {};
   let skippedDuplicates = 0;
   const bump = (k: string) => { created[k] = (created[k] ?? 0) + 1; };
+  const semanticallyCapturedIds = new Set<string>();
+  const captureSource: ProcessMiningCaptureSource = {
+    actorType: "human",
+    actorId: params.userId,
+    sourceModule: "import-intelligence",
+    captureMethod: "imported",
+    provenance: { import_job_id: jobId },
+  };
 
   // ── 1. Project ─────────────────────────────────────────────────────────────
   let projectId = params.targetProjectId;
@@ -176,12 +191,23 @@ export async function executeImport(params: {
         order_index: msOrder++,
         created_by: params.userId,
       })
-      .select("id")
+      .select("id, title, status")
       .single();
     if (row) {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
       bump("milestones");
+      const capture = await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+        milestone: {
+          milestoneId: row.id,
+          organizationId,
+          projectId,
+          title: row.title,
+          status: row.status,
+        },
+        source: captureSource,
+      }));
+      if (capture.complete) semanticallyCapturedIds.add(row.id);
     }
   }
 
@@ -201,12 +227,23 @@ export async function executeImport(params: {
         order_index: msOrder++,
         created_by: params.userId,
       })
-      .select("id")
+      .select("id, title, status")
       .single();
     if (row) {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
       bump("milestones");
+      const capture = await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+        milestone: {
+          milestoneId: row.id,
+          organizationId,
+          projectId,
+          title: row.title,
+          status: row.status,
+        },
+        source: captureSource,
+      }));
+      if (capture.complete) semanticallyCapturedIds.add(row.id);
     }
   }
 
@@ -310,12 +347,31 @@ export async function executeImport(params: {
         execution_notes: task.assigned_to && !assignedResourceId ? `Imported owner: ${task.assigned_to}` : null,
         created_by: params.userId,
       })
-      .select("id")
+      .select("id, title, status, milestone_id, assigned_to, assigned_resource_id, project_team_member_id, priority, estimate_hours, start_date, end_date")
       .single();
     if (row) {
       taskIdBySourceId.set(task.source_id, row.id);
       await track(supabase, organizationId, jobId, "roadmap_tasks", row.id);
       bump("tasks");
+      const capture = await captureProcessMiningEvents(buildTaskCreatedEvents({
+        task: {
+          taskId: row.id,
+          organizationId,
+          projectId,
+          title: row.title,
+          status: row.status,
+          milestoneId: row.milestone_id,
+          assignedTo: row.assigned_to,
+          assignedResourceId: row.assigned_resource_id,
+          projectTeamMemberId: row.project_team_member_id,
+          priority: row.priority,
+          estimateHours: row.estimate_hours,
+          startDate: row.start_date,
+          endDate: row.end_date,
+        },
+        source: { ...captureSource, provenance: { ...captureSource.provenance, source_task_id: task.source_id } },
+      }));
+      if (capture.complete) semanticallyCapturedIds.add(row.id);
     }
   }
 
@@ -334,11 +390,24 @@ export async function executeImport(params: {
         dependency_type: dep.dependency_type,
         lag_days: dep.lag_days,
       })
-      .select("id")
+      .select("id, predecessor_id, successor_id, dependency_type, lag_days")
       .single();
     if (row) {
       await track(supabase, organizationId, jobId, "task_dependencies", row.id);
       bump("dependencies");
+      await captureProcessMiningEvents([buildTaskDependencyEvent({
+        dependency: {
+          dependencyId: row.id,
+          organizationId,
+          projectId,
+          predecessorId: row.predecessor_id,
+          successorId: row.successor_id,
+          dependencyType: row.dependency_type,
+          lagDays: row.lag_days,
+        },
+        change: "added",
+        source: captureSource,
+      })]);
     }
   }
 
@@ -450,7 +519,11 @@ export async function executeImport(params: {
     const nodeId = await emitProcessNode({
       organizationId, projectId,
       nodeType: "milestone_gate", sourceEntityType: "milestones", sourceEntityId: msId,
-      title: titleKey, metadata: { origin: "import" },
+      title: titleKey,
+      metadata: {
+        origin: "import",
+        canonical_event_emitted: semanticallyCapturedIds.has(msId),
+      },
     });
     if (nodeId) {
       milestoneNodeByTitleKey.set(titleKey, nodeId);
@@ -465,7 +538,12 @@ export async function executeImport(params: {
     const taskNodeId = await emitProcessNode({
       organizationId, projectId,
       nodeType: "task_transition", sourceEntityType: "roadmap_tasks", sourceEntityId: taskDbId,
-      title: task.name, metadata: { origin: "import", new_status: task.status },
+      title: task.name,
+      metadata: {
+        origin: "import",
+        new_status: task.status,
+        canonical_event_emitted: semanticallyCapturedIds.has(taskDbId),
+      },
     });
     if (!taskNodeId) continue;
     if (importNodeId) {
