@@ -374,9 +374,35 @@ pilot requires").
 | **Backfill** | `mapRiskToEvents` — `risk_registered` only (flag-gated scanner); actor recovered exclusively via Scribe/import chains, otherwise `missing_actor`; idempotent (dedup + backfill marker). **No other reconstruction.** |
 | **Tests** | 75 new (flag boundary, payload invariants RI-02/RI-07/#11, deprecation + aliases, builders/flags, derived mapping + RI-09, backfill guards); 2 existing ingestion tests deliberately migrated from the deprecated `RiskIdentified` to canonical `risk_registered` (same intent: HIGH-evidence gate). Suite: 171 files / 1908 tests green. |
 
-## C. What this document is NOT
+### P2-T2 rebaseline — mining-ready task lifecycle (2026-07-13)
 
-No code, no migrations, no triggers/listeners, no UI. The audit was strictly read-only.
+The original P2-T2 implementation proved the risk pilot but did not make the
+task process discoverable: most task writes reached the event store as repeated
+`TaskStatusChanged` rows, creation was absent, and the default `case_id` grouped
+unrelated work under the project. The rebaseline is additive to PD-018 and does
+not alter the approved risk semantics.
+
+| Contract | Rebaselined implementation |
+|---|---|
+| **Single pipeline** | All new facts still pass through `emitProjectEvents` in the existing PEG ingestion gateway. Writers never write `project_event_log` or `project_event_objects` directly; no second store or migration is introduced. |
+| **Rollout boundary** | Independent server flag `PROCESS_MINING_EVENT_CAPTURE_PROJECT_IDS` (CSV project IDs or `all`; **default OFF**). Flag OFF preserves the legacy dual-write. When semantic capture succeeds, `canonical_event_emitted=true` suppresses only the duplicate generic dual-write; a failed semantic append leaves the generic event as fallback. |
+| **Task case** | `case_id = task_id`; refs include focal task, project context, milestone/phase, responsibility, and predecessor/dependency when applicable. |
+| **Milestone case** | `case_id = milestone_id`; refs include focal milestone and project context. |
+| **Semantic activities** | `TaskCreated`, `TaskAssigned`/`TaskUnassigned`, `TaskMoved`, `TaskStartDateChanged`, `TaskDueDateChanged`, `TaskEstimateChanged`, `TaskPriorityChanged`, `TaskPromptPrepared`, `TaskAISubmitted`, `TaskStarted`, `TaskImplemented`, `TaskTested`, `TaskCompleted`, `TaskBlocked`/`TaskUnblocked`, `TaskDeferred`/`TaskResumed`, `TaskReopened`, `TaskDeleted`; milestone create/start/achieve/block/defer/reopen/delete; dependency add/remove. Unknown status mappings remain honest `TaskStatusChanged` with `mapping_low_confidence`; a blocked transition without a recorded impediment is flagged `incomplete_payload` + `unknown_reason` instead of inventing a reason. |
+| **Provenance** | Direct human actions carry the authenticated user; system rollups use `actor_type=system`; imports use `capture_method=imported`; static synchronization uses `mapped`; milestone rollups use `derived`. |
+| **Writers covered** | Roadmap create/edit/status/prompt-send/archive and planning dependencies; Execution Map dependencies/dates; Delivery backlog/cycle promotion and milestone generation; Import Intelligence; project templates; Phase 0 synchronization; parent completion from Subtasks; bulk task reassignment/unassignment from Team resource merge/archive. |
+| **Existing data** | Shared backfill now frames task and milestone cases and writes OCEL-style object refs with `capture_method=mapped` + `data_quality_flags=[backfilled]`. It still reconstructs only facts supported by owner timestamps/current state; notably `tested` is not invented as completion. |
+| **Process-readiness guard** | Tests prove a generated `TaskCreated → TaskStarted → TaskCompleted` history yields multiple activities and direct-follow transitions (`status=ready`), while the prior repeated generic activity remains classified `single_activity`. |
+
+The risk-response derived bridge accepts semantic `TaskStarted` in addition to
+the legacy `TaskStatusChanged(to=in_progress)` mapping, preserving RI-09 while
+the semantic capture flag is enabled.
+
+## C. Boundary of the original audit
+
+The original audit portion remained read-only: no migrations, triggers/listeners,
+or UI changes. The later P2-T2 implementation and rebaseline are recorded above
+as explicit follow-on work against that approved contract.
 P2-T2 implements **only** what this contract specifies, only after approval, and only the
 minimum capture list (§B.4). Project Memory remains fed, never replaced (§0.6). Open
 decisions #3–#8 and #10 remain open.

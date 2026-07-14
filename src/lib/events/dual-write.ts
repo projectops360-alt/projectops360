@@ -24,6 +24,7 @@ export function mapProcessNodeToEvent(input: EmitNodeInput): EmitEventInput | nu
     provenance: { via: "dual-write", node_type: input.nodeType },
   };
   const meta = input.metadata ?? {};
+  if (meta.canonical_event_emitted === true) return null;
   const toState = typeof meta.new_status === "string" ? meta.new_status : undefined;
 
   switch (input.nodeType) {

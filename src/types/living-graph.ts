@@ -111,7 +111,19 @@ export type CanonicalEventImportance = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 export type CanonicalEventObjectRole =
   | "focal"
   | "context"
+  | "impacted"
+  | "protected"
+  | "response"
+  | "control"
+  | "materialization"
   | "evidence"
+  | "responsibility"
+  | "reference"
+  | "phase"
+  | "previous_responsibility"
+  | "previous_phase"
+  | "predecessor"
+  | "relation"
   | "actor"
   | "other";
 

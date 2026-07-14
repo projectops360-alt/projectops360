@@ -36,7 +36,7 @@ export interface EventObjectRef {
 
 /** Task events that feed the derived risk response trail (PD-018 §B.4). */
 const DERIVABLE_TASK_EVENT_TYPES: ReadonlySet<string> = new Set([
-  "TaskCreated", "TaskStatusChanged", "TaskCompleted",
+  "TaskCreated", "TaskStatusChanged", "TaskStarted", "TaskCompleted",
 ]);
 
 const VALID_LIFECYCLE_CLASSES: ReadonlySet<string> = new Set([

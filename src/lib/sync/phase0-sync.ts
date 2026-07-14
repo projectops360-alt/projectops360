@@ -12,6 +12,16 @@
 
 import { phase0Tasks } from "@/data/phase0-tasks";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildMilestoneCreatedEvents,
+  buildTaskCreatedEvents,
+  buildTaskDependencyEvent,
+  buildTaskMutationEvents,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+  type ProcessMiningCaptureSource,
+} from "@/lib/events/process-mining-capture";
 import type { TaskStatus as DbTaskStatus } from "@/types/database";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -107,6 +117,12 @@ export async function syncPhase0Tasks(
   const supabase = createAdminClient();
   const errors: string[] = [];
   let upserted = 0;
+  const captureSource: ProcessMiningCaptureSource = {
+    actorType: "system",
+    sourceModule: "phase0-sync",
+    captureMethod: "mapped",
+    provenance: { source: "src/data/phase0-tasks.ts" },
+  };
 
   // Step 1: Ensure the Phase 0 milestone exists
   const { data: existingMilestone } = await supabase
@@ -132,13 +148,23 @@ export async function syncPhase0Tasks(
         status: "in_progress",
         order_index: 0,
       })
-      .select("id")
+      .select("id, title, status")
       .single();
 
     if (mErr) {
       errors.push(`Milestone insert failed: ${mErr.message}`);
     } else {
       milestoneId = newMilestone.id;
+      await captureProcessMiningEvents(buildMilestoneCreatedEvents({
+        milestone: {
+          milestoneId: newMilestone.id,
+          organizationId: orgId,
+          projectId,
+          title: newMilestone.title,
+          status: newMilestone.status,
+        },
+        source: captureSource,
+      }));
     }
   }
 
@@ -156,7 +182,7 @@ export async function syncPhase0Tasks(
     // Check if task already exists
     const { data: existing } = await supabase
       .from("roadmap_tasks")
-      .select("id")
+      .select(TASK_CAPTURE_SELECT)
       .eq("project_id", projectId)
       .eq("external_key", task.id)
       .is("deleted_at", null)
@@ -183,25 +209,38 @@ export async function syncPhase0Tasks(
     };
 
     if (existing) {
-      const { error: uErr } = await supabase
+      const { data: updatedTask, error: uErr } = await supabase
         .from("roadmap_tasks")
         .update(row)
-        .eq("id", existing.id);
+        .eq("id", existing.id)
+        .select(TASK_CAPTURE_SELECT)
+        .single();
 
-      if (uErr) {
-        errors.push(`Task ${task.id} update failed: ${uErr.message}`);
+      if (uErr || !updatedTask) {
+        errors.push(`Task ${task.id} update failed: ${uErr?.message ?? "missing row"}`);
       } else {
         upserted++;
+        await captureProcessMiningEvents(buildTaskMutationEvents({
+          before: taskCaptureSnapshotFromRow(existing, orgId, projectId),
+          after: taskCaptureSnapshotFromRow(updatedTask, orgId, projectId),
+          source: captureSource,
+        }));
       }
     } else {
-      const { error: iErr } = await supabase
+      const { data: insertedTask, error: iErr } = await supabase
         .from("roadmap_tasks")
-        .insert(row);
+        .insert(row)
+        .select(TASK_CAPTURE_SELECT)
+        .single();
 
-      if (iErr) {
-        errors.push(`Task ${task.id} insert failed: ${iErr.message}`);
+      if (iErr || !insertedTask) {
+        errors.push(`Task ${task.id} insert failed: ${iErr?.message ?? "missing row"}`);
       } else {
         upserted++;
+        await captureProcessMiningEvents(buildTaskCreatedEvents({
+          task: taskCaptureSnapshotFromRow(insertedTask, orgId, projectId),
+          source: captureSource,
+        }));
       }
     }
   }
@@ -237,7 +276,7 @@ export async function syncPhase0Tasks(
         .maybeSingle();
 
       if (!existingDep) {
-        const { error: dErr } = await supabase
+        const { data: dependency, error: dErr } = await supabase
           .from("task_dependencies")
           .insert({
             organization_id: orgId,
@@ -245,10 +284,26 @@ export async function syncPhase0Tasks(
             predecessor_id: predecessorId,
             successor_id: successorId,
             dependency_type: "finish_to_start",
-          });
+          })
+          .select("id, predecessor_id, successor_id, dependency_type, lag_days")
+          .single();
 
         if (dErr) {
           errors.push(`Dep ${depId}→${task.id} failed: ${dErr.message}`);
+        } else if (dependency) {
+          await captureProcessMiningEvents([buildTaskDependencyEvent({
+            dependency: {
+              dependencyId: dependency.id,
+              organizationId: orgId,
+              projectId,
+              predecessorId: dependency.predecessor_id,
+              successorId: dependency.successor_id,
+              dependencyType: dependency.dependency_type,
+              lagDays: dependency.lag_days,
+            },
+            change: "added",
+            source: captureSource,
+          })]);
         }
       }
     }

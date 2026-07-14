@@ -80,6 +80,15 @@ export const env = {
    */
   RISK_EVENT_CAPTURE_PROJECT_IDS: process.env.RISK_EVENT_CAPTURE_PROJECT_IDS ?? "",
   /**
+   * Feature flag — mining-ready task and milestone event capture (P2-T2
+   * remediation, server-side only). Comma-separated project IDs or "all" for
+   * local testing. Default OFF. When enabled, roadmap writers emit semantic
+   * lifecycle events with task/milestone cases and object references through
+   * the existing PEG ingestion gateway.
+   */
+  PROCESS_MINING_EVENT_CAPTURE_PROJECT_IDS:
+    process.env.PROCESS_MINING_EVENT_CAPTURE_PROJECT_IDS ?? "",
+  /**
    * Feature flag — Living Graph canonical-event Relationships view (server-side
    * only, DEFAULT OFF). Comma-separated list of project IDs, or the literal
    * "all" (local testing only). When OFF, the Living Graph is byte-identical to

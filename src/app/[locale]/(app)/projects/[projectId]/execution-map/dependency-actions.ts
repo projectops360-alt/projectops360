@@ -5,7 +5,14 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import type { TaskDependency, DependencyType } from "@/types/database";
+import {
+  buildTaskDependencyEvent,
+  buildTaskMutationEvents,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+} from "@/lib/events/process-mining-capture";
+import type { TaskDependency } from "@/types/database";
 
 // ── Zod Schemas ────────────────────────────────────────────────────────────────
 
@@ -142,7 +149,7 @@ export async function createDependencyAction(input: {
       dependency_type: data.dependency_type,
       lag_days: data.lag_days,
     })
-    .select("id")
+    .select("id, predecessor_id, successor_id, dependency_type, lag_days")
     .single();
 
   if (insertError || !dependency) {
@@ -167,6 +174,25 @@ export async function createDependencyAction(input: {
       lag_days: data.lag_days,
     },
   });
+
+  await captureProcessMiningEvents([buildTaskDependencyEvent({
+    dependency: {
+      dependencyId: dependency.id,
+      organizationId: org.organizationId,
+      projectId: data.projectId,
+      predecessorId: dependency.predecessor_id,
+      successorId: dependency.successor_id,
+      dependencyType: dependency.dependency_type,
+      lagDays: dependency.lag_days,
+    },
+    change: "added",
+    source: {
+      actorType: "human",
+      actorId: org.userId,
+      sourceModule: "execution-map",
+      captureMethod: "direct",
+    },
+  })]);
 
   revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
 
@@ -195,6 +221,19 @@ export async function deleteDependencyAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  const { data: dependency, error: dependencyError } = await supabase
+    .from("task_dependencies")
+    .select("id, predecessor_id, successor_id, dependency_type, lag_days")
+    .eq("id", data.dependencyId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .single();
+
+  if (dependencyError || !dependency) {
+    console.error("Failed to load dependency before delete:", dependencyError);
+    return { error: "unexpected" };
+  }
+
   const { error: deleteError } = await supabase
     .from("task_dependencies")
     .delete()
@@ -215,6 +254,25 @@ export async function deleteDependencyAction(input: {
     entityId: data.dependencyId,
     metadata: {},
   });
+
+  await captureProcessMiningEvents([buildTaskDependencyEvent({
+    dependency: {
+      dependencyId: dependency.id,
+      organizationId: org.organizationId,
+      projectId: data.projectId,
+      predecessorId: dependency.predecessor_id,
+      successorId: dependency.successor_id,
+      dependencyType: dependency.dependency_type,
+      lagDays: dependency.lag_days,
+    },
+    change: "removed",
+    source: {
+      actorType: "human",
+      actorId: org.userId,
+      sourceModule: "execution-map",
+      captureMethod: "direct",
+    },
+  })]);
 
   revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
 
@@ -280,6 +338,20 @@ export async function updateTaskDatesAction(input: {
   const data = parsed.data;
   const supabase = createAdminClient();
 
+  const { data: currentTask, error: currentTaskError } = await supabase
+    .from("roadmap_tasks")
+    .select(TASK_CAPTURE_SELECT)
+    .eq("id", data.taskId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", data.projectId)
+    .is("deleted_at", null)
+    .single();
+
+  if (currentTaskError || !currentTask) {
+    console.error("Failed to load task before date update:", currentTaskError);
+    return { error: "unexpected" };
+  }
+
   // Calculate duration_days
   let durationDays: number | null = null;
   if (data.start_date && data.end_date) {
@@ -290,7 +362,7 @@ export async function updateTaskDatesAction(input: {
     }
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedTask, error: updateError } = await supabase
     .from("roadmap_tasks")
     .update({
       start_date: data.start_date || null,
@@ -300,9 +372,11 @@ export async function updateTaskDatesAction(input: {
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select(TASK_CAPTURE_SELECT)
+    .single();
 
-  if (updateError) {
+  if (updateError || !updatedTask) {
     console.error("Failed to update task dates:", updateError);
     return { error: "unexpected" };
   }
@@ -320,6 +394,17 @@ export async function updateTaskDatesAction(input: {
       duration_days: durationDays,
     },
   });
+
+  await captureProcessMiningEvents(buildTaskMutationEvents({
+    before: taskCaptureSnapshotFromRow(currentTask, org.organizationId, data.projectId),
+    after: taskCaptureSnapshotFromRow(updatedTask, org.organizationId, data.projectId),
+    source: {
+      actorType: "human",
+      actorId: org.userId,
+      sourceModule: "execution-map",
+      captureMethod: "direct",
+    },
+  }));
 
   revalidatePath(`/(app)/projects/${data.projectId}`, "layout");
 

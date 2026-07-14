@@ -46,6 +46,9 @@ describe("mapTaskEventToDerivedRiskInput (explicit rule — PD-016 event #11)", 
     const started = mapTaskEventToDerivedRiskInput(
       taskEvent({ eventType: "TaskStatusChanged", toState: "in_progress" }), RISK);
     expect(started?.eventType).toBe("risk_response_started");
+    expect(mapTaskEventToDerivedRiskInput(
+      taskEvent({ eventType: "TaskStarted", toState: "in_progress" }), RISK,
+    )?.eventType).toBe("risk_response_started");
 
     for (const state of ["todo", "blocked", "done", "review", null]) {
       const none = mapTaskEventToDerivedRiskInput(
@@ -86,7 +89,7 @@ describe("mapTaskEventToDerivedRiskInput (explicit rule — PD-016 event #11)", 
   });
 
   it("RI-09: the bridge can never emit a closure (completing an action ≠ closing the risk)", () => {
-    for (const t of ["TaskCreated", "TaskStatusChanged", "TaskCompleted"]) {
+    for (const t of ["TaskCreated", "TaskStatusChanged", "TaskStarted", "TaskCompleted"]) {
       for (const state of ["in_progress", "done", null]) {
         const e = mapTaskEventToDerivedRiskInput(taskEvent({ eventType: t, toState: state }), RISK);
         if (e) {

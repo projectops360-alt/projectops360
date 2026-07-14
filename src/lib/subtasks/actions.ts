@@ -16,6 +16,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext, type OrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { emitProjectEventSafe } from "@/lib/events/ingestion";
+import {
+  buildTaskStatusTransitionEvent,
+  captureProcessMiningEvents,
+  TASK_CAPTURE_SELECT,
+  taskCaptureSnapshotFromRow,
+  type TaskCaptureRow,
+} from "@/lib/events/process-mining-capture";
 import { buildSubtaskEvent, type SubtaskEventType } from "./subtask-events";
 import { authorizeSubtaskAction, type SubtaskAction } from "./permissions";
 import {
@@ -33,12 +40,8 @@ import type { Subtask, SubtaskProgressMode } from "./types";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-interface TaskRow {
-  id: string;
-  title: string;
+interface TaskRow extends TaskCaptureRow {
   progress: number;
-  status: string;
-  assigned_to: string | null;
   subtask_progress_mode: SubtaskProgressMode;
   progress_overridden: boolean;
 }
@@ -51,7 +54,7 @@ async function loadTask(
 ): Promise<TaskRow | null> {
   const { data } = await supabase
     .from("roadmap_tasks")
-    .select("id, title, progress, status, assigned_to, subtask_progress_mode, progress_overridden")
+    .select(`${TASK_CAPTURE_SELECT}, progress, subtask_progress_mode, progress_overridden`)
     .eq("id", taskId)
     .eq("project_id", projectId)
     .eq("organization_id", org.organizationId)
@@ -644,14 +647,16 @@ export async function closeParentTaskWithIncompleteAction(
     if (denied) return { error: denied };
   }
 
-  const { error } = await supabase
+  const { data: updatedTask, error } = await supabase
     .from("roadmap_tasks")
     .update({ status: "done", completed_at: new Date().toISOString() })
     .eq("id", data.taskId)
     .eq("organization_id", org.organizationId)
     .eq("project_id", data.projectId)
-    .is("deleted_at", null);
-  if (error) return { error: "unexpected" };
+    .is("deleted_at", null)
+    .select(TASK_CAPTURE_SELECT)
+    .single();
+  if (error || !updatedTask) return { error: "unexpected" };
 
   await logAudit({
     org,
@@ -665,6 +670,23 @@ export async function closeParentTaskWithIncompleteAction(
       reason: data.reason,
     },
   });
+  const completedEvent = buildTaskStatusTransitionEvent({
+    task: taskCaptureSnapshotFromRow(updatedTask, org.organizationId, data.projectId),
+    fromStatus: task.status,
+    toStatus: updatedTask.status,
+    source: {
+      actorType: "human",
+      actorId: org.userId,
+      sourceModule: "subtasks",
+      captureMethod: "direct",
+      provenance: {
+        closed_with_incomplete_subtasks: !gate.allowed,
+        incomplete_subtask_count: gate.incompleteCount,
+      },
+    },
+    note: data.reason,
+  });
+  if (completedEvent) await captureProcessMiningEvents([completedEvent]);
   revalidate();
   return {};
 }
