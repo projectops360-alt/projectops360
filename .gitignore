@@ -72,3 +72,6 @@ docs/sample-plans/*.pdf
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# GitHub Intelligence visual harness output (local only)
+gh-review-shots/
