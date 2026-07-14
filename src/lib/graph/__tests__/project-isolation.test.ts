@@ -35,7 +35,7 @@ function node(id: string, projectId: string): LivingGraphNode {
 
 function canonicalEvent(eventId: string, projectId: string, seq: number): LivingGraphCanonicalEvent {
   return {
-    eventId, organizationId: "org-1", projectId, eventType: "task_status_changed",
+    eventId, organizationId: "org-1", projectId, caseId: projectId, eventType: "task_status_changed",
     eventCategory: "execution", eventSchemaVersion: 1, eventImportance: null,
     lifecycleClass: "BUSINESS_EVENT", subjectType: "task", subjectId: null, actorType: "human",
     actorId: "u1", occurredAt: "2026-01-01T00:00:00.000Z", recordedAt: "2026-01-01T00:00:00.000Z",

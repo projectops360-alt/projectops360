@@ -93,6 +93,7 @@ export const BetweenAnalysisPanel = memo(function BetweenAnalysisPanel({
   onClear,
 }: BetweenAnalysisPanelProps) {
   const t = useTranslations("livingGraph.between");
+  const emptyResult = result.eventCount === 0 && result.operationalPath.length === 0;
 
   return (
     <aside
@@ -146,6 +147,16 @@ export const BetweenAnalysisPanel = memo(function BetweenAnalysisPanel({
           </button>
         </div>
       </div>
+
+      {emptyResult && (
+        <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-amber-500/40 bg-amber-500/10 px-4 py-10 text-center">
+          <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400" aria-hidden />
+          <p className="mt-3 text-sm font-semibold text-foreground">{t("emptyTitle")}</p>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground">{t("emptyDescription")}</p>
+        </div>
+      )}
+
+      <div className={emptyResult ? "hidden" : "contents"}>
 
       {/* Headline metrics */}
       <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -316,6 +327,7 @@ export const BetweenAnalysisPanel = memo(function BetweenAnalysisPanel({
           </ol>
         )}
       </Section>
+      </div>
     </aside>
   );
 });

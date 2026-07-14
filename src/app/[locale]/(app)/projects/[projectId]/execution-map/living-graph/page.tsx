@@ -50,6 +50,7 @@ import { computeResourceCapacity } from "@/lib/capacity/service";
 import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { isEventRelationshipsEnabled } from "@/lib/graph/event-relationships-flag";
 import { loadCanonicalEventProjection } from "@/lib/graph/event-relationship-loader";
+import type { TaskAttachmentRef } from "@/lib/graph/task-case-analysis";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -353,6 +354,26 @@ export default async function LivingGraphPage({
     created_at: string; deleted_at: string | null;
   }[];
 
+  // Case Explorer evidence context. Read-only and project/org scoped; storage
+  // paths are deliberately not sent to the client because the story only needs
+  // the safe display metadata.
+  const attachmentsResult = await supabase
+    .from("project_task_attachments")
+    .select("id, task_id, subtask_id, file_name, mime_type, created_at")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true });
+  const taskAttachments: TaskAttachmentRef[] = (attachmentsResult.data ?? []).map((row) => ({
+    id: row.id,
+    taskId: row.task_id,
+    subtaskId: row.subtask_id,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    createdAt: row.created_at,
+  }));
+
   // Resolve subtask owner display names (read-only team context for the
   // inspector). Uses the admin client only to read names — access is already
   // gated by the project-ownership check above (same pattern as the Workboard).
@@ -613,6 +634,7 @@ export default async function LivingGraphPage({
         resourceCapacity={resourceCapacity}
         subtasks={subtasks}
         subtaskOwnerNames={subtaskOwnerNames}
+        taskAttachments={taskAttachments}
       />
     </div>
   );

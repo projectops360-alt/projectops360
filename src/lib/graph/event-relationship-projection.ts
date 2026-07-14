@@ -30,8 +30,6 @@ import type {
   LivingGraphCanonicalEvent,
   LivingGraphEventRelationship,
   EventRelationshipType,
-  EventRelationshipClass,
-  EventRelationshipEvidence,
   CanonicalEventObjectRef,
   CanonicalEventObjectRole,
   CanonicalEventLifecycleClass,
@@ -47,6 +45,7 @@ export interface CanonicalEventLogRow {
   event_id: string;
   organization_id: string;
   project_id: string;
+  case_id: string;
   event_category: string;
   event_type: string;
   event_schema_version: number | null;
@@ -270,6 +269,7 @@ function normalizeEvents(
       eventId: row.event_id,
       organizationId: row.organization_id,
       projectId: row.project_id,
+      caseId: row.case_id,
       eventType: row.event_type,
       eventCategory: row.event_category,
       eventSchemaVersion: row.event_schema_version ?? null,

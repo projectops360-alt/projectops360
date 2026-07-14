@@ -24,6 +24,7 @@ function logRow(over: Partial<CanonicalEventLogRow>): CanonicalEventLogRow {
     event_id,
     organization_id: ORG,
     project_id: PROJECT,
+    case_id: PROJECT,
     event_category: "risk",
     event_type: "risk_registered",
     event_schema_version: 1,

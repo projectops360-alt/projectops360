@@ -1917,7 +1917,9 @@
       "limitations": "Limitaciones",
       "summaryFacts": "Resumen",
       "noPath": "No hay ruta operativa registrada entre estos extremos.",
-      "noEvents": "No hay eventos canónicos en este intervalo."
+      "noEvents": "No hay eventos canónicos en este intervalo.",
+      "emptyTitle": "No hay suficiente historial registrado para comparar estos puntos",
+      "emptyDescription": "Elige puntos con eventos canónicos. Las métricas en cero no explicarían qué ocurrió."
     },
     "drill": {
       "selected": "Hitos seleccionados: {names}",

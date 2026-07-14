@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import {
   analyzeBetween,
+  assessBetweenAnalysis,
   getBetweenAnalysisLayoutKey,
   type BetweenAnalysisInput,
   type BetweenEndpoint,
@@ -68,6 +69,7 @@ function event(
     eventId,
     organizationId: "org-1",
     projectId,
+    caseId: projectId,
     eventType: opts.eventType ?? "task_status_changed",
     eventCategory: opts.eventCategory ?? "execution",
     eventSchemaVersion: 1,
@@ -300,5 +302,32 @@ describe("CAP-045 §C.2 — analyzeBetween (pure motor)", () => {
     const k2 = getBetweenAnalysisLayoutKey(PROJECT, "m2", "m1");
     expect(k1).toBe(k2);
     expect(k1).toBe(`between:v1:${PROJECT}:m1:m2`);
+  });
+
+  it("preflight allows evidence-backed endpoints before analysis", () => {
+    const result = assessBetweenAnalysis(baseInput());
+    expect(result.canAnalyze).toBe(true);
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.startHistoryCount).toBeGreaterThan(0);
+    expect(result.endHistoryCount).toBeGreaterThan(0);
+  });
+
+  it("preflight blocks zero-history comparisons instead of showing zero metrics", () => {
+    const fixture = buildIntervalFixture();
+    const events = fixture.events.map((candidate) =>
+      candidate.sequenceNumber === 20
+        ? { ...candidate, objectRefs: [], sourceEntityId: null, subjectId: null }
+        : candidate,
+    );
+    const result = assessBetweenAnalysis(baseInput({ canonicalEvents: events }));
+    expect(result.canAnalyze).toBe(false);
+    expect(result.blockingReasons).toContain("end_has_no_canonical_history");
+  });
+
+  it("preflight discloses a missing operational path without inventing causality", () => {
+    const result = assessBetweenAnalysis(baseInput({ edges: [] }));
+    expect(result.canAnalyze).toBe(true);
+    expect(result.hasOperationalPath).toBe(false);
+    expect(result.warnings).toEqual(["no_recorded_operational_path"]);
   });
 });
