@@ -271,7 +271,30 @@ export interface LivingGraphData {
    *  truncated. Surfaced in the view so the user knows the projection is
    *  bounded — never silently truncated. */
   eventsTruncated?: boolean;
+  // ── Projection status contract (CAP-045 §C.2 / Part B) ─────────────────
+  // EXPLICIT signal of the canonical-event projection state so the "events"
+  // view never silently falls back to operational process_nodes/process_edges.
+  // - "disabled": flag OFF for this project (the three arrays above stay
+  //   undefined — preserves the byte-identical invariant for flag-OFF).
+  // - "empty":    flag ON, projection loaded, 0 canonical events.
+  // - "ready":    flag ON, ≥1 canonical event rendered.
+  // - "truncated": flag ON, log exceeded the explicit read limit.
+  // - "error":    the projection read failed (loader returned status "error").
+  canonicalEventProjectionStatus?: CanonicalEventProjectionStatus;
+  /** The project the page actually requested. The view filters every layer
+   *  to rows whose projectId === requestedProjectId — defense-in-depth against
+   *  any cross-project leak when data is reused across mounts. */
+  requestedProjectId?: string;
 }
+
+/** Explicit state of the canonical-event projection for the current project.
+ *  Drives the status banners in the "events" view (never a silent fallback). */
+export type CanonicalEventProjectionStatus =
+  | "disabled"
+  | "empty"
+  | "ready"
+  | "error"
+  | "truncated";
 
 export type LivingGraphOverlay =
   | "normal"

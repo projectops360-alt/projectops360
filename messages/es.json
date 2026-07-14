@@ -1867,12 +1867,62 @@
       "importance": "Importancia",
       "lifecycle": "Clase de ciclo de vida",
       "category": "Categoría",
-      "objectNodeLabel": "Objeto"
+      "objectNodeLabel": "Objeto",
+      "status": {
+        "disabled": {
+          "title": "La vista de eventos canónicos está deshabilitada para este proyecto. Pide al administrador que la habilite con el flag LIVING_GRAPH_EVENT_RELATIONSHIPS."
+        },
+        "empty": {
+          "title": "Aún no se han capturado eventos canónicos para este proyecto. La vista de eventos muestra el historial canónico — no las tareas operativas."
+        },
+        "error": {
+          "title": "No se pudo cargar la proyección de eventos canónicos. La vista de eventos no está disponible (no es un respaldo a las tareas operativas)."
+        },
+        "truncated": {
+          "title": "Mostrando los primeros {count} eventos canónicos. El registro se truncó para mantener la legibilidad de la vista."
+        }
+      }
+    },
+    "between": {
+      "toggle": "¿Qué pasó entre?",
+      "analyze": "Analizar qué pasó entre",
+      "clear": "Limpiar",
+      "swap": "Invertir dirección",
+      "start": "Inicio",
+      "end": "Fin",
+      "selected": "Extremos: {names}",
+      "panelTitle": "¿Qué pasó entre?",
+      "pickHint": "Elige dos extremos (hitos, tareas o eventos) en el grafo.",
+      "twoEndpointsRequired": "Elige dos extremos para ejecutar el análisis.",
+      "operationalPath": "Ruta operativa",
+      "canonicalEvents": "Eventos canónicos (cronología)",
+      "relatedObjects": "Objetos relacionados",
+      "elapsedBusiness": "Transcurrido (occurred_at)",
+      "recordedElapsed": "Span de registro (recorded_at)",
+      "eventCount": "Eventos",
+      "transitionCount": "Transiciones",
+      "largestWaitingGap": "Mayor espera",
+      "statusChanges": "Cambios de estado",
+      "blockers": "Bloqueos",
+      "risks": "Riesgos",
+      "decisions": "Decisiones",
+      "approvals": "Aprobaciones",
+      "reworkSignals": "Señales de retrabajo",
+      "actors": "Actores",
+      "sourceModules": "Módulos de origen",
+      "evidenceRefs": "Refs. de evidencia",
+      "dataQualityFlags": "Banderas de calidad de datos",
+      "explicitCausal": "Enlaces causales explícitos",
+      "temporalRelationships": "Relaciones temporales",
+      "limitations": "Limitaciones",
+      "summaryFacts": "Resumen",
+      "noPath": "No hay ruta operativa registrada entre estos extremos.",
+      "noEvents": "No hay eventos canónicos en este intervalo."
     },
     "drill": {
       "selected": "Hitos seleccionados: {names}",
       "viewFlow": "Ver flujo",
-      "hint": "Consejo: arrastra un hito sobre otro (o haz clic en dos) para conectarlos y ver el flujo entre ambos. Arrastra las tarjetas libremente para reacomodar el lienzo."
+      "hint": "Consejo: elige dos hitos para \"Ver flujo\" (inmersión) o \"Analizar qué pasó entre\" (análisis entre). Arrastra las tarjetas libremente para reacomodar el lienzo."
     },
     "milestoneFocus": {
       "title": "Enfoque del milestone",
