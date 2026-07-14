@@ -1,4 +1,4 @@
-import { emitProjectEvents, type EmitEventInput, type EmitResult, type EventObjectRef } from "./ingestion";
+import { emitProcessMiningEventsAtomic, type EmitEventInput, type EmitResult, type EventObjectRef } from "./ingestion";
 import { isProcessMiningEventCaptureEnabled } from "./process-mining-capture-flag";
 import type { ActorType, CaptureMethod, DataQualityFlag } from "./registry";
 
@@ -525,7 +525,7 @@ export async function captureProcessMiningEvents(
     return { enabled: false, complete: false, results: [] };
   }
   try {
-    const results = await emitProjectEvents(events);
+    const results = await emitProcessMiningEventsAtomic(events);
     const complete = results.every((result) => result.ok);
     if (!complete) {
       console.error(

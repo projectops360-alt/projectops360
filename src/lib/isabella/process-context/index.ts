@@ -31,7 +31,12 @@ export {
   type MilestoneEvidenceOutcome,
   type MilestoneLite,
 } from "./milestone-evidence";
-export { buildProcessSignals } from "./process-signals";
+export { buildProcessSignals, mergeProcessMiningSignals } from "./process-signals";
+export {
+  buildProcessMiningEvidence,
+  getIsabellaProcessMiningEvidence,
+  type ProcessMiningEvidenceOutcome,
+} from "./process-mining-evidence";
 export { resolveIsabellaProjectAccess, type ResolveAccessInput } from "./access";
 export { executeDeterministicProjectDataRequest, type ProjectQueryExecution } from "./query-executor";
 export { buildIsabellaProcessContext } from "./context-builder";

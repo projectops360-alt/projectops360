@@ -47,6 +47,39 @@ export interface ScreenDefinition {
  */
 export const SCREEN_REGISTRY: ScreenDefinition[] = [
   {
+    match: "/projects",
+    projectSubroute: "execution-map",
+    module: "process_mining",
+    screen: "process_mining_layer",
+    title: { en: "Execution Map - Process Mining Layer", es: "Mapa de Ejecucion - Capa de Process Mining" },
+    workflow: {
+      en: "Read execution from canonical task and milestone cases, aggregated process paths, milestone transitions, variants, statistical associations, and governed KPIs without turning visual layout into truth.",
+      es: "Leer la ejecucion desde casos canonicos de tareas e hitos, rutas agregadas, transiciones entre hitos, variantes, asociaciones estadisticas y KPIs gobernados sin convertir el diseno visual en verdad.",
+    },
+    components: {
+      en: [
+        "Living Graph views: Task cases, Process, Full audit",
+        "Search, level, overlay, layout, filters, simplified edges, focus and Insights controls",
+        "Milestone Flow transition health, delay, rework and bottleneck findings",
+        "Execution Variants with frequency, coverage and outcome-aware comparison",
+        "Statistical Root Cause Miner with influence, lift, sample size and confidence",
+        "KPI catalog and sandboxed custom KPI evaluation",
+      ],
+      es: [
+        "Vistas del Living Graph: Casos de tarea, Proceso y Auditoria completa",
+        "Busqueda, nivel, overlay, layout, filtros, conexiones simplificadas, foco e Insights",
+        "Flujo entre hitos con salud de transicion, retrasos, retrabajo y cuellos de botella",
+        "Variantes de ejecucion con frecuencia, cobertura y comparacion basada en resultados",
+        "Root Cause Miner estadistico con influencia, lift, muestra y confianza",
+        "Catalogo KPI y evaluacion segura de KPIs personalizados",
+      ],
+    },
+    followups: {
+      en: ["What is the difference between Task cases, Process and Full audit?", "Show the milestone-to-milestone flow", "Which findings are derived rather than canonical?"],
+      es: ["Cual es la diferencia entre Casos de tarea, Proceso y Auditoria?", "Muestrame el flujo de hito a hito", "Cuales hallazgos son derivados y no canonicos?"],
+    },
+  },
+  {
     match: "/team",
     module: "people_permissions",
     screen: "team_directory",

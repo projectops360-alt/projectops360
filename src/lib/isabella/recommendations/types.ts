@@ -23,6 +23,7 @@ export type RecommendationCategory =
   | "investigate_evidence_gap"
   | "stabilize_milestone"
   | "clarify_scope"
+  | "review_process_friction"
   | "reduce_execution_uncertainty";
 
 /** Categories this engine can support TODAY (all others are never fabricated). */
@@ -34,6 +35,7 @@ export const SUPPORTED_RECOMMENDATION_CATEGORIES: RecommendationCategory[] = [
   "investigate_evidence_gap",
   "stabilize_milestone",
   "clarify_scope",
+  "review_process_friction",
   "reduce_execution_uncertainty",
 ];
 

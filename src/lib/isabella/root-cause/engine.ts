@@ -87,6 +87,30 @@ export function classifyRootCauseFindings(
         explanation: tt(es, "Work outside the milestone structure may be under-tracked.", "El trabajo fuera de la estructura de hitos puede estar mal seguido."),
         affectedEntities: affected(context, (t) => !t.milestoneId), evidenceRefs: [],
       };
+    } else if (c.type === "process_delay") {
+      f = {
+        id: "f-process-delay", label: c.label, classification: "possible_cause", constraintType: c.type,
+        severity: "at_risk", confidence: c.confidence,
+        explanation: tt(es, "The process flow contains evidenced delay findings; the underlying cause still requires corroboration.", "El flujo contiene hallazgos de retraso con evidencia; la causa subyacente aún requiere corroboración."),
+        affectedEntities: [], evidenceRefs: c.evidenceRefs,
+        limitations: [tt(es, "A delay finding is not causal proof by itself.", "Un hallazgo de retraso no prueba causalidad por sí solo.")],
+      };
+    } else if (c.type === "rework_signal") {
+      f = {
+        id: "f-rework", label: c.label, classification: "possible_cause", constraintType: c.type,
+        severity: "at_risk", confidence: c.confidence,
+        explanation: tt(es, "Repeated or reopened work is consuming execution flow and may be contributing to delay.", "El trabajo repetido o reabierto consume flujo de ejecución y puede contribuir al retraso."),
+        affectedEntities: [], evidenceRefs: c.evidenceRefs,
+        limitations: [tt(es, "The pattern identifies rework, not who or what caused it.", "El patrón identifica retrabajo, no quién o qué lo causó.")],
+      };
+    } else if (c.type === "bottleneck_signal") {
+      f = {
+        id: "f-bottleneck", label: c.label, classification: "possible_cause", constraintType: c.type,
+        severity: "watch", confidence: c.confidence,
+        explanation: tt(es, "The flow engine identified a bottleneck candidate backed by repeated or long-duration friction.", "El motor identificó un candidato a cuello de botella respaldado por fricción repetida o prolongada."),
+        affectedEntities: [], evidenceRefs: c.evidenceRefs,
+        limitations: [tt(es, "A candidate is not a confirmed structural bottleneck.", "Un candidato no es un cuello de botella estructural confirmado.")],
+      };
     }
 
     if (f) {
@@ -211,7 +235,7 @@ export async function buildIsabellaRootCauseAnalysis(request: RootCauseRequest):
   const language: RootCauseLanguage = request.locale === "es" ? "es" : "en";
   const context =
     request.context ??
-    (await buildIsabellaProcessContext({ projectId: request.projectId, locale: language, include: ["project", "tasks", "milestones", "blockers"] }));
+    (await buildIsabellaProcessContext({ projectId: request.projectId, locale: language, include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"] }));
   const diagnosis =
     request.dailyDiagnosis ??
     (context.status === "ready" || context.status === "partial" ? assembleDailyDiagnosis(context, language) : undefined);

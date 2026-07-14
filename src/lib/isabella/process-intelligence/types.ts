@@ -144,7 +144,9 @@ export type IsabellaSourceKind =
   | "project_event_graph"
   | "risk_decision_approval_blocker"
   | "project_memory_status_report"
-  | "observability_realtime_state";
+  | "observability_realtime_state"
+  | "product_brain_knowledge"
+  | "screen_program_context";
 
 export const ISABELLA_SOURCE_KINDS = [
   "deterministic_project_data",
@@ -154,6 +156,8 @@ export const ISABELLA_SOURCE_KINDS = [
   "risk_decision_approval_blocker",
   "project_memory_status_report",
   "observability_realtime_state",
+  "product_brain_knowledge",
+  "screen_program_context",
 ] as const satisfies readonly IsabellaSourceKind[];
 
 // ── Citation ─────────────────────────────────────────────────────────────────

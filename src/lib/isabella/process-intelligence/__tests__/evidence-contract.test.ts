@@ -28,9 +28,11 @@ describe("approved / forbidden data sources", () => {
     expect(isAvailableSource("living_graph")).toBe(true);
   });
 
-  it("keeps event graph + observability as future placeholders", () => {
+  it("enables governed event, Product Brain, and screen/program sources", () => {
     expect(isApprovedSource("project_event_graph")).toBe(true);
-    expect(isAvailableSource("project_event_graph")).toBe(false);
+    expect(isAvailableSource("project_event_graph")).toBe(true);
+    expect(isAvailableSource("product_brain_knowledge")).toBe(true);
+    expect(isAvailableSource("screen_program_context")).toBe(true);
     expect(isAvailableSource("observability_realtime_state")).toBe(false);
   });
 

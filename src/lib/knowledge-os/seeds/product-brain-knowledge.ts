@@ -37,6 +37,69 @@ export interface ProductBrainPackage {
 export const DOMAIN = "product_intelligence" as const;
 
 export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
+  {
+    slug: "pi-process-mining-layer-truth",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "isabella-process-mining-layer-training.md -> Deterministic project and event data; CAP-045",
+    authority: "product_decision",
+    en: {
+      title: "What is the source of truth for the Process Mining Layer?",
+      body:
+        "ProjectOps360 uses canonical task, milestone and dependency owners plus the append-only Project Event Graph. Task events are framed as one case per task; milestone events as one case per milestone. The Living Graph and Milestone Process Flow are read-only projections or derived intelligence, never new owners of business facts. Isabella receives sanitized summaries and safe evidence references, never raw event payloads. Temporal order shows sequence only; causality exists only when an explicit caused_by relationship was recorded.\n" +
+        "Source: isabella-process-mining-layer-training.md -> Source contract; CAP-045.\n" +
+        "Verify: open Execution Map -> Living Graph -> Full audit and inspect event source, timestamps, object references and explicit relationships.",
+    },
+    es: {
+      title: "Cual es la fuente de verdad de la capa de Process Mining?",
+      body:
+        "ProjectOps360 usa los propietarios canonicos de tareas, hitos y dependencias junto con el Project Event Graph append-only. Los eventos de tarea forman un caso por tarea y los de hito un caso por hito. Living Graph y Milestone Process Flow son proyecciones de solo lectura o inteligencia derivada, nunca nuevos propietarios de hechos. Isabella recibe resumenes sanitizados y referencias seguras, nunca payloads crudos. El orden temporal solo muestra secuencia; hay causalidad unicamente cuando se registro una relacion caused_by explicita.\n" +
+        "Fuente: isabella-process-mining-layer-training.md -> Contrato de fuentes; CAP-045.\n" +
+        "Verifica: abre Execution Map -> Living Graph -> Auditoria y revisa fuente, tiempos, referencias de objeto y relaciones explicitas.",
+    },
+  },
+  {
+    slug: "pi-process-mining-reading-views",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "isabella-process-mining-layer-training.md -> Reading the Process Mining Layer; CAP-046",
+    authority: "module_strategy",
+    en: {
+      title: "How should I read Task cases, Process and Full audit?",
+      body:
+        "Task cases reads one task chronology at a time. Process aggregates observed activities, directly-following connections and variants across cases; coverage controls narrow the map to frequent paths. Full audit reads the canonical event projection. Milestone Flow adds deterministic transitions and derived delay, rework and bottleneck findings. Variants describe observed sequences; Statistical Root Cause reports association, lift, sample and confidence, not confirmed causation; KPI shows not computable when evidence is missing instead of inventing zero.\n" +
+        "Source: isabella-process-mining-layer-training.md -> Reading the Process Mining Layer.\n" +
+        "Verify: Execution Map -> Living Graph, Milestone Flow, Variants, Root Causes and KPIs.",
+    },
+    es: {
+      title: "Como se leen Casos de tarea, Proceso y Auditoria?",
+      body:
+        "Casos de tarea lee una cronologia por tarea. Proceso agrega actividades observadas, conexiones directly-following y variantes; la cobertura reduce el mapa a rutas frecuentes. Auditoria lee la proyeccion canonica de eventos. Milestone Flow agrega transiciones deterministas y hallazgos derivados de retraso, retrabajo y cuellos de botella. Variantes describe secuencias observadas; Root Cause estadistico informa asociacion, lift, muestra y confianza, no causalidad confirmada; KPI muestra no calculable cuando falta evidencia en vez de inventar cero.\n" +
+        "Fuente: isabella-process-mining-layer-training.md -> Lectura de la capa de Process Mining.\n" +
+        "Verifica: Execution Map -> Living Graph, Milestone Flow, Variantes, Root Causes y KPIs.",
+    },
+  },
+  {
+    slug: "pi-isabella-process-mining-sources",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "isabella-process-mining-layer-training.md -> Purpose and response policy; Product Constitution section 11",
+    authority: "product_decision",
+    en: {
+      title: "Which three sources does Isabella use for Process Mining?",
+      body:
+        "Isabella uses three governed sources: (1) deterministic, RBAC-scoped project and event queries for current facts; (2) vectorized and lexical Product Brain knowledge for product meaning and rules; and (3) deterministic screen/program context for the implemented view the user is seeing. Live project data outranks documentation for current status; Product Brain explains semantics but cannot invent current counts; screen layout explains controls but is never business truth. Isabella labels canonical, derived, statistical and guidance claims separately.\n" +
+        "Source: isabella-process-mining-layer-training.md -> Source contract and response policy.\n" +
+        "Verify: ask Isabella a current-status question, a how-it-works question and Explain this screen from the Process Mining Layer.",
+    },
+    es: {
+      title: "Que tres fuentes usa Isabella para Process Mining?",
+      body:
+        "Isabella usa tres fuentes gobernadas: (1) queries deterministas y acotados por RBAC a datos y eventos del proyecto para hechos actuales; (2) Product Brain vectorizado y lexical para significado y reglas del producto; y (3) contexto determinista de pantalla/programa para la vista implementada que observa el usuario. Los datos actuales superan a la documentacion para estado; Product Brain explica semantica pero no inventa conteos; el layout explica controles pero nunca es verdad de negocio. Isabella separa afirmaciones canonicas, derivadas, estadisticas y de guia.\n" +
+        "Fuente: isabella-process-mining-layer-training.md -> Contrato de fuentes y politica de respuesta.\n" +
+        "Verifica: pregunta por estado actual, por como funciona la capa y luego pide Explica esta pantalla desde Process Mining.",
+    },
+  },
   // ── Living Graph + Critical Path ───────────────────────────────────────────
   {
     slug: "pi-living-graph-what-is",

@@ -143,6 +143,27 @@ describe("sections + metrics", () => {
     expect(d.sections.todayFocus.items.length).toBeGreaterThan(0);
     expect((d.sections.todayFocus.limitations ?? []).join(" ")).toMatch(/recommendation engine/i);
   });
+  it("surfaces delay, rework, and bottleneck findings as derived attention signals", () => {
+    const processContext = ctx({
+      evidencePackets: [
+        packet({ evidenceId: "delay:1", evidenceType: "delay_finding", sourceKind: "milestone_process_flow", citationRef: "delay:1" }),
+        packet({ evidenceId: "rework:1", evidenceType: "rework_finding", sourceKind: "milestone_process_flow", citationRef: "rework:1" }),
+        packet({ evidenceId: "bottleneck:1", evidenceType: "bottleneck_finding", sourceKind: "milestone_process_flow", citationRef: "bottleneck:1" }),
+      ],
+      taskContext: tctx({ totalVisibleTasks: 1, byStatus: { in_progress: 1 } }),
+      processSignals: {
+        blockedCount: 0, advancedFindingsAvailable: true, packets: [], transitionCount: 3,
+        delayFindingCount: 1, reworkFindingCount: 1, bottleneckFindingCount: 1,
+      },
+    });
+    const diagnosis = assembleDailyDiagnosis(processContext, "en");
+    const labels = diagnosis.sections.risksOrAttention.items.map((item) => item.label).join("|");
+    expect(labels).toMatch(/Process delay findings/);
+    expect(labels).toMatch(/Rework findings/);
+    expect(labels).toMatch(/Bottleneck candidates/);
+    expect(diagnosis.sections.risksOrAttention.items.every((item) => item.confidence !== "verified")).toBe(true);
+    expect(diagnosis.metrics).toMatchObject({ processTransitionCount: 3, delayFindingCount: 1, reworkFindingCount: 1, bottleneckFindingCount: 1 });
+  });
   it("next-engine hints hand off symptoms to root-cause / recommendation", () => {
     const hints = buildNextEngineHints(context);
     expect(hints.some((h) => h.engine === "root_cause")).toBe(true);

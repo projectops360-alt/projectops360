@@ -14,6 +14,7 @@ import type { IsabellaCitation } from "@/lib/isabella/process-intelligence/types
 export type IsabellaRoute =
   | "product_help"
   | "factual_project_data"
+  | "process_mining_summary"
   // Deterministic screen/UI-label explanation (ISABELLA-SCREEN-CONTEXT-EXPLANATION).
   // Answers "explain this screen" / "what does <UI term> mean" from screen context —
   // MUST take priority over the diagnosis/root-cause/recommendation engines.

@@ -52,6 +52,28 @@ describe("constraint taxonomy / signals", () => {
     const types = cs.map((c) => c.type);
     expect(types).toEqual(expect.arrayContaining(["ownership_gap", "milestone_assignment_gap", "overdue_constraint"]));
   });
+  it("maps advanced Process Mining findings without claiming confirmed causality", () => {
+    const context = ctx({
+      evidencePackets: [
+        packet({ evidenceId: "delay:1", evidenceType: "delay_finding", sourceKind: "milestone_process_flow", citationRef: "delay:1", confidence: "medium" }),
+        packet({ evidenceId: "rework:1", evidenceType: "rework_finding", sourceKind: "milestone_process_flow", citationRef: "rework:1", confidence: "medium" }),
+        packet({ evidenceId: "bottleneck:1", evidenceType: "bottleneck_finding", sourceKind: "milestone_process_flow", citationRef: "bottleneck:1", confidence: "medium" }),
+      ],
+      processSignals: {
+        blockedCount: 0, advancedFindingsAvailable: true, packets: [], transitionCount: 3,
+        delayFindingCount: 1, reworkFindingCount: 1, bottleneckFindingCount: 1,
+      },
+    });
+    const constraints = classifyConstraintSignals(context, "en");
+    expect(constraints.map((constraint) => constraint.type)).toEqual(expect.arrayContaining([
+      "process_delay", "rework_signal", "bottleneck_signal",
+    ]));
+    const findings = classifyRootCauseFindings(context, constraints, "en")
+      .filter((finding) => ["process_delay", "rework_signal", "bottleneck_signal"].includes(finding.constraintType));
+    expect(findings).toHaveLength(3);
+    expect(findings.every((finding) => finding.classification === "possible_cause")).toBe(true);
+    expect(findings.every((finding) => finding.evidenceRefs.length > 0)).toBe(true);
+  });
 });
 
 describe("classification (conservative)", () => {

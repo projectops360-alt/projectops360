@@ -24,6 +24,12 @@ function isOverdue(t: IsabellaTaskSummary, day: string): boolean {
 function blockerRefs(context: IsabellaProcessContext): string[] {
   return (context.processSignals?.packets ?? []).map((p) => p.citationRef ?? p.evidenceId).filter(Boolean) as string[];
 }
+function processPacketRefs(context: IsabellaProcessContext, type: "delay_finding" | "rework_finding" | "bottleneck_finding"): string[] {
+  return context.evidencePackets
+    .filter((packet) => packet.evidenceType === type)
+    .map((packet) => packet.citationRef ?? packet.evidenceId)
+    .filter(Boolean) as string[];
+}
 
 /** Observed symptoms (facts) — the "what", not yet the "why". */
 export function extractRootCauseSymptoms(context: IsabellaProcessContext, language: RootCauseLanguage): SymptomSignal[] {
@@ -35,6 +41,9 @@ export function extractRootCauseSymptoms(context: IsabellaProcessContext, langua
   if (s.withoutOwnerTasks > 0) out.push({ id: "sym-owner", type: "missing_owner", label: tt(es, `${s.withoutOwnerTasks} task(s) without owner`, `${s.withoutOwnerTasks} tarea(s) sin responsable`), evidenceRefs: [] });
   if (s.withoutMilestoneTasks > 0) out.push({ id: "sym-milestone", type: "missing_milestone", label: tt(es, `${s.withoutMilestoneTasks} task(s) without milestone`, `${s.withoutMilestoneTasks} tarea(s) sin hito`), evidenceRefs: [] });
   if (context.status === "partial") out.push({ id: "sym-partial", type: "partial_context", label: tt(es, "Some evidence sources are unavailable", "Algunas fuentes de evidencia no están disponibles"), evidenceRefs: [] });
+  if (s.delayFindingCount > 0) out.push({ id: "sym-process-delay", type: "process_delay", label: tt(es, `${s.delayFindingCount} process delay finding(s)`, `${s.delayFindingCount} hallazgo(s) de retraso de proceso`), evidenceRefs: processPacketRefs(context, "delay_finding") });
+  if (s.reworkFindingCount > 0) out.push({ id: "sym-rework", type: "rework", label: tt(es, `${s.reworkFindingCount} rework finding(s)`, `${s.reworkFindingCount} hallazgo(s) de retrabajo`), evidenceRefs: processPacketRefs(context, "rework_finding") });
+  if (s.bottleneckFindingCount > 0) out.push({ id: "sym-bottleneck", type: "bottleneck", label: tt(es, `${s.bottleneckFindingCount} bottleneck candidate(s)`, `${s.bottleneckFindingCount} candidato(s) a cuello de botella`), evidenceRefs: processPacketRefs(context, "bottleneck_finding") });
   return out;
 }
 
@@ -74,6 +83,19 @@ export function classifyConstraintSignals(context: IsabellaProcessContext, langu
   // milestone_assignment_gap
   if (s.withoutMilestoneTasks > 0) {
     out.push({ id: "c-milestone", type: "milestone_assignment_gap", label: tt(es, `${s.withoutMilestoneTasks} task(s) without milestone`, `${s.withoutMilestoneTasks} tarea(s) sin hito`), severity: "watch", confidence: conf, evidenceRefs: [], affectedEntityRefs: [] });
+  }
+
+  const delayRefs = processPacketRefs(context, "delay_finding");
+  if (delayRefs.length > 0) {
+    out.push({ id: "c-process-delay", type: "process_delay", label: tt(es, `${delayRefs.length} evidenced process delay(s)`, `${delayRefs.length} retraso(s) de proceso con evidencia`), severity: "at_risk", confidence: "medium", evidenceRefs: delayRefs, affectedEntityRefs: delayRefs });
+  }
+  const reworkRefs = processPacketRefs(context, "rework_finding");
+  if (reworkRefs.length > 0) {
+    out.push({ id: "c-rework", type: "rework_signal", label: tt(es, `${reworkRefs.length} rework pattern(s)`, `${reworkRefs.length} patrón(es) de retrabajo`), severity: "at_risk", confidence: "medium", evidenceRefs: reworkRefs, affectedEntityRefs: reworkRefs });
+  }
+  const bottleneckRefs = processPacketRefs(context, "bottleneck_finding");
+  if (bottleneckRefs.length > 0) {
+    out.push({ id: "c-bottleneck", type: "bottleneck_signal", label: tt(es, `${bottleneckRefs.length} bottleneck candidate(s)`, `${bottleneckRefs.length} candidato(s) a cuello de botella`), severity: "watch", confidence: "medium", evidenceRefs: bottleneckRefs, affectedEntityRefs: bottleneckRefs });
   }
 
   // evidence_gap — advanced findings / risk / decision / approval not available.

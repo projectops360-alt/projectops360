@@ -20,6 +20,13 @@ function ctx(status: IsabellaContextStatus = "ready", message?: string): Isabell
     evidencePackets: [], citations: [{ sourceLabel: "Workboard", entityType: "task", entityTitle: "QA", confidence: "verified" }],
     taskContext: { totalVisibleTasks: 5, tasks: [], subtasks: [], byStatus: { in_progress: 2, not_started: 1 }, byPriority: {}, withoutMilestoneCount: 1, withoutOwnerCount: 2, overdueCount: 1, blockedCount: 1 },
     processSignals: { blockedCount: 1, advancedFindingsAvailable: false, packets: [packet()] },
+    processMiningContext: {
+      status: "ready", eventCount: 12, caseCount: 4, taskEventCount: 8, milestoneEventCount: 3,
+      dependencyEventCount: 1, transitionCount: 5, delayFindingCount: 2, blockerFindingCount: 1,
+      reworkFindingCount: 1, bottleneckFindingCount: 1, dataQualityFlagCount: 0,
+      firstOccurredAt: "2026-07-14T00:00:00Z", lastOccurredAt: "2026-07-15T00:00:00Z",
+      eventsTruncated: false, integrityValid: true, integrityIssueCount: 0,
+    },
     limitations: ["Risk evidence is not available in this layer yet."], status, message,
   };
 }
@@ -38,6 +45,25 @@ describe("route fallback (existing pipeline handles it)", () => {
 });
 
 describe("engine orchestration", () => {
+  it("answers Process Mining counts and integrity from deterministic aggregates", async () => {
+    const context = ctx();
+    context.evidencePackets.push({
+      ...packet(), evidenceId: "event:e1", evidenceType: "event_summary", sourceKind: "project_event_graph",
+      citationRef: "event:e1", title: "task.status_changed", summary: "Transition todo -> done",
+    });
+    context.citations.push({ sourceLabel: "Canonical event summary", entityType: "event_summary", entityTitle: "task.status_changed", safeRef: "event:e1", confidence: "verified" });
+    const result = await runIsabellaProcessIntelligence(req("How many canonical events and transitions are in Process Mining?"), {
+      buildContext: async () => context,
+    });
+    expect(result.status).toBe("answered");
+    expect(result.route).toBe("process_mining_summary");
+    expect(result.answer).toMatch(/12/);
+    expect(result.answer).toMatch(/integrity: \*\*valid\*\*/i);
+    expect(result.answer).toMatch(/does not prove causality/i);
+    expect(result.audit.enginesUsed).toEqual(["process_mining_summary"]);
+    expect(result.evidenceRefs).toEqual(["event:e1"]);
+  });
+
   it("daily_diagnosis calls diagnosis engine with authorized context", async () => {
     const r = await runIsabellaProcessIntelligence(req("What needs my attention?"), { buildContext: build() });
     expect(r.status).toBe("answered");
@@ -70,6 +96,7 @@ describe("engine orchestration", () => {
 describe("screen-context explanation (never Daily Diagnosis, no engine, no DB)", () => {
   const RES = { screenContext: { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" } };
   const TASK = { screenContext: { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" } };
+  const PROCESS = { screenContext: { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" } };
 
   it("Resources 'unassigned' → answered from screen context, never builds diagnosis", async () => {
     let called = 0;
@@ -102,6 +129,17 @@ describe("screen-context explanation (never Daily Diagnosis, no engine, no DB)",
     expect(r.route).toBe("screen_context_explanation");
     expect(r.status).toBe("needs_clarification");
     expect(r.audit.confidence).not.toBe("high");
+  });
+
+  it("Process Mining help explains cases/process/audit without building context", async () => {
+    let called = 0;
+    const result = await runIsabellaProcessIntelligence(req("Explain this screen", PROCESS), {
+      buildContext: async () => { called += 1; return ctx(); },
+    });
+    expect(result.route).toBe("screen_context_explanation");
+    expect(called).toBe(0);
+    expect(result.answer).toMatch(/Task cases/);
+    expect(result.answer).toMatch(/Full audit/);
   });
 });
 

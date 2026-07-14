@@ -123,6 +123,26 @@ the PMO gets the same help one level up.
 **Protection rule (binding):** future Isabella UI, mode, Product Brain, or layout changes **must not
 remove** the project-aware automatic briefing behavior. See [REG-013](10-regression-log.md#reg-013).
 
+## Process Mining Layer grounding (P2-T3)
+
+Isabella interprets Process Mining through three governed sources, selected by intent rather than
+blended into one unverifiable answer:
+
+1. **Current project truth:** authenticated deterministic reads over canonical task/milestone/
+   dependency owners, the Project Event Graph, and Milestone Process Flow aggregates. Explicit
+   questions about event counts, cases, transitions or integrity use this source directly.
+2. **Product meaning:** bilingual Product Brain packages retrieved lexically and through the vector
+   index explain vocabulary, boundaries and verification paths; they never supply live counts.
+3. **Visible implementation:** the screen registry and deterministic screen-help resolver explain
+   Task cases, Process, Full audit, Milestone Flow, Variants, Root Cause Miner and KPI screens from
+   the implemented routes/programs without treating layout as business evidence.
+
+Only safe aggregate/evidence packets cross the Isabella boundary; raw event payloads and arbitrary
+table access do not. Temporal succession is not causality, statistical association is not a
+confirmed cause, and derived delay/rework/bottleneck findings require corroboration. The binding
+training and verification contract is
+[isabella-process-mining-layer-training.md](isabella-process-mining-layer-training.md).
+
 ## Next actions
 1. Pipe the Execution Status Engine's explanation into Isabella's context for the focused node.
 2. Living Graph node → "ask Isabella" wired to that explanation.

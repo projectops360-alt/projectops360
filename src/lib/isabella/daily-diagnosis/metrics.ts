@@ -28,6 +28,11 @@ export interface DiagnosisSignals extends Required<DiagnosisMetrics> {
   hasTaskData: boolean;
   /** Advanced findings (delay/rework/bottleneck) present? (from process signals) */
   advancedFindingsAvailable: boolean;
+  processEventCount: number;
+  processTransitionCount: number;
+  delayFindingCount: number;
+  reworkFindingCount: number;
+  bottleneckFindingCount: number;
 }
 
 /** Deterministic metrics + signals from an authorized process context. */
@@ -42,12 +47,20 @@ export function computeDiagnosisSignals(context: IsabellaProcessContext): Diagno
   const overdueTasks = tc?.overdueCount ?? 0;
   const withoutMilestoneTasks = tc?.withoutMilestoneCount ?? 0;
   const withoutOwnerTasks = tc?.withoutOwnerCount ?? 0;
+  const processEventCount = context.processMiningContext?.eventCount ?? 0;
+  const processTransitionCount = context.processSignals?.transitionCount ?? 0;
+  const delayFindingCount = context.processSignals?.delayFindingCount ?? 0;
+  const reworkFindingCount = context.processSignals?.reworkFindingCount ?? 0;
+  const bottleneckFindingCount = context.processSignals?.bottleneckFindingCount ?? 0;
 
   const attentionSignalCount = [
     overdueTasks > 0,
     blockedTasks > 0,
     withoutOwnerTasks > 0,
     withoutMilestoneTasks > 0,
+    delayFindingCount > 0,
+    reworkFindingCount > 0,
+    bottleneckFindingCount > 0,
   ].filter(Boolean).length;
 
   return {
@@ -63,5 +76,10 @@ export function computeDiagnosisSignals(context: IsabellaProcessContext): Diagno
     attentionSignalCount,
     hasTaskData: !!tc && totalTasks > 0,
     advancedFindingsAvailable: context.processSignals?.advancedFindingsAvailable ?? false,
+    processEventCount,
+    processTransitionCount,
+    delayFindingCount,
+    reworkFindingCount,
+    bottleneckFindingCount,
   };
 }

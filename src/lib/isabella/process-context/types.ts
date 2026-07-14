@@ -43,6 +43,7 @@ export type IsabellaContextInclude =
   | "workboard"
   | "living_graph_summary"
   | "milestone_flow_summary"
+  | "process_mining_summary"
   | "risks"
   | "decisions"
   | "approvals"
@@ -112,6 +113,36 @@ export interface IsabellaProcessSignals {
   /** Advanced findings (delay/rework/bottleneck) availability. */
   advancedFindingsAvailable: boolean;
   packets: IsabellaEvidencePacket[];
+  eventHistoryAvailable?: boolean;
+  delayFindingCount?: number;
+  reworkFindingCount?: number;
+  bottleneckFindingCount?: number;
+  transitionCount?: number;
+  advancedPackets?: IsabellaEvidencePacket[];
+}
+
+export type IsabellaProcessMiningStatus = "ready" | "partial" | "empty" | "unavailable";
+
+/** Sanitized Process Mining aggregate; never raw event rows or payloads. */
+export interface IsabellaProcessMiningContext {
+  status: IsabellaProcessMiningStatus;
+  eventCount: number;
+  caseCount: number;
+  taskEventCount: number;
+  milestoneEventCount: number;
+  dependencyEventCount: number;
+  transitionCount: number;
+  delayFindingCount: number;
+  blockerFindingCount: number;
+  reworkFindingCount: number;
+  bottleneckFindingCount: number;
+  dataQualityFlagCount: number;
+  firstOccurredAt: string | null;
+  lastOccurredAt: string | null;
+  eventsTruncated: boolean;
+  integrityValid: boolean | null;
+  integrityIssueCount: number;
+  engineVersion?: string | null;
 }
 
 export interface IsabellaContextRequest {
@@ -144,6 +175,7 @@ export interface IsabellaProcessContext {
   taskContext?: IsabellaTaskContext;
   milestoneContext?: IsabellaMilestoneContext;
   processSignals?: IsabellaProcessSignals;
+  processMiningContext?: IsabellaProcessMiningContext;
   limitations: string[];
   status: IsabellaContextStatus;
   /** User-safe message for missing_context / unauthorized / unavailable. */

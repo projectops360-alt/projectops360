@@ -2,15 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/events/ingestion", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/events/ingestion")>();
-  return { ...actual, emitProjectEvents: vi.fn() };
+  return { ...actual, emitProcessMiningEventsAtomic: vi.fn() };
 });
 
-import { emitProjectEvents, type EmitEventInput } from "@/lib/events/ingestion";
+import { emitProcessMiningEventsAtomic, type EmitEventInput } from "@/lib/events/ingestion";
 import { captureProcessMiningEvents } from "@/lib/events/process-mining-capture";
 
 const PROJECT = "22222222-2222-2222-2222-222222222222";
 const OTHER_PROJECT = "33333333-3333-3333-3333-333333333333";
-const mockedEmitProjectEvents = vi.mocked(emitProjectEvents);
+const mockedEmitProjectEvents = vi.mocked(emitProcessMiningEventsAtomic);
 
 function event(projectId = PROJECT, eventType = "TaskCreated"): EmitEventInput {
   return {

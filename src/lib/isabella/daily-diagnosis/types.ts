@@ -55,6 +55,11 @@ export interface DiagnosisMetrics {
   withoutMilestoneTasks?: number;
   withoutOwnerTasks?: number;
   milestonesTotal?: number;
+  processEventCount?: number;
+  processTransitionCount?: number;
+  delayFindingCount?: number;
+  reworkFindingCount?: number;
+  bottleneckFindingCount?: number;
 }
 
 export interface DiagnosisOverallHealth {

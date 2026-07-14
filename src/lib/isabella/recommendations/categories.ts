@@ -35,6 +35,7 @@ export const CATEGORY_PROFILE: Record<RecommendationCategory, CategoryProfile> =
   investigate_evidence_gap: { expectedImpact: "reduce_uncertainty", urgency: "this_week", effort: "low" },
   stabilize_milestone: { expectedImpact: "reduce_risk", urgency: "today", effort: "medium" },
   clarify_scope: { expectedImpact: "increase_clarity", urgency: "this_week", effort: "low" },
+  review_process_friction: { expectedImpact: "reduce_uncertainty", urgency: "today", effort: "low" },
   reduce_execution_uncertainty: { expectedImpact: "reduce_uncertainty", urgency: "this_week", effort: "low" },
 };
 
@@ -47,6 +48,7 @@ const CATEGORY_LABEL: Record<RecommendationCategory, { en: string; es: string }>
   investigate_evidence_gap: { en: "Investigate evidence gap", es: "Investigar gap de evidencia" },
   stabilize_milestone: { en: "Stabilize milestone", es: "Estabilizar hito" },
   clarify_scope: { en: "Clarify scope", es: "Aclarar alcance" },
+  review_process_friction: { en: "Review process friction", es: "Revisar friccion del proceso" },
   reduce_execution_uncertainty: { en: "Reduce execution uncertainty", es: "Reducir incertidumbre de ejecución" },
 };
 
@@ -81,6 +83,10 @@ export function mapFindingToRecommendationCategory(finding: RootCauseFinding): R
     case "stalled_progress":
       // A symptom with no evidenced cause → collect evidence, do not prescribe a fix.
       return "reduce_execution_uncertainty";
+    case "process_delay":
+    case "rework_signal":
+    case "bottleneck_signal":
+      return "review_process_friction";
     default:
       // sequencing_gap / decision_delay / approval_delay / external_dependency /
       // capacity_signal / evidence_gap → no fabricated action here.

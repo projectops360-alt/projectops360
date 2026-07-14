@@ -49,3 +49,21 @@ export function buildProcessSignals(
     packets,
   };
 }
+
+/** Merge MPF/PEG signals without treating every advanced finding as a blocker. */
+export function mergeProcessMiningSignals(
+  current: IsabellaProcessSignals | undefined,
+  mining: IsabellaProcessSignals,
+): IsabellaProcessSignals {
+  return {
+    blockedCount: current?.blockedCount ?? 0,
+    packets: current?.packets ?? [],
+    advancedFindingsAvailable: mining.advancedFindingsAvailable,
+    eventHistoryAvailable: mining.eventHistoryAvailable,
+    delayFindingCount: mining.delayFindingCount ?? 0,
+    reworkFindingCount: mining.reworkFindingCount ?? 0,
+    bottleneckFindingCount: mining.bottleneckFindingCount ?? 0,
+    transitionCount: mining.transitionCount ?? 0,
+    advancedPackets: mining.advancedPackets ?? [],
+  };
+}

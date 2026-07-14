@@ -36,7 +36,7 @@ vi.mock("@/lib/supabase/server", () => ({
     from(table: string) {
       const cfg = tables[table] ?? {};
       const chain: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "is", "order", "limit"]) {
+      for (const m of ["select", "eq", "is", "in", "order", "limit"]) {
         chain[m] = () => chain;
       }
       chain.single = () =>
@@ -119,7 +119,16 @@ describe("read-only engine consumption", () => {
             occurred_at: "2026-01-12T00:00:00.000Z", subject_type: "task", subject_id: "t1",
             from_state: null, to_state: "in_progress", event_lifecycle_class: "BUSINESS_EVENT",
             confidence: 0.95, is_compensating_event: false,
-            payload: { milestone_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+            payload: {},
+          },
+        ],
+      },
+      project_event_objects: {
+        rows: [
+          {
+            event_id: "e1",
+            object_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            role: "phase",
           },
         ],
       },

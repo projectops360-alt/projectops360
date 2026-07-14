@@ -16,6 +16,10 @@ describe("deterministic routing", () => {
     expect(routeIsabellaQuestion("Dame todas las tareas sin milestone", P).route).toBe("factual_project_data");
     expect(routeIsabellaQuestion("list all blocked tasks", P).route).toBe("factual_project_data");
   });
+  it("current Process Mining facts → process_mining_summary", () => {
+    expect(routeIsabellaQuestion("¿Cuántos eventos canónicos y casos tenemos?", P).route).toBe("process_mining_summary");
+    expect(routeIsabellaQuestion("Show the Process Mining integrity status", P).route).toBe("process_mining_summary");
+  });
   it("daily status / attention → daily_diagnosis", () => {
     expect(routeIsabellaQuestion("What is happening in this project today?", P).route).toBe("daily_diagnosis");
     expect(routeIsabellaQuestion("¿Qué necesita atención hoy?", P).route).toBe("daily_diagnosis");
@@ -47,6 +51,8 @@ describe("knowledge / how-it-works routing (never Daily Diagnosis)", () => {
       "what is the Execution Map?",
       "¿para qué sirve el workboard?",
       "explain the Living Graph",
+      "what is Process Mining?",
+      "how does Process Mining work?",
     ]) {
       const d = routeIsabellaQuestion(q, P);
       expect(d.route, q).toBe("product_help");
@@ -69,6 +75,7 @@ describe("knowledge / how-it-works routing (never Daily Diagnosis)", () => {
 describe("screen-context explanation priority", () => {
   const RES = { ...P, screenContext: { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" } };
   const TASK = { ...P, screenContext: { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" } };
+  const PROCESS = { ...P, screenContext: { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" } };
 
   it("A · Resources + 'member está unassigned' → screen_context_explanation (not daily_diagnosis)", () => {
     const d = routeIsabellaQuestion("explícame qué significa member está unassigned", RES);
@@ -88,6 +95,9 @@ describe("screen-context explanation priority", () => {
     const d = routeIsabellaQuestion("What does Unassigned mean?", { hasProject: true });
     expect(d.route).toBe("screen_context_explanation");
     expect(isEngineRoute(d.route)).toBe(false);
+  });
+  it("Process Mining screen explanations stay deterministic", () => {
+    expect(routeIsabellaQuestion("Explain this screen", PROCESS).route).toBe("screen_context_explanation");
   });
   it("UI question is never treated as an engine route", () => {
     expect(isEngineRoute("screen_context_explanation")).toBe(false);
@@ -133,5 +143,6 @@ describe("scope + clarification", () => {
     expect((["daily_diagnosis", "root_cause", "recommendation", "mixed"] as const).every(isEngineRoute)).toBe(true);
     expect(isEngineRoute("product_help")).toBe(false);
     expect(isEngineRoute("factual_project_data")).toBe(false);
+    expect(isEngineRoute("process_mining_summary")).toBe(false);
   });
 });
