@@ -1836,7 +1836,11 @@
       "knowledge": "Knowledge"
     },
     "canonicalKnowledge": {
-      "viewHint": "Canonical graph spec v{version}. Read-only projection; lifecycle and evidence remain owned by Knowledge Objects.",
+      "viewHint": "Canonical graph spec v{version}. Evidence links support findings; they are not process transitions or proof of causality.",
+      "summary": "{count} Knowledge Objects",
+      "selectHint": "Select one finding to reveal its grouped evidence.",
+      "focusedEvidence": "{count} evidence references shown in {groups} group(s).",
+      "clearFocus": "Back to summary",
       "status": {
         "empty": "No Knowledge Objects exist for this project yet.",
         "insufficient_evidence": "Some Knowledge Objects lack evidence for their current version. The available trace is shown honestly.",

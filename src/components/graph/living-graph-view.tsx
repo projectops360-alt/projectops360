@@ -166,6 +166,7 @@ import {
   type BetweenAnalysisResult,
 } from "@/lib/graph/between-analysis";
 import { scopeLivingGraphDataToProject } from "@/lib/graph/project-scoped-data";
+import { buildProgressiveKnowledgeGraph } from "@/lib/graph/knowledge-progressive-view";
 import { BetweenAnalysisPanel } from "./between-analysis-panel";
 import type {
   LivingFlowNode,
@@ -421,6 +422,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const [editingEntity, setEditingEntity] = useState<EditingEntity | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [knowledgeFocusId, setKnowledgeFocusId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [nodeTypeFilter, setNodeTypeFilter] = useState<Set<ProcessNodeType>>(
     new Set(ALL_NODE_TYPES),
@@ -666,6 +668,22 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // rfEdges memos short-circuit on `canonicalEventsActive` and otherwise
   // consume this `displayGraph`, so an empty displayGraph means no operational
   // nodes ever render under "events".
+  const progressiveKnowledgeGraph = useMemo(
+    () => buildProgressiveKnowledgeGraph(
+      projectScopedData.knowledgeGraphNodes ?? [],
+      projectScopedData.knowledgeGraphEdges ?? [],
+      knowledgeFocusId,
+      locale,
+    ),
+    [projectScopedData.knowledgeGraphNodes, projectScopedData.knowledgeGraphEdges, knowledgeFocusId, locale],
+  );
+
+  useEffect(() => {
+    if (viewLevel !== "knowledge") return;
+    const timeoutId = window.setTimeout(() => void fitView({ padding: 0.2, duration: 300 }), 100);
+    return () => window.clearTimeout(timeoutId);
+  }, [viewLevel, knowledgeFocusId, progressiveKnowledgeGraph.nodes.length, fitView]);
+
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
       return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges, milestoneCensus);
@@ -677,10 +695,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       if (knowledgeProjectionStatus !== "ready" && knowledgeProjectionStatus !== "insufficient_evidence") {
         return { nodes: [], edges: [] };
       }
-      return {
-        nodes: projectScopedData.knowledgeGraphNodes ?? [],
-        edges: projectScopedData.knowledgeGraphEdges ?? [],
-      };
+      return progressiveKnowledgeGraph;
     }
     const graph =
       viewLevel === "activities"
@@ -689,7 +704,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive, knowledgeProjectionStatus, projectScopedData.knowledgeGraphNodes, projectScopedData.knowledgeGraphEdges]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive, knowledgeProjectionStatus, progressiveKnowledgeGraph]);
 
   const canonicalFlow = useMemo(
     () =>
@@ -788,6 +803,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   );
 
   const filtered = useMemo(() => {
+    if (viewLevel === "knowledge") return { nodes: baseNodes, edges: baseEdges };
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTime = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null;
     const nodes = baseNodes.filter((n) => {
@@ -918,6 +934,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   }, [isMilestoneFocusMode, focusRootNode, milestoneFocus, withSubtasks.nodes, projectId]);
 
   const layoutPositions = useMemo(() => {
+    if (viewLevel === "knowledge") return progressiveKnowledgeGraph.positions;
     if (viewLevel === "milestones") {
       return milestoneFlowLayout(withSubtasks.nodes); // serpentine roadmap, layoutMode ignored
     }
@@ -931,7 +948,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       });
     }
     return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
-  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode]);
+  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode, progressiveKnowledgeGraph.positions]);
 
   // User drags win over the computed layout. In milestone focus mode the manual
   // positions come from a PER-MILESTONE saved layout (scoped by the focus layout
@@ -941,13 +958,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     // Canonical-events view uses its own deterministic layout (project sequence
     // order); saved/manual arrangements belong to the operational contexts.
     if (canonicalAuditActive && canonicalFlow) return canonicalFlow.positions;
+    if (viewLevel === "knowledge") return progressiveKnowledgeGraph.positions;
     if (manualPositions.size === 0) return layoutPositions;
     const merged = new Map(layoutPositions);
     for (const [id, pos] of manualPositions) {
       if (merged.has(id)) merged.set(id, pos);
     }
     return merged;
-  }, [canonicalAuditActive, canonicalFlow, layoutPositions, manualPositions]);
+  }, [canonicalAuditActive, canonicalFlow, viewLevel, progressiveKnowledgeGraph.positions, layoutPositions, manualPositions]);
 
   // ── UX-007 — Saved Layouts ──────────────────────────────────────────────────
   // The context a saved arrangement is scoped to (level + layout mode). Switching
@@ -1192,7 +1210,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   );
 
   // Hierarchical flows top→bottom (Celonis style); timeline/force flow left→right
-  const flowVertical = layoutMode === "hierarchical";
+  const flowVertical = layoutMode === "hierarchical" || viewLevel === "knowledge";
   const isMilestoneLevel = viewLevel === "milestones";
 
   const rfNodes = useMemo<LivingFlowNode[]>(() => {
@@ -1223,12 +1241,11 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     const total = withSubtasks.nodes.length;
     return withSubtasks.nodes.map((node, index) => {
       const metrics = analysis.metrics.get(node.id) ?? null;
-      const emphasis: OverlayEmphasis = nodeOverlayEmphasis(
-        overlay,
-        node,
-        metrics ?? undefined,
-        analysis,
-      );
+      const emphasis: OverlayEmphasis = viewLevel === "knowledge"
+        ? knowledgeFocusId && node.nodeType === "knowledge_object" && node.id !== knowledgeFocusId
+          ? "dimmed"
+          : "normal"
+        : nodeOverlayEmphasis(overlay, node, metrics ?? undefined, analysis);
       const clusterSize =
         typeof node.metadata.clusterSize === "number" ? node.metadata.clusterSize : 1;
       // Milestone cards follow the serpentine flow; other levels follow layout direction
@@ -1239,16 +1256,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         position: positions.get(node.id) ?? { x: 0, y: 0 },
         width: isMilestoneLevel ? MILESTONE_NODE_WIDTH : NODE_WIDTH,
         height: isMilestoneLevel ? MILESTONE_NODE_HEIGHT : NODE_HEIGHT,
-        sourcePosition: snakeSides
-          ? SIDE_TO_POSITION[snakeSides.source]
-          : flowVertical
-            ? Position.Bottom
-            : Position.Right,
-        targetPosition: snakeSides
-          ? SIDE_TO_POSITION[snakeSides.target]
-          : flowVertical
-            ? Position.Top
-            : Position.Left,
+        sourcePosition: viewLevel === "knowledge"
+          ? Position.Bottom
+          : snakeSides
+            ? SIDE_TO_POSITION[snakeSides.source]
+            : flowVertical
+              ? Position.Bottom
+              : Position.Right,
+        targetPosition: viewLevel === "knowledge"
+          ? Position.Top
+          : snakeSides
+            ? SIDE_TO_POSITION[snakeSides.target]
+            : flowVertical
+              ? Position.Top
+              : Position.Left,
         selected: node.id === selectedNodeId,
         data: {
           node,
@@ -1309,6 +1330,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     betweenStartNodeId,
     betweenEndNodeId,
     betweenPathNodeIds,
+    knowledgeFocusId,
   ]);
 
   // Drill-down: show only the picked milestones' activities. Flow the tasks
@@ -1643,6 +1665,12 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const onNodeClick = useCallback<NodeMouseHandler<LivingFlowNode>>(
     (_event, node) => {
+      if (viewLevel === "knowledge") {
+        if (node.data.node.nodeType === "knowledge_object") setKnowledgeFocusId(node.id);
+        setSelectedNodeId(node.id);
+        setSelectedEdgeId(null);
+        return;
+      }
       if ((node.type as string) === "processActivity") {
         setSelectedNodeId(node.id);
         setSelectedEdgeId(null);
@@ -1703,15 +1731,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const onEdgeClick = useCallback<EdgeMouseHandler<LivingFlowEdge>>(
     (_event, edge) => {
+      if (viewLevel === "knowledge") return;
       setSelectedNodeId(null);
       setSelectedEdgeId(edge.id);
     },
-    [],
+    [viewLevel],
   );
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    setKnowledgeFocusId(null);
   }, []);
 
   // Free repositioning: drag position changes become manual layout overrides
@@ -2046,6 +2076,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         viewLevel={viewLevel}
         onViewLevelChange={(level) => {
           setViewLevel(level);
+          setKnowledgeFocusId(null);
           setMilestonePicks([]);
           setMilestoneFocus(null);
           // The layout-key effect loads this level's saved arrangement (or auto).
@@ -2439,7 +2470,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* UX-007 — Saved Layouts: compact floating controls (works in normal,
             fullscreen and Focus Mode). Save node positions + reset/clear. */}
-        {viewLevel !== "events" && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && (
           <LivingGraphLayoutControls
             locale={locale}
             hasUnsaved={hasUnsavedLayout}
@@ -2453,7 +2484,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         )}
 
         {/* Transient confirmation (acts as the "Layout saved" toast). */}
-        {viewLevel !== "events" && layoutNotice && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && layoutNotice && (
           <div
             role="status"
             className={
@@ -2476,7 +2507,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         )}
 
         {/* TASK 7 — graph changed since the save: positions partially applied. */}
-        {viewLevel !== "events" && layoutPartiallyApplied && !layoutNotice && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && layoutPartiallyApplied && !layoutNotice && (
           <div
             role="status"
             className="absolute left-1/2 top-14 z-20 -translate-x-1/2 max-w-[min(92%,30rem)] rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-center text-[11px] text-amber-700 dark:text-amber-400"
@@ -2489,7 +2520,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* Sprint #3 — overlay clarity: what am I looking at, why are nodes here,
             what to do next + empty/incomplete state, for the advanced overlays. */}
-        {viewLevel !== "events" && ADVANCED_OVERLAYS.includes(overlay) && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && ADVANCED_OVERLAYS.includes(overlay) && (
           <OverlayInfo
             key={overlay}
             overlay={overlay}
@@ -2503,7 +2534,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* Floating Insights (executive KPIs + summary) — hidden while a node
             detail panel occupies the right side. Graph keeps full height. */}
-        {viewLevel !== "events" && !showPanel && !insightsOpen && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && !showPanel && !insightsOpen && (
           <button
             type="button"
             onClick={() => setInsightsOpen(true)}
@@ -2522,7 +2553,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             </span>
           </button>
         )}
-        {viewLevel !== "events" && !showPanel && insightsOpen && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && !showPanel && insightsOpen && (
           <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
             <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2686,9 +2717,37 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           </div>
         )}
         {viewLevel === "knowledge" && knowledgeProjectionStatus === "ready" && (
-          <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
-            {t("canonicalKnowledge.viewHint", { version: data.canonicalGraphSpecVersion ?? "—" })}
-          </p>
+          <>
+            <div className="absolute left-14 right-3 top-3 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-card/95 px-3 py-2 text-[11px] shadow-sm backdrop-blur">
+              <span className="font-semibold text-foreground">
+                {t("canonicalKnowledge.summary", { count: progressiveKnowledgeGraph.knowledgeCount })}
+              </span>
+              <span className="text-muted-foreground">
+                {knowledgeFocusId
+                  ? t("canonicalKnowledge.focusedEvidence", {
+                      count: progressiveKnowledgeGraph.evidenceCount,
+                      groups: progressiveKnowledgeGraph.evidenceGroupCount,
+                    })
+                  : t("canonicalKnowledge.selectHint")}
+              </span>
+              {knowledgeFocusId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKnowledgeFocusId(null);
+                    setSelectedNodeId(null);
+                    setSelectedEdgeId(null);
+                  }}
+                  className="ml-auto rounded-md border border-border px-2 py-1 font-medium text-foreground hover:bg-muted"
+                >
+                  {t("canonicalKnowledge.clearFocus")}
+                </button>
+              )}
+            </div>
+            <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+              {t("canonicalKnowledge.viewHint", { version: data.canonicalGraphSpecVersion ?? "—" })}
+            </p>
+          </>
         )}
         {caseExplorerActive ? (
           <div className="min-h-0 min-w-0 flex-1">
@@ -2799,7 +2858,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
                 fitView
                 minZoom={0.1}
                 maxZoom={2}
-                nodesDraggable={!processExplorerActive}
+                nodesDraggable={!processExplorerActive && viewLevel !== "knowledge"}
                 nodesConnectable={false}
                 edgesFocusable
                 proOptions={{ hideAttribution: true }}

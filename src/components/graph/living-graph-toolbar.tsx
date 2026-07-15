@@ -105,6 +105,7 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
   const [searchInput, setSearchInput] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { onSearchChange } = props;
+  const knowledgeView = props.viewLevel === "knowledge";
 
   // Debounced search propagation
   useEffect(() => {
@@ -166,7 +167,7 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
         </label>
 
         {/* Overlay selector */}
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {!knowledgeView && <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="hidden lg:inline">{t("overlays.label")}</span>
           <select
             value={props.overlay}
@@ -180,10 +181,10 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
               </option>
             ))}
           </select>
-        </label>
+        </label>}
 
         {/* Layout selector */}
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {!knowledgeView && <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="hidden lg:inline">{t("layoutModes.label")}</span>
           <select
             value={props.layoutMode}
@@ -197,10 +198,10 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
               </option>
             ))}
           </select>
-        </label>
+        </label>}
 
         {/* Toggles */}
-        <button
+        {!knowledgeView && <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
           aria-expanded={showFilters}
@@ -222,8 +223,8 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
               {props.activeFilterCount}
             </span>
           )}
-        </button>
-        {props.viewLevel !== "milestones" && (
+        </button>}
+        {props.viewLevel !== "milestones" && !knowledgeView && (
           <button
             type="button"
             onClick={props.onToggleSimplifyEdges}
@@ -288,18 +289,18 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
         </button>
 
         {/* Summary */}
-        <span className="ml-auto hidden text-[11px] text-muted-foreground md:inline">
+        {!knowledgeView && <span className="ml-auto hidden text-[11px] text-muted-foreground md:inline">
           {t("summary", {
             nodes: props.summary.nodeCount,
             edges: props.summary.edgeCount,
             blocked: props.summary.blockedCount,
             waiting: props.summary.waitingCount,
           })}
-        </span>
+        </span>}
       </div>
 
       {/* Large graph warning */}
-      {props.largeGraphWarning && (
+      {props.largeGraphWarning && !knowledgeView && (
         <p
           role="status"
           className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400"
@@ -309,7 +310,7 @@ function LivingGraphToolbarComponent(props: LivingGraphToolbarProps) {
       )}
 
       {/* Expanded filters */}
-      {showFilters && (
+      {showFilters && !knowledgeView && (
         <div className="space-y-3 rounded-md border border-border bg-card p-3">
           {/* Node types */}
           <fieldset>
