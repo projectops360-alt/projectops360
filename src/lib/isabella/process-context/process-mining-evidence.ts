@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { validateEventIntegrity } from "@/lib/events/event-integrity";
 import {
+  adaptCanonicalEventsForDiscovery,
+  discoverProcess,
+} from "@/lib/process-mining/discovery";
+import {
   loadCanonicalEventProjection,
   type CanonicalEventLoadResult,
 } from "@/lib/graph/event-relationship-loader";
@@ -252,6 +256,10 @@ export function buildProcessMiningEvidence(
   const es = scope.locale === "es";
   const events = eventLoad.status === "ok" ? eventLoad.canonicalEvents : [];
   const miningEvents = events.filter((event) => MINING_CATEGORIES.has(event.eventCategory));
+  const discoveryInput = adaptCanonicalEventsForDiscovery(miningEvents);
+  const discovery = discoveryInput.events.length > 0
+    ? discoverProcess(discoveryInput.events, scope.organizationId, scope.projectId)
+    : null;
   // Validate the complete canonical window. Filtering to mining categories
   // first would report a false broken chain whenever another event category is
   // legitimately interleaved between two task/milestone events.
@@ -329,6 +337,10 @@ export function buildProcessMiningEvidence(
     milestoneEventCount: events.filter((event) => event.eventCategory === "milestone").length,
     dependencyEventCount: events.filter((event) => event.eventCategory === "dependency").length,
     transitionCount: observability?.transitionCount ?? 0,
+    directFollowCount: discovery?.directFollow.length ?? 0,
+    variantCount: discovery?.variants.length ?? 0,
+    temporallyMeasuredCaseCount: discovery?.temporalMetrics.filter((item) => item.cycleTimeMs !== null).length ?? 0,
+    unknownActivityCount: discovery?.quality.unknownActivities ?? 0,
     delayFindingCount: observability?.delayFindingCount ?? 0,
     blockerFindingCount: observability?.blockerFindingCount ?? 0,
     reworkFindingCount: observability?.reworkFindingCount ?? 0,
