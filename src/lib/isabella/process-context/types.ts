@@ -132,6 +132,10 @@ export interface IsabellaProcessMiningContext {
   milestoneEventCount: number;
   dependencyEventCount: number;
   transitionCount: number;
+  directFollowCount?: number;
+  variantCount?: number;
+  temporallyMeasuredCaseCount?: number;
+  unknownActivityCount?: number;
   delayFindingCount: number;
   blockerFindingCount: number;
   reworkFindingCount: number;
