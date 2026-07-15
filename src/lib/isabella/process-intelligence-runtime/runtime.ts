@@ -16,6 +16,11 @@ import { assembleDailyDiagnosis, formatDailyDiagnosisForIsabella } from "@/lib/i
 import { assembleRootCauseAnalysis, formatRootCauseAnalysisForIsabella } from "@/lib/isabella/root-cause";
 import { assembleRecommendationPlan, formatRecommendationPlanForIsabella } from "@/lib/isabella/recommendations";
 import { answerScreenHelp } from "@/lib/isabella/screen-help";
+import {
+  buildIsabellaReasoningTrace,
+  governRecommendationPlan,
+  governRootCauseAnalysis,
+} from "@/lib/isabella/reasoning-pipeline";
 import { routeIsabellaQuestion } from "./router";
 import type {
   IsabellaProcessIntelligenceAudit,
@@ -154,33 +159,41 @@ function synthesize(
   const diagnosis = assembleDailyDiagnosis(context, language);
 
   if (route === "daily_diagnosis") {
+    const reasoningTrace = buildIsabellaReasoningTrace(context, route, { diagnosis });
     return {
       status: "answered", route,
       answer: formatDailyDiagnosisForIsabella(diagnosis, language),
       structuredResult: diagnosis,
       evidenceRefs: diagnosis.evidenceRefs, citations: diagnosis.citations, limitations: diagnosis.limitations,
+      reasoningTrace,
       audit: audit({ enginesUsed: ["daily_diagnosis"], resultStatus: diagnosis.status, confidence: diagnosis.overallHealth.confidence, evidenceRefCount: diagnosis.evidenceRefs.length, citationCount: diagnosis.citations.length, limitationsCount: diagnosis.limitations.length, executionMs: Date.now() - started }),
     };
   }
 
-  const analysis = assembleRootCauseAnalysis(context, diagnosis, scope, language);
+  const rawAnalysis = assembleRootCauseAnalysis(context, diagnosis, scope, language);
+  const analysisTrace = buildIsabellaReasoningTrace(context, "root_cause", { diagnosis, analysis: rawAnalysis });
+  const analysis = governRootCauseAnalysis(rawAnalysis, analysisTrace, language);
   if (route === "root_cause") {
     return {
       status: "answered", route,
       answer: formatRootCauseAnalysisForIsabella(analysis, language),
       structuredResult: analysis,
       evidenceRefs: analysis.evidenceRefs, citations: analysis.citations, limitations: analysis.limitations,
+      reasoningTrace: analysisTrace,
       audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause"], resultStatus: analysis.status, confidence: analysis.confidence, evidenceRefCount: analysis.evidenceRefs.length, citationCount: analysis.citations.length, limitationsCount: analysis.limitations.length, executionMs: Date.now() - started }),
     };
   }
 
-  const plan = assembleRecommendationPlan(context, analysis, diagnosis, language);
+  const rawPlan = assembleRecommendationPlan(context, analysis, diagnosis, language);
+  const planTrace = buildIsabellaReasoningTrace(context, route, { diagnosis, analysis, plan: rawPlan });
+  const plan = governRecommendationPlan(rawPlan, planTrace, language);
   if (route === "recommendation") {
     return {
       status: "answered", route,
       answer: formatRecommendationPlanForIsabella(plan, language),
       structuredResult: plan,
       evidenceRefs: plan.evidenceRefs, citations: plan.citations, limitations: plan.limitations,
+      reasoningTrace: planTrace,
       audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: plan.recommendations[0]?.confidence ?? "unavailable", evidenceRefCount: plan.evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
     };
   }
@@ -203,6 +216,7 @@ function synthesize(
     answer,
     structuredResult: { diagnosis, analysis, plan },
     evidenceRefs, citations: plan.citations, limitations: plan.limitations,
+    reasoningTrace: planTrace,
     audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: analysis.confidence, evidenceRefCount: evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
   };
 }
@@ -248,11 +262,14 @@ function synthesizeProcessMiningSummary(
   const window = mining.firstOccurredAt && mining.lastOccurredAt
     ? `${mining.firstOccurredAt} → ${mining.lastOccurredAt}`
     : (es ? "sin eventos observados" : "no observed events");
+  const reasoningTrace = buildIsabellaReasoningTrace(context, "process_mining_summary", {});
   const answer = es
     ? [
         "**Process Mining Layer — resumen verificado**",
         `- Eventos canónicos minables: **${mining.eventCount}** (tareas ${mining.taskEventCount}, hitos ${mining.milestoneEventCount}, dependencias ${mining.dependencyEventCount}).`,
         `- Casos: **${mining.caseCount}**. Transiciones observadas: **${mining.transitionCount}**.`,
+        `- Descubrimiento: **${mining.directFollowCount ?? 0}** relaciones direct-follow, **${mining.variantCount ?? 0}** variantes y **${mining.temporallyMeasuredCaseCount ?? 0}** casos con tiempo de ciclo medible.`,
+        `- Actividades fuera de la taxonomía conocida: **${mining.unknownActivityCount ?? 0}**.`,
         `- Integridad de la ventana canónica: **${integrity}**.`,
         `- Hallazgos derivados: retrasos ${mining.delayFindingCount}, bloqueos ${mining.blockerFindingCount}, retrabajo ${mining.reworkFindingCount}, cuellos de botella ${mining.bottleneckFindingCount}.`,
         `- Ventana observada: ${window}.`,
@@ -262,6 +279,8 @@ function synthesizeProcessMiningSummary(
         "**Process Mining Layer — verified summary**",
         `- Mineable canonical events: **${mining.eventCount}** (tasks ${mining.taskEventCount}, milestones ${mining.milestoneEventCount}, dependencies ${mining.dependencyEventCount}).`,
         `- Cases: **${mining.caseCount}**. Observed transitions: **${mining.transitionCount}**.`,
+        `- Discovery: **${mining.directFollowCount ?? 0}** direct-follow relations, **${mining.variantCount ?? 0}** variants and **${mining.temporallyMeasuredCaseCount ?? 0}** cases with measurable cycle time.`,
+        `- Activities outside the known taxonomy: **${mining.unknownActivityCount ?? 0}**.`,
         `- Canonical-window integrity: **${integrity}**.`,
         `- Derived findings: delays ${mining.delayFindingCount}, blockers ${mining.blockerFindingCount}, rework ${mining.reworkFindingCount}, bottlenecks ${mining.bottleneckFindingCount}.`,
         `- Observed window: ${window}.`,
@@ -276,6 +295,7 @@ function synthesizeProcessMiningSummary(
     evidenceRefs: processRefs,
     citations,
     limitations: context.limitations,
+    reasoningTrace,
     audit: audit({
       enginesUsed: ["process_mining_summary"],
       resultStatus: mining.status,
