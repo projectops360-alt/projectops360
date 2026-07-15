@@ -208,6 +208,10 @@ function LivingGraphDetailPanelComponent({
     );
   }
 
+  if (selectedNode?.metadata.canonicalGraph === true) {
+    return <KnowledgeNodeDetail node={selectedNode} isEs={isEs} onClose={onClose} />;
+  }
+
   return (
     <aside
       aria-label={t("detailPanel.title")}
@@ -990,6 +994,106 @@ function LaborRiskDetailBlock({ laborRisk: lr }: { laborRisk: LaborRiskNodeData 
         </p>
       )}
     </div>
+  );
+}
+
+function KnowledgeNodeDetail({
+  node,
+  isEs,
+  onClose,
+}: {
+  node: LivingGraphNode;
+  isEs: boolean;
+  onClose: () => void;
+}) {
+  const evidenceRefs = Array.isArray(node.metadata.evidenceRefs)
+    ? node.metadata.evidenceRefs.filter((ref): ref is string => typeof ref === "string")
+    : [];
+  const aggregate = node.metadata.aggregateEvidence === true;
+  const provenance = node.metadata.provenance && typeof node.metadata.provenance === "object"
+    ? node.metadata.provenance as Record<string, unknown>
+    : null;
+
+  return (
+    <aside className="flex h-full w-[340px] max-w-[88vw] flex-col overflow-y-auto border-l border-border bg-card shadow-xl">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+        <div>
+          <p className="text-xs font-semibold text-foreground">
+            {aggregate
+              ? isEs ? "Evidencia agrupada" : "Grouped evidence"
+              : isEs ? "Hallazgo de conocimiento" : "Knowledge finding"}
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            {isEs ? "Proyección canónica de solo lectura" : "Read-only canonical projection"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={isEs ? "Cerrar" : "Close"}
+          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="space-y-4 p-3">
+        <div>
+          <p className="text-sm font-semibold leading-tight text-foreground">{node.label}</p>
+          {node.description && <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{node.description}</p>}
+        </div>
+
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2.5 text-[11px] leading-relaxed text-foreground">
+          {aggregate
+            ? isEs
+              ? "Estas referencias respaldan el hallazgo seleccionado. No indican una transición entre tareas ni demuestran causalidad."
+              : "These references support the selected finding. They do not indicate a task transition or prove causality."
+            : isEs
+              ? "Este nodo resume una conclusión derivada del historial canónico. Seleccionarlo revela únicamente la evidencia que lo respalda."
+              : "This node summarizes a conclusion derived from canonical history. Selecting it reveals only the evidence that supports it."}
+        </div>
+
+        <dl className="divide-y divide-border/60 rounded-md border border-border px-2.5 py-1">
+          <Field label={isEs ? "Tipo" : "Type"}>
+            {aggregate
+              ? String(node.metadata.evidenceType ?? "evidence")
+              : String(node.metadata.knowledgeType ?? "knowledge object")}
+          </Field>
+          {!aggregate && (
+            <Field label={isEs ? "Lifecycle" : "Lifecycle"}>
+              {node.status?.replaceAll("_", " ") ?? "—"}
+            </Field>
+          )}
+          <Field label={isEs ? "Confianza" : "Confidence"}>
+            {String(node.metadata.confidence ?? "—")}
+          </Field>
+          <Field label={isEs ? "Evidencias" : "Evidence references"}>
+            {evidenceRefs.length}
+          </Field>
+          {aggregate && (
+            <Field label={isEs ? "Relación" : "Relationship"}>
+              {String(node.metadata.evidenceRole ?? "supports")}
+            </Field>
+          )}
+          {!aggregate && (
+            <Field label={isEs ? "Versión" : "Version"}>
+              {String(node.metadata.versionNo ?? "—")}
+            </Field>
+          )}
+          {provenance && (
+            <Field label={isEs ? "Origen" : "Source"}>
+              {String(provenance.sourceKind ?? provenance.engineName ?? "—")}
+            </Field>
+          )}
+        </dl>
+
+        <p className="rounded-md border border-border bg-muted/30 px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
+          {isEs
+            ? "Para leer el flujo real entre actividades, cambia al nivel Eventos y abre la vista Proceso. Knowledge responde qué aprendimos; Proceso responde qué ocurrió después de qué."
+            : "To read the actual activity flow, switch to Events and open Process view. Knowledge answers what was learned; Process answers what happened after what."}
+        </p>
+      </div>
+    </aside>
   );
 }
 

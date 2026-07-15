@@ -1836,7 +1836,11 @@
       "knowledge": "Conocimiento"
     },
     "canonicalKnowledge": {
-      "viewHint": "Especificación canónica del grafo v{version}. Proyección de solo lectura; el ciclo y la evidencia pertenecen a Knowledge Objects.",
+      "viewHint": "Especificación canónica del grafo v{version}. Los vínculos respaldan hallazgos; no son transiciones del proceso ni prueba de causalidad.",
+      "summary": "{count} objetos de conocimiento",
+      "selectHint": "Selecciona un hallazgo para revelar su evidencia agrupada.",
+      "focusedEvidence": "{count} evidencias mostradas en {groups} grupo(s).",
+      "clearFocus": "Volver al resumen",
       "status": {
         "empty": "Este proyecto todavía no tiene Knowledge Objects.",
         "insufficient_evidence": "Algunos Knowledge Objects no tienen evidencia para su versión actual. La traza disponible se muestra sin inventar datos.",

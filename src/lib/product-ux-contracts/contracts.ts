@@ -193,9 +193,24 @@ export const UX_013_WORKBOARD_RESPONSIVE: ProductUxContract = {
   ],
 };
 
+export const UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE: ProductUxContract = {
+  id: "UX-015",
+  title: "Knowledge Graph Uses Progressive Evidence Disclosure",
+  status: "APPROVED",
+  rules: [
+    "The default Knowledge view shows Knowledge Objects only; it never dumps every evidence node and edge at once.",
+    "Selecting one Knowledge Object reveals only that object's evidence, grouped by evidence type and relationship role.",
+    "Evidence links are labeled as support/context/contradiction and must never read as process transitions or proof of causality.",
+    "Operational overlays, layout controls, filters, simulation metrics, and path actions are hidden in the Knowledge view.",
+    "The Knowledge detail panel explains lifecycle, confidence, provenance, evidence count, and the boundary between Knowledge and Process views.",
+    "Progressive presentation is read-only and must not mutate the canonical projection, lifecycle, evidence, or process graph.",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
   UX_012_LANGUAGE_CONSISTENCY,
   UX_013_WORKBOARD_RESPONSIVE,
   UX_014_TASK_EDITOR_AI_PROMPT,
+  UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE,
 ];

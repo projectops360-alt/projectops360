@@ -257,3 +257,30 @@ collapse/resize/visibility were already present. Protected by
 
 **The regression to never reintroduce:** a Workboard where the full workflow can only be reached by
 zooming the browser out, or a compact mode that no longer narrows columns.
+
+---
+
+## UX-015 — Knowledge Graph Uses Progressive Evidence Disclosure
+
+**Status:** APPROVED.
+
+**Principle:** Knowledge answers **what the project learned** and what evidence supports it. It must
+not resemble a task-flow diagram or expose the full evidence mesh by default.
+
+**Contract (binding):**
+- The initial Knowledge view shows only Knowledge Objects in a stable reading order.
+- Selecting one object reveals only its evidence, grouped by evidence type and relationship role.
+- Evidence links mean supports, contradicts, or contextualizes; they are not task transitions and do
+  not prove causality.
+- Operational overlays, layout controls, filters, simulations, health scores, path actions, and manual
+  dragging stay out of Knowledge.
+- The detail panel explains lifecycle, confidence, provenance, evidence count, and when to switch to
+  Process/Events for direct-follow flow.
+- The presentation is read-only and never changes the canonical graph, evidence, or lifecycle.
+
+**Implementation:** `src/lib/graph/knowledge-progressive-view.ts`, consumed by
+`src/components/graph/living-graph-view.tsx`; protected by
+`src/lib/graph/__tests__/knowledge-progressive-view.test.ts`.
+
+**The regression to never reintroduce:** rendering every evidence node and relationship at once so
+the Knowledge view becomes an unreadable evidence spaghetti graph.

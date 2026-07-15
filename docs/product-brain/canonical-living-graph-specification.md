@@ -28,6 +28,11 @@ The Knowledge view reads `project_knowledge_object_current` and the evidence rec
 
 Knowledge and evidence nodes use deterministic identifiers. Supporting, contradictory, contextual and derived relationships are projected without persistence in `process_nodes` or `process_edges`. Source evidence can navigate to the canonical event audit or the applicable project area.
 
+The user-facing Knowledge view applies progressive disclosure over that complete canonical projection.
+It initially renders only Knowledge Objects. Selecting one object reveals only its evidence, grouped
+by evidence type and relationship role. Grouping is presentation-only: it does not change, delete, or
+merge canonical evidence. Evidence associations never render as process transitions or causal claims.
+
 ## Validation
 
 `validateCanonicalGraph` rejects cross-tenant or cross-project entities, duplicate or unstable identifiers, unknown families, dangling endpoints, invalid source-target pairs, incorrect relationship classes, missing evidence and missing required provenance. Invalid projections render an honest unavailable state and never fall back to operational nodes.
