@@ -1832,7 +1832,17 @@
       "label": "Level",
       "milestones": "Milestones",
       "activities": "Activities",
-      "events": "Events"
+      "events": "Events",
+      "knowledge": "Knowledge"
+    },
+    "canonicalKnowledge": {
+      "viewHint": "Canonical graph spec v{version}. Read-only projection; lifecycle and evidence remain owned by Knowledge Objects.",
+      "status": {
+        "empty": "No Knowledge Objects exist for this project yet.",
+        "insufficient_evidence": "Some Knowledge Objects lack evidence for their current version. The available trace is shown honestly.",
+        "invalid": "The Knowledge projection failed canonical graph validation and was not rendered.",
+        "error": "The Knowledge projection could not be loaded. Operational graph views remain unchanged."
+      }
     },
     "canonicalEvents": {
       "viewTitle": "Events (canonical)",
@@ -2008,7 +2018,9 @@
       "permit_event": "Permit",
       "critical_path_event": "Critical Path",
       "import_event": "Imported File",
-      "subtask_item": "Subtask"
+      "subtask_item": "Subtask",
+      "knowledge_object": "Knowledge Object",
+      "evidence_reference": "Evidence reference"
     },
     "edgeTypes": {
       "caused": "Caused",
@@ -2031,7 +2043,10 @@
       "supplied_by": "Supplied by",
       "contains": "Contains",
       "imported_from": "Imported from file",
-      "subtask_of": "Subtask of"
+      "subtask_of": "Subtask of",
+      "supported_by": "Supported by",
+      "contradicted_by": "Contradicted by",
+      "derived_from": "Derived from"
     },
     "edgeMeanings": {
       "caused": "This activity directly triggered the next one — a causal dependency in the execution flow.",

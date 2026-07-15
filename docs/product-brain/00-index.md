@@ -69,6 +69,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [31-dr-isabella-product-intelligence.md](31-dr-isabella-product-intelligence.md) | **Dr. Isabella** — Product Intelligence Expert: Product-Brain grounding, knowledge hierarchy, authority order, sources & verification |
 | [32-product-ux-contracts.md](32-product-ux-contracts.md) | **Product UX Contracts** — approved, test-protected UX behaviors (UX-001 Isabella Welcome Hero Lifecycle) |
 | [project-knowledge-objects.md](project-knowledge-objects.md) | **Project Knowledge Objects** — project-scoped types, evidence, versioning, lifecycle, access boundary, and MPF proposal promotion |
+| [canonical-living-graph-specification.md](canonical-living-graph-specification.md) | **Canonical Living Graph Specification** — six layers, semantic classes, allowed connections, Knowledge projection and validation |
 | [regression-test-map.md](regression-test-map.md) | **Regression → Test Map** — each protected REG-###/UX contract ↔ the test that fails if it returns (executable governance) |
 
 | [isabella-process-mining-layer-training.md](isabella-process-mining-layer-training.md) | **Isabella × Process Mining** — governed three-source training contract: deterministic project/event data, vectorized Product Brain, and screen/program context |

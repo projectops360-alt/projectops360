@@ -549,6 +549,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // fallback. The canonical flow is a READ-ONLY projection — it never feeds the
   // operational analysis (critical path / bottleneck / cycles …).
   const projectionStatus = data.canonicalEventProjectionStatus;
+  const knowledgeProjectionStatus = data.knowledgeGraphProjectionStatus;
   const canonicalEvents = useMemo(
     () => projectScopedData.canonicalEvents ?? [],
     [projectScopedData.canonicalEvents],
@@ -644,6 +645,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return () => window.clearTimeout(timeoutId);
   }, [tasks, setViewLevel, setEventExperience]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const eventId = new URLSearchParams(window.location.search).get("event");
+    if (!eventId || !canonicalEvents.some((event) => event.eventId === eventId)) return;
+    const timeoutId = window.setTimeout(() => {
+      setViewLevel("events");
+      setEventExperience("audit");
+      setSelectedNodeId(canonicalEventNodeId(eventId));
+      setSelectedEdgeId(null);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [canonicalEvents, setViewLevel, setEventExperience]);
+
   // ── Derived graph (aggregate → prune → analysis → filter → layout) ──
   // Part B — the "events" view level NEVER falls back to operational
   // process_nodes/process_edges. When the canonical-event projection is not
@@ -659,6 +673,15 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (viewLevel === "events" && !canonicalEventsActive) {
       return { nodes: [], edges: [] };
     }
+    if (viewLevel === "knowledge") {
+      if (knowledgeProjectionStatus !== "ready" && knowledgeProjectionStatus !== "insufficient_evidence") {
+        return { nodes: [], edges: [] };
+      }
+      return {
+        nodes: projectScopedData.knowledgeGraphNodes ?? [],
+        edges: projectScopedData.knowledgeGraphEdges ?? [],
+      };
+    }
     const graph =
       viewLevel === "activities"
         ? clusterByEntity(laborEnrichedData.nodes, laborEnrichedData.edges)
@@ -666,7 +689,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive, knowledgeProjectionStatus, projectScopedData.knowledgeGraphNodes, projectScopedData.knowledgeGraphEdges]);
 
   const canonicalFlow = useMemo(
     () =>
@@ -2024,6 +2047,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         onViewLevelChange={(level) => {
           setViewLevel(level);
           setMilestonePicks([]);
+          setMilestoneFocus(null);
           // The layout-key effect loads this level's saved arrangement (or auto).
           setSelectedNodeId(null);
           setSelectedEdgeId(null);
@@ -2650,6 +2674,20 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {canonicalAuditActive && canonicalEvents.length > 0 && (
           <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
             {t("canonicalEvents.viewTitle")} — {t("canonicalEvents.viewHint")}
+          </p>
+        )}
+        {viewLevel === "knowledge" && knowledgeProjectionStatus !== "ready" && (
+          <div
+            role="status"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-amber-500/40 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-amber-700 shadow-sm backdrop-blur dark:text-amber-300"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {t(`canonicalKnowledge.status.${knowledgeProjectionStatus ?? "error"}`)}
+          </div>
+        )}
+        {viewLevel === "knowledge" && knowledgeProjectionStatus === "ready" && (
+          <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+            {t("canonicalKnowledge.viewHint", { version: data.canonicalGraphSpecVersion ?? "—" })}
           </p>
         )}
         {caseExplorerActive ? (

@@ -250,6 +250,22 @@ function LivingGraphDetailPanelComponent({
             <Field label={t("detailPanel.sourceEntityId")}>
               <span className="break-all font-mono text-[10px]">{selectedNode.sourceEntityId}</span>
             </Field>
+            {selectedNode.metadata.canonicalGraph === true && (
+              <>
+                <Field label={isEs ? "Capa canónica" : "Canonical layer"}>
+                  {String(selectedNode.metadata.layer ?? "—")}
+                </Field>
+                <Field label={isEs ? "Familia" : "Family"}>
+                  {String(selectedNode.metadata.family ?? "—")}
+                </Field>
+                <Field label={isEs ? "Confianza" : "Confidence"}>
+                  {String(selectedNode.metadata.confidence ?? "—")}
+                </Field>
+                <Field label={isEs ? "Evidencias" : "Evidence refs"}>
+                  {Array.isArray(selectedNode.metadata.evidenceRefs) ? selectedNode.metadata.evidenceRefs.length : 0}
+                </Field>
+              </>
+            )}
             <Field label={t("detailPanel.status")}>
               {selectedNode.status ? selectedNode.status.replaceAll("_", " ") : "—"}
             </Field>
