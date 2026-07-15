@@ -24,6 +24,7 @@ function ctx(status: IsabellaContextStatus = "ready", message?: string): Isabell
       status: "ready", eventCount: 12, caseCount: 4, taskEventCount: 8, milestoneEventCount: 3,
       dependencyEventCount: 1, transitionCount: 5, delayFindingCount: 2, blockerFindingCount: 1,
       reworkFindingCount: 1, bottleneckFindingCount: 1, dataQualityFlagCount: 0,
+      directFollowCount: 4, variantCount: 2, temporallyMeasuredCaseCount: 3, unknownActivityCount: 0,
       firstOccurredAt: "2026-07-14T00:00:00Z", lastOccurredAt: "2026-07-15T00:00:00Z",
       eventsTruncated: false, integrityValid: true, integrityIssueCount: 0,
     },
@@ -49,7 +50,7 @@ describe("engine orchestration", () => {
     const context = ctx();
     context.evidencePackets.push({
       ...packet(), evidenceId: "event:e1", evidenceType: "event_summary", sourceKind: "project_event_graph",
-      citationRef: "event:e1", title: "task.status_changed", summary: "Transition todo -> done",
+      citationRef: "event:e1", title: "task.status_changed", summary: "Transition todo -> done", confidence: "verified",
     });
     context.citations.push({ sourceLabel: "Canonical event summary", entityType: "event_summary", entityTitle: "task.status_changed", safeRef: "event:e1", confidence: "verified" });
     const result = await runIsabellaProcessIntelligence(req("How many canonical events and transitions are in Process Mining?"), {
@@ -59,6 +60,8 @@ describe("engine orchestration", () => {
     expect(result.route).toBe("process_mining_summary");
     expect(result.answer).toMatch(/12/);
     expect(result.answer).toMatch(/integrity: \*\*valid\*\*/i);
+    expect(result.answer).toMatch(/4\*\* direct-follow relations/i);
+    expect(result.reasoningTrace?.findings[0].status).toBe("accepted");
     expect(result.answer).toMatch(/does not prove causality/i);
     expect(result.audit.enginesUsed).toEqual(["process_mining_summary"]);
     expect(result.evidenceRefs).toEqual(["event:e1"]);
@@ -76,6 +79,8 @@ describe("engine orchestration", () => {
     const r = await runIsabellaProcessIntelligence(req("Why is this blocked?"), { buildContext: build() });
     expect(r.status).toBe("answered");
     expect(r.audit.enginesUsed).toEqual(["daily_diagnosis", "root_cause"]);
+    expect(r.reasoningTrace?.contractVersion).toBe("1.0.0");
+    expect(r.reasoningTrace?.stages).toContain("conflict_resolution");
   });
   it("recommendation chains diagnosis + root cause + recommendations and requires human approval", async () => {
     const r = await runIsabellaProcessIntelligence(req("What should I do next?"), { buildContext: build() });
@@ -83,6 +88,7 @@ describe("engine orchestration", () => {
     expect(r.audit.enginesUsed).toEqual(["daily_diagnosis", "root_cause", "recommendations"]);
     expect(r.answer.toLowerCase()).toMatch(/not executed automatically/);
     expect(r.answer.toLowerCase()).toMatch(/requires human approval/);
+    expect(r.reasoningTrace?.recommendationCount).toBeGreaterThan(0);
   });
   it("mixed produces a concise combined answer without long duplication", async () => {
     const r = await runIsabellaProcessIntelligence(req("What is happening and what should I do next?"), { buildContext: build() });

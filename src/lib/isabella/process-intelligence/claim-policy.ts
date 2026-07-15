@@ -34,7 +34,7 @@ export interface ClaimEvidenceRequirement {
 export const CLAIM_EVIDENCE_REQUIREMENTS: Record<IsabellaClaimType, ClaimEvidenceRequirement> = {
   factual_project_data: {
     claimType: "factual_project_data",
-    anyOfEvidenceTypes: ["task", "subtask", "milestone", "status_report"],
+    anyOfEvidenceTypes: ["task", "subtask", "milestone", "event_summary", "status_report"],
     minEvidence: 1,
     minConfidence: "verified",
     mustLabelInference: false,

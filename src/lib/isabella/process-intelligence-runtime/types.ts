@@ -9,6 +9,7 @@
 // ============================================================================
 
 import type { IsabellaCitation } from "@/lib/isabella/process-intelligence/types";
+import type { IsabellaReasoningTrace } from "@/lib/isabella/reasoning-pipeline/types";
 
 /** Where a question is routed. `product_help` = RAG (no engine). */
 export type IsabellaRoute =
@@ -80,6 +81,7 @@ export interface IsabellaProcessIntelligenceResult {
   evidenceRefs?: string[];
   citations?: IsabellaCitation[];
   limitations?: string[];
+  reasoningTrace?: IsabellaReasoningTrace;
   audit: IsabellaProcessIntelligenceAudit;
 }
 
