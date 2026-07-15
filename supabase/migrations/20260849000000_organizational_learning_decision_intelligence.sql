@@ -86,6 +86,26 @@ create table public.decision_intelligence_reviews (
 create index decision_intelligence_reviews_scope_idx
   on public.decision_intelligence_reviews(organization_id, project_id, created_at desc);
 
+create or replace function public.reject_governance_trace_mutation()
+returns trigger language plpgsql set search_path = public, pg_temp as $$
+begin
+  raise exception 'governance_trace_is_append_only';
+end
+$$;
+
+create trigger organizational_learning_transitions_no_update
+  before update on public.organizational_learning_transitions
+  for each row execute function public.reject_governance_trace_mutation();
+create trigger organizational_learning_transitions_no_delete
+  before delete on public.organizational_learning_transitions
+  for each row execute function public.reject_governance_trace_mutation();
+create trigger decision_intelligence_reviews_no_update
+  before update on public.decision_intelligence_reviews
+  for each row execute function public.reject_governance_trace_mutation();
+create trigger decision_intelligence_reviews_no_delete
+  before delete on public.decision_intelligence_reviews
+  for each row execute function public.reject_governance_trace_mutation();
+
 alter table public.organizational_learnings enable row level security;
 alter table public.organizational_learning_transitions enable row level security;
 alter table public.decision_intelligence_reviews enable row level security;
