@@ -51,6 +51,8 @@ import type { ResourceCapacityResult } from "@/lib/capacity/service";
 import { isEventRelationshipsEnabled } from "@/lib/graph/event-relationships-flag";
 import { loadCanonicalEventProjection } from "@/lib/graph/event-relationship-loader";
 import type { TaskAttachmentRef } from "@/lib/graph/task-case-analysis";
+import { loadKnowledgeGraphProjection } from "@/lib/graph/knowledge-graph-loader";
+import { adaptCanonicalKnowledgeGraph } from "@/lib/graph/canonical-graph-living-adapter";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -489,6 +491,23 @@ export default async function LivingGraphPage({
       console.error("Living Graph canonical-event projection failed:", err);
       data.canonicalEventProjectionStatus = "error";
     }
+  }
+
+  // Canonical Knowledge layer: authenticated, tenant/project-scoped, read-only
+  // projection over P3-T2. It never writes process_nodes/process_edges and
+  // never changes lifecycle, confidence, provenance or evidence.
+  try {
+    const knowledgeProjection = await loadKnowledgeGraphProjection(supabase, org.organizationId, projectId);
+    data.knowledgeGraphProjectionStatus = knowledgeProjection.status;
+    if (knowledgeProjection.projection) {
+      const adapted = adaptCanonicalKnowledgeGraph(knowledgeProjection.projection);
+      data.knowledgeGraphNodes = adapted.nodes;
+      data.knowledgeGraphEdges = adapted.edges;
+      data.canonicalGraphSpecVersion = knowledgeProjection.projection.specVersion;
+    }
+  } catch (error) {
+    console.error("Living Graph knowledge projection failed:", error);
+    data.knowledgeGraphProjectionStatus = "error";
   }
 
   // Compute labor capacity (non-fatal — errors just mean no labor overlay)

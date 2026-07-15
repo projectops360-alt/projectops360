@@ -50,7 +50,7 @@ const OVERLAYS: LivingGraphOverlay[] = [
 
 const LAYOUT_MODES: LivingGraphLayoutMode[] = ["hierarchical", "timeline", "force"];
 
-const VIEW_LEVELS: LivingGraphViewLevel[] = ["milestones", "activities", "events"];
+const VIEW_LEVELS: LivingGraphViewLevel[] = ["milestones", "activities", "events", "knowledge"];
 
 const NODE_TYPES = Object.keys(NODE_TYPE_STYLES) as ProcessNodeType[];
 const EDGE_TYPES = Object.keys(EDGE_TYPE_STYLES) as ProcessEdgeType[];

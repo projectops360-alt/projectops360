@@ -1832,7 +1832,17 @@
       "label": "Nivel",
       "milestones": "Hitos",
       "activities": "Actividades",
-      "events": "Eventos"
+      "events": "Eventos",
+      "knowledge": "Conocimiento"
+    },
+    "canonicalKnowledge": {
+      "viewHint": "Especificación canónica del grafo v{version}. Proyección de solo lectura; el ciclo y la evidencia pertenecen a Knowledge Objects.",
+      "status": {
+        "empty": "Este proyecto todavía no tiene Knowledge Objects.",
+        "insufficient_evidence": "Algunos Knowledge Objects no tienen evidencia para su versión actual. La traza disponible se muestra sin inventar datos.",
+        "invalid": "La proyección de conocimiento no pasó la validación canónica y no fue renderizada.",
+        "error": "No se pudo cargar la proyección de conocimiento. Las vistas operativas permanecen intactas."
+      }
     },
     "canonicalEvents": {
       "viewTitle": "Eventos (canónico)",
@@ -2008,7 +2018,9 @@
       "permit_event": "Permiso",
       "critical_path_event": "Ruta Crítica",
       "import_event": "Archivo Importado",
-      "subtask_item": "Subtarea"
+      "subtask_item": "Subtarea",
+      "knowledge_object": "Objeto de conocimiento",
+      "evidence_reference": "Referencia de evidencia"
     },
     "edgeTypes": {
       "caused": "Causó",
@@ -2031,7 +2043,10 @@
       "supplied_by": "Suministrado por",
       "contains": "Contiene",
       "imported_from": "Importado de archivo",
-      "subtask_of": "Subtarea de"
+      "subtask_of": "Subtarea de",
+      "supported_by": "Respaldado por",
+      "contradicted_by": "Contradicho por",
+      "derived_from": "Derivado de"
     },
     "edgeMeanings": {
       "caused": "Esta actividad disparó directamente la siguiente — una dependencia causal en el flujo de ejecución.",

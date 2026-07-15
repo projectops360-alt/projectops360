@@ -285,6 +285,11 @@ export interface LivingGraphData {
    *  truncated. Surfaced in the view so the user knows the projection is
    *  bounded — never silently truncated. */
   eventsTruncated?: boolean;
+  /** Read-only canonical Knowledge layer projected from P3-T2 contracts. */
+  knowledgeGraphNodes?: LivingGraphNode[];
+  knowledgeGraphEdges?: LivingGraphEdge[];
+  knowledgeGraphProjectionStatus?: "empty" | "ready" | "insufficient_evidence" | "invalid" | "error";
+  canonicalGraphSpecVersion?: string;
   // ── Projection status contract (CAP-045 §C.2 / Part B) ─────────────────
   // EXPLICIT signal of the canonical-event projection state so the "events"
   // view never silently falls back to operational process_nodes/process_edges.
@@ -334,7 +339,7 @@ export type LivingGraphLayoutMode = "hierarchical" | "timeline" | "force";
  * - activities: one node per source entity (aggregated process map)
  * - events: every process event as its own node
  */
-export type LivingGraphViewLevel = "milestones" | "activities" | "events";
+export type LivingGraphViewLevel = "milestones" | "activities" | "events" | "knowledge";
 
 export type LivingGraphSimulationScenario =
   | "delay1d"

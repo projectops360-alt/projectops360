@@ -24,6 +24,8 @@ export function scopeLivingGraphDataToProject(
 
   const hasCanonical = data.canonicalEvents !== undefined;
   const hasRelationships = data.eventRelationships !== undefined;
+  const hasKnowledgeNodes = data.knowledgeGraphNodes !== undefined;
+  const hasKnowledgeEdges = data.knowledgeGraphEdges !== undefined;
 
   return {
     ...data,
@@ -43,6 +45,12 @@ export function scopeLivingGraphDataToProject(
             (r) => r.projectId === requestedProjectId,
           ),
         }
+      : {}),
+    ...(hasKnowledgeNodes
+      ? { knowledgeGraphNodes: (data.knowledgeGraphNodes ?? []).filter((node) => node.projectId === requestedProjectId) }
+      : {}),
+    ...(hasKnowledgeEdges
+      ? { knowledgeGraphEdges: (data.knowledgeGraphEdges ?? []).filter((edge) => edge.projectId === requestedProjectId) }
       : {}),
   };
 }

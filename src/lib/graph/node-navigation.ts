@@ -101,6 +101,15 @@ const NO_PAGE_LABEL: Record<string, I18nField> = {
  * no page yet. Synthetic/aggregate nodes (milestone:* ids) route to the source.
  */
 export function getNodeNavActions(node: LivingGraphNode, projectId: string): NodeNavAction[] {
+  const projectedHref = typeof node.metadata.navigationHref === "string" ? node.metadata.navigationHref : null;
+  if (node.metadata.canonicalGraph === true && projectedHref) {
+    return [{
+      id: "open-canonical-source",
+      label_i18n: { en: "Open source evidence", es: "Abrir evidencia fuente" },
+      href: projectedHref,
+      enabled: true,
+    }];
+  }
   const src = node.sourceEntityType as string;
   const route = ROUTE_BY_SOURCE[src];
   if (route) {
@@ -119,5 +128,6 @@ export function getNodeNavActions(node: LivingGraphNode, projectId: string): Nod
 
 /** True when the node points at a record the user can actually open. */
 export function nodeHasNavigation(node: LivingGraphNode): boolean {
+  if (node.metadata.canonicalGraph === true && typeof node.metadata.navigationHref === "string") return true;
   return (node.sourceEntityType as string) in ROUTE_BY_SOURCE;
 }
