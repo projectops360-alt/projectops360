@@ -11,6 +11,7 @@ const teamActions = read("src/app/[locale]/(app)/team/actions.ts");
 const teamPage = read("src/app/[locale]/(app)/team/page.tsx");
 const orgContext = read("src/lib/auth/org-context.ts");
 const adminClient = read("src/lib/supabase/admin.ts");
+const middleware = read("src/middleware.ts");
 
 describe("security hardening contracts", () => {
   it("keeps privileged graph implementations outside the exposed schema", () => {
@@ -53,5 +54,11 @@ describe("security hardening contracts", () => {
 
   it("keeps the service-role client out of client bundles", () => {
     expect(adminClient).toMatch(/^import "server-only";/);
+  });
+
+  it("keeps temporary preview surfaces behind authentication", () => {
+    expect(middleware).not.toContain('"/auth/callback", "/navigator-preview"');
+    expect(middleware).toContain('pathname === "/navigator-preview"');
+    expect(middleware).toContain("const { response, user } = await updateSession(request)");
   });
 });

@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const intlMiddleware = createMiddleware(routing);
 
 // Paths that do NOT require authentication
-const publicPaths = ["/login", "/signup", "/forgot-password", "/auth/callback", "/navigator-preview"];
+const publicPaths = ["/login", "/signup", "/forgot-password", "/auth/callback"];
 
 /**
  * Check if a pathname is a public (unauthenticated) path.
@@ -41,9 +41,24 @@ export async function middleware(request: NextRequest) {
   // ── Routes OUTSIDE the [locale] segment ──
   // These routes live outside [locale]. next-intl would otherwise rewrite
   // them to /en/<path>, which does not exist. The auth callback must also
-  // remain untouched so Supabase can exchange its confirmation code.
-  if (isUnlocalizedPath(pathname)) {
+  // remain untouched so Supabase can exchange its confirmation code. The
+  // Navigator route is handled separately because it requires authentication.
+  if (isUnlocalizedPath(pathname) && !pathname.startsWith("/navigator-preview")) {
     return NextResponse.next();
+  }
+
+  // The temporary Navigator harness also lives outside [locale], but it is an
+  // internal surface. Keep the direct route while requiring a verified session.
+  if (pathname === "/navigator-preview" || pathname.startsWith("/navigator-preview/")) {
+    const { response, user } = await updateSession(request);
+    if (user) return response;
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {});
+    });
+    return redirectResponse;
   }
 
   // ── API routes: not localized, not auth-guarded at the edge ──

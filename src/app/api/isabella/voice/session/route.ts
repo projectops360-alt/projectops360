@@ -22,8 +22,10 @@ import {
 } from "@/lib/isabella/voice/tool-contract";
 import { persistVoiceAudit } from "@/lib/isabella/voice/audit";
 import type { VoiceSessionResponse } from "@/lib/isabella/voice/types";
+import { readLimitedJson, RequestBodyError } from "@/lib/http/request-body";
 
 const OPENAI_CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets";
+const MAX_REQUEST_BYTES = 32 * 1024;
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isIsabellaVoiceEnabled()) {
@@ -39,9 +41,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    body = null;
+    body = await readLimitedJson(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      return NextResponse.json({ error: error.code }, { status: error.status });
+    }
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
   const parsed = voiceSessionRequestSchema.safeParse(body);
   if (!parsed.success) {

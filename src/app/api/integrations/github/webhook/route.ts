@@ -14,6 +14,9 @@ import { getWebhookSecret } from "@/lib/github-intelligence/config";
 import { verifyWebhookSignature, parseWebhookEnvelope } from "@/lib/github-intelligence/webhooks";
 import { ingestWebhookEvent, type ConnectedRepository, type IngestionStore } from "@/lib/github-intelligence/ingestion";
 import { logAudit } from "@/lib/audit";
+import { readLimitedText, RequestBodyError } from "@/lib/http/request-body";
+
+const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
 
 export async function POST(request: Request): Promise<NextResponse> {
   // Feature flag — when OFF the module is dark; accept-and-ignore so GitHub
@@ -30,7 +33,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const rawBody = await request.text();
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
+    return NextResponse.json({ error: "unsupported_media_type" }, { status: 415 });
+  }
+
+  let rawBody: string;
+  try {
+    rawBody = await readLimitedText(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      return NextResponse.json({ error: error.code }, { status: error.status });
+    }
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
   const signature = request.headers.get("x-hub-signature-256");
   if (!verifyWebhookSignature(rawBody, signature, secret)) {
     // Do not reveal whether the signature was missing vs mismatched.
