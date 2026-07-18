@@ -5,15 +5,10 @@ import type { I18nField } from "@/types/database";
 // ---------------------------------------------------------------------------
 // OrgContext — the full authenticated + organizational context for a request
 // ---------------------------------------------------------------------------
-// Fetches auth user → profile → membership → org in parallel queries.
+// Fetches auth user → profile → active memberships → selected organization.
 //
-// MVP-0: assumes one organization per user (the trigger creates exactly one).
-// Future: add org switching by querying all memberships and storing the
-//         active org ID in a cookie or profile field.
-//
-// Resilience: if the user has no org membership (e.g., trigger failed or user
-// was created before the trigger existed), calls ensure_user_org() RPC which
-// creates the missing data and returns it. This makes the app self-healing.
+// Resilience: a brand-new user with neither profile nor membership can be
+// auto-healed. An existing user without an active membership is denied.
 // ---------------------------------------------------------------------------
 
 export interface OrgContext {
@@ -40,12 +35,12 @@ export interface OrgContext {
 /**
  * Fetch the full org context for the current authenticated user.
  *
- * Uses two parallel queries:
+ * Uses two scoped queries:
  *   1. profile (with organization_id for scoping)
- *   2. organization_members (with organizations join for org details)
+ *   2. active organization_members (with organizations join for org details)
  *
- * If no membership is found (e.g., trigger failed or user was created before
- * trigger existed), calls ensure_user_org() RPC to auto-create missing data.
+ * If a brand-new user has no profile or membership, calls ensure_user_org().
+ * Existing users without active membership are denied instead of auto-healed.
  *
  * Throws only if the user is not authenticated.
  *
@@ -64,22 +59,44 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
     throw new Error("Not authenticated");
   }
 
-  // Query profile and membership in parallel
-  const [profileResult, membershipResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("display_name, avatar_url, locale, organization_id")
-      .eq("id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("organization_members")
-      .select("role, organizations(id, slug, name_i18n)")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  if (user.user_metadata?.must_change_password === true) {
+    throw new Error("Password change required");
+  }
+
+  const profileResult = await supabase
+    .from("profiles")
+    .select("display_name, avatar_url, locale, organization_id, default_organization_id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { data: activeMemberships, error: membershipError } = await supabase
+    .from("organization_members")
+    .select("role, organization_id, organizations(id, slug, name_i18n)")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  if (membershipError) {
+    throw new Error(`Failed to load organization membership: ${membershipError.message}`);
+  }
+
+  const preferredOrganizationId = profileResult.data?.default_organization_id
+    ?? profileResult.data?.organization_id
+    ?? null;
+  const membership = activeMemberships?.find(
+    (candidate) => candidate.organization_id === preferredOrganizationId,
+  ) ?? activeMemberships?.[0] ?? null;
 
   // If no membership found, auto-heal via RPC
-  if (!membershipResult.data) {
+  if (!membership) {
+    // An existing profile with no active membership is suspended/removed or
+    // misconfigured. Never create a new organization as an authorization
+    // fallback for that state.
+    if (profileResult.data) {
+      throw new Error("No active organization membership");
+    }
+
     // Call ensure_user_org() which creates org/profile/membership if missing
     const { data: rpcData, error: rpcError } = await supabase.rpc("ensure_user_org");
 
@@ -99,7 +116,7 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
     // Re-fetch profile since it may have been created by the RPC
     const { data: newProfile } = await supabase
       .from("profiles")
-      .select("display_name, avatar_url, locale, organization_id")
+      .select("display_name, avatar_url, locale, organization_id, default_organization_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -126,7 +143,6 @@ export const getOrgContext = cache(async function getOrgContext(): Promise<OrgCo
   }
 
   // Normal path — membership found
-  const membership = membershipResult.data;
   const org = membership.organizations as unknown as {
     id: string;
     slug: string;

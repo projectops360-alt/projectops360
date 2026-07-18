@@ -20,6 +20,12 @@ export default async function AppLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user?.user_metadata?.must_change_password === true) {
+    redirect(locale === routing.defaultLocale ? "/change-password" : `/${locale}/change-password`);
+  }
+
   // Fetch full auth + org context in one call.
   // Redirects to login if unauthenticated or no org membership found.
   let org;
@@ -27,14 +33,6 @@ export default async function AppLayout({
     org = await getOrgContext();
   } catch {
     redirect(locale === routing.defaultLocale ? "/login" : `/${locale}/login`);
-  }
-
-  // Force a password change on first login (members created with a temporary
-  // password). Redirects to the standalone /change-password screen until done.
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (user?.user_metadata?.must_change_password === true) {
-    redirect(locale === routing.defaultLocale ? "/change-password" : `/${locale}/change-password`);
   }
 
   return (

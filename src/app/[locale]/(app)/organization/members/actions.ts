@@ -65,9 +65,8 @@ export async function renameWorkspaceUserAction(input: { userId: string; name: s
 }
 
 /**
- * Full control over a workspace user: name, email, seat/role, workspace role,
- * status, department, job title. PMO/admin only. Email changes go through the
- * auth admin API (no SMTP). organization_id is never touched (DB-guarded).
+ * Manage a workspace membership and display name. Global identity changes are
+ * intentionally rejected; only the account owner may change a verified email.
  */
 export async function updateWorkspaceUserAction(input: {
   memberId: string; userId: string;
@@ -78,20 +77,25 @@ export async function updateWorkspaceUserAction(input: {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
 
+  const { data: targetMember } = await c.supabase
+    .from("organization_members")
+    .select("id")
+    .eq("id", input.memberId)
+    .eq("user_id", input.userId)
+    .eq("organization_id", c.org.organizationId)
+    .maybeSingle();
+  if (!targetMember) return { error: "not_found" };
+
+  // Workspace administrators manage memberships, not global Auth identities.
+  // Email changes must be completed by the account owner through verification.
+  if (input.email !== undefined) return { error: "identity_change_requires_user" };
+
   // Name (profiles.display_name) — never touch organization_id.
   if (input.name !== undefined) {
     const name = input.name.trim();
     if (!name) return { error: "empty_name" };
     if (name.length > 120) return { error: "name_too_long" };
     await c.supabase.from("profiles").update({ display_name: name }).eq("id", input.userId);
-  }
-
-  // Email (auth admin, no SMTP).
-  if (input.email !== undefined && input.email.trim()) {
-    const email = input.email.trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid_email" };
-    const { error: eErr } = await c.supabase.auth.admin.updateUserById(input.userId, { email, email_confirm: true });
-    if (eErr) return { error: "email_in_use" };
   }
 
   // Membership fields.
@@ -118,25 +122,12 @@ export async function updateWorkspaceUserAction(input: {
   return {};
 }
 
-/** Set a new temporary password for a workspace user; forces change on next login. PMO/admin only. */
+/** Tenant administrators cannot reset another user's global Auth password. */
 export async function resetWorkspaceUserPasswordAction(input: { userId: string; password: string }): Promise<{ error?: string }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
-  if (!input.password || input.password.length < 8) return { error: "weak_password" };
-
-  const { data: member } = await c.supabase.from("organization_members")
-    .select("user_id").eq("organization_id", c.org.organizationId).eq("user_id", input.userId).maybeSingle();
-  if (!member) return { error: "not_found" };
-
-  const { data: u } = await c.supabase.auth.admin.getUserById(input.userId);
-  const { error } = await c.supabase.auth.admin.updateUserById(input.userId, {
-    password: input.password,
-    user_metadata: { ...(u?.user?.user_metadata ?? {}), must_change_password: true },
-  });
-  if (error) return { error: "unexpected" };
-  // NEVER log the password.
-  await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.userId, metadata: { password_reset: true } });
-  return {};
+  void input;
+  return { error: "password_recovery_required" };
 }
 
 /**
@@ -156,37 +147,14 @@ export async function removeWorkspaceUserAction(input: { memberId: string; userI
 }
 
 /**
- * Permanently delete a user's account — ONLY when they have no activity that
- * would be orphaned. PMO/admin only, never self.
- *
- * Safety: we pre-check "set null" references that would silently orphan data
- * (assigned tasks, project memberships, PM-of-project, risk ownership). And the
- * auth delete itself FAILS on "no action" FKs (created projects/meetings/
- * decisions/tasks/etc.), which we surface as has_activity — so a user who has
- * interacted with the system is never hard-deleted (use "Remove" instead).
- * On success, cascade FKs clean up profile + memberships automatically.
+ * Global Auth-account deletion is reserved for a separately governed platform
+ * operation. Tenant administrators may remove only their own membership.
  */
 export async function deleteUserPermanentlyAction(input: { userId: string }): Promise<{ error?: string; activity?: number }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
-  if (input.userId === c.org.userId) return { error: "cannot_remove_self" };
-
-  const checks = await Promise.all([
-    c.supabase.from("roadmap_tasks").select("id", { count: "exact", head: true }).eq("assigned_to", input.userId),
-    c.supabase.from("project_team_members").select("id", { count: "exact", head: true }).eq("user_id", input.userId),
-    c.supabase.from("projects").select("id", { count: "exact", head: true }).eq("project_manager_id", input.userId),
-    c.supabase.from("risks").select("id", { count: "exact", head: true }).eq("owner_user_id", input.userId),
-    c.supabase.from("action_items").select("id", { count: "exact", head: true }).eq("assigned_to", input.userId),
-  ]);
-  const activity = checks.reduce((s, r) => s + (r.count ?? 0), 0);
-  if (activity > 0) return { error: "has_activity", activity };
-
-  const { error } = await c.supabase.auth.admin.deleteUser(input.userId);
-  // "No action" FKs (created content) make this fail — never orphan anything.
-  if (error) return { error: "has_activity" };
-
-  await logAudit({ org: c.org, action: "delete", entityType: "organization_members", entityId: input.userId, metadata: { permanently_deleted: true } });
-  return {};
+  void input;
+  return { error: "platform_admin_required" };
 }
 
 /**
@@ -200,43 +168,31 @@ export async function deleteUserPermanentlyAction(input: { userId: string }): Pr
  */
 export async function createMemberWithPasswordAction(input: {
   email: string; password: string; displayName?: string; billingSeatType?: string; workspaceRole?: string;
-}): Promise<{ error?: string; status?: "created" | "linked" }> {
+}): Promise<{ error?: string; status?: "created" }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
 
   const email = (input.email ?? "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid_email" };
-  if (!input.password || input.password.length < 8) return { error: "weak_password" };
+  if (!input.password || input.password.length < 12) return { error: "weak_password" };
 
   const seat = SEAT_VALUES.includes(input.billingSeatType ?? "") ? input.billingSeatType! : "full_seat";
   const role = MEMBER_ROLE(seat);
   const displayName = input.displayName?.trim() || email.split("@")[0];
 
   try {
-    const { data: list } = await c.supabase.auth.admin.listUsers();
-    const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-
-    let userId: string;
-    let status: "created" | "linked";
-    if (existing) {
-      // Account exists — (re)set the temporary password and link into this org.
-      userId = existing.id;
-      status = "linked";
-      await c.supabase.auth.admin.updateUserById(userId, {
-        password: input.password,
-        user_metadata: { ...(existing.user_metadata ?? {}), must_change_password: true },
-      });
-    } else {
-      const { data: created, error: cErr } = await c.supabase.auth.admin.createUser({
-        email,
-        password: input.password,
-        email_confirm: true, // no SMTP confirmation needed
-        user_metadata: { display_name: displayName, must_change_password: true },
-      });
-      if (cErr || !created?.user) return { error: "create_failed" };
-      userId = created.user.id;
-      status = "created";
+    const { data: created, error: createError } = await c.supabase.auth.admin.createUser({
+      email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { display_name: displayName, must_change_password: true },
+    });
+    if (createError || !created?.user) {
+      const duplicate = createError?.code === "email_exists"
+        || /already|registered|exists/i.test(createError?.message ?? "");
+      return { error: duplicate ? "account_exists_invite_required" : "create_failed" };
     }
+    const userId = created.user.id;
 
     // Set the name and make THIS org their active/default org. We must NOT touch
     // profiles.organization_id (a DB guard forbids changing it); the new user
@@ -248,15 +204,15 @@ export async function createMemberWithPasswordAction(input: {
       { onConflict: "organization_id,user_id" });
 
     // Audit — NEVER record the password.
-    await logAudit({ org: c.org, action: "create", entityType: "organization_members", entityId: userId, metadata: { created_login: email, seat, status } });
-    return { status };
+    await logAudit({ org: c.org, action: "create", entityType: "organization_members", entityId: userId, metadata: { created_login: email, seat, status: "created" } });
+    return { status: "created" };
   } catch {
     return { error: "create_failed" };
   }
 }
 
 /** Invite a new internal member by email (status = invited until accepted). */
-export async function inviteMemberAction(input: { email: string; billingSeatType?: string; workspaceRole?: string }): Promise<{ error?: string; status?: "linked" | "invited" }> {
+export async function inviteMemberAction(input: { email: string; billingSeatType?: string; workspaceRole?: string }): Promise<{ error?: string; status?: "invited" }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
   const email = (input.email ?? "").trim().toLowerCase();
@@ -265,23 +221,15 @@ export async function inviteMemberAction(input: { email: string; billingSeatType
   const role = MEMBER_ROLE(seat);
 
   try {
-    const { data: list } = await c.supabase.auth.admin.listUsers();
-    const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-
-    if (existing) {
-      await c.supabase.from("organization_members").upsert(
-        { organization_id: c.org.organizationId, user_id: existing.id, role, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "active" },
-        { onConflict: "organization_id,user_id" });
-      await c.supabase.from("profiles").upsert({ id: existing.id, organization_id: c.org.organizationId });
-      return { status: "linked" };
-    }
-
     const redirectTo = await getAuthEmailCallbackUrl("/change-password?invite=1");
     const { data: invited, error: inviteErr } = await c.supabase.auth.admin.inviteUserByEmail(email, {
       data: { invited_to_org: c.org.organizationId },
       redirectTo,
     });
-    if (inviteErr || !invited?.user) return { error: "email_not_configured" };
+    if (inviteErr || !invited?.user) {
+      const existingAccount = /already|registered|exists/i.test(inviteErr?.message ?? "");
+      return { error: existingAccount ? "account_exists_invite_required" : "email_not_configured" };
+    }
     await c.supabase.from("organization_members").upsert(
       { organization_id: c.org.organizationId, user_id: invited.user.id, role, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "invited", invited_at: new Date().toISOString() },
       { onConflict: "organization_id,user_id" });

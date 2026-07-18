@@ -9,8 +9,8 @@ vi.mock("server-only", () => ({}));
 // ============================================================================
 // Executes the exact server logic (access.server.ts) the /admin route and the
 // sidebar flag both rely on. Asserts: only authorized emails pass, comparison
-// is case-insensitive/trimmed, the table allowlist wins, and the two hardcoded
-// platform owners (efrain.pradas@gmail.com + pmo@xxx-demo.io) always authorize —
+// is case-insensitive/trimmed, the table allowlist wins, and the emergency
+// platform owner (efrain.pradas@gmail.com) always authorizes —
 // independently of PRODUCT_BRAIN_ALLOWED_EMAILS and of the table being seeded.
 // ============================================================================
 
@@ -63,11 +63,11 @@ beforeEach(() => h.reset());
 
 describe("isPlatformAdmin — who may access the Admin Console", () => {
   it("authorizes the temporary fallback email (empty table)", async () => {
-    expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+    expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
   });
 
   it("authorizes the fallback case-insensitively and trimmed", async () => {
-    expect(await isPlatformAdmin("  PMO@XXX-DEMO.IO ")).toBe(true);
+    expect(await isPlatformAdmin("  EFRAIN.PRADAS@GMAIL.COM ")).toBe(true);
   });
 
   it("authorizes an active row in admin_authorized_users", async () => {
@@ -88,15 +88,14 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
     expect(await isPlatformAdmin("  Efrain.Pradas@gmail.com ")).toBe(true);
   });
 
-  it("authorizes both owners regardless of PRODUCT_BRAIN_ALLOWED_EMAILS", async () => {
+  it("authorizes the owner regardless of PRODUCT_BRAIN_ALLOWED_EMAILS", async () => {
     // The Admin Console gate is self-contained: it must NOT read this env-var.
-    // Setting it to something that excludes both owners must NOT lock them out
+    // Setting it to something that excludes the owner must NOT lock them out
     // (this was the exact prod bug — Efrain got a 404 because the env-var
     // override omitted him).
     vi.stubEnv("PRODUCT_BRAIN_ALLOWED_EMAILS", "custom@admin.io");
     try {
       expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
-      expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
       // And the env-var value does NOT grant Admin Console access.
       expect(await isPlatformAdmin("custom@admin.io")).toBe(false);
     } finally {
@@ -105,6 +104,7 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
   });
 
   it("denies any other authenticated user", async () => {
+    expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(false);
     expect(await isPlatformAdmin("someone@else.io")).toBe(false);
     expect(await isPlatformAdmin("attacker@evil.com")).toBe(false);
   });
@@ -119,7 +119,7 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
   it("consults the table BEFORE applying the fallback (table-first)", async () => {
     h.setActiveEmails(["explicit@allowed.io"]);
     // Fallback email is NOT in the table; it should still pass via fallback.
-    expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+    expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
     // And a non-fallback, non-table email is denied.
     expect(await isPlatformAdmin("nope@nowhere.io")).toBe(false);
     // The table query was actually issued (gate is table-first).
@@ -129,14 +129,14 @@ describe("isPlatformAdmin — who may access the Admin Console", () => {
   it("falls back gracefully when the table is absent (query error)", async () => {
     h.setQueryError({ code: "42P01", message: "relation does not exist" });
     // Table query failed → fallback path still authorizes the fallback email.
-    expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+    expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
     // ...and denies everyone else (no table, not the fallback).
     expect(await isPlatformAdmin("someone@else.io")).toBe(false);
   });
 
   it("falls back gracefully when createAdminClient throws (no service role)", async () => {
     h.setThrow(true);
-    expect(await isPlatformAdmin("pmo@xxx-demo.io")).toBe(true);
+    expect(await isPlatformAdmin("efrain.pradas@gmail.com")).toBe(true);
     expect(await isPlatformAdmin("someone@else.io")).toBe(false);
   });
 });
@@ -148,13 +148,13 @@ describe("requirePlatformAdmin — denial logging", () => {
   });
 
   it("returns true for the fallback admin", async () => {
-    const ok = await requirePlatformAdmin("pmo@xxx-demo.io", "/admin");
+    const ok = await requirePlatformAdmin("efrain.pradas@gmail.com", "/admin");
     expect(ok).toBe(true);
   });
 });
 
 describe("FALLBACK_ADMIN_EMAIL", () => {
-  it("is the documented PMO address", () => {
-    expect(FALLBACK_ADMIN_EMAIL).toBe("pmo@xxx-demo.io");
+  it("is the documented emergency owner address", () => {
+    expect(FALLBACK_ADMIN_EMAIL).toBe("efrain.pradas@gmail.com");
   });
 });

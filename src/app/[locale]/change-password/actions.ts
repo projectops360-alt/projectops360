@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
  */
 export async function changeOwnPasswordAction(input: { password: string }): Promise<{ ok: boolean; error?: string }> {
   const password = input.password ?? "";
-  if (password.length < 8) return { ok: false, error: "weak_password" };
+  if (password.length < 12) return { ok: false, error: "weak_password" };
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

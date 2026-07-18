@@ -11,14 +11,14 @@ import "server-only";
 //   1. If `admin_authorized_users` has an active (is_active=true) row for the
 //      normalized email → authorized. (Future source of truth for admins added
 //      from inside the Console; empty/absent table falls through.)
-//   2. Else if the email is one of the two hardcoded platform owners
-//      (ADMIN_CONSOLE_ALLOWED_EMAILS — efrain.pradas@gmail.com + pmo@xxx-demo.io)
+//   2. Else if the email is the emergency hardcoded platform owner
+//      (ADMIN_CONSOLE_ALLOWED_EMAILS — efrain.pradas@gmail.com)
 //      → authorized. This is intentionally SELF-CONTAINED: it does NOT depend on
 //      the `PRODUCT_BRAIN_ALLOWED_EMAILS` env-var (which in prod excludes Efrain
 //      and previously caused a 404 for him) nor on the migration being applied.
 //   3. Else → denied (the route returns 404 and loads NO data).
 //
-// Result: exactly these two owners always reach the Console, plus anyone an
+// Result: exactly this owner always reaches the Console, plus anyone an
 // admin later grants via the table. No one else.
 //
 // Every admin query (page render, server actions) MUST call isPlatformAdmin()
@@ -32,7 +32,7 @@ import { logAdminEvent } from "./audit";
 import type { AuthorizedAdminRow } from "./types";
 
 /**
- * The two platform owners who may always reach the Admin Console. This list is
+ * The emergency platform owner who may always reach the Admin Console. This list is
  * self-contained on purpose: it does NOT read any env-var and does NOT depend on
  * the admin_authorized_users migration being applied, so the Console can never
  * be locked out for these owners (and no one else is authorized unless an admin
@@ -40,11 +40,10 @@ import type { AuthorizedAdminRow } from "./types";
  */
 export const ADMIN_CONSOLE_ALLOWED_EMAILS: readonly string[] = [
   "efrain.pradas@gmail.com",
-  "pmo@xxx-demo.io",
 ];
 
 /** @deprecated Use ADMIN_CONSOLE_ALLOWED_EMAILS. Kept for existing callers/tests. */
-export const FALLBACK_ADMIN_EMAIL = "pmo@xxx-demo.io";
+export const FALLBACK_ADMIN_EMAIL = "efrain.pradas@gmail.com";
 
 /** Active authorizations from the table (empty array if the table is absent). */
 async function activeAuthorizedEmails(): Promise<Set<string>> {
@@ -74,8 +73,8 @@ export async function isPlatformAdmin(
   //    Console; empty/absent → fall through).
   const tableEmails = await activeAuthorizedEmails();
   if (tableEmails.has(normalized)) return true;
-  // 2) The two hardcoded platform owners. Self-contained: no env-var, no
-  //    migration dependency, so these owners are never locked out.
+  // 2) The hardcoded emergency platform owner. Self-contained: no env-var, no
+  //    migration dependency, so the owner is never locked out.
   return ADMIN_CONSOLE_ALLOWED_EMAILS.some(
     (a) => normalizeEmail(a) === normalized,
   );

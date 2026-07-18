@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, UserRound, HardHat, Building2, Wrench, ShieldCheck, Plus, Pencil, Merge,
-  Archive, Mail, X, Loader2, KeyRound, Wand2, Copy, Check, Trash2, UserCog,
+  Archive, Mail, X, Loader2, KeyRound, Wand2, Copy, Check, UserCog,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import { SEAT_TYPES, WORKSPACE_ROLES, MEMBER_STATUSES } from "@/lib/billing/config";
@@ -21,7 +21,7 @@ import {
 } from "./actions";
 import {
   createMemberWithPasswordAction, updateWorkspaceUserAction,
-  resetWorkspaceUserPasswordAction, removeWorkspaceUserAction, deleteUserPermanentlyAction,
+  removeWorkspaceUserAction,
 } from "../organization/members/actions";
 
 /** Generate a readable temporary password (no ambiguous chars). */
@@ -360,7 +360,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
   tt: TT; member: TeamMember; onClose: () => void; onSaved: () => void; onRemoved: () => void;
 }) {
   const [name, setName] = useState(member.name === "—" ? "" : member.name);
-  const [email, setEmail] = useState(member.email ?? "");
+  const email = member.email ?? "";
   const [seat, setSeat] = useState(member.seatType ?? "full_seat");
   const [wsRole, setWsRole] = useState(member.workspaceRole ?? "");
   const [status, setStatus] = useState(member.status);
@@ -369,10 +369,6 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [pwd, setPwd] = useState("");
-  const [resetting, setResetting] = useState(false);
-  const [resetDone, setResetDone] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState(false);
 
   const ERR: Record<string, string> = {
@@ -380,7 +376,8 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     invalid_email: tt("Invalid email.", "Correo inválido."),
     email_in_use: tt("That email is already in use.", "Ese correo ya está en uso."),
     empty_name: tt("Name cannot be empty.", "El nombre no puede estar vacío."),
-    weak_password: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
+    weak_password: tt("Password must be at least 12 characters.", "La contraseña debe tener al menos 12 caracteres."),
+    account_exists_invite_required: tt("That account already exists. Ask the user to accept a verified invitation instead.", "Esa cuenta ya existe. Pide al usuario aceptar una invitación verificada."),
     cannot_change_self_status: tt("You can't change your own status.", "No puedes cambiar tu propio estado."),
     cannot_remove_self: tt("You can't remove yourself.", "No puedes removerte a ti mismo."),
     has_activity: tt("This user already has activity in the system, so it can't be permanently deleted (it would orphan tasks). Use \"Remove\" instead — they lose access but their history stays intact.", "Este usuario ya tiene actividad en el sistema, así que no se puede eliminar definitivamente (dejaría tareas huérfanas). Usa \"Remover\" — pierde el acceso pero su historial queda intacto."),
@@ -391,18 +388,11 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     setSaving(true); setError(null);
     const r = await updateWorkspaceUserAction({
       memberId: member.memberId, userId: member.userId,
-      name, email: email.trim() && email.trim().toLowerCase() !== (member.email ?? "").toLowerCase() ? email : undefined,
+      name,
       billingSeatType: seat, workspaceRole: wsRole, status, department: dept, jobTitle,
     });
     setSaving(false);
     if (r.error) setError(r.error); else onSaved();
-  }
-  async function resetPassword() {
-    if (pwd.length < 8) { setError("weak_password"); return; }
-    setResetting(true); setError(null);
-    const r = await resetWorkspaceUserPasswordAction({ userId: member.userId, password: pwd });
-    setResetting(false);
-    if (r.error) setError(r.error); else { setResetDone(pwd); setPwd(""); }
   }
   async function remove() {
     if (!confirm(tt("Remove this user from the workspace? They lose access; their history stays.", "¿Remover a este usuario del workspace? Pierde el acceso; su historial queda."))) return;
@@ -411,19 +401,12 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     setRemoving(false);
     if (r.error) setError(r.error); else onRemoved();
   }
-  async function deletePerm() {
-    if (!confirm(tt("Permanently delete this account? This cannot be undone.", "¿Eliminar esta cuenta definitivamente? No se puede deshacer."))) return;
-    setRemoving(true); setError(null);
-    const r = await deleteUserPermanentlyAction({ userId: member.userId });
-    setRemoving(false);
-    if (r.error) setError(r.error); else onRemoved();
-  }
 
   return (
     <Dialog title={tt("Manage user", "Gestionar usuario")} onClose={onClose}>
       <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
         <Field label={tt("Name", "Nombre")}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={inputCls} /></Field>
-        <Field label={tt("Email", "Correo")}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} className={inputCls} /></Field>
+        <Field label={tt("Email (managed by the user)", "Correo (gestionado por el usuario)")}><input type="email" value={email} readOnly className={`${inputCls} cursor-not-allowed opacity-70`} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={tt("Seat", "Asiento")}>
             <select value={seat} onChange={(e) => setSeat(e.target.value)} className={inputCls}>
@@ -447,23 +430,6 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
         </div>
         <Field label={tt("Job title", "Cargo")}><input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={80} className={inputCls} /></Field>
 
-        {/* Security: reset password */}
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><KeyRound className="h-3.5 w-3.5" />{tt("Reset password", "Restablecer contraseña")}</p>
-          {resetDone ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-foreground">{tt("New temporary password (they'll change it on next login):", "Nueva clave temporal (la cambiará al ingresar):")}</span>
-              <code className="rounded bg-background px-1.5 py-0.5 text-foreground">{resetDone}</code>
-              <button type="button" onClick={() => { navigator.clipboard?.writeText(resetDone); setCopied(true); setTimeout(() => setCopied(false), 1500); }} className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted-foreground hover:bg-muted">{copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}{tt("Copy", "Copiar")}</button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={tt("New temp password", "Nueva clave temporal")} className={`${inputCls} flex-1`} />
-              <button type="button" title={tt("Generate", "Generar")} onClick={() => setPwd(genTempPassword())} className="inline-flex items-center rounded-lg border border-border px-2.5 py-2 text-muted-foreground hover:bg-muted"><Wand2 className="h-4 w-4" /></button>
-              <button type="button" onClick={resetPassword} disabled={resetting || pwd.length < 8} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{resetting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{tt("Set", "Aplicar")}</button>
-            </div>
-          )}
-        </div>
       </div>
 
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{ERR[error] ?? error}</p>}
@@ -473,9 +439,6 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
           <div className="flex items-center gap-2">
             <button type="button" onClick={remove} disabled={removing} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-50">
               {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}{tt("Remove", "Remover")}
-            </button>
-            <button type="button" onClick={deletePerm} disabled={removing} title={tt("Delete the account permanently (only if it has no activity)", "Eliminar la cuenta definitivamente (solo si no tiene actividad)")} className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-950/30">
-              {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{tt("Delete permanently", "Eliminar definitivamente")}
             </button>
           </div>
         ) : <span />}
@@ -498,7 +461,8 @@ function CreateLoginDialog({ tt, onClose, onCreated }: { tt: TT; onClose: () => 
   const ERR: Record<string, string> = {
     not_allowed: tt("Only owners/admins can do this.", "Solo propietarios/administradores pueden hacer esto."),
     invalid_email: tt("Invalid email.", "Correo inválido."),
-    weak_password: tt("Password must be at least 8 characters.", "La contraseña debe tener al menos 8 caracteres."),
+    weak_password: tt("Password must be at least 12 characters.", "La contraseña debe tener al menos 12 caracteres."),
+    account_exists_invite_required: tt("That account already exists and must accept a verified invitation.", "Esa cuenta ya existe y debe aceptar una invitación verificada."),
     create_failed: tt("Could not create the login.", "No se pudo crear el acceso."),
   };
 
@@ -533,7 +497,7 @@ function CreateLoginDialog({ tt, onClose, onCreated }: { tt: TT; onClose: () => 
             <Field label={tt("Email", "Correo")}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={200} className={inputCls} placeholder="persona@empresa.com" /></Field>
             <Field label={tt("Temporary password", "Clave temporal")}>
               <div className="flex items-center gap-2">
-                <input value={pwd} onChange={(e) => setPwd(e.target.value)} className={inputCls} placeholder={tt("Min. 8 characters", "Mín. 8 caracteres")} />
+                <input value={pwd} onChange={(e) => setPwd(e.target.value)} className={inputCls} placeholder={tt("Min. 12 characters", "Mín. 12 caracteres")} />
                 <button type="button" title={tt("Generate", "Generar")} onClick={() => setPwd(genTempPassword())} className="inline-flex items-center rounded-lg border border-border px-2.5 py-2 text-muted-foreground hover:bg-muted"><Wand2 className="h-4 w-4" /></button>
               </div>
             </Field>
@@ -548,7 +512,7 @@ function CreateLoginDialog({ tt, onClose, onCreated }: { tt: TT; onClose: () => 
           {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{ERR[error] ?? error}</p>}
           <div className="mt-5 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{tt("Cancel", "Cancelar")}</button>
-            <button type="button" disabled={!email.trim() || pwd.length < 8 || saving}
+            <button type="button" disabled={!email.trim() || pwd.length < 12 || saving}
               onClick={async () => {
                 setSaving(true); setError(null);
                 const r = await createMemberWithPasswordAction({ email: email.trim(), password: pwd, displayName: name, billingSeatType: seatFor(role) });
@@ -592,12 +556,14 @@ function InviteDialog({ tt, resource, onClose, onResult }: { tt: TT; resource: T
             const r = await inviteResourceAsUserAction({ resourceId: resource.id, email, role });
             if (r.error) {
               setSaving(false);
-              setError(r.error === "email_not_configured"
+              setError(r.error === "account_exists_invite_required"
+                ? tt("That account already exists and must accept a verified invitation.", "Esa cuenta ya existe y debe aceptar una invitación verificada.")
+                : r.error === "email_not_configured"
                 ? tt("Email delivery isn't configured yet. The invite is prepared; configure SMTP to send it.", "El envío de correo aún no está configurado. La invitación quedó preparada; configura SMTP para enviarla.")
                 : r.error === "not_allowed" ? tt("Only owners/admins can invite.", "Solo propietarios/administradores pueden invitar.")
                 : tt("Could not send the invite.", "No se pudo enviar la invitación."));
             } else {
-              onResult(r.status === "linked" ? tt("Linked to existing user", "Vinculado a usuario existente") : tt("Invite sent", "Invitación enviada"));
+              onResult(tt("Invite sent", "Invitación enviada"));
             }
           }}
           className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">

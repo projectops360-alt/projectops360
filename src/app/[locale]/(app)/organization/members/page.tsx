@@ -29,9 +29,14 @@ export default async function MembersPage({ params }: { params: Promise<{ locale
   const countById = new Map<string, number>();
   for (const r of (projectCounts.data ?? []) as Row[]) { const k = String(r.user_id); countById.set(k, (countById.get(k) ?? 0) + 1); }
 
-  // Emails (best-effort).
+  // Resolve only the current tenant's member ids; never enumerate global Auth users.
   const emailById = new Map<string, string>();
-  try { const { data: list } = await admin.auth.admin.listUsers(); for (const u of list?.users ?? []) if (u.email) emailById.set(u.id, u.email); } catch { /* ignore */ }
+  if (ids.length) {
+    const { data: emailRows } = await admin.rpc("admin_get_user_emails", { p_user_ids: ids });
+    for (const row of (emailRows ?? []) as { user_id: string; email: string | null }[]) {
+      if (row.email) emailById.set(row.user_id, row.email);
+    }
+  }
 
   const view = members.map((m) => {
     const uid = String(m.user_id);
