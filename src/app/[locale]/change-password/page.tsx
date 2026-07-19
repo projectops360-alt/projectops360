@@ -12,10 +12,13 @@ import { ChangePasswordForm } from "./change-password-form";
  */
 export default async function ChangePasswordPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ recovery?: string; invite?: string }>;
 }) {
   const { locale } = await params;
+  const query = await searchParams;
   setRequestLocale(locale);
 
   const supabase = await createClient();
@@ -25,5 +28,6 @@ export default async function ChangePasswordPage({
   }
 
   const forced = user!.user_metadata?.must_change_password === true;
-  return <ChangePasswordForm locale={locale as Locale} forced={forced} />;
+  const mode = query.recovery === "1" ? "recovery" : query.invite === "1" ? "invite" : undefined;
+  return <ChangePasswordForm locale={locale as Locale} forced={forced} mode={mode} />;
 }

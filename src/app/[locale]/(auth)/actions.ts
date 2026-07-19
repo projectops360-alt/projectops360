@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { getAuthEmailCallbackUrl } from "@/lib/auth/email-redirects.server";
 
 export async function loginAction(formData: FormData) {
   const supabase = await createClient();
@@ -32,11 +32,7 @@ export async function signupAction(formData: FormData) {
   // handle_new_user() trigger to name the new organization (both locales).
   const companyName = ((formData.get("companyName") as string) ?? "").trim();
 
-  // Prefer an explicit canonical site URL (production) over the request origin,
-  // so confirmation links always point at the real domain — not a Vercel preview
-  // hash URL or localhost. Falls back to the request origin for local dev.
-  const configuredSite = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "");
-  const origin = configuredSite || (await headers()).get("origin") || "http://localhost:3000";
+  const confirmationUrl = await getAuthEmailCallbackUrl();
 
   const { error } = await supabase.auth.signUp({
     email,
@@ -46,7 +42,7 @@ export async function signupAction(formData: FormData) {
         display_name: displayName,
         ...(companyName ? { company_name: companyName } : {}),
       },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: confirmationUrl,
     },
   });
 
@@ -55,6 +51,22 @@ export async function signupAction(formData: FormData) {
   }
 
   return { success: true, email };
+}
+
+export async function requestPasswordResetAction(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { error: "invalid_email" as const };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: await getAuthEmailCallbackUrl("/change-password?recovery=1"),
+  });
+
+  if (error) return { error: "delivery_failed" as const };
+
+  return { success: true as const };
 }
 
 export async function logoutAction() {

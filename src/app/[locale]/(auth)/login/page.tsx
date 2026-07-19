@@ -1,12 +1,15 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { LoginForm } from "@/components/auth/login-form";
+import { LoginForm, type LoginNotice } from "@/components/auth/login-form";
 
 export default async function LoginPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ authError?: string }>;
 }) {
   const { locale } = await params;
+  const { authError } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations("auth.login");
@@ -19,7 +22,13 @@ export default async function LoginPage({
         </h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </div>
-      <LoginForm />
+      <LoginForm
+        initialNotice={
+          authError === "confirmation_failed" || authError === "recovery_link_invalid"
+            ? (authError as LoginNotice)
+            : undefined
+        }
+      />
     </div>
   );
 }

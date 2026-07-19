@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthEmailCallbackUrl } from "@/lib/auth/email-redirects.server";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { planMerge, type MergeableResource } from "@/lib/team/merge";
@@ -309,8 +310,10 @@ export async function inviteResourceAsUserAction(input: {
     }
 
     // 2) Send an invite email (Supabase Auth). Requires SMTP/email config.
+    const redirectTo = await getAuthEmailCallbackUrl("/change-password?invite=1");
     const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(d.email, {
       data: { display_name: resource.name, invited_to_org: org.organizationId },
+      redirectTo,
     });
     if (inviteErr || !invited?.user) {
       return { error: "email_not_configured" };

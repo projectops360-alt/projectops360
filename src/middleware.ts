@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const intlMiddleware = createMiddleware(routing);
 
 // Paths that do NOT require authentication
-const publicPaths = ["/login", "/signup", "/auth/callback", "/navigator-preview"];
+const publicPaths = ["/login", "/signup", "/forgot-password", "/auth/callback", "/navigator-preview"];
 
 /**
  * Check if a pathname is a public (unauthenticated) path.
