@@ -6,13 +6,22 @@ import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import type { Locale } from "@/types/database";
 import { changeOwnPasswordAction } from "./actions";
 
-export function ChangePasswordForm({ locale, forced }: { locale: Locale; forced: boolean }) {
+export function ChangePasswordForm({
+  locale,
+  forced,
+  mode,
+}: {
+  locale: Locale;
+  forced: boolean;
+  mode?: "recovery" | "invite";
+}) {
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
   const router = useRouter();
   const [pwd, setPwd] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [pending, start] = useTransition();
 
   const ERRORS: Record<string, { en: string; es: string }> = {
@@ -31,9 +40,39 @@ export function ChangePasswordForm({ locale, forced }: { locale: Locale; forced:
     start(async () => {
       const r = await changeOwnPasswordAction({ password: pwd });
       if (!r.ok) return setError(r.error ?? "update_failed");
+      if (mode) return setSuccess(true);
       router.push("/");
       router.refresh();
     });
+  }
+
+  if (success) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+        <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+          <ShieldCheck className="mx-auto h-8 w-8 text-brand-600 dark:text-brand-400" />
+          <h1 className="mt-3 text-xl font-bold text-foreground">
+            {tt("Password updated", "Contraseña actualizada")}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {tt(
+              "Your password was updated successfully and your session is active.",
+              "Tu contraseña se actualizó correctamente y tu sesión está activa.",
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              router.push("/");
+              router.refresh();
+            }}
+            className="mt-5 w-full rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            {tt("Continue", "Continuar")}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -43,9 +82,23 @@ export function ChangePasswordForm({ locale, forced }: { locale: Locale; forced:
           <ShieldCheck className="h-5 w-5" />
           <span className="text-xs font-semibold uppercase tracking-wide">{tt("Security", "Seguridad")}</span>
         </div>
-        <h1 className="text-xl font-bold text-foreground">{tt("Set a new password", "Establece una nueva contraseña")}</h1>
+        <h1 className="text-xl font-bold text-foreground">
+          {mode === "invite"
+            ? tt("Create your password", "Crea tu contraseña")
+            : tt("Set a new password", "Establece una nueva contraseña")}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {forced
+          {mode === "recovery"
+            ? tt(
+                "Choose a new password to finish recovering your account.",
+                "Elige una contraseña nueva para terminar de recuperar tu cuenta.",
+              )
+            : mode === "invite"
+              ? tt(
+                  "Choose a password to finish accepting your invitation.",
+                  "Elige una contraseña para terminar de aceptar tu invitación.",
+                )
+            : forced
             ? tt(
                 "Your account uses a temporary password. Please choose a new one to continue.",
                 "Tu cuenta usa una contraseña temporal. Elige una nueva para continuar.",

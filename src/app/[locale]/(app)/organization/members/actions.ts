@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAuthEmailCallbackUrl } from "@/lib/auth/email-redirects.server";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { SEAT_TYPES } from "@/lib/billing/config";
@@ -275,7 +276,11 @@ export async function inviteMemberAction(input: { email: string; billingSeatType
       return { status: "linked" };
     }
 
-    const { data: invited, error: inviteErr } = await c.supabase.auth.admin.inviteUserByEmail(email, { data: { invited_to_org: c.org.organizationId } });
+    const redirectTo = await getAuthEmailCallbackUrl("/change-password?invite=1");
+    const { data: invited, error: inviteErr } = await c.supabase.auth.admin.inviteUserByEmail(email, {
+      data: { invited_to_org: c.org.organizationId },
+      redirectTo,
+    });
     if (inviteErr || !invited?.user) return { error: "email_not_configured" };
     await c.supabase.from("organization_members").upsert(
       { organization_id: c.org.organizationId, user_id: invited.user.id, role, billing_seat_type: seat, workspace_role: input.workspaceRole || null, status: "invited", invited_at: new Date().toISOString() },

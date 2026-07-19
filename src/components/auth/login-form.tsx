@@ -2,10 +2,12 @@
 
 import { useActionState } from "react";
 import { useTranslations } from "next-intl";
-import Link from "next/link";
 import { loginAction } from "@/app/[locale]/(auth)/actions";
+import { Link } from "@/i18n/navigation";
 
-export function LoginForm() {
+export type LoginNotice = "confirmation_failed" | "recovery_link_invalid";
+
+export function LoginForm({ initialNotice }: { initialNotice?: LoginNotice }) {
   const t = useTranslations("auth.login");
 
   async function handleLogin(
@@ -31,6 +33,12 @@ export function LoginForm() {
 
   return (
     <form action={formAction} className="space-y-4">
+      {initialNotice && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          {t(`notices.${initialNotice}`)}
+        </div>
+      )}
+
       {state?.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
           {state.error}
@@ -74,6 +82,15 @@ export function LoginForm() {
           placeholder="••••••"
           disabled={isPending}
         />
+      </div>
+
+      <div className="text-right">
+        <Link
+          href="/forgot-password"
+          className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+        >
+          {t("forgotPassword")}
+        </Link>
       </div>
 
       <button

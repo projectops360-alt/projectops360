@@ -22,8 +22,15 @@ const SEV_BADGE: Record<string, string> = {
   info: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
 };
 
-export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function HomePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ auth?: string }>;
+}) {
   const { locale } = await params;
+  const { auth } = await searchParams;
   setRequestLocale(locale);
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
@@ -55,6 +62,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     return (
       <div className="space-y-6">
         <Header tt={tt} base={base} />
+        {auth === "confirmed" && <EmailConfirmedBanner tt={tt} />}
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
           <Gauge className="h-10 w-10 text-muted-foreground" />
           <p className="max-w-md text-sm text-muted-foreground">
@@ -73,6 +81,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   return (
     <div className="space-y-6">
       <Header tt={tt} base={base} />
+      {auth === "confirmed" && <EmailConfirmedBanner tt={tt} />}
 
       {/* KPI cards — each drills into its related view */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -359,6 +368,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+function EmailConfirmedBanner({ tt }: { tt: (en: string, es: string) => string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
+      <CheckCircle2 className="h-4 w-4 shrink-0" />
+      {tt("Email confirmed successfully. Your session is now active.", "Correo confirmado correctamente. Tu sesión ya está activa.")}
     </div>
   );
 }

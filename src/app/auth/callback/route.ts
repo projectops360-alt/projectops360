@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeAuthNextPath } from "@/lib/auth/email-redirects";
 import { NextResponse } from "next/server";
 
 /**
@@ -14,17 +15,22 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const requestedNext = searchParams.get("next");
+  const next = sanitizeAuthNextPath(requestedNext, "/?auth=confirmed");
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(new URL(next, origin));
     }
   }
 
-  // If the code is missing or exchange failed, redirect to login with error
-  return NextResponse.redirect(`${origin}/login?error=confirmation_failed`);
+  const loginUrl = new URL("/login", origin);
+  loginUrl.searchParams.set(
+    "authError",
+    requestedNext?.includes("recovery=1") ? "recovery_link_invalid" : "confirmation_failed",
+  );
+  return NextResponse.redirect(loginUrl);
 }

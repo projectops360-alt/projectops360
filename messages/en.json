@@ -825,6 +825,10 @@
         "invalidCredentials": "Invalid email or password.",
         "emailNotConfirmed": "Please check your email and confirm your account before signing in.",
         "unexpected": "Something went wrong. Please try again."
+      },
+      "notices": {
+        "confirmation_failed": "The confirmation link is invalid or expired. Request a new confirmation email or try signing up again.",
+        "recovery_link_invalid": "The password recovery link is invalid or expired. Request a new link."
       }
     },
     "signup": {
@@ -849,6 +853,19 @@
         "title": "Check your email",
         "message": "We sent a confirmation link to {email}. Click the link to verify your account.",
         "backToLogin": "Back to sign in"
+      }
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "Enter your email to receive a secure recovery link.",
+      "email": "Email address",
+      "submit": "Send recovery link",
+      "sending": "Sending…",
+      "success": "If an account exists for that email, a recovery link has been sent.",
+      "backToLogin": "Back to sign in",
+      "errors": {
+        "invalid_email": "Enter a valid email address.",
+        "delivery_failed": "The recovery email could not be sent. Please try again later or contact support."
       }
     },
     "logout": {
