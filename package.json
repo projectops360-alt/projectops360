@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/generate-product-brain-content.mjs",
+    "predev": "node scripts/validate-supabase-environment.mjs --target staging && node scripts/generate-product-brain-content.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/generate-product-brain-content.mjs",
+    "prebuild": "node scripts/validate-supabase-environment.mjs --target auto && node scripts/generate-product-brain-content.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,6 +14,9 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:list": "playwright test --list",
+    "env:check": "node scripts/validate-supabase-environment.mjs --target auto",
+    "env:check:development": "node scripts/validate-supabase-environment.mjs --target staging",
+    "env:check:production": "node scripts/validate-supabase-environment.mjs --target production",
     "knowledge:backfill": "tsx scripts/backfill-process-discovery-knowledge.ts"
   },
   "dependencies": {

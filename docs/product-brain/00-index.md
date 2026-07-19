@@ -68,6 +68,7 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [30-product-decision-log.md](30-product-decision-log.md) | **Product Decision Log** — binding decisions (PD-001…PD-009, incl. PD-009 BIM Navigation Placement) |
 | [31-dr-isabella-product-intelligence.md](31-dr-isabella-product-intelligence.md) | **Dr. Isabella** — Product Intelligence Expert: Product-Brain grounding, knowledge hierarchy, authority order, sources & verification |
 | [32-product-ux-contracts.md](32-product-ux-contracts.md) | **Product UX Contracts** — approved, test-protected UX behaviors (UX-001 Isabella Welcome Hero Lifecycle) |
+| [33-environment-release-operations.md](33-environment-release-operations.md) | **Environment & Release Operations Contract** — executable staging/production boundaries, release gates, recovery and production operations |
 | [project-knowledge-objects.md](project-knowledge-objects.md) | **Project Knowledge Objects** — project-scoped types, evidence, versioning, lifecycle, access boundary, and MPF proposal promotion |
 | [canonical-living-graph-specification.md](canonical-living-graph-specification.md) | **Canonical Living Graph Specification** — six layers, semantic classes, allowed connections, Knowledge projection and validation |
 | [process-discovery-conformance.md](process-discovery-conformance.md) | **P4-T1 Process Discovery** — taxonomy, direct-follow paths, variants, declared-model conformance and honest temporal metrics |

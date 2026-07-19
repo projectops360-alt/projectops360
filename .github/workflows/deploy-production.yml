@@ -1,26 +1,13 @@
 name: Deploy Production
 
-# Auto-promote master to the production domain (projectops360.vercel.app).
-#
-# WHY THIS EXISTS: pushing to master creates a Vercel "production" build, but that
-# build does NOT move the projectops360.vercel.app alias on its own — the alias was
-# only ever updated by `vercel --prod` from the CLI. This workflow runs that promote
-# step automatically after every merge, so the live domain always matches master.
-#
-# ONE-TIME SETUP: add a repo secret VERCEL_TOKEN
-#   (GitHub → Settings → Secrets and variables → Actions → New repository secret).
-#   Create the token at https://vercel.com/account/tokens (scope: the project's team).
-# The org/project IDs below are NOT secret (they live in .vercel/project.json).
-#
-# Until the secret exists the job runs but SKIPS gracefully (stays green), so this
-# never blocks a merge.
-
 on:
-  push:
-    branches: [master]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
 
-# Never run two production promotions at once; let the newest finish (don't cancel
-# a promote mid-flight).
+permissions:
+  contents: read
+
 concurrency:
   group: production-deploy
   cancel-in-progress: false
@@ -32,40 +19,62 @@ env:
 
 jobs:
   deploy:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'master'
+      }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://projectops360.com
     steps:
-      - name: Guard — require VERCEL_TOKEN
-        id: guard
+      - name: Guard - require deployment credentials
         run: |
+          set -euo pipefail
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::warning::VERCEL_TOKEN secret is not set — skipping production deploy. Add it in repo Settings → Secrets → Actions."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "::error::VERCEL_TOKEN is required for production deployment."
+            exit 1
           fi
 
-      - name: Checkout
-        if: steps.guard.outputs.skip != 'true'
+      - name: Checkout exact CI-approved commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node
-        if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
 
-      - name: Install Vercel CLI
-        if: steps.guard.outputs.skip != 'true'
-        run: npm install -g vercel@latest
+      - name: Install pinned Vercel CLI
+        run: npm install -g vercel@54.21.1
 
-      - name: Pull Vercel project settings (production)
-        if: steps.guard.outputs.skip != 'true'
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Deploy exact CI-approved commit
+        id: deploy
+        run: |
+          set -euo pipefail
+          output="$(vercel deploy --prod --yes --token="$VERCEL_TOKEN")"
+          deployment_url="$(printf '%s\n' "$output" | tail -n 1)"
+          if [[ "$deployment_url" != https://* ]]; then
+            echo "::error::Vercel did not return a deployment URL."
+            exit 1
+          fi
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
 
-      - name: Build (production)
-        if: steps.guard.outputs.skip != 'true'
-        run: vercel build --prod --token="$VERCEL_TOKEN"
-
-      - name: Deploy prebuilt to production (auto-aliases projectops360.vercel.app)
-        if: steps.guard.outputs.skip != 'true'
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      - name: Smoke production domain
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            status="$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 https://projectops360.com/landing || true)"
+            if [[ "$status" == "200" ]]; then
+              echo "Production smoke passed."
+              exit 0
+            fi
+            echo "Attempt $attempt returned HTTP $status; retrying..."
+            sleep 10
+          done
+          echo "::error::Production smoke failed. Previous Vercel deployment remains available for rollback."
+          exit 1
