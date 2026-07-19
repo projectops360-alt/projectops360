@@ -108,6 +108,13 @@ Translations live in `messages/en.json` and `messages/es.json`. Add new keys und
 
 ## Environment Variables
 
+Environment boundaries are mandatory:
+
+- Local, Vercel Development and Preview use Supabase staging (`gcxcljfzleasrleyyyda`).
+- Vercel Production uses Supabase production (`ocopmlnkvidvmxgiwvxw`).
+- `npm run env:check` verifies the current environment without printing secrets.
+- The complete release policy is in [`docs/product-brain/33-environment-release-operations.md`](docs/product-brain/33-environment-release-operations.md).
+
 | Variable | Scope | Description |
 |----------|-------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Public | Supabase project URL |

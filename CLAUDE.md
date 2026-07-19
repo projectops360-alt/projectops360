@@ -53,5 +53,12 @@ stop it — executable checks do. See `docs/product-brain/11-ai-development-rule
 - Deploy: `vercel --prod` (CLI linked; auto-aliases `projectops360.vercel.app`).
 - Prod Supabase project ref: `ocopmlnkvidvmxgiwvxw` (org `gbubmgyeymcclwgezkkj`). Two
   Supabase accounts exist — do not confuse them.
+- Staging Supabase project ref: `gcxcljfzleasrleyyyda`. Local, Development and Preview
+  must use staging; Production must use `ocopmlnkvidvmxgiwvxw`. Never cross these
+  boundaries. The executable guard is `scripts/validate-supabase-environment.mjs` and
+  the binding runbook is `docs/product-brain/33-environment-release-operations.md`.
+- Production deploys only the exact commit that passed CI, through the GitHub
+  `production` environment and its required manual approval. Never bypass the environment
+  guard or deploy a failed CI run.
 - Commit messages end with the `Co-Authored-By: Claude …` trailer; branch off `master`
   (protected) and open a PR — CI must be green before merge.
