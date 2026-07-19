@@ -95,7 +95,7 @@ describe("membership plan catalog", () => {
 
   it("uses a data-only migration that preserves plan and subscription identities", () => {
     const sql = readFileSync(
-      join(process.cwd(), "supabase", "migrations", "20260851000000_membership_plan_catalog.sql"),
+      join(process.cwd(), "supabase", "migrations", "20260853000000_membership_plan_catalog.sql"),
       "utf8",
     );
 
