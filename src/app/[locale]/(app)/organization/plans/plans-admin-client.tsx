@@ -9,13 +9,29 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Save, CheckCircle2, Tag } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { LIMIT_FIELDS, FEATURE_FIELDS, PLAN_LABELS } from "@/lib/billing/config";
+import {
+  FEATURE_FIELDS,
+  getCapabilitiesForPlan,
+  isPlanCode,
+  LIMIT_FIELDS,
+  PLAN_CODES,
+  PLAN_LABELS,
+  type PlanCapability,
+  type PlanCode,
+} from "@/lib/billing/config";
 import { updatePlanAction, updateEntitlementsAction } from "./actions";
-import { getCapabilityGroupsForPlan, isPlanCode, PLAN_COMMERCIAL_CATALOG } from "./plan-catalog";
 
 const inp = "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
-export function PlansAdminClient({ locale, plans }: { locale: string; plans: Record<string, unknown>[] }) {
+export function PlansAdminClient({
+  locale,
+  plans,
+  capabilities,
+}: {
+  locale: string;
+  plans: Record<string, unknown>[];
+  capabilities: PlanCapability[];
+}) {
   const isEs = locale === "es";
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -27,19 +43,41 @@ export function PlansAdminClient({ locale, plans }: { locale: string; plans: Rec
         <p className="mt-1 text-sm text-muted-foreground">{isEs ? "Edita precios y límites. Los cambios aplican a todas las organizaciones (planes globales)." : "Edit prices and limits. Changes apply to all organizations (global plans)."}</p>
         <Link href="/organization/billing" className="mt-1 inline-block text-xs text-brand-600 hover:underline dark:text-brand-400">← {isEs ? "Volver a facturación" : "Back to billing"}</Link>
       </div>
-      {plans.map((p) => <PlanCard key={String(p.id)} plan={p} isEs={isEs} />)}
+      {plans.map((p) => (
+        <PlanCard
+          key={String(p.id)}
+          plan={p}
+          isEs={isEs}
+          capabilities={capabilities}
+        />
+      ))}
     </div>
   );
 }
 
-function PlanCard({ plan, isEs }: { plan: Record<string, unknown>; isEs: boolean }) {
+function PlanCard({
+  plan,
+  isEs,
+  capabilities,
+}: {
+  plan: Record<string, unknown>;
+  isEs: boolean;
+  capabilities: PlanCapability[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
   const ent = (plan.entitlements as Record<string, unknown> | null) ?? {};
   const code = String(plan.plan_code);
-  const catalogPlan = isPlanCode(code) ? PLAN_COMMERCIAL_CATALOG[code] : null;
-  const capabilityGroups = getCapabilityGroupsForPlan(code);
+  const includedCapabilities = isPlanCode(code)
+    ? getCapabilitiesForPlan(code, capabilities)
+    : [];
+  const capabilityGroups = PLAN_CODES.map((tier) => ({
+    tier,
+    capabilities: includedCapabilities.filter(
+      (capability) => capability.minimumPlanCode === tier,
+    ),
+  })).filter((group) => group.capabilities.length > 0);
 
   const [name, setName] = useState(String(plan.name ?? ""));
   const [description, setDescription] = useState(String(plan.description ?? ""));
@@ -78,11 +116,7 @@ function PlanCard({ plan, isEs }: { plan: Record<string, unknown>; isEs: boolean
             {plan.is_enterprise === true && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">Enterprise</span>}
             {!isActive && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">{isEs ? "Inactivo" : "Inactive"}</span>}
           </h2>
-          {catalogPlan && (
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {catalogPlan.subtitle[isEs ? "es" : "en"]}
-            </p>
-          )}
+          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
         </div>
         <button onClick={save} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
@@ -140,13 +174,13 @@ function PlanCard({ plan, isEs }: { plan: Record<string, unknown>; isEs: boolean
             {capabilityGroups.map((group) => (
               <div key={group.tier} className="rounded-xl border border-border/70 bg-muted/20 p-3">
                 <p className="mb-2 text-xs font-semibold text-foreground">
-                  {group.title[isEs ? "es" : "en"]}
+                  {capabilityGroupTitle(group.tier, isEs)}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {group.capabilities.map((capability) => (
                     <div key={capability.key} className="flex items-center gap-2 text-sm text-foreground">
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
-                      <span>{capability.label[isEs ? "es" : "en"]}</span>
+                      <span>{isEs ? capability.labelEs : capability.labelEn}</span>
                     </div>
                   ))}
                 </div>
@@ -162,6 +196,11 @@ function PlanCard({ plan, isEs }: { plan: Record<string, unknown>; isEs: boolean
       )}
     </div>
   );
+}
+
+function capabilityGroupTitle(tier: PlanCode, isEs: boolean): string {
+  const planName = PLAN_LABELS[tier]?.[isEs ? "es" : "en"] ?? tier;
+  return isEs ? `Incluido desde ${planName}` : `Included from ${planName}`;
 }
 
 function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {

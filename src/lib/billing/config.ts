@@ -77,6 +77,31 @@ export function isPlanCode(value: string): value is PlanCode {
   return PLAN_CODES.some((planCode) => planCode === value);
 }
 
+export interface PlanCapability {
+  key: string;
+  minimumPlanCode: PlanCode;
+  labelEn: string;
+  labelEs: string;
+  sortOrder: number;
+}
+
+const PLAN_TIER: Record<PlanCode, number> = {
+  personal: 0,
+  team: 1,
+  business: 2,
+  enterprise: 3,
+};
+
+export function getCapabilitiesForPlan(
+  planCode: PlanCode,
+  capabilities: PlanCapability[],
+): PlanCapability[] {
+  return capabilities.filter(
+    (capability) =>
+      PLAN_TIER[capability.minimumPlanCode] <= PLAN_TIER[planCode],
+  );
+}
+
 export type PlanPricingPeriod = "perMonth" | "perUserMonth" | "none";
 
 export interface PublicPricingPlan {
@@ -87,6 +112,7 @@ export interface PublicPricingPlan {
   currency: string;
   isEnterprise: boolean;
   sortOrder: number;
+  capabilities: PlanCapability[];
 }
 
 export function getPlanPricingPeriod(
