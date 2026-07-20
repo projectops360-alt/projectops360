@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { getOrgContext } from "@/lib/auth";
 import { getPlansWithEntitlements } from "@/lib/billing/service";
+import { getPlanCapabilityCatalog } from "@/lib/billing/plan-capabilities.server";
 import { isPlatformAdmin } from "@/lib/admin-console/access.server";
 import { PlansAdminClient } from "./plans-admin-client";
 
@@ -13,6 +14,15 @@ export default async function PlansAdminPage({ params }: { params: Promise<{ loc
   const org = await getOrgContext();
   if (!(await isPlatformAdmin(org.email))) notFound();
 
-  const plans = await getPlansWithEntitlements();
-  return <PlansAdminClient locale={locale} plans={plans as unknown as Record<string, unknown>[]} />;
+  const [plans, capabilities] = await Promise.all([
+    getPlansWithEntitlements(),
+    getPlanCapabilityCatalog(),
+  ]);
+  return (
+    <PlansAdminClient
+      locale={locale}
+      plans={plans as unknown as Record<string, unknown>[]}
+      capabilities={capabilities}
+    />
+  );
 }

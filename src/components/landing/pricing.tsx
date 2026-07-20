@@ -34,7 +34,6 @@ export function Pricing({ plans }: PricingProps) {
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-center">
           {plans.map((plan, i) => {
-            const features = t(`pricing.plans.${plan.planCode}.features`, { returnObjects: true }) as string[];
             const featured = plan.planCode === "business";
             const period = getPlanPricingPeriod(plan.planCode, plan.isEnterprise);
             const formattedPrice = plan.isEnterprise
@@ -66,11 +65,13 @@ export function Pricing({ plans }: PricingProps) {
                 </div>
                 <p className="mt-3 text-[13.5px] leading-[1.55] text-[#5f6b66]">{t(`pricing.plans.${plan.planCode}.desc`)}</p>
 
-                <ul className="mt-5 flex flex-1 flex-col gap-2.5">
-                  {features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13.5px] text-[#07130f]">
+                <ul className="mt-5 flex flex-1 flex-col gap-2.5 lg:max-h-[440px] lg:overflow-y-auto lg:pr-2">
+                  {plan.capabilities.map((capability) => (
+                    <li key={capability.key} className="flex items-start gap-2 text-[13.5px] text-[#07130f]">
                       <Check size={16} strokeWidth={2.4} className="mt-0.5 flex-shrink-0 text-[#007a4d]" />
-                      {f}
+                      {i18n.resolvedLanguage === "es"
+                        ? capability.labelEs
+                        : capability.labelEn}
                     </li>
                   ))}
                 </ul>
@@ -83,7 +84,7 @@ export function Pricing({ plans }: PricingProps) {
                       : "border border-[#bcd8cb] text-[#07130f] hover:bg-[#f0fbf5]"
                   }`}
                 >
-                  {t(`pricing.plans.${plan.planCode}.cta`)}
+                  {t("pricing.trialCta")}
                 </a>
               </Reveal>
             );

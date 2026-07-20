@@ -16,8 +16,11 @@ export const metadata: Metadata = {
   title: "ProjectOps360°",
   description: "Project Operations Management Platform",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
   },
 };
 
