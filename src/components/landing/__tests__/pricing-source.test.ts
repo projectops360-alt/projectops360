@@ -8,9 +8,9 @@ function readSource(path: string): string {
 
 describe("landing pricing source", () => {
   it("loads commercial values from the plans table", () => {
-    expect(readSource("src/app/landing/page.tsx")).toContain(
-      "getPublicPricingPlans",
-    );
+    const landingPage = readSource("src/app/landing/page.tsx");
+    expect(landingPage).toContain("await connection()");
+    expect(landingPage).toContain("getPublicPricingPlans");
     expect(readSource("src/lib/billing/public-plans.ts")).toContain(
       '.from("plans")',
     );

@@ -10,10 +10,10 @@ import { Pricing } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
 import { getPublicPricingPlans } from "@/lib/billing/public-plans";
-
-export const revalidate = 300;
+import { connection } from "next/server";
 
 export default async function LandingPage() {
+  await connection();
   const plans = await getPublicPricingPlans();
 
   return (
