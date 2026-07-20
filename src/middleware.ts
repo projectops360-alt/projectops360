@@ -1,5 +1,6 @@
 import createMiddleware from "next-intl/middleware";
 import { routing } from "@/i18n/routing";
+import { isUnlocalizedPath } from "@/lib/i18n/unlocalized-paths";
 import { updateSession } from "@/lib/supabase/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -38,16 +39,10 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Routes OUTSIDE the [locale] segment ──
-  // /landing (marketing) and /navigator-preview (temporary Navigator harness)
-  // live outside [locale]. next-intl would otherwise rewrite them to
-  // /en/<path> (which doesn't exist) and 404. Bypass next-intl rewriting + the
-  // auth guard so they render directly for anyone.
-  if (
-    pathname === "/landing" ||
-    pathname.startsWith("/landing/") ||
-    pathname === "/navigator-preview" ||
-    pathname.startsWith("/navigator-preview/")
-  ) {
+  // These routes live outside [locale]. next-intl would otherwise rewrite
+  // them to /en/<path>, which does not exist. The auth callback must also
+  // remain untouched so Supabase can exchange its confirmation code.
+  if (isUnlocalizedPath(pathname)) {
     return NextResponse.next();
   }
 

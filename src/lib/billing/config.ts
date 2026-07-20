@@ -69,7 +69,33 @@ export const MEMBER_STATUSES: { value: string; es: string; en: string; tone: str
 
 // ── Plans ───────────────────────────────────────────────────────────────────
 
-export type PlanCode = "personal" | "team" | "business" | "enterprise";
+export const PLAN_CODES = ["personal", "team", "business", "enterprise"] as const;
+
+export type PlanCode = (typeof PLAN_CODES)[number];
+
+export function isPlanCode(value: string): value is PlanCode {
+  return PLAN_CODES.some((planCode) => planCode === value);
+}
+
+export type PlanPricingPeriod = "perMonth" | "perUserMonth" | "none";
+
+export interface PublicPricingPlan {
+  planCode: PlanCode;
+  name: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  currency: string;
+  isEnterprise: boolean;
+  sortOrder: number;
+}
+
+export function getPlanPricingPeriod(
+  planCode: PlanCode,
+  isEnterprise: boolean,
+): PlanPricingPeriod {
+  if (isEnterprise) return "none";
+  return planCode === "personal" ? "perMonth" : "perUserMonth";
+}
 
 export const PLAN_LABELS: Record<string, { es: string; en: string }> = {
   personal: { es: "Personal", en: "Personal" },

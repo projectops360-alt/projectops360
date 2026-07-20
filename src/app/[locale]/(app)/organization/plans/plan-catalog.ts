@@ -1,4 +1,6 @@
-import type { PlanCode } from "@/lib/billing/config";
+import { isPlanCode, type PlanCode } from "@/lib/billing/config";
+
+export { isPlanCode };
 
 export type PlanLimitKey =
   | "max_active_projects"
@@ -299,10 +301,6 @@ const PLAN_TIER: Record<PlanCode, number> = {
   business: 2,
   enterprise: 3,
 };
-
-export function isPlanCode(value: string): value is PlanCode {
-  return Object.prototype.hasOwnProperty.call(PLAN_COMMERCIAL_CATALOG, value);
-}
 
 export function getCapabilityGroupsForPlan(planCode: string): PlanCapabilityGroup[] {
   if (!isPlanCode(planCode)) return [];

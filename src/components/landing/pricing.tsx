@@ -4,18 +4,17 @@ import { useTranslation } from "react-i18next";
 import { Check } from "lucide-react";
 import { Reveal } from "./reveal";
 import { useAuthPaths } from "./auth-links";
+import {
+  getPlanPricingPeriod,
+  type PublicPricingPlan,
+} from "@/lib/billing/config";
 
-type Plan = { key: string; period: "perMonth" | "perUserMonth" | "none"; featured?: boolean };
+interface PricingProps {
+  plans: PublicPricingPlan[];
+}
 
-const PLANS: Plan[] = [
-  { key: "personal", period: "perMonth" },
-  { key: "team", period: "perUserMonth" },
-  { key: "business", period: "perUserMonth", featured: true },
-  { key: "enterprise", period: "none" },
-];
-
-export function Pricing() {
-  const { t } = useTranslation();
+export function Pricing({ plans }: PricingProps) {
+  const { t, i18n } = useTranslation();
   const auth = useAuthPaths();
   return (
     <section id="pricing" className="relative overflow-hidden bg-[#f8faf7] px-6 py-24 md:px-10">
@@ -34,12 +33,20 @@ export function Pricing() {
         </Reveal>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:items-center">
-          {PLANS.map((plan, i) => {
-            const features = t(`pricing.plans.${plan.key}.features`, { returnObjects: true }) as string[];
-            const featured = plan.featured;
+          {plans.map((plan, i) => {
+            const features = t(`pricing.plans.${plan.planCode}.features`, { returnObjects: true }) as string[];
+            const featured = plan.planCode === "business";
+            const period = getPlanPricingPeriod(plan.planCode, plan.isEnterprise);
+            const formattedPrice = plan.isEnterprise
+              ? t("pricing.custom")
+              : new Intl.NumberFormat(i18n.resolvedLanguage ?? "en", {
+                  style: "currency",
+                  currency: plan.currency,
+                  maximumFractionDigits: 0,
+                }).format(plan.monthlyPrice);
             return (
               <Reveal
-                key={plan.key}
+                key={plan.planCode}
                 index={i}
                 className={`relative flex flex-col rounded-[20px] bg-white p-7 ${
                   featured
@@ -52,12 +59,12 @@ export function Pricing() {
                     {t("pricing.mostPopular")}
                   </span>
                 )}
-                <h3 className="text-[15px] font-bold text-[#5f6b66]">{t(`pricing.plans.${plan.key}.name`)}</h3>
+                <h3 className="text-[15px] font-bold text-[#5f6b66]">{plan.name}</h3>
                 <div className="mt-3 flex items-baseline gap-1.5">
-                  <span className="lp-display text-[36px] font-extrabold leading-none text-[#07130f]">{t(`pricing.plans.${plan.key}.price`)}</span>
-                  {plan.period !== "none" && <span className="text-[13px] font-medium text-[#7b877f]">{t(`pricing.${plan.period}`)}</span>}
+                  <span className="lp-display text-[36px] font-extrabold leading-none text-[#07130f]">{formattedPrice}</span>
+                  {period !== "none" && <span className="text-[13px] font-medium text-[#7b877f]">{t(`pricing.${period}`)}</span>}
                 </div>
-                <p className="mt-3 text-[13.5px] leading-[1.55] text-[#5f6b66]">{t(`pricing.plans.${plan.key}.desc`)}</p>
+                <p className="mt-3 text-[13.5px] leading-[1.55] text-[#5f6b66]">{t(`pricing.plans.${plan.planCode}.desc`)}</p>
 
                 <ul className="mt-5 flex flex-1 flex-col gap-2.5">
                   {features.map((f) => (
@@ -69,14 +76,14 @@ export function Pricing() {
                 </ul>
 
                 <a
-                  href={`${auth.signup}?plan=${plan.key}`}
+                  href={`${auth.signup}?plan=${plan.planCode}`}
                   className={`mt-7 inline-flex min-h-[46px] items-center justify-center rounded-full px-5 text-[14px] font-bold transition-colors ${
                     featured
                       ? "bg-[#007a4d] text-white hover:bg-[#066b44]"
                       : "border border-[#bcd8cb] text-[#07130f] hover:bg-[#f0fbf5]"
                   }`}
                 >
-                  {t(`pricing.plans.${plan.key}.cta`)}
+                  {t(`pricing.plans.${plan.planCode}.cta`)}
                 </a>
               </Reveal>
             );
