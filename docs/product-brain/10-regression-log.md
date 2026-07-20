@@ -759,5 +759,33 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-024 — Supabase email confirmation callback rewritten to a missing locale route
+
+- **Reported:** 2026-07-19. Confirmation email opened `/auth/callback?code=...` and production
+  returned `404`.
+- **Root cause:** the route handler intentionally lives outside `[locale]`, but next-intl middleware
+  rewrote it to `/en/auth/callback`; only landing and Navigator were bypassed.
+- **Status: RESOLVED.** All non-localized app routes are centralized in
+  `src/lib/i18n/unlocalized-paths.ts`; middleware bypasses them before next-intl and Auth session
+  handling.
+- **Protection rule:** `/auth/callback` must never be localized. CI protects the registry and the
+  production workflow smokes an invalid callback code, which must redirect instead of returning 404.
+
+---
+
+## REG-025 — Landing pricing diverged from the plan catalog
+
+- **Reported:** 2026-07-19. Landing displayed Personal `$0`, Team `$29` and Business `$99` while
+  production `plans` contained Personal `$9`, Team `$16` and Business `$29`.
+- **Root cause:** prices were duplicated in EN/ES translation JSON and rendered independently from
+  the billing tables.
+- **Status: RESOLVED.** Landing reads active plan commercial values from `public.plans`; translation
+  files contain presentation copy only. Personal is monthly individual billing, Team and Business
+  are monthly per-user billing, and Enterprise is custom.
+- **Protection rule:** no price or currency literal may be added to landing translations/components;
+  changes to the plan table are the only supported commercial update path.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

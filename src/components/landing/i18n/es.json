@@ -187,31 +187,24 @@
     "mostPopular": "★ Más popular",
     "perMonth": "/mes",
     "perUserMonth": "/usuario/mes",
+    "custom": "Personalizado",
     "plans": {
       "personal": {
-        "name": "Personal",
-        "price": "$0",
         "desc": "Para validar proyectos, estudiantes o fundadores.",
         "features": ["Workspace personal", "Proyectos limitados", "Charter básico", "Créditos IA limitados"],
-        "cta": "Comenzar gratis"
+        "cta": "Comenzar"
       },
       "team": {
-        "name": "Team",
-        "price": "$29",
         "desc": "Para startups y equipos pequeños con visibilidad compartida.",
         "features": ["Workspace de empresa", "Equipos reusables", "Roles y permisos", "Acceso básico stakeholders"],
         "cta": "Probar 14 días"
       },
       "business": {
-        "name": "Business / PMO",
-        "price": "$99",
         "desc": "Para equipos serios que necesitan gobernanza e inteligencia.",
         "features": ["Gobernanza avanzada", "Detección de desvíos", "Reportes ejecutivos", "Memoria de proyecto ilimitada"],
         "cta": "Contratar ahora"
       },
       "enterprise": {
-        "name": "Enterprise",
-        "price": "Custom",
         "desc": "Para empresas reguladas y grandes implementaciones.",
         "features": ["Límites personalizados", "SSO y auditoría", "Integraciones avanzadas", "Soporte dedicado"],
         "cta": "Hablar con ventas"

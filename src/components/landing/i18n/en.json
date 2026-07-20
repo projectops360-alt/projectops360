@@ -187,31 +187,24 @@
     "mostPopular": "★ Most popular",
     "perMonth": "/mo",
     "perUserMonth": "/user/mo",
+    "custom": "Custom",
     "plans": {
       "personal": {
-        "name": "Personal",
-        "price": "$0",
         "desc": "For validating projects, students or founders.",
         "features": ["Personal workspace", "Limited projects", "Basic charter", "Limited AI credits"],
-        "cta": "Start free"
+        "cta": "Get started"
       },
       "team": {
-        "name": "Team",
-        "price": "$29",
         "desc": "For startups and small teams with shared visibility.",
         "features": ["Company workspace", "Reusable teams", "Roles and permissions", "Basic stakeholder access"],
         "cta": "Try 14 days"
       },
       "business": {
-        "name": "Business / PMO",
-        "price": "$99",
         "desc": "For serious teams that need governance and intelligence.",
         "features": ["Advanced governance", "Drift detection", "Executive reports", "Unlimited project memory"],
         "cta": "Get started"
       },
       "enterprise": {
-        "name": "Enterprise",
-        "price": "Custom",
         "desc": "For regulated companies and large rollouts.",
         "features": ["Custom limits", "SSO and auditing", "Advanced integrations", "Dedicated support"],
         "cta": "Talk to sales"

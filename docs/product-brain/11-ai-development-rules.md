@@ -6,7 +6,7 @@ defect.
 
 ---
 
-## The 12 rules
+## Binding rules
 
 1. **Never remove, hide, replace, or degrade existing functionality** without explicit,
    recorded approval. If a change would do so, stop and surface it. (See REG log; this is the
@@ -44,8 +44,17 @@ breaking it breaks an automated check. These rules turn the prose above into enf
 16. **CI is the wall.** `.github/workflows/ci.yml` runs typecheck + the full test suite + build on
     every PR and push to `master`. With branch protection, **no green CI → no merge**. Do not weaken,
     skip, or `continue-on-error` the regression suite to make a PR pass.
+17. **Routes outside `[locale]` must be registered once.** Every public route handler or page that
+    lives outside the locale segment must be declared in `src/lib/i18n/unlocalized-paths.ts` and
+    covered by its regression test. Never duplicate bypass lists in middleware.
+18. **Commercial values come from the database.** Public and authenticated pricing must read the
+    active `plans` rows. Prices, currency, enterprise status and plan order must never be duplicated
+    in components, translation JSON, environment variables or marketing constants.
+19. **Authentication callbacks are a release gate.** Production smoke checks must prove that
+    `/auth/callback` resolves to the route handler and redirects an invalid code to the login flow;
+    any `404` blocks release completion.
 
-> Mantra: **No green test, no closed regression. No CI, no merge. No Product UX Contract, no UI overwrite.**
+> Mantra: **No green test, no closed regression. No CI, no merge. No Product UX Contract, no UI overwrite. No duplicated commercial truth.**
 
 ## Operating procedure (per task)
 

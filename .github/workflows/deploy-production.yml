@@ -67,14 +67,25 @@ jobs:
       - name: Smoke production domain
         run: |
           set -euo pipefail
+          landing_ok=false
           for attempt in {1..12}; do
             status="$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 https://projectops360.com/landing || true)"
             if [[ "$status" == "200" ]]; then
-              echo "Production smoke passed."
-              exit 0
+              landing_ok=true
+              break
             fi
             echo "Attempt $attempt returned HTTP $status; retrying..."
             sleep 10
           done
-          echo "::error::Production smoke failed. Previous Vercel deployment remains available for rollback."
-          exit 1
+          if [[ "$landing_ok" != "true" ]]; then
+            echo "::error::Production landing smoke failed. Previous Vercel deployment remains available for rollback."
+            exit 1
+          fi
+
+          callback_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 20 'https://projectops360.com/auth/callback?code=release-smoke-invalid' || true)"
+          if [[ "$callback_status" != "303" && "$callback_status" != "307" && "$callback_status" != "308" ]]; then
+            echo "::error::Auth callback smoke returned HTTP $callback_status; expected a redirect, never 404."
+            exit 1
+          fi
+
+          echo "Production landing and auth callback smokes passed."

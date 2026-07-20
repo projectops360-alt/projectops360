@@ -9,8 +9,13 @@ import { About } from "@/components/landing/about";
 import { Pricing } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
+import { getPublicPricingPlans } from "@/lib/billing/public-plans";
 
-export default function LandingPage() {
+export const revalidate = 300;
+
+export default async function LandingPage() {
+  const plans = await getPublicPricingPlans();
+
   return (
     <>
       <Hero />
@@ -22,7 +27,7 @@ export default function LandingPage() {
         <AiSection />
         <Quote />
         <About />
-        <Pricing />
+        <Pricing plans={plans} />
         <FinalCta />
       </main>
       <Footer />
