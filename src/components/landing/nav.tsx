@@ -15,9 +15,9 @@ export function LandingNav() {
   const { t } = useTranslation();
   const auth = useAuthPaths();
   return (
-    <nav className="relative z-10 mx-auto flex max-w-[1240px] items-center justify-between gap-4 px-6 py-5 md:px-10 md:py-6">
+    <nav className="relative z-10 mx-auto flex max-w-[1240px] items-center justify-between gap-2 px-4 py-5 sm:gap-4 sm:px-6 md:px-10 md:py-6">
       <a href="#" className="flex items-center" aria-label="ProjectOps 360°">
-        <LogoStage className="h-16 md:h-[72px]" />
+        <LogoStage className="h-12 sm:h-16 md:h-[72px]" />
       </a>
 
       <div className="hidden items-center gap-9 text-[15px] font-semibold text-[#5f6b66] lg:flex">
@@ -35,7 +35,7 @@ export function LandingNav() {
         </a>
         <a
           href={auth.signup}
-          className="inline-flex items-center rounded-full bg-[#007a4d] px-[22px] py-3 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(0,122,77,.6)] transition-transform hover:-translate-y-px"
+          className="hidden items-center rounded-full bg-[#007a4d] px-[22px] py-3 text-[15px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(0,122,77,.6)] transition-transform hover:-translate-y-px sm:inline-flex"
         >
           {t("nav.requestAccess")}
         </a>
