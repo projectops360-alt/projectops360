@@ -41,7 +41,7 @@ const T = {
     recent: "Recent saved reports", noRecent: "Create your first custom report using curated ProjectOps360° datasets.",
     run: "Run", open: "Open", dataset: "Dataset", columns: "Columns", filters: "Filters", grouping: "Group by",
     sort: "Sort", visualization: "Visualization", preview: "Preview", save: "Save", exportCsv: "Export CSV",
-    addFilter: "Add filter", none: "None", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
+    addFilter: "Add filter", none: "None", filterHint: "Repeat = on the same field to match any value. Wildcards: * any text, ? one character.", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
     selectDataset: "Select a dataset to start building.", noColumns: "Pick at least one column, then Run.",
     runFirst: "Run the report to preview results.", noData: "No rows match this report.",
     scope: { label: "Scope", all: "All Projects", allHint: "Portfolio-wide", choose: "Choose a project", runningFor: "Running report for", noProjects: "No projects available yet.", search: "Search projects…" },
@@ -71,7 +71,7 @@ const T = {
     recent: "Reportes guardados recientes", noRecent: "Crea tu primer reporte a la medida con los datasets de ProjectOps360°.",
     run: "Ejecutar", open: "Abrir", dataset: "Dataset", columns: "Columnas", filters: "Filtros", grouping: "Agrupar por",
     sort: "Ordenar", visualization: "Visualización", preview: "Vista previa", save: "Guardar", exportCsv: "Exportar CSV",
-    addFilter: "Agregar filtro", none: "Ninguno", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
+    addFilter: "Agregar filtro", none: "Ninguno", filterHint: "Repite = en el mismo campo para incluir cualquier valor. Wildcards: * cualquier texto, ? un carácter.", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
     selectDataset: "Elige un dataset para empezar.", noColumns: "Elige al menos una columna y ejecuta.",
     runFirst: "Ejecuta el reporte para ver resultados.", noData: "Ninguna fila coincide con este reporte.",
     scope: { label: "Alcance", all: "Todos los Proyectos", allHint: "Todo el portafolio", choose: "Elige un proyecto", runningFor: "Ejecutando reporte para", noProjects: "Aún no hay proyectos disponibles.", search: "Buscar proyectos…" },
@@ -683,6 +683,7 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.filters}</p>
         <button type="button" onClick={addFilter} className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline dark:text-brand-400"><Plus className="h-3.5 w-3.5" />{t.addFilter}</button>
       </div>
+      <p className="mb-2 text-[11px] text-muted-foreground">{t.filterHint}</p>
       {filters.length === 0 ? (
         <p className="text-xs text-muted-foreground">{t.none}</p>
       ) : (
@@ -714,6 +715,7 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
                     <input type={type === "number" ? "number" : type === "date" ? "date" : "text"}
                       value={Array.isArray(f.value) ? f.value.join(",") : String(f.value ?? "")}
                       onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? e.target.value.split(",").map((s) => s.trim()) : e.target.value })}
+                      maxLength={500}
                       className="w-40 rounded-lg border border-border bg-background px-2 py-1 text-xs" placeholder="…" />
                   )
                 )}

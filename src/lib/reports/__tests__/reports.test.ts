@@ -53,9 +53,9 @@ describe("prebuilt report library", () => {
 // ── Filter engine ────────────────────────────────────────────────────────────
 
 const rows: ReportRow[] = [
-  { task_name: "Dig", status: "done", owner: "Ana", duration_days: 3, blocked: false, planned_finish: "2026-06-10" },
-  { task_name: "Pour", status: "blocked", owner: "", duration_days: 5, blocked: true, planned_finish: "2026-06-20" },
-  { task_name: "Frame", status: "in_progress", owner: "Luis", duration_days: 10, blocked: false, planned_finish: "2026-07-01" },
+  { project_name: "Mobile App Design", task_name: "Dig", status: "done", owner: "Ana", duration_days: 3, blocked: false, planned_finish: "2026-06-10" },
+  { project_name: "Mining Layer", task_name: "Pour", status: "blocked", owner: "", duration_days: 5, blocked: true, planned_finish: "2026-06-20" },
+  { project_name: "Project (Alpha)+", task_name: "Frame", status: "in_progress", owner: "Luis", duration_days: 10, blocked: false, planned_finish: "2026-07-01" },
 ];
 const columns = getDataset("task_execution")!.columns;
 
@@ -83,6 +83,44 @@ describe("filter engine", () => {
     const r = applyFilters(rows, [
       { column: "blocked", operator: "equals", value: false },
       { column: "duration_days", operator: "greater_than", value: 4 },
+    ]);
+    expect(r.map((x) => x.task_name)).toEqual(["Frame"]);
+  });
+
+  it("OR-combines repeated equals filters on the same column", () => {
+    const r = applyFilters(rows, [
+      { column: "project_name", operator: "equals", value: "Mobile App Design" },
+      { column: "project_name", operator: "equals", value: "Mining Layer" },
+    ]);
+    expect(r.map((x) => x.project_name)).toEqual(["Mobile App Design", "Mining Layer"]);
+  });
+
+  it("keeps AND semantics across columns and for range constraints", () => {
+    const byProjectAndStatus = applyFilters(rows, [
+      { column: "project_name", operator: "equals", value: "Mobile App Design" },
+      { column: "project_name", operator: "equals", value: "Mining Layer" },
+      { column: "status", operator: "equals", value: "blocked" },
+    ]);
+    expect(byProjectAndStatus.map((x) => x.task_name)).toEqual(["Pour"]);
+
+    const byRange = applyFilters(rows, [
+      { column: "duration_days", operator: "greater_than_or_equal", value: 4 },
+      { column: "duration_days", operator: "less_than_or_equal", value: 6 },
+    ]);
+    expect(byRange.map((x) => x.task_name)).toEqual(["Pour"]);
+  });
+
+  it("supports safe * and ? wildcards in text filters", () => {
+    expect(applyFilters(rows, [{ column: "project_name", operator: "equals", value: "Mobile*" }]).map((x) => x.task_name)).toEqual(["Dig"]);
+    expect(applyFilters(rows, [{ column: "project_name", operator: "equals", value: "M?ning Layer" }]).map((x) => x.task_name)).toEqual(["Pour"]);
+    expect(applyFilters(rows, [{ column: "project_name", operator: "equals", value: "Project (Alpha)+" }]).map((x) => x.task_name)).toEqual(["Frame"]);
+    expect(applyFilters(rows, [{ column: "project_name", operator: "equals", value: "Project (Alpha)*" }]).map((x) => x.task_name)).toEqual(["Frame"]);
+  });
+
+  it("AND-combines repeated exclusion filters", () => {
+    const r = applyFilters(rows, [
+      { column: "project_name", operator: "not_equals", value: "Mobile*" },
+      { column: "project_name", operator: "not_equals", value: "Mining*" },
     ]);
     expect(r.map((x) => x.task_name)).toEqual(["Frame"]);
   });

@@ -75,6 +75,31 @@ function asTime(v: unknown): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+type TextMatchMode = "equals" | "contains" | "starts_with" | "ends_with";
+
+function matchesText(raw: unknown, value: unknown, mode: TextMatchMode): boolean {
+  const input = raw === null || raw === undefined ? "" : String(raw);
+  const pattern = value === null || value === undefined ? "" : String(value);
+  const hasWildcard = pattern.includes("*") || pattern.includes("?");
+
+  if (!hasWildcard) {
+    const normalizedInput = input.toLowerCase();
+    const normalizedPattern = pattern.toLowerCase();
+    if (mode === "contains") return normalizedInput.includes(normalizedPattern);
+    if (mode === "starts_with") return normalizedInput.startsWith(normalizedPattern);
+    if (mode === "ends_with") return normalizedInput.endsWith(normalizedPattern);
+    return normalizedInput === normalizedPattern;
+  }
+
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*+/g, ".*")
+    .replace(/\?/g, ".");
+  const prefix = mode === "equals" || mode === "starts_with" ? "^" : "";
+  const suffix = mode === "equals" || mode === "ends_with" ? "$" : "";
+  return new RegExp(`${prefix}${escaped}${suffix}`, "i").test(input);
+}
+
 function matchesFilter(row: ReportRow, filter: ReportFilter): boolean {
   const raw = row[filter.column] ?? null;
   const op = filter.operator;
@@ -82,22 +107,21 @@ function matchesFilter(row: ReportRow, filter: ReportFilter): boolean {
   if (op === "is_empty") return raw === null || raw === "";
   if (op === "is_not_empty") return raw !== null && raw !== "";
 
-  const str = raw === null ? "" : String(raw).toLowerCase();
   const val = filter.value;
 
   switch (op) {
     case "equals":
       if (typeof raw === "boolean") return raw === (val === true || val === "true");
-      return str === String(val ?? "").toLowerCase();
+      return matchesText(raw, val, "equals");
     case "not_equals":
       if (typeof raw === "boolean") return raw !== (val === true || val === "true");
-      return str !== String(val ?? "").toLowerCase();
-    case "contains": return str.includes(String(val ?? "").toLowerCase());
-    case "not_contains": return !str.includes(String(val ?? "").toLowerCase());
-    case "starts_with": return str.startsWith(String(val ?? "").toLowerCase());
-    case "ends_with": return str.endsWith(String(val ?? "").toLowerCase());
-    case "in": return Array.isArray(val) && val.map((x) => String(x).toLowerCase()).includes(str);
-    case "not_in": return Array.isArray(val) && !val.map((x) => String(x).toLowerCase()).includes(str);
+      return !matchesText(raw, val, "equals");
+    case "contains": return matchesText(raw, val, "contains");
+    case "not_contains": return !matchesText(raw, val, "contains");
+    case "starts_with": return matchesText(raw, val, "starts_with");
+    case "ends_with": return matchesText(raw, val, "ends_with");
+    case "in": return Array.isArray(val) && val.some((candidate) => matchesText(raw, candidate, "equals"));
+    case "not_in": return Array.isArray(val) && val.every((candidate) => !matchesText(raw, candidate, "equals"));
     case "greater_than": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a > b; }
     case "greater_than_or_equal": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a >= b; }
     case "less_than": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a < b; }
@@ -120,10 +144,33 @@ function matchesFilter(row: ReportRow, filter: ReportFilter): boolean {
   }
 }
 
-/** Apply all filters (AND semantics). */
+/**
+ * Apply filters with AND semantics across columns and constraints. Repeated
+ * positive membership filters (`equals` / `in`) on the same column are
+ * alternatives, so Project=A + Project=B behaves as Project IN (A, B).
+ */
 export function applyFilters(rows: ReportRow[], filters: ReportFilter[]): ReportRow[] {
   if (filters.length === 0) return rows;
-  return rows.filter((row) => filters.every((f) => matchesFilter(row, f)));
+
+  const alternativesByColumn = new Map<string, ReportFilter[]>();
+  const constraints: ReportFilter[] = [];
+
+  for (const filter of filters) {
+    if (filter.operator === "equals" || filter.operator === "in") {
+      const alternatives = alternativesByColumn.get(filter.column) ?? [];
+      alternatives.push(filter);
+      alternativesByColumn.set(filter.column, alternatives);
+    } else {
+      constraints.push(filter);
+    }
+  }
+
+  return rows.filter((row) =>
+    constraints.every((filter) => matchesFilter(row, filter))
+    && Array.from(alternativesByColumn.values()).every((alternatives) =>
+      alternatives.some((filter) => matchesFilter(row, filter)),
+    ),
+  );
 }
 
 // ── Sorting ─────────────────────────────────────────────────────────────────
