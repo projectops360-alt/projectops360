@@ -25,7 +25,13 @@ import { getI18nValue, type I18nField } from "@/types/database";
 const filterSchema = z.object({
   column: z.string().min(1).max(64),
   operator: z.string().min(1).max(32),
-  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()])), z.null()]).optional(),
+  value: z.union([
+    z.string().max(500),
+    z.number(),
+    z.boolean(),
+    z.array(z.union([z.string().max(500), z.number()])).max(100),
+    z.null(),
+  ]).optional(),
 });
 
 const calcFieldSchema = z.object({
