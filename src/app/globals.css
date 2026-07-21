@@ -194,7 +194,16 @@ body {
 .workboard-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--brand-600);
 }
-/* ── Print isolation for the Project Status Report ─────────────────────────── */
+.reports-print-only {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 1000px;
+  background: white;
+  color: #0f172a;
+}
+
+/* ── Print isolation for ProjectOps360 reports ─────────────────────────────── */
 /* When printing, hide everything except the report card so the browser's
    "Save as PDF" produces a clean, full-page document (no sidebar/header). */
 @media print {
@@ -208,18 +217,41 @@ body {
   #closeout-report-print,
   #closeout-report-print *,
   #charter-report-print,
-  #charter-report-print * {
+  #charter-report-print *,
+  #reports-result-print,
+  #reports-result-print * {
     visibility: visible;
   }
   #status-report-print,
   #budget-report-print,
   #closeout-report-print,
-  #charter-report-print {
+  #charter-report-print,
+  #reports-result-print {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     padding: 0;
+  }
+  #reports-result-print {
+    color: #0f172a;
+    background: white;
+  }
+  #reports-result-print .overflow-x-auto {
+    overflow: visible;
+  }
+  #reports-result-print table {
+    width: 100%;
+    table-layout: auto;
+    font-size: 9px;
+  }
+  #reports-result-print th,
+  #reports-result-print td {
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    color: #0f172a;
   }
   @page {
     size: letter;

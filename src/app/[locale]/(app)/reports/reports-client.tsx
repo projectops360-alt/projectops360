@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   BarChart3, LayoutGrid, Wrench, Bookmark, Compass, BookOpen, Play, Save, Download,
   Plus, X, Loader2, Table as TableIcon, Copy, Trash2, Database, AlertTriangle, Calculator, Sparkles,
-  FolderKanban, ChevronDown, Check, Globe,
+  FolderKanban, ChevronDown, Check, Globe, Printer,
 } from "lucide-react";
 import type { Locale } from "@/types/database";
 import { localizedHref } from "@/i18n/href";
@@ -40,7 +40,8 @@ const T = {
     categories: "Report categories",
     recent: "Recent saved reports", noRecent: "Create your first custom report using curated ProjectOps360° datasets.",
     run: "Run", open: "Open", dataset: "Dataset", columns: "Columns", filters: "Filters", grouping: "Group by",
-    sort: "Sort", visualization: "Visualization", preview: "Preview", save: "Save", exportCsv: "Export CSV",
+    sort: "Sort", visualization: "Visualization", preview: "Preview", save: "Save", exportCsv: "Export CSV", print: "Print",
+    includeSubtasks: "Include subtasks", includeSubtasksHint: "Shows each subtask beneath its parent task in the report, CSV, and printout.", preparingPrint: "Preparing print…",
     addFilter: "Add filter", none: "None", filterHint: "Repeat = on the same field to match any value. Wildcards: * any text, ? one character.", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
     selectDataset: "Select a dataset to start building.", noColumns: "Pick at least one column, then Run.",
     runFirst: "Run the report to preview results.", noData: "No rows match this report.",
@@ -70,7 +71,8 @@ const T = {
     categories: "Categorías de reportes",
     recent: "Reportes guardados recientes", noRecent: "Crea tu primer reporte a la medida con los datasets de ProjectOps360°.",
     run: "Ejecutar", open: "Abrir", dataset: "Dataset", columns: "Columnas", filters: "Filtros", grouping: "Agrupar por",
-    sort: "Ordenar", visualization: "Visualización", preview: "Vista previa", save: "Guardar", exportCsv: "Exportar CSV",
+    sort: "Ordenar", visualization: "Visualización", preview: "Vista previa", save: "Guardar", exportCsv: "Exportar CSV", print: "Imprimir",
+    includeSubtasks: "Incluir subtareas", includeSubtasksHint: "Muestra cada subtarea debajo de su tarea principal en el reporte, CSV y la impresión.", preparingPrint: "Preparando impresión…",
     addFilter: "Agregar filtro", none: "Ninguno", filterHint: "Repite = en el mismo campo para incluir cualquier valor. Wildcards: * cualquier texto, ? un carácter.", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
     selectDataset: "Elige un dataset para empezar.", noColumns: "Elige al menos una columna y ejecuta.",
     runFirst: "Ejecuta el reporte para ver resultados.", noData: "Ninguna fila coincide con este reporte.",
@@ -115,7 +117,7 @@ const VIS_OPTIONS: { value: VisualizationType; label: string }[] = [
 
 function emptyConfig(datasetId: string): ReportConfig {
   const ds = getDataset(datasetId);
-  return { datasetId, columns: ds?.defaultColumns ?? [], filters: [], grouping: null, sort: [], visualization: "table" };
+  return { datasetId, columns: ds?.defaultColumns ?? [], filters: [], grouping: null, sort: [], visualization: "table", includeSubtasks: false };
 }
 
 export function ReportsClient({ locale, initialSavedReports, initialReportId, initialProjects, initialProjectId }: { locale: Locale; initialSavedReports: SavedReportRow[]; initialReportId?: string | null; initialProjects: ReportProject[]; initialProjectId?: string | null }) {
@@ -123,7 +125,9 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
   const [tab, setTab] = useState<Tab>("overview");
   const [config, setConfig] = useState<ReportConfig | null>(null);
   const [result, setResult] = useState<ReportResult | null>(null);
+  const [printResult, setPrintResult] = useState<ReportResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedReportRow[]>(initialSavedReports);
   const [showSave, setShowSave] = useState(false);
@@ -194,6 +198,29 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
     }
   }
 
+  async function printReport() {
+    if (!config) return;
+    setPrinting(true);
+    setError(null);
+    const res = await runReportAction({ config, projectId: projectScope, page: 1, pageSize: 5000, forPrint: true });
+    if (res.error || !res.result) {
+      setError(t.errors[res.error ?? "unexpected"] ?? res.details?.join(" ") ?? t.errors.unexpected);
+      setPrinting(false);
+      return;
+    }
+    setPrintResult(res.result);
+  }
+
+  useEffect(() => {
+    if (!printResult) return;
+    const id = setTimeout(() => {
+      window.print();
+      setPrintResult(null);
+      setPrinting(false);
+    }, 100);
+    return () => clearTimeout(id);
+  }, [printResult]);
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -229,7 +256,7 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
           t={t} locale={locale} datasets={datasets} config={config} setConfig={setConfig} dataset={dataset}
           result={result} running={running} error={error} scopeName={scopeName} scoped={!!activeProject}
           emptyText={activeProject ? t.noDataProject : t.noData}
-          onRun={() => config && run(config)} onSave={() => setShowSave(true)} onExport={exportCsv}
+          onRun={() => config && run(config)} onSave={() => setShowSave(true)} onExport={exportCsv} onPrint={printReport} printing={printing}
         />
       )}
       {tab === "saved" && (
@@ -247,6 +274,16 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
       )}
       {savedToast && (
         <div className="fixed bottom-4 right-4 z-50 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-lg">{t.saved} ✓</div>
+      )}
+      {printResult && config && dataset && (
+        <div id="reports-result-print" className="reports-print-only" aria-hidden="true">
+          <header className="mb-5 border-b border-slate-300 pb-3">
+            <h1 className="text-xl font-bold text-slate-950">{dataset.displayName}</h1>
+            <p className="mt-1 text-sm text-slate-600">{t.scope.runningFor}: {scopeName}</p>
+            {config.includeSubtasks && <p className="mt-1 text-xs font-medium text-slate-700">{t.includeSubtasks}</p>}
+          </header>
+          <PreviewPane t={t} locale={locale} config={config} result={printResult} emptyText={activeProject ? t.noDataProject : t.noData} />
+        </div>
       )}
     </div>
   );
@@ -270,6 +307,7 @@ function savedToConfig(r: SavedReportRow): ReportConfig {
     grouping: r.grouping_json ?? null,
     sort: r.sorting_json ?? [],
     visualization: r.visualization_type,
+    includeSubtasks: r.report_options_json?.includeSubtasks === true,
     calculatedFields: r.calculated_fields_json ?? [],
   };
 }
@@ -463,12 +501,12 @@ function Library({ t, onRun }: { t: Labels; onRun: (cfg: ReportConfig) => void }
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
-function Builder({ t, locale, datasets, config, setConfig, dataset, result, running, error, scopeName, scoped, emptyText, onRun, onSave, onExport }: {
+function Builder({ t, locale, datasets, config, setConfig, dataset, result, running, printing, error, scopeName, scoped, emptyText, onRun, onSave, onExport, onPrint }: {
   t: Labels; locale: Locale; datasets: ReturnType<typeof listDatasets>; config: ReportConfig | null;
   setConfig: (c: ReportConfig) => void; dataset: ReturnType<typeof getDataset>;
-  result: ReportResult | null; running: boolean; error: string | null;
+  result: ReportResult | null; running: boolean; printing: boolean; error: string | null;
   scopeName: string; scoped: boolean; emptyText: string;
-  onRun: () => void; onSave: () => void; onExport: () => void;
+  onRun: () => void; onSave: () => void; onExport: () => void; onPrint: () => void;
 }) {
   if (!config || !dataset) {
     return (
@@ -548,6 +586,12 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
             <option value="">{t.grouping}: {t.none}</option>
             {groupableCols.map((c) => <option key={c.key} value={c.key}>{t.grouping}: {c.label}</option>)}
           </select>
+          {config.datasetId === "task_execution" && (
+            <label title={t.includeSubtasksHint} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
+              <input type="checkbox" checked={config.includeSubtasks === true} onChange={(e) => setConfig({ ...config, includeSubtasks: e.target.checked })} className="h-4 w-4 rounded border-border accent-brand-600" />
+              {t.includeSubtasks}
+            </label>
+          )}
           <div className="ml-auto flex gap-2">
             <button type="button" onClick={onRun} disabled={running || config.columns.length === 0}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
@@ -555,6 +599,9 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
             </button>
             <button type="button" onClick={onSave} disabled={config.columns.length === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"><Save className="h-4 w-4" />{t.save}</button>
             <button type="button" onClick={onExport} disabled={!result} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"><Download className="h-4 w-4" />{t.exportCsv}</button>
+            <button type="button" onClick={onPrint} disabled={!result || printing} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50">
+              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}{printing ? t.preparingPrint : t.print}
+            </button>
           </div>
         </div>
 
@@ -783,16 +830,19 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
             <tbody>
               {result.rows.map((row, i) => {
                 const href = entityHref(locale, config.datasetId, (row._projectId as string) ?? null, (row._recordId as string) ?? null);
+                const isSubtask = row._rowKind === "subtask";
                 return (
                   <tr
                     key={i}
                     onClick={href ? () => router.push(href) : undefined}
                     title={href ? t.open : undefined}
-                    className={`border-b border-border last:border-0 ${href ? "cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/20" : ""}`}
+                    className={`border-b border-border last:border-0 ${isSubtask ? "bg-muted/20" : ""} ${href ? "cursor-pointer hover:bg-brand-50/60 dark:hover:bg-brand-950/20" : ""}`}
                   >
                     {result.columns.map((c, ci) => (
                       <td key={c.key} className={`max-w-[260px] truncate px-3 py-1.5 ${ci === 0 && href ? "font-medium text-brand-600 dark:text-brand-400" : "text-foreground"}`}>
-                        {formatCell(row[c.key], c, locale)}
+                        {isSubtask && c.key === "task_name" ? (
+                          <span className="inline-flex items-center gap-1 pl-4 font-medium"><span aria-hidden="true">↳</span>{formatCell(row[c.key], c, locale)}</span>
+                        ) : formatCell(row[c.key], c, locale)}
                       </td>
                     ))}
                   </tr>

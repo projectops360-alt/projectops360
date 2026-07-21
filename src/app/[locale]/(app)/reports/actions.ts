@@ -53,6 +53,7 @@ const configSchema = z.object({
     .nullable(),
   sort: z.array(z.object({ column: z.string().max(64), direction: z.enum(["asc", "desc"]) })).max(10),
   visualization: z.enum(["table", "kpi_cards", "bar", "line", "donut", "pivot"]),
+  includeSubtasks: z.boolean().optional(),
   calculatedFields: z.array(calcFieldSchema).max(10).optional(),
 });
 
@@ -116,6 +117,7 @@ export async function runReportAction(input: {
   projectId?: string | null;
   page?: number;
   pageSize?: number;
+  forPrint?: boolean;
 }): Promise<{ error?: string; details?: string[]; result?: ReportResult }> {
   let org;
   try {
@@ -134,7 +136,7 @@ export async function runReportAction(input: {
   const result = await runReport(
     config,
     { organizationId: org.organizationId, projectId: input.projectId ?? null },
-    { page: input.page ?? 1, pageSize: Math.min(input.pageSize ?? 100, 200) },
+    { page: input.page ?? 1, pageSize: Math.min(input.pageSize ?? 100, input.forPrint ? 5000 : 200) },
   );
   if ("error" in result) return { error: result.error, details: result.details };
 
@@ -261,6 +263,7 @@ export interface SavedReportRow {
   grouping_json: ReportConfig["grouping"];
   sorting_json: ReportConfig["sort"];
   calculated_fields_json: NonNullable<ReportConfig["calculatedFields"]>;
+  report_options_json?: { includeSubtasks?: boolean } | null;
   visibility: "private" | "project" | "organization";
   project_id: string | null;
   created_by: string | null;
@@ -309,6 +312,7 @@ export async function saveReportAction(input: {
       grouping_json: config.grouping,
       sorting_json: config.sort,
       calculated_fields_json: config.calculatedFields ?? [],
+      report_options_json: { includeSubtasks: config.includeSubtasks === true },
       visibility: d.visibility,
       created_by: org.userId,
     })
@@ -385,6 +389,7 @@ export async function duplicateSavedReportAction(input: { reportId: string }): P
       grouping_json: src.grouping_json,
       sorting_json: src.sorting_json,
       calculated_fields_json: src.calculated_fields_json ?? [],
+      report_options_json: src.report_options_json ?? {},
       visibility: src.visibility,
       created_by: org.userId,
     })

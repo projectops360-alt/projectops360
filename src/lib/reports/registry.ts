@@ -30,10 +30,13 @@ const TASK_STATUS_VALUES = [
   { value: "prompt_ready", label: "Prompt ready" },
   { value: "sent_to_ai", label: "Sent to AI" },
   { value: "in_progress", label: "In progress" },
+  { value: "in_review", label: "In review" },
   { value: "implemented", label: "Implemented" },
   { value: "tested", label: "Tested" },
   { value: "done", label: "Done" },
+  { value: "completed", label: "Completed" },
   { value: "blocked", label: "Blocked" },
+  { value: "cancelled", label: "Cancelled" },
   { value: "deferred", label: "Deferred" },
 ];
 const PRIORITY_VALUES = [
@@ -99,6 +102,11 @@ export const DATASETS: DatasetDefinition[] = [
     columns: [
       text("project_name", "Project", "Project Structure"),
       text("milestone", "Milestone", "Project Structure"),
+      enumCol("record_type", "Record Type", "Project Structure", [
+        { value: "task", label: "Task" },
+        { value: "subtask", label: "Subtask" },
+      ]),
+      text("parent_task", "Parent Task", "Project Structure"),
       text("task_name", "Task Name", "Identification"),
       enumCol("status", "Status", "Status", TASK_STATUS_VALUES),
       enumCol("priority", "Priority", "Status", PRIORITY_VALUES),
