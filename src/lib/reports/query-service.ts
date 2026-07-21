@@ -95,7 +95,24 @@ async function fetchProjectHealth(supabase: Admin, ctx: QueryContext): Promise<R
     });
 }
 
-async function fetchTaskExecution(supabase: Admin, ctx: QueryContext): Promise<ReportRow[]> {
+interface TaskExecutionSubtaskRow {
+  id: string;
+  task_id: string;
+  project_id: string;
+  title: string;
+  status: string;
+  priority: string;
+  owner_id: string | null;
+  start_date: string | null;
+  due_date: string | null;
+  estimated_hours: number | null;
+  progress: number | null;
+  is_critical: boolean | null;
+  blocked_reason: string | null;
+  sort_order: number | null;
+}
+
+async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: ReportConfig): Promise<ReportRow[]> {
   const projects = await projectNameMap(supabase, ctx.organizationId);
   const [{ data: tasks }, { data: milestones }, { data: profiles }, { data: resources }] = await Promise.all([
     scope(supabase.from("roadmap_tasks").select("id, title, status, priority, milestone_id, assigned_to, assigned_resource_id, trade_key, discipline, start_date, end_date, duration_days, progress, is_blocked, blocker_reason, is_critical, slack_days, estimated_labor_hours, project_id").is("deleted_at", null).limit(ROW_CAP), ctx.organizationId, ctx.projectId),
@@ -107,27 +124,84 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext): Promise<R
   const personName = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "—"]));
   const resName = new Map((resources ?? []).map((r) => [r.id, r.name]));
 
-  return (tasks ?? []).filter((t) => t.project_id != null && projects.has(t.project_id)).map((t) => ({
-    project_name: projects.get(t.project_id) ?? "—",
-    _projectId: t.project_id ?? null,
-    _recordId: t.id,
-    milestone: t.milestone_id ? msName.get(t.milestone_id) ?? "—" : "—",
-    task_name: t.title,
-    status: t.status,
-    priority: t.priority,
-    owner: t.assigned_to ? personName.get(t.assigned_to) ?? "" : t.assigned_resource_id ? resName.get(t.assigned_resource_id) ?? "" : "",
-    trade: t.trade_key ?? "",
-    discipline: t.discipline ?? "",
-    planned_start: t.start_date,
-    planned_finish: t.end_date,
-    duration_days: t.duration_days,
-    progress_pct: t.progress ?? 0,
-    blocked: t.status === "blocked" || !!t.is_blocked,
-    blocker_reason: t.blocker_reason ?? "",
-    critical_path: !!t.is_critical,
-    total_float: t.slack_days,
-    estimated_hours: t.estimated_labor_hours,
-  } as ReportRow));
+  const validTasks = (tasks ?? []).filter((task) => task.project_id != null && projects.has(task.project_id));
+  const taskRows = validTasks.map((task) => ({
+    task,
+    row: {
+      project_name: projects.get(task.project_id!) ?? "—",
+      _projectId: task.project_id ?? null,
+      _recordId: task.id,
+      _rowKind: "task",
+      milestone: task.milestone_id ? msName.get(task.milestone_id) ?? "—" : "—",
+      record_type: "task",
+      parent_task: "",
+      task_name: task.title,
+      status: task.status,
+      priority: task.priority,
+      owner: task.assigned_to ? personName.get(task.assigned_to) ?? "" : task.assigned_resource_id ? resName.get(task.assigned_resource_id) ?? "" : "",
+      trade: task.trade_key ?? "",
+      discipline: task.discipline ?? "",
+      planned_start: task.start_date,
+      planned_finish: task.end_date,
+      duration_days: task.duration_days,
+      progress_pct: task.progress ?? 0,
+      blocked: task.status === "blocked" || !!task.is_blocked,
+      blocker_reason: task.blocker_reason ?? "",
+      critical_path: !!task.is_critical,
+      total_float: task.slack_days,
+      estimated_hours: task.estimated_labor_hours,
+    } as ReportRow,
+  }));
+
+  if (!config.includeSubtasks || validTasks.length === 0) return taskRows.map(({ row }) => row);
+
+  const { data: subtasksData } = await scope(
+    supabase
+      .from("task_subtasks")
+      .select("id, task_id, project_id, title, status, priority, owner_id, start_date, due_date, estimated_hours, progress, is_critical, blocked_reason, sort_order")
+      .is("deleted_at", null)
+      .order("sort_order", { ascending: true })
+      .limit(ROW_CAP),
+    ctx.organizationId,
+    ctx.projectId,
+  );
+  const validTaskIds = new Set(validTasks.map((task) => task.id));
+  const subtasksByTask = new Map<string, TaskExecutionSubtaskRow[]>();
+  for (const subtask of (subtasksData ?? []) as TaskExecutionSubtaskRow[]) {
+    if (!validTaskIds.has(subtask.task_id)) continue;
+    const siblings = subtasksByTask.get(subtask.task_id) ?? [];
+    siblings.push(subtask);
+    subtasksByTask.set(subtask.task_id, siblings);
+  }
+
+  return taskRows.flatMap(({ task, row }) => {
+    const children = (subtasksByTask.get(task.id) ?? []).map((subtask) => ({
+      project_name: row.project_name,
+      _projectId: subtask.project_id,
+      _recordId: task.id,
+      _subtaskId: subtask.id,
+      _rowKind: "subtask",
+      milestone: row.milestone,
+      record_type: "subtask",
+      parent_task: task.title,
+      task_name: subtask.title,
+      status: subtask.status,
+      priority: subtask.priority,
+      owner: subtask.owner_id ? personName.get(subtask.owner_id) ?? "" : "",
+      trade: row.trade,
+      discipline: row.discipline,
+      planned_start: subtask.start_date,
+      planned_finish: subtask.due_date,
+      duration_days: null,
+      progress_pct: subtask.progress ?? 0,
+      blocked: subtask.status === "blocked",
+      blocker_reason: subtask.blocked_reason ?? "",
+      critical_path: !!subtask.is_critical,
+      total_float: null,
+      estimated_hours: subtask.estimated_hours,
+    } as ReportRow));
+    return [row, ...children];
+  }).slice(0, ROW_CAP);
 }
 
 async function fetchBudget(supabase: Admin, ctx: QueryContext): Promise<ReportRow[]> {
@@ -255,7 +329,7 @@ async function fetchProjectMemory(supabase: Admin, ctx: QueryContext): Promise<R
   });
 }
 
-const FETCHERS: Record<string, (s: Admin, c: QueryContext) => Promise<ReportRow[]>> = {
+const FETCHERS: Record<string, (s: Admin, c: QueryContext, config: ReportConfig) => Promise<ReportRow[]>> = {
   project_health: fetchProjectHealth,
   task_execution: fetchTaskExecution,
   budget_performance: fetchBudget,
@@ -321,7 +395,7 @@ export async function runReport(
   if (!fetcher) return { error: "dataset_not_implemented" };
 
   const supabase = createAdminClient();
-  const rawRows = await fetcher(supabase, ctx);
+  const rawRows = await fetcher(supabase, ctx, config);
   const truncated = rawRows.length >= ROW_CAP;
   const allRows = applyCalculated(rawRows, calcFields);
 
@@ -353,7 +427,7 @@ export async function runReportForExport(config: ReportConfig, ctx: QueryContext
   const { calcCols } = buildCalcColumns(dataset, calcFields);
   const effectiveColumns = [...dataset.columns, ...calcCols];
   const supabase = createAdminClient();
-  const allRows = applyCalculated(await fetcher(supabase, ctx), calcFields);
+  const allRows = applyCalculated(await fetcher(supabase, ctx, config), calcFields);
   const filtered = applySort(applyFilters(allRows, config.filters), config.sort, effectiveColumns);
   return { rows: filtered, columns: result.columns };
 }

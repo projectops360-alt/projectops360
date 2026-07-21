@@ -12,8 +12,11 @@ const h = vi.hoisted(() => {
       { id: "t1", title: "Task 1", status: "in_progress", priority: "p2", project_id: "p1" },
       { id: "t2", title: "Task 2", status: "done", priority: "p3", project_id: "p2" },
     ],
+    task_subtasks: [
+      { id: "s1", task_id: "t1", project_id: "p1", title: "Subtask 1", status: "in_review", priority: "p1", owner_id: "u1", progress: 80, is_critical: true, sort_order: 1 },
+    ],
     milestones: [],
-    profiles: [],
+    profiles: [{ id: "u1", display_name: "Ana" }],
     resources: [],
   };
   function makeBuilder(table: string) {
@@ -91,5 +94,37 @@ describe("project-scoped report execution", () => {
     expect((h.eqCalls["roadmap_tasks"] ?? []).some(([c, v]) => c === "organization_id" && v === "orgX")).toBe(true);
     // project name lookup is also org-scoped (no cross-org exposure)
     expect((h.eqCalls["projects"] ?? []).some(([c, v]) => c === "organization_id" && v === "orgX")).toBe(true);
+  });
+
+  it("includes scoped subtasks directly beneath their parent when requested", async () => {
+    const result = await runReport(
+      { ...config, includeSubtasks: true },
+      { organizationId: "org1", projectId: "p1" },
+    );
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+
+    expect(result.rows.map((row) => row._rowKind)).toEqual(["task", "subtask"]);
+    expect(result.rows[1]).toMatchObject({
+      task_name: "Subtask 1",
+      parent_task: "Task 1",
+      record_type: "subtask",
+      owner: "Ana",
+      status: "in_review",
+      progress_pct: 80,
+      critical_path: true,
+      _recordId: "t1",
+      _subtaskId: "s1",
+    });
+    expect(h.eqCalls["task_subtasks"]).toContainEqual(["organization_id", "org1"]);
+    expect(h.eqCalls["task_subtasks"]).toContainEqual(["project_id", "p1"]);
+  });
+
+  it("does not query or include subtasks unless the option is enabled", async () => {
+    const result = await runReport(config, { organizationId: "org1", projectId: "p1" });
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.rows.map((row) => row._rowKind)).toEqual(["task"]);
+    expect(h.eqCalls["task_subtasks"]).toBeUndefined();
   });
 });

@@ -24,6 +24,7 @@ describe("dataset registry", () => {
     expect(getDataset("task_execution")?.displayName).toBe("Task Execution");
     expect(getDataset("nope")).toBeNull();
     expect(getColumn("task_execution", "status")?.type).toBe("enum");
+    expect(getColumn("task_execution", "record_type")?.type).toBe("enum");
   });
 });
 

@@ -117,6 +117,8 @@ export interface ReportConfig {
   grouping: ReportGrouping | null;
   sort: ReportSort[];
   visualization: VisualizationType;
+  /** Task Execution only: include child subtasks as hierarchical report rows. */
+  includeSubtasks?: boolean;
   /** Calculated columns added on top of the dataset's curated columns. */
   calculatedFields?: CalculatedField[];
 }
