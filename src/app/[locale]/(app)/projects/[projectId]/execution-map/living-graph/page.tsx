@@ -442,15 +442,16 @@ export default async function LivingGraphPage({
   };
 
   // ── Canonical-event Relationships view (CAP-045 extension) ───────────────────
-  // A READ-ONLY PROJECTION over the canonical event store. Gated by
-  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS (server-side, default OFF).
+  // A READ-ONLY PROJECTION over the canonical event store, enabled by default
+  // for every project. An explicit global kill switch or
+  // project denylist can disable it server-side for rollback/quarantine.
   //
   // Status contract (Part B): the page ALWAYS sets `canonicalEventProjectionStatus`
   // so the "events" view can render an explicit banner instead of silently
   // falling back to operational process_nodes/process_edges:
-  //   * flag OFF            → "disabled"  (the three projection arrays stay
+  //   * explicit OFF        → "disabled"  (the three projection arrays stay
   //                                    UNDEFINED — preserves the byte-identical
-  //                                    invariant for flag-OFF behavior).
+  //                                    invariant for disabled behavior).
   //   * flag ON, 0 events   → "empty".
   //   * flag ON, ≥1 event    → "ready" (or "truncated" if the log exceeded the limit).
   //   * loader error/throw   → "error".

@@ -14,6 +14,7 @@ import type {
   IsabellaCitation,
   IsabellaEvidencePacket,
 } from "@/lib/isabella/process-intelligence/types";
+import type { FinancialIntelligenceContext } from "@/lib/financial/intelligence";
 
 /** The trusted scope every retrieval runs under (resolved server-side). */
 export interface IsabellaProjectScope {
@@ -44,6 +45,7 @@ export type IsabellaContextInclude =
   | "living_graph_summary"
   | "milestone_flow_summary"
   | "process_mining_summary"
+  | "financial_summary"
   | "risks"
   | "decisions"
   | "approvals"
@@ -180,6 +182,7 @@ export interface IsabellaProcessContext {
   milestoneContext?: IsabellaMilestoneContext;
   processSignals?: IsabellaProcessSignals;
   processMiningContext?: IsabellaProcessMiningContext;
+  financialContext?: FinancialIntelligenceContext;
   limitations: string[];
   status: IsabellaContextStatus;
   /** User-safe message for missing_context / unauthorized / unavailable. */

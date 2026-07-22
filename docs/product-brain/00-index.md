@@ -74,9 +74,12 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 | [process-discovery-conformance.md](process-discovery-conformance.md) | **P4-T1 Process Discovery** — taxonomy, direct-follow paths, variants, declared-model conformance and honest temporal metrics |
 | [reasoning-pipeline-isabella-integration.md](reasoning-pipeline-isabella-integration.md) | **P4-T2 Governed Reasoning** — scoped evidence, conflict handling, claim validation, conservative confidence and Isabella output trace |
 | [known-history-grounded-answer-validation.md](known-history-grounded-answer-validation.md) | **P4-T3 Validation** — golden process histories, exact mining expectations and bilingual grounded-answer checks |
+| [import-order-integrity.md](import-order-integrity.md) | **Import Order Integrity** — source ordinal, milestone `order_index`, diagnosis and safe repair (`REG-026`) |
 | [regression-test-map.md](regression-test-map.md) | **Regression → Test Map** — each protected REG-###/UX contract ↔ the test that fails if it returns (executable governance) |
 
 | [isabella-process-mining-layer-training.md](isabella-process-mining-layer-training.md) | **Isabella × Process Mining** — governed three-source training contract: deterministic project/event data, vectorized Product Brain, and screen/program context |
+
+| [financial-control-rollout.md](financial-control-rollout.md) | **Financial Control P4–P9** — canonical financial workflows, PMO cockpit, stage gates, forecast quality and production-readiness boundaries |
 
 ### Sub-repositories
 

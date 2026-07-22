@@ -4,6 +4,7 @@ import path from 'path';
 export default defineConfig({
   test: {
     environment: 'node',
+    testTimeout: 10_000,
     // The Playwright multi-tab realtime E2E lives in ./e2e and is run by
     // `npm run test:e2e` (needs a live app + realtime env), never by vitest.
     exclude: [...configDefaults.exclude, 'e2e/**'],
@@ -11,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'server-only': path.resolve(__dirname, './src/test/server-only.ts'),
     },
   },
 });

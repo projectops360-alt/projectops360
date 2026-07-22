@@ -89,21 +89,24 @@ export const env = {
   PROCESS_MINING_EVENT_CAPTURE_PROJECT_IDS:
     process.env.PROCESS_MINING_EVENT_CAPTURE_PROJECT_IDS ?? "",
   /**
-   * Feature flag — Living Graph canonical-event Relationships view (server-side
-   * only, DEFAULT OFF). Comma-separated list of project IDs, or the literal
-   * "all" (local testing only). When OFF, the Living Graph is byte-identical to
-   * before: no canonical-events view, no event-relationship edges, no new
-   * controls. When ON for a project, the Living Graph additionally exposes a
-   * read-only "events" view built as a PROJECTION over the canonical event
-   * store (project_event_log + project_event_objects) — it never writes, never
-   * copies events into process_nodes/process_edges, and never touches the
-   * milestones/activities views, saved layouts, or any operational analysis.
-   * Rollback = unset this flag (no migration needed; the projection is pure).
-   * Independent of RISK_EVENT_CAPTURE_PROJECT_IDS. See
-   * docs/product-brain/capabilities/CAP-045-canonical-event-contract-and-source-audit.md.
+   * Living Graph canonical-event Relationships view. The read-only projection
+   * is enabled automatically for every project. Set the global switch to false
+   * for emergency rollback, or provide a comma-separated denylist to quarantine
+   * individual projects. This never gates event capture or writes to the event
+   * store or operational graph.
    */
-  LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS:
-    process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS ?? "",
+  LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED:
+    process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED ?? "true",
+  LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS:
+    process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS ?? "",
+  /** Financial engine foundation. Every financial flag is server-side and default OFF. */
+  FINANCIAL_FOUNDATION_ENABLED: process.env.FINANCIAL_FOUNDATION_ENABLED ?? "",
+  FINANCIAL_WRITERS_ENABLED: process.env.FINANCIAL_WRITERS_ENABLED ?? "",
+  FINANCIAL_PROJECTIONS_ENABLED: process.env.FINANCIAL_PROJECTIONS_ENABLED ?? "",
+  FINANCIAL_UI_ENABLED: process.env.FINANCIAL_UI_ENABLED ?? "",
+  FINANCIAL_ISABELLA_ENABLED: process.env.FINANCIAL_ISABELLA_ENABLED ?? "",
+  /** Explicit comma-separated pilot projects; "all" is rejected in production. */
+  FINANCIAL_PILOT_PROJECT_IDS: process.env.FINANCIAL_PILOT_PROJECT_IDS ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

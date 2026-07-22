@@ -34,12 +34,14 @@ import type {
   ImportEntityType,
 } from "@/types/import-intelligence";
 import { emptyCanonicalImport } from "./extract";
+import { orderImportEntities } from "./source-order";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-interface EntityRow {
+export interface ImportEntityRow {
   id: string;
   entity_type: ImportEntityType;
+  source_order: number | null;
   source_key: string | null;
   normalized_json: Record<string, unknown>;
   validation_status: string;
@@ -74,9 +76,9 @@ async function track(
 }
 
 /** Rebuild the canonical import from the stored, possibly user-edited entities. */
-export function entitiesToCanonical(entities: EntityRow[]): CanonicalImport {
+export function entitiesToCanonical(entities: ImportEntityRow[]): CanonicalImport {
   const canonical = emptyCanonicalImport();
-  for (const e of entities) {
+  for (const e of orderImportEntities(entities)) {
     const n = e.normalized_json as unknown;
     switch (e.entity_type) {
       case "project": Object.assign(canonical.project, n); break;
@@ -104,7 +106,7 @@ export async function executeImport(params: {
   importMode: "create_new" | "merge_existing";
   targetProjectId: string | null;
   selectedProjectType: string;
-  entities: EntityRow[];
+  entities: ImportEntityRow[];
   locale: "en" | "es";
 }): Promise<ExecuteImportResult> {
   const supabase = createAdminClient();

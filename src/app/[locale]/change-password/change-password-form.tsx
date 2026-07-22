@@ -25,7 +25,7 @@ export function ChangePasswordForm({
   const [pending, start] = useTransition();
 
   const ERRORS: Record<string, { en: string; es: string }> = {
-    weak_password: { en: "Use at least 8 characters.", es: "Usa al menos 8 caracteres." },
+    weak_password: { en: "Use at least 12 characters.", es: "Usa al menos 12 caracteres." },
     same_password: { en: "Choose a password different from the temporary one.", es: "Elige una contraseña distinta a la temporal." },
     update_failed: { en: "Could not update the password. Try again.", es: "No se pudo actualizar la contraseña. Inténtalo de nuevo." },
     not_authenticated: { en: "Your session expired. Please sign in again.", es: "Tu sesión expiró. Inicia sesión de nuevo." },
@@ -35,7 +35,7 @@ export function ChangePasswordForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (pwd.length < 8) return setError("weak_password");
+    if (pwd.length < 12) return setError("weak_password");
     if (pwd !== confirm) return setError("mismatch");
     start(async () => {
       const r = await changeOwnPasswordAction({ password: pwd });
@@ -114,7 +114,7 @@ export function ChangePasswordForm({
               <input
                 type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} autoFocus
                 className="w-full bg-transparent py-2 text-sm text-foreground focus:outline-none"
-                placeholder={tt("At least 8 characters", "Al menos 8 caracteres")} minLength={8} required
+                placeholder={tt("At least 12 characters", "Al menos 12 caracteres")} minLength={12} required
               />
             </div>
           </div>
@@ -125,7 +125,7 @@ export function ChangePasswordForm({
               <input
                 type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)}
                 className="w-full bg-transparent py-2 text-sm text-foreground focus:outline-none"
-                placeholder={tt("Repeat the password", "Repite la contraseña")} minLength={8} required
+                placeholder={tt("Repeat the password", "Repite la contraseña")} minLength={12} required
               />
             </div>
           </div>

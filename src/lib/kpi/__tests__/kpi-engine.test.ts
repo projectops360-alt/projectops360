@@ -65,11 +65,15 @@ describe("KPI-ENGINE-SANDBOX — parser security", () => {
 
   it("rejects member access, assignment and injection attempts (never eval)", () => {
     expect(validateKpiExpression("constructor.constructor('return 1')()", vars).valid).toBe(false);
+    expect(validateKpiExpression("__proto__", vars).valid).toBe(false);
+    expect(validateKpiExpression("prototype", vars).valid).toBe(false);
     expect(validateKpiExpression("a = 5", vars).valid).toBe(false);
     expect(validateKpiExpression("SUM(estimate_hours).constructor", vars).valid).toBe(false);
+    expect(validateKpiExpression("SUM(estimate_hours)['constructor']", vars).valid).toBe(false);
     expect(validateKpiExpression("random()", vars).valid).toBe(false); // built-ins stripped
     expect(validateKpiExpression("", vars).valid).toBe(false);
     expect(validateKpiExpression("x".repeat(501), vars).valid).toBe(false);
+    expect(validateKpiExpression(`${"(".repeat(40)}1${")".repeat(40)}`, vars).valid).toBe(false);
   });
 
   it("evaluates validated expressions in the sandbox scope", () => {

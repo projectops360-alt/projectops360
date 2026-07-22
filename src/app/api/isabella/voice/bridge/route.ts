@@ -19,6 +19,9 @@ import { isIsabellaVoiceEnabled } from "@/lib/isabella/voice/flag";
 import { runVoiceBridge } from "@/lib/isabella/voice/bridge";
 import { persistVoiceAudit } from "@/lib/isabella/voice/audit";
 import type { VoiceBridgeRequest } from "@/lib/isabella/voice/types";
+import { readLimitedJson, RequestBodyError } from "@/lib/http/request-body";
+
+const MAX_REQUEST_BYTES = 128 * 1024;
 
 export async function POST(request: Request): Promise<NextResponse> {
   if (!isIsabellaVoiceEnabled()) {
@@ -34,9 +37,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    body = null;
+    body = await readLimitedJson(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      return NextResponse.json({ ok: false, error: error.code }, { status: error.status });
+    }
+    return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 400 });
   }
 
   const start = Date.now();

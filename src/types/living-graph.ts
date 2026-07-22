@@ -271,12 +271,11 @@ export interface LivingGraphData {
   events: LivingGraphEvent[];
   generatedAt: string;
   // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
-  // ALL OPTIONAL and backward-compatible: when the feature flag
-  // LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS is OFF (default), these are
-  // absent/empty and the Living Graph behaves byte-identically to before. When
-  // ON, the "events" view renders a read-only PROJECTION over the canonical
-  // event store (project_event_log + project_event_objects) — never a second
-  // event store, never a write path.
+  // ALL OPTIONAL and backward-compatible. When explicitly disabled for
+  // rollback/quarantine, these are absent/empty. When enabled (the default),
+  // the "events" view renders a read-only PROJECTION over the canonical event
+  // store (project_event_log + project_event_objects) — never a second event
+  // store, never a write path.
   /** Canonical events projected from project_event_log (1:1 with log rows). */
   canonicalEvents?: LivingGraphCanonicalEvent[];
   /** Deterministic relationships between events / events↔objects. */

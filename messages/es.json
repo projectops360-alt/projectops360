@@ -3,6 +3,47 @@
     "appName": "ProjectOps360°",
     "appShortName": "POps360"
   },
+  "financialControl": {
+    "title": "Control financiero",
+    "badge": "Core PMO",
+    "description": "Baseline, funding, compromisos, costos, accruals, pagos, reservas y forecast desde las verdades financieras canónicas. El estimado de materiales existente sigue disponible abajo.",
+    "authorizedFor": "Vista autorizada para {role}",
+    "dataDate": "Fecha de datos: {date}",
+    "livingGraph": "Living Graph",
+    "reports": "Reportes",
+    "currentBaseline": "Baseline actual",
+    "original": "Original",
+    "authorizedFunding": "Funding autorizado",
+    "released": "Liberado",
+    "currentCommitment": "Compromiso actual",
+    "outstanding": "Pendiente",
+    "costExposure": "Exposición de costo",
+    "actual": "Actual",
+    "accrual": "Accrual",
+    "settledPayments": "Pagos liquidados",
+    "remainingReserve": "Reserva restante",
+    "eac": "EAC",
+    "p50": "P50",
+    "p80": "P80",
+    "cpiSpi": "CPI / SPI",
+    "spiNote": "SPI no equivale a retraso calendario.",
+    "controlQueue": "Cola de control",
+    "approvedChangesNotPosted": "Cambios aprobados sin postear",
+    "noActiveBaseline": "No existe un baseline activo.",
+    "legacyActualsWarning": "{count} actuals heredados requieren verificación.",
+    "currencyMismatchWarning": "{count} registros quedaron fuera por moneda distinta.",
+    "reconciliationWarning": "{count} excepciones de reconciliación abiertas.",
+    "noExceptions": "Sin excepciones financieras abiertas.",
+    "unavailable": "—",
+    "quality": {
+      "available": "Datos disponibles",
+      "provisional": "Provisional",
+      "incomplete": "Incompleto",
+      "insufficient_inputs": "Datos insuficientes",
+      "invalid": "Inválido",
+      "unknown": "Desconocido"
+    }
+  },
   "nav": {
     "commandCenter": "Centro de Mando",
     "pmCenter": "Centro del PM",
@@ -1901,7 +1942,7 @@
       "objectNodeLabel": "Objeto",
       "status": {
         "disabled": {
-          "title": "La vista de eventos canónicos está deshabilitada para este proyecto. Pide al administrador que la habilite con el flag LIVING_GRAPH_EVENT_RELATIONSHIPS."
+          "title": "Un administrador deshabilitó la vista de eventos canónicos por rollback o cuarentena. Revisa LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED y la lista de proyectos deshabilitados."
         },
         "empty": {
           "title": "Aún no se han capturado eventos canónicos para este proyecto. La vista de eventos muestra el historial canónico — no las tareas operativas."

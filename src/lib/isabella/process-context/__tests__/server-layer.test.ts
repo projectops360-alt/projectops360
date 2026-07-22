@@ -38,6 +38,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => h.client }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => h.client }));
 vi.mock("@/lib/auth", () => ({
   getOrgContext: async () => {
     if (h.state.orgThrows) throw new Error("Not authenticated");
@@ -62,7 +63,13 @@ function task(o: Record<string, unknown>) {
     end_date: null, updated_at: null, created_at: "2026-07-01T00:00:00Z", is_blocked: false, blocker_reason: null, ...o };
 }
 
-beforeEach(() => h.reset());
+beforeEach(() => {
+  h.reset();
+  delete process.env.FINANCIAL_FOUNDATION_ENABLED;
+  delete process.env.FINANCIAL_PROJECTIONS_ENABLED;
+  delete process.env.FINANCIAL_ISABELLA_ENABLED;
+  delete process.env.FINANCIAL_PILOT_PROJECT_IDS;
+});
 
 describe("resolveIsabellaProjectAccess — deny by default", () => {
   it("missing project → missing_context (no DB touch)", async () => {
@@ -123,6 +130,60 @@ describe("buildIsabellaProcessContext", () => {
     expect(ctx.limitations.join(" ")).toMatch(/risk/i);
   });
 
+  it("adds a read-only financial context only for an enabled pilot", async () => {
+    process.env.FINANCIAL_FOUNDATION_ENABLED = "true";
+    process.env.FINANCIAL_PROJECTIONS_ENABLED = "true";
+    process.env.FINANCIAL_ISABELLA_ENABLED = "true";
+    process.env.FINANCIAL_PILOT_PROJECT_IDS = "p1";
+    seedProject();
+    h.set("financial_project_cockpit", {
+      single: {
+        data: {
+          organization_id: "org1",
+          project_id: "p1",
+          currency: "USD",
+          original_budget: 1000,
+          current_baseline: 1100,
+          authorized_funding: 900,
+          released_funding: 700,
+          current_commitment: 500,
+          outstanding_commitment: 250,
+          actual_cost: 100,
+          open_accrual: 50,
+          settled_payments: 80,
+          remaining_reserve: 100,
+          approved_changes_not_posted: 0,
+          latest_eac: 1080,
+          p50_eac: null,
+          p80_eac: null,
+          cpi: 0.98,
+          spi: 1.01,
+          quality_status: "available",
+          pending_approvals: 0,
+          reconciliation_exceptions: 0,
+          unverified_actuals: 0,
+          currency_mismatches: 0,
+          data_date: "2026-07-22",
+        },
+        error: null,
+      },
+    });
+
+    const ctx = await buildIsabellaProcessContext({ projectId: "p1", include: ["financial_summary"] });
+    expect(ctx.status).toBe("ready");
+    expect(ctx.financialContext?.allowedOperations).toEqual(["explain", "compare", "trace"]);
+    expect(ctx.financialContext?.prohibitedOperations).toContain("approve");
+    expect(ctx.evidencePackets[0]).toMatchObject({ confidence: "verified", sourceKind: "deterministic_project_data" });
+  });
+
+  it("discloses when financial intelligence is feature-disabled", async () => {
+    seedProject();
+    const ctx = await buildIsabellaProcessContext({ projectId: "p1", include: ["financial_summary"] });
+    expect(ctx.status).toBe("partial");
+    expect(ctx.financialContext).toBeUndefined();
+    expect(ctx.limitations).toContain("financial_intelligence_feature_disabled");
+  });
+
   it("unauthorized project → no data", async () => {
     h.set("projects", { single: { data: null, error: null } });
     const ctx = await buildIsabellaProcessContext({ projectId: "foreign" });
@@ -159,7 +220,7 @@ describe("executeDeterministicProjectDataRequest", () => {
 describe("import boundaries (read-only)", () => {
   const dir = fileURLToPath(new URL("../", import.meta.url));
   it("no module writes the event log / process graph or mutates", () => {
-    for (const f of ["access.ts", "context-builder.ts", "task-evidence.ts", "milestone-evidence.ts", "process-signals.ts", "process-mining-evidence.ts", "evidence-builder.ts", "query-executor.ts"]) {
+    for (const f of ["access.ts", "context-builder.ts", "financial-evidence.ts", "task-evidence.ts", "milestone-evidence.ts", "process-signals.ts", "process-mining-evidence.ts", "evidence-builder.ts", "query-executor.ts"]) {
       const src = readFileSync(dir + f, "utf8");
       expect(src, f).not.toMatch(/\.from\(["'](?:project_event_log|process_nodes|process_edges)["']\)/);
       expect(src, f).not.toMatch(/\.(insert|update|delete|upsert)\s*\(/);

@@ -14,6 +14,9 @@ import {
   drawingSourceEventSchema,
   handleDrawingSourceEvent,
 } from "@/lib/drawing-intelligence/connectors/events";
+import { readLimitedJson, RequestBodyError } from "@/lib/http/request-body";
+
+const MAX_REQUEST_BYTES = 256 * 1024;
 
 export async function POST(request: Request): Promise<NextResponse> {
   const secret = process.env.DRAWING_WEBHOOK_SECRET;
@@ -33,8 +36,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = await readLimitedJson(request, MAX_REQUEST_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyError) {
+      return NextResponse.json({ error: error.code }, { status: error.status });
+    }
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 

@@ -36,12 +36,16 @@ yarn-error.log*
 
 # env files — NEVER commit secrets
 .env
+.env.*
+!.env.example
+!.env.test.example
 .env*.local
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 .env.test
+.mcp.json
 
 # vercel
 .vercel
@@ -58,8 +62,11 @@ next-env.d.ts
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea
+.vs/
 # local-only
 .claude/
+.devnull
+.mcp.json
 dev_out.log
 olla.bat
 
@@ -72,3 +79,13 @@ docs/sample-plans/*.pdf
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Validation evidence — may contain session data or client information
+/docs/evidence/
+storageState.json
+**/storageState.json
+
+# Temporary validation and screenshot harness files
+**/.tmp-*.mjs
+**/_tmp-*.test.tsx
+**/_tmp-*.tsx

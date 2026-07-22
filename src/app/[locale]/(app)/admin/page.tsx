@@ -3,7 +3,7 @@
 // ============================================================================
 // Internal administration surface giving platform-wide visibility over
 // companies, users, projects and tasks. Access is a STRICT server-side check:
-// only authorized platform admins (today: pmo@xxx-demo.io, plus any active row
+// only authorized platform admins (the emergency owner, plus any active row
 // in admin_authorized_users) may reach it. Unauthorized users get a 404 — the
 // route existence is not revealed and NO data is loaded before the gate.
 //
@@ -39,7 +39,7 @@ export default async function AdminConsolePage({
   //    unauthenticated; this re-resolves the caller for the gate + logging).
   const ctx = await getOrgContext().catch(() => null);
 
-  // 2) Platform-admin gate (table first, then pmo@xxx-demo.io fallback). The
+  // 2) Platform-admin gate (table first, then the emergency-owner fallback). The
   //    fallback email is the ONLY authorized address until the allowlist table
   //    is populated from this same console.
   const route = "/admin";
@@ -89,7 +89,7 @@ export default async function AdminConsolePage({
       projectTasks={projectTasks}
       admins={admins}
       planCatalog={planCatalog}
-      fallbackEmail="pmo@xxx-demo.io"
+      fallbackEmail="efrain.pradas@gmail.com"
     />
   );
 }

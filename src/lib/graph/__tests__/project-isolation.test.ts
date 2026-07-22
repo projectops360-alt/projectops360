@@ -100,10 +100,12 @@ describe("CAP-045 §C.2 — project isolation filter", () => {
 });
 
 describe("CAP-045 §C.2 — status contract (no silent fallback)", () => {
-  it("flag OFF → status 'disabled' for every project (the events view must NOT fall back)", () => {
-    expect(isEventRelationshipsEnabledFor(PROJECT, "")).toBe(false);
-    expect(isEventRelationshipsEnabledFor(PROJECT, undefined)).toBe(false);
-    // The page maps flag OFF → canonicalEventProjectionStatus === "disabled",
+  it("defaults ON and supports explicit disable without fallback", () => {
+    expect(isEventRelationshipsEnabledFor(PROJECT, "")).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, undefined)).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, "false")).toBe(false);
+    expect(isEventRelationshipsEnabledFor(PROJECT, "true", PROJECT)).toBe(false);
+    // The page maps explicit OFF/quarantine → status "disabled",
     // and the view renders an empty events graph + banner — never operational
     // nodes. This test pins the flag contract that drives that mapping.
   });

@@ -499,13 +499,15 @@ declares it supports canonical events). Milestones and activities views are
 
 ### F.4 Feature flag
 
-`LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS` (server-side, **default OFF**,
-CSV of project IDs or `all`). **Independent** of `RISK_EVENT_CAPTURE_PROJECT_IDS`
-— capturing events and rendering them as a graph projection are two separate
-concerns. Flag OFF ⇒ the Living Graph is **byte-identical** to before: the
-"events" view keeps its current timeline/process behavior, no canonical-events
-view, no event-relationship edges, no new controls. The flag gates only the
-read-only projection; it never gates event capture and never writes to the log.
+The read-only projection is **enabled by default for every valid project**, so
+existing and newly created projects receive the canonical-events view without a
+manual allowlist. `LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED=false` is the global
+rollback switch; `LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS` is an
+optional CSV denylist for project quarantine. These controls are **independent**
+of `RISK_EVENT_CAPTURE_PROJECT_IDS`: capturing events and rendering them as a
+graph projection are separate concerns. Explicit OFF/quarantine keeps the three
+canonical arrays undefined and reports status `disabled`; the projection never
+gates event capture and never writes to the log.
 
 ### F.5 What this extension does NOT do
 
@@ -561,7 +563,8 @@ second event store, no backfill, no Process-Mining metrics outside the
 between-analysis motor, no Variant Analysis, no Root Cause Miner, no RI-05
 change, no invented causality, no silent fallback. The analysis READS both
 layers but never FEEDS the operational analyses (isolated by construction).
-The flag is unchanged and independent of `RISK_EVENT_CAPTURE_PROJECT_IDS`.
+The automatic read-only projection remains independent of
+`RISK_EVENT_CAPTURE_PROJECT_IDS` and retains explicit rollback/quarantine.
 
 Row `LG-BETWEEN-ANALYSIS / CAP-045 §C.2` in
 [regression-test-map.md](../regression-test-map.md), protected by

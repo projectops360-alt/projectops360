@@ -40,12 +40,14 @@ export default async function TeamPage({
     supabase.from("projects").select("id, title_i18n, slug").eq("organization_id", org.organizationId).is("deleted_at", null),
   ]);
 
-  // Emails (best-effort, from the auth admin API).
+  // Resolve only the current tenant's member ids; never enumerate global Auth users.
   const emailById = new Map<string, string>();
-  try {
-    const { data: list } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-    for (const u of list?.users ?? []) if (u.email) emailById.set(u.id, u.email);
-  } catch { /* ignore */ }
+  if (memberIds.length) {
+    const { data: emailRows } = await supabase.rpc("admin_get_user_emails", { p_user_ids: memberIds });
+    for (const row of (emailRows ?? []) as { user_id: string; email: string | null }[]) {
+      if (row.email) emailById.set(row.user_id, row.email);
+    }
+  }
 
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
   const members: TeamMember[] = memberRows.map((m) => ({

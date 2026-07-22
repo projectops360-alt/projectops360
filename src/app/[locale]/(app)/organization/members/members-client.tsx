@@ -54,7 +54,8 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
   const CL_ERR: Record<string, { en: string; es: string }> = {
     not_allowed: { en: "Not allowed.", es: "No autorizado." },
     invalid_email: { en: "Invalid email.", es: "Correo inválido." },
-    weak_password: { en: "Password must be at least 8 characters.", es: "La contraseña debe tener al menos 8 caracteres." },
+    weak_password: { en: "Password must be at least 12 characters.", es: "La contraseña debe tener al menos 12 caracteres." },
+    account_exists_invite_required: { en: "That account already exists and must accept a verified invitation.", es: "Esa cuenta ya existe y debe aceptar una invitación verificada." },
     create_failed: { en: "Could not create the login.", es: "No se pudo crear el acceso." },
   };
 
@@ -62,7 +63,7 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
     setClErr(null); setCreated(null);
     const e = clEmail.trim();
     if (!e) return setClErr("invalid_email");
-    if (clPwd.length < 8) return setClErr("weak_password");
+    if (clPwd.length < 12) return setClErr("weak_password");
     start(async () => {
       const r = await createMemberWithPasswordAction({ email: e, password: clPwd, displayName: clName, billingSeatType: clSeat });
       if (r.error) return setClErr(r.error);
@@ -94,7 +95,7 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
   });
 
   const update = (id: string, patch: Omit<Parameters<typeof updateMemberSeatAction>[0], "memberId">) => start(async () => { await updateMemberSeatAction({ ...patch, memberId: id }); router.refresh(); });
-  const invite = () => { if (!email.trim()) return; start(async () => { const r = await inviteMemberAction({ email, billingSeatType: inviteSeat }); setMsg(r.error ? (isEs ? "No se pudo invitar (¿email configurado?)" : "Couldn't invite (email configured?)") : r.status === "linked" ? (isEs ? "Usuario vinculado" : "User linked") : (isEs ? "Invitación enviada" : "Invite sent")); setEmail(""); router.refresh(); }); };
+  const invite = () => { if (!email.trim()) return; start(async () => { const r = await inviteMemberAction({ email, billingSeatType: inviteSeat }); setMsg(r.error === "account_exists_invite_required" ? (isEs ? "La cuenta ya existe y debe aceptar una invitación verificada." : "The account already exists and must accept a verified invitation.") : r.error ? (isEs ? "No se pudo enviar la invitación." : "Couldn't send the invite.") : (isEs ? "Invitación enviada" : "Invite sent")); setEmail(""); router.refresh(); }); };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6">
@@ -146,12 +147,12 @@ export function MembersClient({ locale, members, canManage }: { locale: string; 
             <div className="min-w-[180px] flex-1">
               <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{isEs ? "Clave temporal" : "Temporary password"}</label>
               <div className="flex items-center gap-1">
-                <input className={`${inp} w-full !py-1.5 text-sm`} placeholder={isEs ? "Mín. 8 caracteres" : "Min. 8 characters"} value={clPwd} onChange={(e) => setClPwd(e.target.value)} />
+                <input className={`${inp} w-full !py-1.5 text-sm`} placeholder={isEs ? "Mín. 12 caracteres" : "Min. 12 characters"} value={clPwd} onChange={(e) => setClPwd(e.target.value)} />
                 <button type="button" title={isEs ? "Generar" : "Generate"} onClick={() => setClPwd(genTempPassword())} className="inline-flex items-center rounded-lg border border-border px-2 py-1.5 text-muted-foreground hover:bg-muted"><Wand2 className="h-4 w-4" /></button>
               </div>
             </div>
             <select className={`${inp} !py-1.5 text-sm`} value={clSeat} onChange={(e) => setClSeat(e.target.value)}>{SEAT_TYPES.map((s) => <option key={s.value} value={s.value}>{isEs ? s.es : s.en}</option>)}</select>
-            <button onClick={createLogin} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}{isEs ? "Crear acceso" : "Create login"}</button>
+            <button onClick={createLogin} disabled={pending || clPwd.length < 12} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}{isEs ? "Crear acceso" : "Create login"}</button>
           </div>
           {clErr && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{CL_ERR[clErr]?.[isEs ? "es" : "en"] ?? clErr}</p>}
           {created && (

@@ -270,7 +270,7 @@ export async function inviteResourceAsUserAction(input: {
   resourceId: string;
   email: string;
   role?: string;
-}): Promise<{ error?: string; status?: "linked" | "invited" }> {
+}): Promise<{ error?: string; status?: "invited" }> {
   let org;
   try { org = await getOrgContext(); } catch { return { error: "not_authenticated" }; }
   if (org.role !== "owner" && org.role !== "admin") return { error: "not_allowed" };
@@ -283,40 +283,17 @@ export async function inviteResourceAsUserAction(input: {
     .from("resources").select("id, name").eq("id", d.resourceId).eq("organization_id", org.organizationId).is("deleted_at", null).single();
   if (!resource) return { error: "not_found" };
 
-  // Already a member?
-  const { data: existingProfiles } = await supabase
-    .from("profiles").select("id").eq("organization_id", org.organizationId);
-  // (We can't read auth.users emails via PostgREST; rely on admin API below.)
-
   try {
-    // 1) Look for an existing auth user with this email.
-    const { data: list } = await supabase.auth.admin.listUsers();
-    const existing = list?.users?.find((u) => (u.email ?? "").toLowerCase() === d.email.toLowerCase());
-
-    if (existing) {
-      // Link into org: membership + profile + resource link.
-      await supabase.from("organization_members").upsert(
-        { organization_id: org.organizationId, user_id: existing.id, role: d.role },
-        { onConflict: "organization_id,user_id" },
-      );
-      const alreadyProfile = (existingProfiles ?? []).some((p) => p.id === existing.id);
-      if (!alreadyProfile) {
-        await supabase.from("profiles").upsert({ id: existing.id, organization_id: org.organizationId, display_name: resource.name });
-      }
-      await supabase.from("resources").update({ linked_user_id: existing.id }).eq("id", d.resourceId);
-      await logAudit({ org, action: "update", entityType: "resources", entityId: d.resourceId, metadata: { linked_user: existing.id, email: d.email } });
-      revalidatePath("/(app)/team", "page");
-      return { status: "linked" };
-    }
-
-    // 2) Send an invite email (Supabase Auth). Requires SMTP/email config.
+    // Send an invite through Supabase Auth. Existing global accounts are never
+    // linked implicitly across tenant boundaries.
     const redirectTo = await getAuthEmailCallbackUrl("/change-password?invite=1");
     const { data: invited, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(d.email, {
       data: { display_name: resource.name, invited_to_org: org.organizationId },
       redirectTo,
     });
     if (inviteErr || !invited?.user) {
-      return { error: "email_not_configured" };
+      const existingAccount = /already|registered|exists/i.test(inviteErr?.message ?? "");
+      return { error: existingAccount ? "account_exists_invite_required" : "email_not_configured" };
     }
     await supabase.from("organization_members").upsert(
       { organization_id: org.organizationId, user_id: invited.user.id, role: d.role },

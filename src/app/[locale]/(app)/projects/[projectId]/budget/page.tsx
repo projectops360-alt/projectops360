@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
+import { getFinancialFeatureStateFromProcess } from "@/lib/financial/flags";
+import { getFinancialCockpitSummary } from "@/lib/financial/read-model.server";
 import { BudgetReportClient, type BudgetCategory, type BudgetLine } from "./budget-client";
+import { FinancialCockpit } from "./financial-cockpit";
 
 export default async function ProjectBudgetPage({
   params,
@@ -40,7 +43,7 @@ export default async function ProjectBudgetPage({
   let lineCount = 0;
   let unquantified = 0;
   let uncosted = 0;
-  let currency = "USD";
+  const currency = "USD";
 
   for (const m of materials ?? []) {
     const meta = (m.metadata ?? {}) as Record<string, unknown>;
@@ -78,16 +81,30 @@ export default async function ProjectBudgetPage({
     .sort((a, b) => b.subtotal - a.subtotal || a.name.localeCompare(b.name));
 
   const projectName = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
+  const financialFeatures = getFinancialFeatureStateFromProcess(projectId);
+  const financialSummary = financialFeatures.ui
+    ? await getFinancialCockpitSummary(org.organizationId, projectId)
+    : null;
 
   return (
-    <BudgetReportClient
-      locale={locale}
-      projectId={projectId}
-      projectName={projectName}
-      categories={categories}
-      grandTotal={Math.round(grandTotal * 100) / 100}
-      currency={currency}
-      stats={{ lineCount, unquantified, uncosted }}
-    />
+    <>
+      {financialSummary ? (
+        <FinancialCockpit
+          locale={locale}
+          projectId={projectId}
+          role={org.role}
+          summary={financialSummary}
+        />
+      ) : null}
+      <BudgetReportClient
+        locale={locale}
+        projectId={projectId}
+        projectName={projectName}
+        categories={categories}
+        grandTotal={Math.round(grandTotal * 100) / 100}
+        currency={currency}
+        stats={{ lineCount, unquantified, uncosted }}
+      />
+    </>
   );
 }

@@ -6,6 +6,16 @@
 
 This contract prevents cross-environment data access and defines the minimum release and production discipline for ProjectOps360.
 
+## 0. Corporate deployment ownership
+
+- Vercel team: `ProjectOps360's projects` (`project-ops360-s-projects`).
+- Vercel project: `projectops360` (`prj_FkwU97q9h094J5bBhaxmdLW4QChb`).
+- GitHub repository: `projectops360-alt/projectops360`.
+- Production domain: `projectops360.com`; `projectops360.vercel.app` redirects to it.
+- Native Vercel Git integration is the only production deployment mechanism. Do not add a second Vercel project or a token-based GitHub Actions deployment for this application.
+- Commits deployed from the Hobby team must be authored by the linked corporate GitHub identity. Configure this repository with `git config user.name "ProjectOps360"` and `git config user.email "291304067+projectops360-alt@users.noreply.github.com"` before committing.
+- `projectops360-pretransfer-backup` is a disconnected historical backup. It must not be linked to GitHub or receive production domains.
+
 ## 1. Binding environment matrix
 
 | Application environment | Supabase project | Project ref | Allowed data |
@@ -32,7 +42,7 @@ Non-production code must never read or write the production database. Production
 3. Apply and validate the migration in staging first.
 4. Open a pull request. CI must pass typecheck, tests and build.
 5. Validate the Preview deployment against staging, including authentication, RLS, critical workflows and rollback behavior.
-6. Obtain human approval for the GitHub `production` environment.
+6. Obtain human approval through the protected pull-request review and release decision.
 7. Apply the reviewed migration to production using one coordinated migration owner.
 8. Deploy the exact CI-approved commit. The production build guard must confirm the production Supabase ref.
 9. Run post-deploy smoke checks and monitor errors, latency and database health.
@@ -57,7 +67,7 @@ A production release is allowed only when all are true:
 - Backup/recovery posture is current.
 - A rollback owner and previous known-good deployment are identified.
 
-`master` Git auto-deployment is disabled in `vercel.json`. `.github/workflows/deploy-production.yml` deploys only after the `CI` workflow succeeds. The GitHub `production` environment requires approval by `projectops360-alt` and accepts only protected branches.
+Pull requests must pass CI and Vercel Preview before merge. The protected `master` branch is the Vercel production branch; merging the approved commit triggers exactly one native Vercel production deployment. Manual CLI production deployments and token-based GitHub Actions deployments are recovery-only operations and must not run in parallel with the native Git integration.
 
 ## 6. Reliability and recovery
 

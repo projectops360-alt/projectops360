@@ -14,6 +14,7 @@ import { resolveIsabellaProjectAccess } from "./access";
 import { getIsabellaTaskEvidence } from "./task-evidence";
 import { getIsabellaMilestoneEvidence } from "./milestone-evidence";
 import { getIsabellaProcessMiningEvidence } from "./process-mining-evidence";
+import { getIsabellaFinancialEvidence } from "./financial-evidence";
 import { buildProcessSignals, mergeProcessMiningSignals } from "./process-signals";
 import { buildIsabellaCitation, safeRef } from "./evidence-builder";
 import type {
@@ -142,6 +143,25 @@ export async function buildIsabellaProcessContext(
     }
   }
 
+  // ── Financial control: read-only canonical PMO projections ────────────────
+  if (included.includes("financial_summary")) {
+    try {
+      const financial = await getIsabellaFinancialEvidence(scope);
+      if (!financial.ok) {
+        requestedSourcePartial = true;
+        limitations.push(...financial.limitations);
+      } else {
+        ctx.financialContext = financial.context;
+        ctx.evidencePackets.push(...financial.packets);
+        ctx.citations.push(...financial.citations);
+        limitations.push(...financial.limitations);
+      }
+    } catch {
+      requestedSourcePartial = true;
+      limitations.push(es ? "No pude cargar el control financiero." : "Could not load financial control.");
+    }
+  }
+
   // ── Project summary fallback (if tasks were not requested) ──────────────────
   if (!ctx.project) {
     ctx.project = { projectId: scope.projectId, name: es ? "Proyecto" : "Project", citationRef: safeRef("project", scope.projectId) };
@@ -170,9 +190,12 @@ export async function buildIsabellaProcessContext(
   const noMilestones = !ctx.milestoneContext || ctx.milestoneContext.totalVisibleMilestones === 0;
   const noProcessMining = !ctx.processMiningContext
     || (ctx.processMiningContext.eventCount === 0 && ctx.processMiningContext.transitionCount === 0);
+  const noFinancial = !ctx.financialContext;
   if (limitations.some((l) => l.includes("Could not load") || l.includes("No pude cargar"))) {
     ctx.status = "partial";
-  } else if (noTasks && noMilestones && noProcessMining) {
+  } else if (noTasks && noMilestones && noProcessMining && noFinancial && requestedSourcePartial) {
+    ctx.status = "partial";
+  } else if (noTasks && noMilestones && noProcessMining && noFinancial) {
     ctx.status = "empty";
     ctx.message = es ? "Este proyecto no tiene datos visibles para ti todavía." : "This project has no data visible to you yet.";
   } else if (requestedFuture || requestedSourcePartial) {
