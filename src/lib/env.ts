@@ -99,6 +99,14 @@ export const env = {
     process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED ?? "true",
   LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS:
     process.env.LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS ?? "",
+  /** Financial engine foundation. Every financial flag is server-side and default OFF. */
+  FINANCIAL_FOUNDATION_ENABLED: process.env.FINANCIAL_FOUNDATION_ENABLED ?? "",
+  FINANCIAL_WRITERS_ENABLED: process.env.FINANCIAL_WRITERS_ENABLED ?? "",
+  FINANCIAL_PROJECTIONS_ENABLED: process.env.FINANCIAL_PROJECTIONS_ENABLED ?? "",
+  FINANCIAL_UI_ENABLED: process.env.FINANCIAL_UI_ENABLED ?? "",
+  FINANCIAL_ISABELLA_ENABLED: process.env.FINANCIAL_ISABELLA_ENABLED ?? "",
+  /** Explicit comma-separated pilot projects; "all" is rejected in production. */
+  FINANCIAL_PILOT_PROJECT_IDS: process.env.FINANCIAL_PILOT_PROJECT_IDS ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

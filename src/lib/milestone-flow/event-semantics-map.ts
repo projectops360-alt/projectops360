@@ -184,6 +184,23 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   // ── Budget / Cost ─────────────────────────────────────────────────────────
   CostIncurred: sem("CostIncurred", "cost", { notes: "Cost incurred (fact)." }),
   CostVarianceDetected: sem("CostVarianceDetected", "cost", { ...DERIVED, healthSignal: "degrades_health", notes: "Derived cost variance (critical)." }),
+  financial_estimate_prepared: sem("financial_estimate_prepared", "cost", { notes: "Controlled estimate version prepared; factual financial evidence, not a schedule transition." }),
+  financial_boe_approved: sem("financial_boe_approved", "cost", { notes: "Basis of Estimate approved with evidence; no schedule effect is inferred." }),
+  financial_baseline_activated: sem("financial_baseline_activated", "cost", { notes: "Approved financial baseline activated; authoritative cost fact." }),
+  funding_authorized: sem("funding_authorized", "cost", { notes: "Funding authority granted; factual authority boundary." }),
+  funding_released: sem("funding_released", "cost", { notes: "Funding movement posted; cash availability is not inferred beyond its projection." }),
+  commitment_posted: sem("commitment_posted", "cost", { notes: "Commitment movement posted from controlled procurement evidence." }),
+  actual_posted: sem("actual_posted", "cost", { notes: "Actual cost posted; factual accounting evidence." }),
+  accrual_posted: sem("accrual_posted", "cost", { notes: "Accrual movement posted; factual period evidence." }),
+  payment_settled: sem("payment_settled", "cost", { notes: "Payment settlement posted; factual cash evidence." }),
+  financial_change_approved: sem("financial_change_approved", "cost", { notes: "Financial impact of a change approved; baseline changes only after posting." }),
+  financial_change_posted: sem("financial_change_posted", "cost", { reworkSignal: "indicates_possible_rework", notes: "Approved financial change posted; possible downstream replanning, never assumed causality." }),
+  reserve_released: sem("reserve_released", "cost", { notes: "Reserve movement released under approved authority and evidence." }),
+  financial_snapshot_created: sem("financial_snapshot_created", "cost", { ...DERIVED, notes: "Formula-versioned measurement snapshot; derived inference, not a prediction." }),
+  financial_reconciliation_completed: sem("financial_reconciliation_completed", "cost", { notes: "Reconciliation completed; status and exceptions remain in the payload." }),
+  financial_period_closed: sem("financial_period_closed", "cost", { notes: "Financial period closed under controlled authority." }),
+  financial_period_reopened: sem("financial_period_reopened", "cost", { healthSignal: "indicates_regression", reworkSignal: "starts_rework", notes: "Closed financial period reopened with reason; accounting rework is explicit." }),
+  financial_record_reversed: sem("financial_record_reversed", "cost", { reworkSignal: "indicates_possible_rework", notes: "Compensating financial record posted; original evidence remains immutable." }),
 
   // ── Resource / Capacity ───────────────────────────────────────────────────
   ResourceAssigned: sem("ResourceAssigned", "resource", { notes: "Resource assigned; relieves resource gap." }),
