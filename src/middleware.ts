@@ -134,10 +134,6 @@ export async function middleware(request: NextRequest) {
     // Unauthenticated user accessing a protected route → redirect to login
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = getLoginPath(locale);
-    // Preserve cookies on redirect
-    finalResponse.cookies.getAll().forEach((cookie) => {
-      loginUrl; // cookies are set on the response, not the URL
-    });
     const redirectResponse = NextResponse.redirect(loginUrl);
     // Copy all cookies to the redirect response
     finalResponse.cookies.getAll().forEach((cookie) => {
