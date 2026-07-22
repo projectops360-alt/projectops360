@@ -87,6 +87,7 @@ export interface ProjectImportEntity {
   organization_id: string;
   import_job_id: string;
   entity_type: ImportEntityType;
+  source_order: number | null;
   source_key: string | null;
   extracted_json: Record<string, unknown>;
   normalized_json: Record<string, unknown>;

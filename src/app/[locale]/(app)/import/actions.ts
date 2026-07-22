@@ -20,7 +20,6 @@ import { aiExtractCanonicalImport } from "@/lib/import-intelligence/ai-extract";
 import { validateCanonicalImport } from "@/lib/import-intelligence/validate";
 import { executeImport, rollbackImport } from "@/lib/import-intelligence/execute";
 import type {
-  CanonicalImport,
   ImportEntityType,
   ProjectImportJob,
   ProjectImportEntity,
@@ -266,8 +265,12 @@ export async function analyzeImportJobAction(input: {
     pushAll("budget_item", canonical.budget_items);
     pushAll("risk", canonical.risks);
 
-    for (let i = 0; i < entityRows.length; i += 200) {
-      const { error: insError } = await supabase.from("project_import_entities").insert(entityRows.slice(i, i + 200));
+    const orderedEntityRows = entityRows.map((entity, sourceOrder) => ({
+      ...entity,
+      source_order: sourceOrder,
+    }));
+    for (let i = 0; i < orderedEntityRows.length; i += 200) {
+      const { error: insError } = await supabase.from("project_import_entities").insert(orderedEntityRows.slice(i, i + 200));
       if (insError) throw new Error(insError.message);
     }
 
@@ -349,7 +352,13 @@ export async function getImportJobAction(input: { jobId: string }): Promise<{
 
   const supabase = createAdminClient();
   const [entitiesRes, validationsRes] = await Promise.all([
-    supabase.from("project_import_entities").select("*").eq("import_job_id", job.id).order("entity_type").order("created_at"),
+    supabase
+      .from("project_import_entities")
+      .select("*")
+      .eq("import_job_id", job.id)
+      .order("entity_type")
+      .order("source_order", { ascending: true, nullsFirst: false })
+      .order("id"),
     supabase.from("project_import_validation_results").select("*").eq("import_job_id", job.id).order("severity"),
   ]);
   return {
@@ -453,8 +462,10 @@ export async function executeImportAction(input: {
     .limit(1);
   const { data: entities } = await supabase
     .from("project_import_entities")
-    .select("id, entity_type, source_key, normalized_json, validation_status, will_import")
-    .eq("import_job_id", job.id);
+    .select("id, entity_type, source_order, source_key, normalized_json, validation_status, will_import")
+    .eq("import_job_id", job.id)
+    .order("source_order", { ascending: true, nullsFirst: false })
+    .order("id");
 
   if ((blockers?.length ?? 0) > 0) {
     // A blocker (e.g. circular dependency) still allows import when the user
