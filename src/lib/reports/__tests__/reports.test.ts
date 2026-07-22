@@ -25,6 +25,8 @@ describe("dataset registry", () => {
     expect(getDataset("nope")).toBeNull();
     expect(getColumn("task_execution", "status")?.type).toBe("enum");
     expect(getColumn("task_execution", "record_type")?.type).toBe("enum");
+    expect(getDataset("financial_control")?.displayName).toBe("Financial Control");
+    expect(getColumn("financial_control", "settled_payments")?.group).toBe("Cash Flow");
   });
 });
 

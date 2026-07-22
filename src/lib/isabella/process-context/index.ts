@@ -40,3 +40,7 @@ export {
 export { resolveIsabellaProjectAccess, type ResolveAccessInput } from "./access";
 export { executeDeterministicProjectDataRequest, type ProjectQueryExecution } from "./query-executor";
 export { buildIsabellaProcessContext } from "./context-builder";
+export {
+  getIsabellaFinancialEvidence,
+  type IsabellaFinancialEvidenceOutcome,
+} from "./financial-evidence";

@@ -79,6 +79,8 @@ Intelligence™ supersedes conversation history, prompts, and temporary AI conte
 
 | [isabella-process-mining-layer-training.md](isabella-process-mining-layer-training.md) | **Isabella × Process Mining** — governed three-source training contract: deterministic project/event data, vectorized Product Brain, and screen/program context |
 
+| [financial-control-rollout.md](financial-control-rollout.md) | **Financial Control P4–P9** — canonical financial workflows, PMO cockpit, stage gates, forecast quality and production-readiness boundaries |
+
 ### Sub-repositories
 
 | Folder | Purpose |

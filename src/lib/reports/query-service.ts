@@ -231,6 +231,52 @@ async function fetchBudget(supabase: Admin, ctx: QueryContext): Promise<ReportRo
   });
 }
 
+async function fetchFinancialControl(supabase: Admin, ctx: QueryContext): Promise<ReportRow[]> {
+  const projects = await projectNameMap(supabase, ctx.organizationId);
+  const fromView = supabase.from as unknown as (table: string) => {
+    select: (columns: string) => unknown;
+  };
+  const query = fromView("financial_project_cockpit").select("*");
+  const { data } = await scope(
+    query,
+    ctx.organizationId,
+    ctx.projectId,
+  ) as unknown as {
+    data: Array<Record<string, string | number | null>> | null;
+  };
+  const numberOrNull = (value: string | number | null | undefined) =>
+    value == null ? null : Number(value);
+  return (data ?? [])
+    .filter((row) => typeof row.project_id === "string" && projects.has(row.project_id))
+    .map((row) => ({
+      project_name: projects.get(String(row.project_id)) ?? "—",
+      _projectId: String(row.project_id),
+      currency: String(row.currency ?? "USD"),
+      original_budget: numberOrNull(row.original_budget),
+      current_baseline: numberOrNull(row.current_baseline),
+      authorized_funding: numberOrNull(row.authorized_funding),
+      released_funding: numberOrNull(row.released_funding),
+      current_commitment: numberOrNull(row.current_commitment),
+      outstanding_commitment: numberOrNull(row.outstanding_commitment),
+      actual_cost: numberOrNull(row.actual_cost),
+      open_accrual: numberOrNull(row.open_accrual),
+      settled_payments: numberOrNull(row.settled_payments),
+      remaining_reserve: numberOrNull(row.remaining_reserve),
+      approved_changes_not_posted: numberOrNull(row.approved_changes_not_posted),
+      latest_eac: numberOrNull(row.latest_eac),
+      p50_eac: numberOrNull(row.p50_eac),
+      p80_eac: numberOrNull(row.p80_eac),
+      cpi: numberOrNull(row.cpi),
+      spi: numberOrNull(row.spi),
+      quality_status: String(row.quality_status ?? "insufficient_inputs"),
+      pending_approvals: numberOrNull(row.pending_approvals),
+      reconciliation_exceptions: numberOrNull(row.reconciliation_exceptions),
+      unverified_actuals: numberOrNull(row.unverified_actuals),
+      currency_mismatches: numberOrNull(row.currency_mismatches),
+      data_date: row.data_date == null ? null : String(row.data_date),
+    } as ReportRow));
+}
+
 async function fetchRisks(supabase: Admin, ctx: QueryContext): Promise<ReportRow[]> {
   const projects = await projectNameMap(supabase, ctx.organizationId);
   const { data } = await scope(
@@ -333,6 +379,7 @@ const FETCHERS: Record<string, (s: Admin, c: QueryContext, config: ReportConfig)
   project_health: fetchProjectHealth,
   task_execution: fetchTaskExecution,
   budget_performance: fetchBudget,
+  financial_control: fetchFinancialControl,
   risk_register: fetchRisks,
   material_requirements: fetchMaterials,
   rfi_log: fetchRfis,

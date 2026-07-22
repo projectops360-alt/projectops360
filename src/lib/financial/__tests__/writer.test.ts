@@ -108,4 +108,21 @@ describe("financial atomic movement writer", () => {
       expect.objectContaining({ p_domain: "funding", p_parent_id: parentId }),
     );
   });
+
+  it("routes controlled actuals through their compatibility RPC", async () => {
+    rpc.mockResolvedValue({
+      data: { ok: true, event_id: "event-actual", movement_id: movementId, deduped: false },
+      error: null,
+    });
+    const input = validInput();
+    await expect(captureFinancialMovementAtomic({
+      ...input,
+      domain: "actual",
+      event: { ...input.event, eventType: "actual_posted" },
+    })).resolves.toMatchObject({ ok: true, eventId: "event-actual" });
+    expect(rpc).toHaveBeenCalledWith(
+      "capture_financial_actual_atomic",
+      expect.objectContaining({ p_domain: "actual" }),
+    );
+  });
 });

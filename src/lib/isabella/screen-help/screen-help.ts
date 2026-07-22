@@ -26,7 +26,7 @@ export interface ScreenHelpContext {
 }
 
 /** The content areas we can explain deterministically today. */
-export type ScreenHelpArea = "resources" | "task" | "process_mining" | "unknown" | "other";
+export type ScreenHelpArea = "resources" | "task" | "process_mining" | "financial" | "unknown" | "other";
 
 /** A UI term the user might ask the meaning of. */
 type ScreenHelpTerm =
@@ -44,7 +44,17 @@ type ScreenHelpTerm =
   | "integrity"
   | "variant"
   | "root_cause"
-  | "kpi";
+  | "kpi"
+  | "baseline"
+  | "funding"
+  | "commitment"
+  | "actual"
+  | "accrual"
+  | "payment"
+  | "reserve"
+  | "forecast"
+  | "approval_queue"
+  | "quality";
 
 export interface ScreenHelpAnswer {
   answer: string;
@@ -85,6 +95,7 @@ export function resolveScreenArea(ctx: ScreenHelpContext | undefined): ScreenHel
   // Explicit task surfaces first; the Execution Map itself is Process Mining.
   if (/\btask_detail\b|\bsubtask\b|task[_-]?detail|workboard|kanban|\bboard\b/.test(blob)) return "task";
   if (/process[_-]?mining|living[_-]?graph|milestone[_-]?flow|execution[_-]?map|\/variants\b|root[_-]?causes|\/kpis\b/.test(blob)) return "process_mining";
+  if (/financial[_-]?control|financial[_-]?cockpit|budget[_-]?control|\/budget\b/.test(blob)) return "financial";
   // Resources / project participants (route /projects/{id}/team; module project_team).
   if (/project_participants|project_team|team_roles|\bparticipa|\bresource|people_permissions|team_directory|\/team\b|\bteam\b/.test(blob)) return "resources";
   return "other";
@@ -101,6 +112,16 @@ function detectTerm(question: string): ScreenHelpTerm {
   if (/variant|variante/.test(q)) return "variant";
   if (/root\s+cause|causa\s+raiz/.test(q)) return "root_cause";
   if (/\bkpi\b|indicador/.test(q)) return "kpi";
+  if (/baseline|linea\s+base/.test(q)) return "baseline";
+  if (/funding|financiamiento|fondos?\s+autorizados?/.test(q)) return "funding";
+  if (/commitment|compromiso/.test(q)) return "commitment";
+  if (/\bactuals?\b|costo\s+real/.test(q)) return "actual";
+  if (/accrual|devengado/.test(q)) return "accrual";
+  if (/payment|pago/.test(q)) return "payment";
+  if (/reserve|reserva|contingenc/.test(q)) return "reserve";
+  if (/forecast|pronostico|proyeccion|\beac\b|\bp50\b|\bp80\b/.test(q)) return "forecast";
+  if (/approval\s+queue|cola\s+de\s+(control|aprobacion)|pending\s+approval/.test(q)) return "approval_queue";
+  if (/quality|calidad|reconciliation|reconciliacion/.test(q)) return "quality";
   if (/unassigned|sin\s+asignar|missing\s+assignment|pendiente\s+de\s+asignar|owner\s+unassigned|sin\s+responsable|sin\s+due[nñ]o/.test(q)) return "unassigned";
   if (/\bmember\b|\bmiembro\b/.test(q)) return "member";
   if (/permission|permiso/.test(q)) return "permission";
@@ -193,6 +214,76 @@ function taskContent(term: ScreenHelpTerm, es: boolean): string {
   return es
     ? "Esta pantalla muestra el detalle de la tarea y su ejecución. Puedo explicarte un campo específico — por ejemplo owner/responsable, estado, o bloqueos."
     : "This screen shows the task detail and its execution. I can explain a specific field — for example owner/responsible, status, or blockers.";
+}
+
+function financialContent(term: ScreenHelpTerm, es: boolean): string {
+  const definitions: Partial<Record<ScreenHelpTerm, { en: string; es: string }>> = {
+    baseline: {
+      en: "The **current baseline** is the active, approved cost plan. The original budget remains immutable; approved posted changes create a new baseline version instead of rewriting history.",
+      es: "El **baseline actual** es el plan de costo activo y aprobado. El presupuesto original permanece inmutable; los cambios aprobados y posteados crean una nueva versión sin reescribir la historia.",
+    },
+    funding: {
+      en: "**Funding** shows authorized and released financing. It is separate from budget, commitments, actual cost, and cash payments; one value never substitutes for another.",
+      es: "**Funding** muestra financiamiento autorizado y liberado. Está separado del presupuesto, compromisos, costo real y pagos de caja; un valor nunca sustituye a otro.",
+    },
+    commitment: {
+      en: "A **commitment** is an approved contractual obligation, such as a purchase order. Current and outstanding commitment are not actual cost or cash paid.",
+      es: "Un **compromiso** es una obligación contractual aprobada, como una orden de compra. El compromiso actual y pendiente no es costo real ni caja pagada.",
+    },
+    actual: {
+      en: "**Actual cost** is posted cost recognized for the project. Controlled actuals are append-only and traceable; legacy unverified rows remain visibly flagged.",
+      es: "El **costo real** es costo posteado y reconocido para el proyecto. Los actuals controlados son append-only y trazables; los registros heredados sin verificar permanecen señalados.",
+    },
+    accrual: {
+      en: "An **accrual** recognizes cost incurred but not yet invoiced or paid. It contributes to cost exposure but remains separate from actual postings and payments.",
+      es: "Un **accrual** reconoce costo incurrido todavía no facturado o pagado. Contribuye a la exposición de costo, pero permanece separado de actuals y pagos.",
+    },
+    payment: {
+      en: "A **settled payment** is cash disbursed. Payments are displayed separately from cost recognition so cash flow is never confused with actual cost.",
+      es: "Un **pago liquidado** es caja desembolsada. Los pagos se muestran separados del reconocimiento de costo para no confundir flujo de caja con costo real.",
+    },
+    reserve: {
+      en: "**Remaining reserve** is governed contingency or management reserve still available. Reserve use requires the approved change and authorization path.",
+      es: "La **reserva restante** es contingencia o reserva de gestión todavía disponible. Su uso requiere la ruta aprobada de cambio y autorización.",
+    },
+    forecast: {
+      en: "**EAC** is the latest estimate at completion. P50 and P80 are probabilistic scenarios only when sufficient evidence exists; missing values are disclosed rather than invented.",
+      es: "El **EAC** es el estimado más reciente al completar. P50 y P80 son escenarios probabilísticos solo cuando existe evidencia suficiente; los valores faltantes se muestran, no se inventan.",
+    },
+    approval_queue: {
+      en: "The **control queue** counts submitted or validated financial records awaiting an authorized human decision. Isabella can explain and trace them, but cannot approve, post, release, reopen, or execute them.",
+      es: "La **cola de control** cuenta registros financieros enviados o validados que esperan una decisión humana autorizada. Isabella puede explicarlos y rastrearlos, pero no aprobar, postear, liberar, reabrir ni ejecutarlos.",
+    },
+    quality: {
+      en: "**Quality status** exposes missing baseline, unverified actuals, currency exclusions, and reconciliation exceptions. Missing evidence is never converted to zero or hidden.",
+      es: "El **estado de calidad** expone baseline faltante, actuals sin verificar, exclusiones por moneda y excepciones de reconciliación. La evidencia faltante nunca se convierte en cero ni se oculta.",
+    },
+  };
+  const definition = definitions[term];
+  if (definition) return es ? definition.es : definition.en;
+  return es
+    ? [
+        "Estás en **Control financiero**, una vista PMO integrada al Core de ProjectOps360°.",
+        "",
+        "- **Baseline y funding** conservan aprobación, versión y trazabilidad.",
+        "- **Compromisos, actuals y accruals** muestran exposición de costo sin mezclarse.",
+        "- **Pagos** representan caja y permanecen separados del costo reconocido.",
+        "- **Reservas, forecast y CPI/SPI** usan proyecciones canónicas con calidad explícita.",
+        "- **Cola de control** muestra decisiones humanas pendientes y segregación de funciones.",
+        "",
+        "El estimado de materiales existente sigue disponible debajo; esta vista no crea un segundo presupuesto ni otro Gantt. Isabella solo puede explicar, comparar y rastrear evidencia financiera.",
+      ].join("\n")
+    : [
+        "You are in **Financial Control**, a PMO view integrated into the ProjectOps360° Core.",
+        "",
+        "- **Baseline and funding** preserve approval, version, and traceability.",
+        "- **Commitments, actuals, and accruals** show cost exposure without mixing truths.",
+        "- **Payments** represent cash and remain separate from recognized cost.",
+        "- **Reserves, forecast, and CPI/SPI** use canonical projections with explicit quality.",
+        "- **Control queue** shows pending human decisions and segregation of duties.",
+        "",
+        "The existing material estimate remains below; this view creates neither a second budget nor another Gantt. Isabella may only explain, compare, and trace financial evidence.",
+      ].join("\n");
 }
 
 function processMiningContent(
@@ -298,6 +389,7 @@ export function answerScreenHelp(
   if (area === "resources") return { answer: resourcesContent(term, es), area, term, confident: true };
   if (area === "task") return { answer: taskContent(term, es), area, term, confident: true };
   if (area === "process_mining") return { answer: processMiningContent(term, es, ctx), area, term, confident: true };
+  if (area === "financial") return { answer: financialContent(term, es), area, term, confident: true };
 
   // Unknown or a screen we do not have deterministic content for → never guess.
   return { answer: safetyClarification(es), area, term, confident: false };

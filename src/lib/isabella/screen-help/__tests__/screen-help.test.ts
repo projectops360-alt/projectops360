@@ -15,6 +15,7 @@ import {
 const RESOURCES = { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" };
 const TASK = { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" };
 const PROCESS_MINING = { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" };
+const FINANCIAL = { module: "financial_control", screen: "financial_cockpit", pathname: "/projects/p1/budget" };
 
 describe("intent detection", () => {
   it("detects UI-meaning questions (EN + ES, typos, seeded token)", () => {
@@ -58,6 +59,10 @@ describe("area resolution", () => {
     expect(resolveScreenArea(PROCESS_MINING)).toBe("process_mining");
     expect(resolveScreenArea({ pathname: "/projects/p1/execution-map/milestone-flow" })).toBe("process_mining");
     expect(resolveScreenArea({ pathname: "/projects/p1/execution-map/root-causes" })).toBe("process_mining");
+  });
+  it("resolves the integrated budget cockpit to financial", () => {
+    expect(resolveScreenArea(FINANCIAL)).toBe("financial");
+    expect(resolveScreenArea({ pathname: "/projects/p1/budget" })).toBe("financial");
   });
   it("missing context → unknown", () => {
     expect(resolveScreenArea(undefined)).toBe("unknown");
@@ -140,6 +145,27 @@ describe("Process Mining screen/program context", () => {
     );
     expect(result.answer).toMatch(/statistical associations/i);
     expect(result.answer).toMatch(/not a confirmed cause/i);
+  });
+});
+
+describe("Financial control screen context", () => {
+  it("explains the integrated PMO cockpit without inventing a second budget", () => {
+    const result = answerScreenHelp("Explain this screen", FINANCIAL, "en");
+    expect(result.area).toBe("financial");
+    expect(result.confident).toBe(true);
+    expect(result.answer).toMatch(/PMO view integrated/i);
+    expect(result.answer).toMatch(/neither a second budget nor another Gantt/i);
+    expect(result.answer).toMatch(/explain, compare, and trace/i);
+  });
+
+  it("preserves cash-flow and human-approval boundaries", () => {
+    const payment = answerScreenHelp("What does payment mean?", FINANCIAL, "en");
+    const queue = answerScreenHelp("What does approval queue mean?", FINANCIAL, "en");
+    expect(payment.term).toBe("payment");
+    expect(payment.answer).toMatch(/cash/i);
+    expect(payment.answer).toMatch(/separately from cost recognition/i);
+    expect(queue.term).toBe("approval_queue");
+    expect(queue.answer).toMatch(/cannot approve, post, release, reopen, or execute/i);
   });
 });
 

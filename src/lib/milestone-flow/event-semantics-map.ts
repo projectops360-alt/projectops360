@@ -192,6 +192,8 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   commitment_posted: sem("commitment_posted", "cost", { notes: "Commitment movement posted from controlled procurement evidence." }),
   actual_posted: sem("actual_posted", "cost", { notes: "Actual cost posted; factual accounting evidence." }),
   accrual_posted: sem("accrual_posted", "cost", { notes: "Accrual movement posted; factual period evidence." }),
+  financial_accrual_approved: sem("financial_accrual_approved", "cost", { notes: "Accrual approved by authorized human; posting remains a separate fact." }),
+  financial_payment_approved: sem("financial_payment_approved", "cost", { notes: "Payment approved by authorized human; settlement remains a separate cash fact." }),
   payment_settled: sem("payment_settled", "cost", { notes: "Payment settlement posted; factual cash evidence." }),
   financial_change_approved: sem("financial_change_approved", "cost", { notes: "Financial impact of a change approved; baseline changes only after posting." }),
   financial_change_posted: sem("financial_change_posted", "cost", { reworkSignal: "indicates_possible_rework", notes: "Approved financial change posted; possible downstream replanning, never assumed causality." }),

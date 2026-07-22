@@ -38,7 +38,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-024 | Reports | P4 | Implemented | 70% | `lib/reports` |
 | CAP-025 | Dashboards | P2/P4 | Partial | 50% | `components/roadmap`, `lib/command-center` |
 | CAP-026 | Communication Intelligence | P1 | Partial | 30% | `/communications` |
-| CAP-027 | Financial Intelligence | P4 | Partial | 40% | `budget_items`, `lib/execution`, `cost_library` |
+| CAP-027 | Financial Intelligence | P4/P5/P7/P8/P9 | Implemented (stage-gated) | 82% | `lib/financial`, `financial_project_cockpit`, `reports`, `Isabella` |
 | CAP-028 | Security / RBAC | P6 | Partial / Regression-risk | 50% | `lib/auth` |
 | CAP-029 | People / Team Workspace | P6 | Implemented | 70% | `lib/team`, `lib/team-roles` |
 | CAP-030 | Manual Team Member creation | P6 | Implemented | 80% | `lib/team` |

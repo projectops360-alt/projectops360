@@ -11,6 +11,7 @@ import { getFinancialFeatureStateFromProcess } from "./flags";
 export type FinancialMovementDomain =
   | "funding"
   | "commitment"
+  | "actual"
   | "accrual"
   | "payment"
   | "reserve";
@@ -18,6 +19,7 @@ export type FinancialMovementDomain =
 const DOMAIN_EVENT_TYPES: Record<FinancialMovementDomain, ReadonlySet<string>> = {
   funding: new Set(["funding_released", "financial_record_reversed"]),
   commitment: new Set(["commitment_posted", "financial_record_reversed"]),
+  actual: new Set(["actual_posted", "financial_record_reversed"]),
   accrual: new Set(["accrual_posted", "financial_record_reversed"]),
   payment: new Set(["payment_settled", "financial_record_reversed"]),
   reserve: new Set(["reserve_released", "financial_record_reversed"]),
@@ -106,8 +108,11 @@ export async function captureFinancialMovementAtomic(
   }
 
   try {
+    const rpcName = input.domain === "actual"
+      ? "capture_financial_actual_atomic"
+      : "capture_financial_movement_atomic";
     const { data, error } = await createAdminClient().rpc(
-      "capture_financial_movement_atomic",
+      rpcName,
       prepared.data,
     );
     if (error) {
