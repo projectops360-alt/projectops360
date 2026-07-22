@@ -173,6 +173,16 @@
 
 | REG-025 / PLAN-CATALOG-SINGLE-SOURCE | Billing + Landing · Commercial plan truth | Landing reads active plan name, monthly/yearly price, currency, enterprise status and order from `public.plans`; EN/ES translation files contain no price fields; Personal uses monthly individual billing, Team/Business use monthly per-user billing, Enterprise has no unit price. | `src/lib/billing/__tests__/public-plans.test.ts` · `src/components/landing/__tests__/pricing-source.test.ts` | **protected** |
 
+| REG-026 / IMPORT-ENTITY-SOURCE-ORDER | Project Import Intelligence · ordered milestone persistence | Canonical source order must survive bulk persistence and arbitrary database row-return order. Every new import entity carries a unique zero-based `source_order`; execution explicitly orders by it and `entitiesToCanonical` sorts defensively. `milestones.order_index` is the Living Graph business-order source of truth; UUIDs, timestamps, database physical order and saved node positions never establish milestone precedence. Legacy rows without an ordinal retain received order rather than inventing evidence. | `src/lib/import-intelligence/__tests__/execute-order.test.ts` | **protected** (shuffled-row regression + legacy fallback unit-tested; schema uniqueness protected by migration) |
+
+> **LG rollout amendment (2026-07-21):** default-OFF/project-allowlist wording in
+> the LG-EVENT-RELATIONSHIPS and LG-BETWEEN-ANALYSIS rows is superseded. The
+> read-only canonical-event projection defaults ON for every valid project.
+> `LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED=false` is the global rollback switch
+> and `LIVING_GRAPH_EVENT_RELATIONSHIPS_DISABLED_PROJECT_IDS` is the optional
+> quarantine denylist. The disabled/no-fallback contract remains protected for
+> explicit rollback and quarantine states.
+
 ## Open gaps (tests owed)
 
 - _None._ Every protected regression in the table above has an executable test. New regressions must

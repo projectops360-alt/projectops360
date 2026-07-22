@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   PRODUCT_BRAIN_PACKAGES,
@@ -42,6 +42,8 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
     ["pi-process-mining-reading-views", /not computable/i],
     ["pi-isabella-process-mining-sources", /three governed sources/i],
     ["pi-isabella-process-mining-sources", /screen layout.*never business truth/i],
+    ["pi-import-milestone-order-integrity", /source_order/i],
+    ["pi-import-milestone-order-integrity", /must never infer precedence/i],
     ["pi-critical-path-source-of-truth", /Living Graph/i],
     ["pi-critical-path-source-of-truth", /must NOT maintain a separate Critical Path engine/i],
     ["pi-workboard-task-cards", /avatar.*initials|initials/i],
@@ -88,13 +90,15 @@ describe("Dr. Isabella — Product Brain knowledge corpus", () => {
   });
 
   // ── DB seed and code must not drift ─────────────────────────────────────────
-  it("the generated migration contains every package slug (no drift)", () => {
-    const sql = readFileSync(
-      join(process.cwd(), "supabase/migrations/20260817000000_knowledge_product_brain.sql"),
-      "utf8",
-    );
+  it("the migration history contains every package slug (no drift)", () => {
+    const migrationsDirectory = join(process.cwd(), "supabase/migrations");
+    const sql = readdirSync(migrationsDirectory)
+      .filter((file) => file.endsWith(".sql"))
+      .sort()
+      .map((file) => readFileSync(join(migrationsDirectory, file), "utf8"))
+      .join("\n");
     for (const slug of REQUIRED_PB_SLUGS) {
-      expect(sql, `slug ${slug} missing from migration`).toContain(`'${slug}'`);
+      expect(sql, `slug ${slug} missing from migration history`).toContain(`'${slug}'`);
     }
   });
 });

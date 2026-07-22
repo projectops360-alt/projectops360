@@ -1,7 +1,7 @@
 # Import Order Integrity — Milestones and Ordered Entities
 
-**Regression:** `REG-024`  
-**Status:** Protected  
+**Regression:** `REG-026`
+**Status:** Protected
 **Owner:** Product / Engineering
 
 ## Binding rule

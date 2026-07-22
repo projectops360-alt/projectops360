@@ -58,8 +58,11 @@ next-env.d.ts
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea
+.vs/
 # local-only
 .claude/
+.devnull
+.mcp.json
 dev_out.log
 olla.bat
 
@@ -72,3 +75,13 @@ docs/sample-plans/*.pdf
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Validation evidence — may contain session data or client information
+/docs/evidence/
+storageState.json
+**/storageState.json
+
+# Temporary validation and screenshot harness files
+**/.tmp-*.mjs
+**/_tmp-*.test.tsx
+**/_tmp-*.tsx

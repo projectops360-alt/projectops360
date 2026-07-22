@@ -787,5 +787,28 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-026 — Imported milestone order corrupted between analysis and execution
+
+- **Reported:** 2026-07-20. A Budget & Cost Management project showed P6 before
+  P0 in the Living Graph although the approved JSON listed P0 through P9.
+- **Root cause:** `project_import_entities` was bulk inserted in canonical order,
+  then read for execution without `ORDER BY`. PostgreSQL row-return order is
+  undefined, and `executeImport` assigned `milestones.order_index` in that
+  arbitrary order. The Living Graph correctly rendered the corrupted
+  `order_index`.
+- **Status: RESOLVED / PROTECTED (2026-07-21).** Import analysis now persists a
+  unique zero-based `source_order`; execution queries and the canonical rebuild
+  both sort by it. A partial unique index prevents duplicate ordinals.
+- **Protection rule (binding):** imported ordered entities must carry an
+  explicit source ordinal across persistence. Database return order, UUIDs,
+  timestamps and visual node position are never business order. Guard id
+  **IMPORT-ENTITY-SOURCE-ORDER**.
+- **Owner:** Product/Engineering. **Verify:**
+  `src/lib/import-intelligence/__tests__/execute-order.test.ts` supplies shuffled
+  entity rows and must still produce P0, P1, P2, P6. Operational procedure:
+  [Import Order Integrity](import-order-integrity.md).
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*

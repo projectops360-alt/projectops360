@@ -1,4 +1,4 @@
--- Isabella knowledge delta for REG-024. Idempotent; embeddings are filled by
+-- Isabella knowledge delta for REG-026. Idempotent; embeddings are filled by
 -- the existing Knowledge OS indexer after deployment.
 
 WITH pkg AS (
@@ -13,7 +13,7 @@ ver AS (
   )
   SELECT
     p.id, NULL, 1, true, 'verified',
-    jsonb_build_array('import-order-integrity.md; 10-regression-log.md → REG-024')
+    jsonb_build_array('import-order-integrity.md; 10-regression-log.md → REG-026')
   FROM pkg p
   RETURNING id, package_id
 ),
@@ -27,12 +27,12 @@ loc AS (
     (
       'en',
       'Why can an imported milestone appear before P0, and how is it fixed?',
-      E'Imported milestone order is project data. ProjectOps360° preserves the canonical source sequence in project_import_entities.source_order and writes it to milestones.order_index; the Living Graph renders that order and must never infer precedence from UUIDs, timestamps, database return order, or visual node position. If the order is wrong, verify the source file, import source_order, project milestone order_index, and graph projection—in that order. Repair only the verified project''s milestone indexes, then query and compare the exact final sequence. Do not drag nodes to hide corrupted data and do not modify tasks, dependencies, events, other projects, or saved layouts.\nSource: import-order-integrity.md; REG-024.\nVerify: inspect the project''s milestones ordered by order_index, then open Execution Map → Living Graph → Milestones.'
+      E'Imported milestone order is project data. ProjectOps360° preserves the canonical source sequence in project_import_entities.source_order and writes it to milestones.order_index; the Living Graph renders that order and must never infer precedence from UUIDs, timestamps, database return order, or visual node position. If the order is wrong, verify the source file, import source_order, project milestone order_index, and graph projection—in that order. Repair only the verified project''s milestone indexes, then query and compare the exact final sequence. Do not drag nodes to hide corrupted data and do not modify tasks, dependencies, events, other projects, or saved layouts.\nSource: import-order-integrity.md; REG-026.\nVerify: inspect the project''s milestones ordered by order_index, then open Execution Map → Living Graph → Milestones.'
     ),
     (
       'es',
       '¿Por qué un hito importado puede aparecer antes de P0 y cómo se corrige?',
-      E'El orden de los hitos importados es un dato del proyecto. ProjectOps360° conserva la secuencia canónica en project_import_entities.source_order y la escribe en milestones.order_index; el Living Graph representa ese orden y nunca debe inferir precedencia por UUID, fechas, orden de retorno de la base de datos ni posición visual. Si el orden está mal, verifica en este orden: archivo fuente, source_order de la importación, order_index de los hitos y proyección del grafo. Corrige únicamente los índices de hitos del proyecto verificado y luego consulta y compara la secuencia final exacta. No arrastres nodos para ocultar datos corruptos ni modifiques tareas, dependencias, eventos, otros proyectos o layouts guardados.\nFuente: import-order-integrity.md; REG-024.\nVerifica: consulta los hitos del proyecto ordenados por order_index y luego abre Execution Map → Living Graph → Hitos.'
+      E'El orden de los hitos importados es un dato del proyecto. ProjectOps360° conserva la secuencia canónica en project_import_entities.source_order y la escribe en milestones.order_index; el Living Graph representa ese orden y nunca debe inferir precedencia por UUID, fechas, orden de retorno de la base de datos ni posición visual. Si el orden está mal, verifica en este orden: archivo fuente, source_order de la importación, order_index de los hitos y proyección del grafo. Corrige únicamente los índices de hitos del proyecto verificado y luego consulta y compara la secuencia final exacta. No arrastres nodos para ocultar datos corruptos ni modifiques tareas, dependencias, eventos, otros proyectos o layouts guardados.\nFuente: import-order-integrity.md; REG-026.\nVerifica: consulta los hitos del proyecto ordenados por order_index y luego abre Execution Map → Living Graph → Hitos.'
     )
   ) AS c(language, title, body) ON true
   RETURNING id, version_id, package_id, organization_id, language, body

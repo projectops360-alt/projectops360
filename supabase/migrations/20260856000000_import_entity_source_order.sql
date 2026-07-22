@@ -1,4 +1,4 @@
--- Preserve the canonical source order across bulk import persistence (REG-024).
+-- Preserve the canonical source order across bulk import persistence (REG-026).
 -- PostgreSQL row-return order is undefined unless an explicit ordinal is stored
 -- and requested. Existing NULL rows are legacy imports whose original order is
 -- unknown; all new analyzer writes provide a unique zero-based source_order.

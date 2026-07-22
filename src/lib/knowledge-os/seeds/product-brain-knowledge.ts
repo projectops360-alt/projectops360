@@ -100,6 +100,27 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
         "Verifica: pregunta por estado actual, por como funciona la capa y luego pide Explica esta pantalla desde Process Mining.",
     },
   },
+  {
+    slug: "pi-import-milestone-order-integrity",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "import-order-integrity.md; 10-regression-log.md → REG-026",
+    authority: "regression",
+    en: {
+      title: "Why can an imported milestone appear before P0, and how is it fixed?",
+      body:
+        "Imported milestone order is project data. ProjectOps360° preserves the canonical source sequence in project_import_entities.source_order and writes it to milestones.order_index; the Living Graph renders that order and must never infer precedence from UUIDs, timestamps, database return order, or visual node position. If the order is wrong, verify the source file, import source_order, project milestone order_index, and graph projection—in that order. Repair only the verified project's milestone indexes, then query and compare the exact final sequence. Do not drag nodes to hide corrupted data and do not modify tasks, dependencies, events, other projects, or saved layouts.\n" +
+        "Source: import-order-integrity.md; REG-026.\n" +
+        "Verify: inspect the project's milestones ordered by order_index, then open Execution Map → Living Graph → Milestones.",
+    },
+    es: {
+      title: "¿Por qué un hito importado puede aparecer antes de P0 y cómo se corrige?",
+      body:
+        "El orden de los hitos importados es un dato del proyecto. ProjectOps360° conserva la secuencia canónica en project_import_entities.source_order y la escribe en milestones.order_index; el Living Graph representa ese orden y nunca debe inferir precedencia por UUIDs, fechas, orden de retorno de la base de datos ni posición visual. Si el orden está mal, verifica en este orden: archivo fuente, source_order de la importación, order_index de los hitos y proyección del grafo. Corrige únicamente los índices de hitos del proyecto verificado y luego consulta y compara la secuencia final exacta. No arrastres nodos para ocultar datos corruptos ni modifiques tareas, dependencias, eventos, otros proyectos o layouts guardados.\n" +
+        "Fuente: import-order-integrity.md; REG-026.\n" +
+        "Verifica: consulta los hitos del proyecto ordenados por order_index y luego abre Execution Map → Living Graph → Hitos.",
+    },
+  },
   // ── Living Graph + Critical Path ───────────────────────────────────────────
   {
     slug: "pi-living-graph-what-is",
