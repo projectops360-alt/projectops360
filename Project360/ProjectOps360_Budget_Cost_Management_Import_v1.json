@@ -1,0 +1,765 @@
+{
+  "project": {
+    "name": "ProjectOps360° Budget & Cost Management Engine",
+    "description": "Software Development project to design and implement the ProjectOps360° Budget & Cost Management Engine as an integrated Core capability. PMO / Project Controls is the primary financial authority; Project Managers participate according to explicit delegation. No product implementation may begin before architecture gate G6. The solution must reuse Core project identity, Workboard, Living Graph, Process Mining, risks, changes, decisions, and Isabella under read-only financial-assistance constraints. AACE 18R-97 is treated only as a configurable process-industry adapter, never as a universal estimate rule.",
+    "project_type": "Software Development",
+    "status": "planning"
+  },
+  "milestones": [
+    {
+      "name": "P0 — Discovery, charter and governance baseline",
+      "description": "Acordar el problema, autoridad financiera, alcance, realidad existente y reglas que gobiernan todo el trabajo posterior. Gate G0: Discovery baseline approved. Approver: PMO Admin / Product Owner.",
+      "phase": "P0",
+      "status": "planned"
+    },
+    {
+      "name": "P1 — Canonical financial domain model",
+      "description": "Definir las verdades financieras, dimensiones, relaciones, estados y eventos que constituirán el lenguaje universal del motor. Gate G1: Canonical financial model approved. Approver: PMO + Finance + Product Architecture.",
+      "phase": "P1",
+      "status": "planned"
+    },
+    {
+      "name": "P2 — Estimating, classification and baseline architecture",
+      "description": "Controlar cómo nace, madura, se justifica, aprueba y versiona un estimado hasta convertirse en baseline. Gate G2: Estimating and baseline architecture approved. Approver: PMO + Cost Engineering.",
+      "phase": "P2",
+      "status": "planned"
+    },
+    {
+      "name": "P3 — Financial ledger, changes, reserves and governance",
+      "description": "Definir el registro controlado de autorizaciones, obligaciones, costos, pagos, reservas y correcciones. Gate G3: Ledger and governance architecture approved. Approver: PMO + Finance + Security.",
+      "phase": "P3",
+      "status": "planned"
+    },
+    {
+      "name": "P4 — Performance measurement and forecast engine",
+      "description": "Definir cálculos determinísticos, escenarios de costo final, incertidumbre y calidad de forecast. Gate G4: Measurement and forecast formulas validated. Approver: PMO + Controls Assurance.",
+      "phase": "P4",
+      "status": "planned"
+    },
+    {
+      "name": "P5 — Core integration, PMO experience and Isabella",
+      "description": "Diseñar cómo el motor financiero utiliza las funciones actuales de ProjectOps360° sin convertirse en una aplicación separada. Gate G5: Core integration and UX approved. Approver: PMO + Product Owner.",
+      "phase": "P5",
+      "status": "planned"
+    },
+    {
+      "name": "P6 — Architecture package and implementation readiness",
+      "description": "Convertir las decisiones aprobadas en un paquete implementable, seguro, probado y reversible. Gate G6: Architecture approved for implementation. Approver: Product Owner + PMO + Engineering.",
+      "phase": "P6",
+      "status": "planned"
+    },
+    {
+      "name": "P7 — Foundation implementation",
+      "description": "Implementar únicamente la base aprobada, de forma aditiva, segura y verificable en stage. Gate G7: Foundation implementation accepted in stage. Approver: Engineering + Security + PMO.",
+      "phase": "P7",
+      "status": "planned"
+    },
+    {
+      "name": "P8 — Financial workflows and Core surfaces",
+      "description": "Implementar los workflows y superficies aprobados sobre la fundación validada. Gate G8: End-to-end workflows accepted in stage. Approver: PMO + Finance + Product Owner.",
+      "phase": "P8",
+      "status": "planned"
+    },
+    {
+      "name": "P9 — Pilot, production readiness and rollout",
+      "description": "Validar con datos reales, desplegar de forma controlada y medir calidad financiera después del release. Gate G9: Production readiness approved. Approver: Release Owner + PMO + Product Owner.",
+      "phase": "P9",
+      "status": "planned"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "P0-T1",
+      "name": "Approve objective, scope and non-goals",
+      "description": "Deliverable: Approved problem statement and boundaries | Acceptance criteria: The project is explicitly defined as a financial control engine connected to the Core, not an expense screen or parallel planning product. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin / Product Owner | Consulted roles: Product Architecture, Finance / Controller, Project Manager",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": ""
+    },
+    {
+      "id": "P0-T2",
+      "name": "Audit current financial capability and production data paths",
+      "description": "Deliverable: Current-state map of budget_items, cost_actuals, material requirements, procurement, health, reports and budget UI | Acceptance criteria: Every implemented object and gap is evidenced from code/schema; no capability is assumed from conversation memory. | Owner role: Product Architecture | Accountable role: PMO / Project Controls Lead | Consulted roles: Engineering, Finance / Controller, Security",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T1"
+    },
+    {
+      "id": "P0-T3",
+      "name": "Define financial RACI and segregation of duties",
+      "description": "Deliverable: Authority matrix by financial truth and transaction | Acceptance criteria: PMO ownership is explicit; PM rights are delegation-based; no role can request, approve and post the same controlled transaction. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Sponsor, Finance / Controller, Procurement, Project Manager, Security",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T1"
+    },
+    {
+      "id": "P0-T4",
+      "name": "Define source-of-truth and compatibility boundaries",
+      "description": "Deliverable: Current-to-target ownership map | Acceptance criteria: Existing budget and procurement data are evolved additively; no second event ledger, status engine, graph or financial truth is introduced. | Owner role: Product Architecture | Accountable role: Product Owner | Consulted roles: PMO / Project Controls, Engineering, Data Architecture",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T2"
+    },
+    {
+      "id": "P0-T5",
+      "name": "Define representative PMO use cases and control questions",
+      "description": "Deliverable: Prioritized use-case catalog for project and portfolio financial control | Acceptance criteria: Use cases cover funding, baseline, commitments, actuals, accruals, forecast, exposure, changes, reserves, cash flow and decision support. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Portfolio Manager, Finance, Project Manager, Sponsor",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T3;P0-T4"
+    },
+    {
+      "id": "P0-T6",
+      "name": "Approve discovery baseline and charter",
+      "description": "Deliverable: G0 approval record | Acceptance criteria: Scope, ownership, current state, non-goals and success measures are approved and traceable. | Owner role: PMO Admin / Product Owner | Accountable role: Product Owner | Consulted roles: PMO / Project Controls, Finance, Engineering | Gate G0: Discovery baseline approved. Approver: PMO Admin / Product Owner",
+      "phase": "P0",
+      "milestone": "P0 — Discovery, charter and governance baseline",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T2;P0-T3;P0-T4;P0-T5"
+    },
+    {
+      "id": "P1-T1",
+      "name": "Define the six canonical financial truths and cash-flow separation",
+      "description": "Deliverable: Canonical definitions for Funding, Original Budget, Current Baseline, Commitments, Actual Cost, Forecast and Cash Flow | Acceptance criteria: No field or metric conflates authorization, obligation, incurred cost, payment or forecast. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Finance / Controller, Product Architecture",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P0-T6"
+    },
+    {
+      "id": "P1-T2",
+      "name": "Define CBS hierarchy and WBS/control-account linkage",
+      "description": "Deliverable: CBS ontology and linkage rules to project, phase, milestone, task and control account | Acceptance criteria: Every financial line can roll up by CBS and trace to execution scope without forcing one budget line per task. | Owner role: Cost Engineering Lead | Accountable role: PMO / Project Controls Lead | Consulted roles: Product Architecture, Project Manager, Finance",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T1"
+    },
+    {
+      "id": "P1-T3",
+      "name": "Define financial dimensions and traceability references",
+      "description": "Deliverable: Dimension model for cost code, resource, supplier, contract, department, location, country, currency, risk, change and decision | Acceptance criteria: Dimensions support drill-down and portfolio rollup while preserving organization and project isolation. | Owner role: Data Architecture | Accountable role: Product Architecture | Consulted roles: PMO, Finance, Procurement, Security",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T2"
+    },
+    {
+      "id": "P1-T4",
+      "name": "Define currency, FX, fiscal period and accounting-date semantics",
+      "description": "Deliverable: Currency and period policy | Acceptance criteria: Transaction, project and reporting currencies; FX source/date; incurred, posting, invoice and payment dates are distinct. | Owner role: Finance / Controller | Accountable role: PMO / Project Controls Lead | Consulted roles: Data Architecture, Product Architecture",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T1"
+    },
+    {
+      "id": "P1-T5",
+      "name": "Define lifecycle state machines and invariants",
+      "description": "Deliverable: State diagrams for estimate, budget, baseline, commitment, actual, accrual, payment, change and reserve | Acceptance criteria: Invalid transitions, silent baseline edits and cross-period rewrites are explicitly prevented. | Owner role: Product Architecture | Accountable role: PMO / Project Controls Lead | Consulted roles: Finance, Procurement, Security, Engineering",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T1;P1-T3"
+    },
+    {
+      "id": "P1-T6",
+      "name": "Define canonical financial events and provenance envelope",
+      "description": "Deliverable: Financial event vocabulary mapped to the existing Project Event Log | Acceptance criteria: Events are immutable facts with actor, source, evidence, financial object references and idempotency; no second event store is proposed. | Owner role: Event Architecture | Accountable role: Product Architecture | Consulted roles: PMO, Finance, Process Mining, Security",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T5"
+    },
+    {
+      "id": "P1-T7",
+      "name": "Approve canonical financial domain model",
+      "description": "Deliverable: G1 approval record | Acceptance criteria: Definitions, dimensions, lifecycles, events and ownership are internally consistent and approved. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Finance, Product Architecture, Security | Gate G1: Canonical financial model approved. Approver: PMO + Finance + Product Architecture",
+      "phase": "P1",
+      "milestone": "P1 — Canonical financial domain model",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T2;P1-T3;P1-T4;P1-T5;P1-T6"
+    },
+    {
+      "id": "P2-T1",
+      "name": "Define Basis of Estimate contract",
+      "description": "Deliverable: Basis of Estimate schema and required evidence | Acceptance criteria: Every estimate version identifies purpose, scope, exclusions, assumptions, methods, sources, maturity, risks, contingency, currency and approvers. | Owner role: Cost Engineering Lead | Accountable role: PMO / Project Controls Lead | Consulted roles: Estimator, Finance, Product Architecture",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T7"
+    },
+    {
+      "id": "P2-T2",
+      "name": "Design configurable estimate-classification framework",
+      "description": "Deliverable: Universal classification contract with framework-specific adapters | Acceptance criteria: The Core stores classification scheme, class, maturity evidence and determination basis without hardcoding one industry's rules. | Owner role: Product Architecture | Accountable role: PMO / Project Controls Lead | Consulted roles: Cost Engineering, Industry Framework Owners",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T1"
+    },
+    {
+      "id": "P2-T3",
+      "name": "Define AACE 18R-97 process-industries maturity adapter",
+      "description": "Deliverable: Deliverable-maturity checklist for process-industry estimates | Acceptance criteria: Class determination is based on defining-deliverable maturity and quality; nominal design percentage is not used as the sole determinant; accuracy is not presented as guaranteed. | Owner role: Cost Engineering Lead | Accountable role: PMO / Project Controls Lead | Consulted roles: Oil & Gas Framework Owner, Industrial Framework Owner, Product Architecture",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T2"
+    },
+    {
+      "id": "P2-T4",
+      "name": "Define estimate versioning, comparison and supersession rules",
+      "description": "Deliverable: Immutable estimate-version lifecycle | Acceptance criteria: Prior estimates remain traceable; revisions identify changed assumptions, scope, quantities, rates, risks and approvals. | Owner role: Product Architecture | Accountable role: PMO / Project Controls Lead | Consulted roles: Cost Engineering, Audit, Finance",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T1;P2-T2"
+    },
+    {
+      "id": "P2-T5",
+      "name": "Define approval, original budget and rebaseline lifecycle",
+      "description": "Deliverable: Baseline approval and versioning workflow | Acceptance criteria: Original Budget is immutable; Current Baseline changes only through approved change control; pending changes remain separate. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin / Sponsor according to thresholds | Consulted roles: Finance, Project Manager, Change Control Board",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T4"
+    },
+    {
+      "id": "P2-T6",
+      "name": "Approve estimating and baseline architecture",
+      "description": "Deliverable: G2 approval record | Acceptance criteria: Basis of Estimate, classification adapters, versions and baseline lifecycle are approved. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Cost Engineering, Finance, Product Architecture | Gate G2: Estimating and baseline architecture approved. Approver: PMO + Cost Engineering",
+      "phase": "P2",
+      "milestone": "P2 — Estimating, classification and baseline architecture",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T3;P2-T4;P2-T5"
+    },
+    {
+      "id": "P3-T1",
+      "name": "Design funding authorization ledger",
+      "description": "Deliverable: Funding authorization and release model | Acceptance criteria: Authorized, released, restricted and remaining funds are separately traceable by approval and effective period. | Owner role: PMO / Project Controls Lead | Accountable role: Sponsor / Steering Committee | Consulted roles: Finance, Product Architecture",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P2-T6"
+    },
+    {
+      "id": "P3-T2",
+      "name": "Design commitments, contracts and purchase-order ledger",
+      "description": "Deliverable: Commitment lifecycle and line-level linkage model | Acceptance criteria: Original, revised, consumed, cancelled and outstanding commitment values reconcile to contract/PO evidence. | Owner role: Procurement / Contract Management | Accountable role: PMO / Project Controls Lead | Consulted roles: Finance, Legal, Product Architecture",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T1"
+    },
+    {
+      "id": "P3-T3",
+      "name": "Design actual-cost, accrual and reversal ledger",
+      "description": "Deliverable: Actual and accrual posting model | Acceptance criteria: Incurred cost, posted actual, accrual, reversal and source document are distinct, balanced and period-aware. | Owner role: Finance / Controller | Accountable role: Finance / Controller | Consulted roles: PMO, Product Architecture, Audit",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T1"
+    },
+    {
+      "id": "P3-T4",
+      "name": "Design payment and cash-flow ledger",
+      "description": "Deliverable: Payment and cash-flow timing model | Acceptance criteria: Payment does not alter incurred-cost timing; forecast cash flow supports planned, committed, invoiced and paid states. | Owner role: Finance / Treasury | Accountable role: Finance / Controller | Consulted roles: PMO, Accounts Payable, Product Architecture",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T3"
+    },
+    {
+      "id": "P3-T5",
+      "name": "Design change control, contingency and management reserve",
+      "description": "Deliverable: Change and reserve governance model | Acceptance criteria: Pending, approved, rejected and emergency changes remain distinct; contingency is tied to identified risks; management reserve is separately governed. | Owner role: PMO / Project Controls Lead | Accountable role: Change Control Board / Sponsor | Consulted roles: Project Manager, Finance, Risk Manager, Product Architecture",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T1;P2-T5"
+    },
+    {
+      "id": "P3-T6",
+      "name": "Define correction, idempotency, reconciliation and period-close controls",
+      "description": "Deliverable: Control invariant catalog | Acceptance criteria: Imports are retry-safe; corrections use reversal/adjustment rather than silent rewrite; ledgers reconcile; closed periods require controlled reopening. | Owner role: Finance / Controller | Accountable role: PMO Admin | Consulted roles: Audit, Security, Engineering, Product Architecture",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T2;P3-T3;P3-T4;P3-T5"
+    },
+    {
+      "id": "P3-T7",
+      "name": "Approve ledger, security and governance architecture",
+      "description": "Deliverable: G3 approval record | Acceptance criteria: Ledger boundaries, approvals, SoD, correction controls and audit requirements are approved. | Owner role: PMO Admin | Accountable role: PMO Admin | Consulted roles: Finance, Security, Audit, Product Architecture | Gate G3: Ledger and governance architecture approved. Approver: PMO + Finance + Security",
+      "phase": "P3",
+      "milestone": "P3 — Financial ledger, changes, reserves and governance",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T2;P3-T3;P3-T4;P3-T5;P3-T6"
+    },
+    {
+      "id": "P4-T1",
+      "name": "Define canonical formula contract for BAC, PV, EV, AC, CPI, SPI, CV and SV",
+      "description": "Deliverable: Versioned EVM formula specification | Acceptance criteria: Inputs, cut-off date, null/zero handling, units and limitations are explicit; SPI is not represented as calendar delay. | Owner role: Project Controls Analytics | Accountable role: PMO / Project Controls Lead | Consulted roles: Cost Engineering, Schedule Controls, Product Architecture",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T7"
+    },
+    {
+      "id": "P4-T2",
+      "name": "Define earned-value methods and progress evidence",
+      "description": "Deliverable: EV method catalog and eligibility rules | Acceptance criteria: 0/100, weighted milestone, units complete, apportioned effort and level-of-effort methods require explicit configuration and evidence. | Owner role: Project Controls Analytics | Accountable role: PMO / Project Controls Lead | Consulted roles: Project Manager, Engineering, Process Mining",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T1"
+    },
+    {
+      "id": "P4-T3",
+      "name": "Define deterministic EAC and ETC scenarios",
+      "description": "Deliverable: Bottom-up, CPI-based, CPI/SPI and PM forecast scenario definitions | Acceptance criteria: Each scenario identifies formula, assumptions, applicability, confidence, source data and human override rationale. | Owner role: Project Controls Analytics | Accountable role: PMO / Project Controls Lead | Consulted roles: Cost Engineering, Project Manager, Finance",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T1;P4-T2"
+    },
+    {
+      "id": "P4-T4",
+      "name": "Define probabilistic P50/P80 cost forecast and sensitivity model",
+      "description": "Deliverable: Probabilistic forecast contract | Acceptance criteria: P50/P80 are produced only from documented distributions, correlations, uncertainty and risk inputs; insufficient data yields an honest unavailable state. | Owner role: Risk and Cost Analytics | Accountable role: PMO / Project Controls Lead | Consulted roles: Risk Manager, Cost Engineering, Data Science",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T3"
+    },
+    {
+      "id": "P4-T5",
+      "name": "Define TCPI, burn rate, remaining funds and cost exposure metrics",
+      "description": "Deliverable: Decision metric catalog | Acceptance criteria: Metrics distinguish actual, commitment and uncommitted forecast exposure and identify mathematically unrealistic recovery requirements. | Owner role: Project Controls Analytics | Accountable role: PMO / Project Controls Lead | Consulted roles: Finance, Portfolio Manager, Project Manager",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T3"
+    },
+    {
+      "id": "P4-T6",
+      "name": "Create reference datasets and expected calculation results",
+      "description": "Deliverable: Golden datasets for normal, incomplete, zero-value, overrun and multi-currency cases | Acceptance criteria: Expected outputs are independently calculated and approved before engine implementation. | Owner role: Controls Assurance / QA | Accountable role: PMO / Project Controls Lead | Consulted roles: Finance, Cost Engineering, Engineering",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T1;P4-T2;P4-T3;P4-T4;P4-T5"
+    },
+    {
+      "id": "P4-T7",
+      "name": "Validate and approve measurement and forecast formulas",
+      "description": "Deliverable: G4 approval record | Acceptance criteria: All formulas reproduce the approved golden results and document their limitations. | Owner role: Controls Assurance / QA | Accountable role: PMO Admin | Consulted roles: Project Controls, Finance, Cost Engineering, Product Architecture | Gate G4: Measurement and forecast formulas validated. Approver: PMO + Controls Assurance",
+      "phase": "P4",
+      "milestone": "P4 — Performance measurement and forecast engine",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T6"
+    },
+    {
+      "id": "P5-T1",
+      "name": "Design PMO financial control cockpit and portfolio rollups",
+      "description": "Deliverable: PMO-first information architecture | Acceptance criteria: PMO can compare funding, baseline, exposure, EAC, variance, reserve and confidence across projects with drill-down to evidence. | Owner role: PMO Product Lead | Accountable role: PMO Admin / Product Owner | Consulted roles: Portfolio Manager, Finance, UX, Product Architecture",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T7"
+    },
+    {
+      "id": "P5-T2",
+      "name": "Design role-specific PM, Sponsor, Finance and Procurement experiences",
+      "description": "Deliverable: Role-based workflows and disclosure matrix | Acceptance criteria: PM can work without being forced to administer budget; controlled financial actions remain permission- and approval-gated. | Owner role: UX / Product Design | Accountable role: PMO Product Lead | Consulted roles: Project Manager, Sponsor, Finance, Procurement, Security",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P5-T1"
+    },
+    {
+      "id": "P5-T3",
+      "name": "Design evolution of the existing project budget surface",
+      "description": "Deliverable: Additive UX transition plan | Acceptance criteria: Existing material estimate capability remains available and is mapped into the new estimating layer; no current function is silently replaced. | Owner role: UX / Product Design | Accountable role: Product Owner | Consulted roles: PMO, Engineering, Drawing Intelligence Owner",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P5-T1;P5-T2"
+    },
+    {
+      "id": "P5-T4",
+      "name": "Design Living Graph financial nodes, edges and overlays",
+      "description": "Deliverable: Financial graph projection contract | Acceptance criteria: Budget, commitment, actual, change and forecast relationships are projections over canonical sources and never create a parallel truth or decorative graph. | Owner role: Living Graph Architecture | Accountable role: Product Architecture | Consulted roles: PMO, Process Mining, UX",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T6;P5-T1"
+    },
+    {
+      "id": "P5-T5",
+      "name": "Design Process Mining and root-cause financial analysis",
+      "description": "Deliverable: Event-to-variance analysis design | Acceptance criteria: Analysis separates temporal order, explicit causality and correlation; no cost cause is invented from proximity. | Owner role: Process Intelligence Lead | Accountable role: Product Architecture | Consulted roles: PMO, Finance, Risk Manager, Living Graph Architecture",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T6;P5-T4"
+    },
+    {
+      "id": "P5-T6",
+      "name": "Design Isabella Cost Intelligence tools and human-approval boundaries",
+      "description": "Deliverable: Read-only tool contracts, explanations, simulations and refusal rules | Acceptance criteria: Every statement cites source data and formula/scenario; Isabella cannot approve, post, change baseline or release reserves. | Owner role: Isabella / AI Architecture | Accountable role: PMO / Product Owner | Consulted roles: Security, Finance, Project Controls, UX",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T7;P5-T4;P5-T5"
+    },
+    {
+      "id": "P5-T7",
+      "name": "Approve PMO experience and Core integration architecture",
+      "description": "Deliverable: G5 approval record | Acceptance criteria: The design is PMO-first, role-safe, responsive and fully integrated with existing ProjectOps360° capabilities. | Owner role: PMO Product Lead | Accountable role: Product Owner | Consulted roles: PMO Admin, Finance, UX, Product Architecture | Gate G5: Core integration and UX approved. Approver: PMO + Product Owner",
+      "phase": "P5",
+      "milestone": "P5 — Core integration, PMO experience and Isabella",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P5-T2;P5-T3;P5-T4;P5-T5;P5-T6"
+    },
+    {
+      "id": "P6-T1",
+      "name": "Publish canonical architecture, capability specification and ADRs",
+      "description": "Deliverable: Approved-design Product Brain package | Acceptance criteria: Current reality, target architecture, non-goals, contracts, decisions, risks and phased roadmap are explicit and non-contradictory. | Owner role: Product Architecture | Accountable role: Product Owner | Consulted roles: PMO, Finance, Engineering, Security",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P1-T7;P2-T6;P3-T7;P4-T7;P5-T7"
+    },
+    {
+      "id": "P6-T2",
+      "name": "Design additive schema, compatibility and migration sequence",
+      "description": "Deliverable: Migration and compatibility plan with rollback boundaries | Acceptance criteria: No destructive migration or automatic reinterpretation of legacy values; backfill is explicit, idempotent and evidence-aware. | Owner role: Data Architecture | Accountable role: Engineering Lead | Consulted roles: PMO, Finance, Security, Supabase Owner",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P6-T1"
+    },
+    {
+      "id": "P6-T3",
+      "name": "Define RBAC, RLS, approval thresholds and threat model",
+      "description": "Deliverable: Security and approval enforcement specification | Acceptance criteria: Tenant/project isolation, least privilege, SoD and server/database enforcement are testable; UI hiding is never the only control. | Owner role: Security Architecture | Accountable role: PMO Admin / Security Owner | Consulted roles: Finance, Engineering, Audit, Product Architecture",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P3-T7;P6-T1"
+    },
+    {
+      "id": "P6-T4",
+      "name": "Define test strategy, golden data and reconciliation gates",
+      "description": "Deliverable: Unit, property, integration, RLS, migration, reconciliation and UAT plan | Acceptance criteria: Every financial invariant and approval boundary has an executable verification strategy before implementation begins. | Owner role: Controls Assurance / QA | Accountable role: Engineering Lead | Consulted roles: PMO, Finance, Security, Cost Engineering",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P4-T6;P6-T2;P6-T3"
+    },
+    {
+      "id": "P6-T5",
+      "name": "Define feature flags, pilot data, observability and rollback plan",
+      "description": "Deliverable: Controlled activation plan | Acceptance criteria: Foundation, writers, projections and UI can be activated independently; failures are visible; rollback never deletes ledger history. | Owner role: Release Architecture | Accountable role: Engineering Lead | Consulted roles: PMO, Security, Operations, Product Owner",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P6-T2;P6-T4"
+    },
+    {
+      "id": "P6-T6",
+      "name": "Conduct final architecture review and authorize implementation",
+      "description": "Deliverable: G6 implementation authorization | Acceptance criteria: Architecture, security, data, formulas, UX, tests and rollout are approved; only this gate changes P7-P9 from deferred to executable. | Owner role: Product Owner | Accountable role: Product Owner | Consulted roles: PMO Admin, Finance, Engineering, Security, Controls Assurance | Gate G6: Architecture approved for implementation. Approver: Product Owner + PMO + Engineering",
+      "phase": "P6",
+      "milestone": "P6 — Architecture package and implementation readiness",
+      "status": "planned",
+      "priority": "p1",
+      "predecessors": "P6-T1;P6-T2;P6-T3;P6-T4;P6-T5"
+    },
+    {
+      "id": "P7-T1",
+      "name": "Implement additive financial schema and compatibility layer",
+      "description": "Deliverable: Stage migration and compatibility read model | Acceptance criteria: Migration is additive, idempotent and validated against representative legacy projects. | Owner role: Product Engineering | Accountable role: Engineering Lead | Consulted roles: Data Architecture, Security, PMO",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P6-T6"
+    },
+    {
+      "id": "P7-T2",
+      "name": "Implement canonical financial domain contracts and pure calculation primitives",
+      "description": "Deliverable: Typed contracts and deterministic primitives | Acceptance criteria: Contracts preserve canonical definitions and reject invalid states before persistence. | Owner role: Product Engineering | Accountable role: Engineering Lead | Consulted roles: Project Controls, Product Architecture, QA",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T1"
+    },
+    {
+      "id": "P7-T3",
+      "name": "Implement controlled financial event writers and object references",
+      "description": "Deliverable: Atomic append paths into the existing Project Event Log | Acceptance criteria: Writes are atomic, idempotent, tenant-scoped and append-only; no fire-and-forget financial facts. | Owner role: Event Engineering | Accountable role: Engineering Lead | Consulted roles: Event Architecture, Security, Process Mining",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T1;P7-T2"
+    },
+    {
+      "id": "P7-T4",
+      "name": "Implement RBAC, RLS and approval enforcement",
+      "description": "Deliverable: Server and database authorization controls | Acceptance criteria: Unauthorized cross-org/project access and unauthorized approvals fail in executable tests. | Owner role: Security Engineering | Accountable role: Security Owner | Consulted roles: PMO, Finance, Product Engineering",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T1"
+    },
+    {
+      "id": "P7-T5",
+      "name": "Implement financial projections, reconciliations and observability",
+      "description": "Deliverable: Read models and reconciliation health signals | Acceptance criteria: Rollups reconcile to ledger facts; stale, partial or inconsistent data produces explicit status rather than fabricated totals. | Owner role: Product Engineering | Accountable role: Engineering Lead | Consulted roles: PMO, Finance, Operations, QA",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T2;P7-T3;P7-T4"
+    },
+    {
+      "id": "P7-T6",
+      "name": "Validate foundation implementation in stage",
+      "description": "Deliverable: G7 stage acceptance | Acceptance criteria: Migrations, invariants, permissions, event capture, reconciliations, typecheck, tests and build pass. | Owner role: Controls Assurance / QA | Accountable role: Engineering Lead | Consulted roles: PMO, Finance, Security | Gate G7: Foundation implementation accepted in stage. Approver: Engineering + Security + PMO",
+      "phase": "P7",
+      "milestone": "P7 — Foundation implementation",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T1;P7-T2;P7-T3;P7-T4;P7-T5"
+    },
+    {
+      "id": "P8-T1",
+      "name": "Implement estimating, Basis of Estimate, versioning and baseline workflows",
+      "description": "Deliverable: End-to-end estimate and baseline workflow | Acceptance criteria: Estimate maturity, evidence, versions and approvals work without replacing existing material estimating. | Owner role: Product Engineering | Accountable role: PMO Product Lead | Consulted roles: Cost Engineering, UX, QA",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T6"
+    },
+    {
+      "id": "P8-T2",
+      "name": "Implement funding, commitments, actuals, accruals, payments and reconciliation workflows",
+      "description": "Deliverable: Controlled ledger workflows | Acceptance criteria: Each transaction follows its authority, evidence, period and correction rules and reconciles to approved scenarios. | Owner role: Product Engineering | Accountable role: Finance / PMO | Consulted roles: Procurement, UX, QA",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P7-T6"
+    },
+    {
+      "id": "P8-T3",
+      "name": "Implement changes, reserves, EVM and forecast scenarios",
+      "description": "Deliverable: Change control and forecast engine workflows | Acceptance criteria: Approved changes affect Current Baseline; pending/rejected changes do not; all approved formulas match golden datasets. | Owner role: Product Engineering | Accountable role: PMO Product Lead | Consulted roles: Project Controls, Risk Manager, QA",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P8-T1;P8-T2"
+    },
+    {
+      "id": "P8-T4",
+      "name": "Implement PMO cockpit and role-specific project views",
+      "description": "Deliverable: Responsive PMO-first financial experience | Acceptance criteria: Each role sees actionable, permission-appropriate information on desktop, tablet and phone without a separate Gantt. | Owner role: Frontend Engineering / UX | Accountable role: PMO Product Lead | Consulted roles: PMO Admin, Project Manager, Finance, Sponsor",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P8-T1;P8-T2;P8-T3"
+    },
+    {
+      "id": "P8-T5",
+      "name": "Integrate Living Graph, Process Mining, reports and Isabella",
+      "description": "Deliverable: Integrated financial intelligence surfaces | Acceptance criteria: All surfaces consume canonical projections; Isabella remains grounded and read-only; existing Core functions remain intact. | Owner role: Core Integration Engineering | Accountable role: Product Architecture | Consulted roles: PMO, Living Graph, Process Intelligence, AI Architecture, QA",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P8-T3;P8-T4"
+    },
+    {
+      "id": "P8-T6",
+      "name": "Complete end-to-end PMO and Finance UAT in stage",
+      "description": "Deliverable: G8 workflow acceptance | Acceptance criteria: Representative projects reconcile end-to-end and all role, approval, audit, responsive and regression scenarios pass. | Owner role: PMO / Finance UAT Lead | Accountable role: Product Owner | Consulted roles: Engineering, Security, QA, Project Manager | Gate G8: End-to-end workflows accepted in stage. Approver: PMO + Finance + Product Owner",
+      "phase": "P8",
+      "milestone": "P8 — Financial workflows and Core surfaces",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P8-T1;P8-T2;P8-T3;P8-T4;P8-T5"
+    },
+    {
+      "id": "P9-T1",
+      "name": "Prepare governed pilot projects and real financial datasets",
+      "description": "Deliverable: Authorized pilot dataset and privacy classification | Acceptance criteria: Pilot data are representative, authorized, traceable and isolated; missing history is documented rather than synthesized. | Owner role: PMO / Project Controls Lead | Accountable role: PMO Admin | Consulted roles: Finance, Security, Data Owner",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P8-T6"
+    },
+    {
+      "id": "P9-T2",
+      "name": "Validate financial reconciliation and audit traceability",
+      "description": "Deliverable: Pilot reconciliation report | Acceptance criteria: Funding, baseline, commitments, actuals, accruals, payments, forecast and reserves reconcile to source evidence and approved formulas. | Owner role: Finance / Controls Assurance | Accountable role: Finance / Controller | Consulted roles: PMO, Audit, Engineering",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P9-T1"
+    },
+    {
+      "id": "P9-T3",
+      "name": "Validate forecast quality, calibration and bad-learning prevention",
+      "description": "Deliverable: Forecast-quality and calibration report | Acceptance criteria: Historical sufficiency is measured; low-volume results are labeled; no automated learning or predictive claim proceeds without approved quality thresholds. | Owner role: Controls Assurance / Data Science | Accountable role: PMO / Project Controls Lead | Consulted roles: Risk Analytics, AI Governance, Product Owner",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P9-T1;P9-T2"
+    },
+    {
+      "id": "P9-T4",
+      "name": "Complete performance, security, disaster recovery and rollback validation",
+      "description": "Deliverable: Non-functional readiness report | Acceptance criteria: Performance budgets, tenant isolation, backup/restore, feature-flag rollback and ledger-history preservation are verified. | Owner role: Release Engineering / Security | Accountable role: Engineering Lead | Consulted roles: Operations, PMO, Finance, QA",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P9-T2"
+    },
+    {
+      "id": "P9-T5",
+      "name": "Prepare training, operating procedures and support readiness",
+      "description": "Deliverable: Role-based operating playbooks | Acceptance criteria: PMO, PM, Finance, Procurement and Sponsor procedures explain authority, controls, exceptions and escalation paths. | Owner role: PMO Enablement | Accountable role: PMO Admin | Consulted roles: Finance, Project Manager, Support, Product Owner",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p2",
+      "predecessors": "P9-T2;P9-T4"
+    },
+    {
+      "id": "P9-T6",
+      "name": "Approve production release and post-release control window",
+      "description": "Deliverable: G9 production authorization and monitoring plan | Acceptance criteria: All release gates are approved; production activation is staged; KPIs, reconciliation and incident thresholds are monitored through the control window. | Owner role: Release Owner | Accountable role: Product Owner | Consulted roles: PMO Admin, Finance, Engineering, Security, Support | Gate G9: Production readiness approved. Approver: Release Owner + PMO + Product Owner",
+      "phase": "P9",
+      "milestone": "P9 — Pilot, production readiness and rollout",
+      "status": "deferred",
+      "priority": "p1",
+      "predecessors": "P9-T3;P9-T4;P9-T5"
+    }
+  ],
+  "resources": [],
+  "materials": [],
+  "budget_items": [],
+  "risks": [
+    {
+      "title": "Implementation begins before architecture gate G6",
+      "description": "Product code, migrations, APIs, or UI could begin before the architecture and governance contract is approved.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Keep phases P7-P9 deferred until gate G6 is formally approved by PMO Admin and Product Owner.",
+      "owner": "PMO / Project Controls"
+    },
+    {
+      "title": "AACE 18R-97 is hardcoded across all industries",
+      "description": "A process-industry estimate classification could be incorrectly applied to software or unrelated project types.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Implement AACE 18R-97 only through a configurable process-industry adapter and preserve industry-specific rules.",
+      "owner": "Product Architecture"
+    },
+    {
+      "title": "Existing budget experience is replaced instead of extended",
+      "description": "New financial capabilities could break or duplicate the current ProjectOps360 budget surface.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Use additive integration with compatibility tests and preserve the current surface until an approved transition.",
+      "owner": "Product Owner"
+    },
+    {
+      "title": "PMO and PM financial authority is not segregated",
+      "description": "A Project Manager could receive budget approval powers without explicit delegation from the PMO.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Enforce the financial authority matrix, approval thresholds, delegation records, and immutable audit trails.",
+      "owner": "PMO Admin"
+    },
+    {
+      "title": "Duplicate financial or execution sources of truth are created",
+      "description": "Parallel ledgers, events, or project structures could diverge from the ProjectOps360 Core.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Integrate through Core identities, canonical events, Living Graph, Workboard, Process Mining, and existing project structures.",
+      "owner": "Platform Architecture"
+    },
+    {
+      "title": "Predictive claims are enabled without sufficient historical evidence",
+      "description": "Forecast confidence or recommendations could be presented before calibration data and quality gates exist.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigation": "Require historical sufficiency, calibration evidence, human approval, and quality gates before predictive release.",
+      "owner": "PMO / Data Governance"
+    }
+  ]
+}
