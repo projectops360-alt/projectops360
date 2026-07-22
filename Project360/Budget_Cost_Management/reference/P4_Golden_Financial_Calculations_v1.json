@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "formula_version": "evm-1.0",
+  "currency": "USD",
+  "rounding": {
+    "mode": "half_away_from_zero",
+    "comparison_tolerance": 0.000001,
+    "display_decimals": 2
+  },
+  "cases": [
+    {
+      "id": "normal-performance",
+      "description": "Complete reconciled snapshot with four deterministic EAC scenarios.",
+      "inputs": {
+        "bac": 1000,
+        "pv": 400,
+        "ev": 350,
+        "ac": 375,
+        "bottom_up_etc": 680,
+        "pm_etc": 700
+      },
+      "expected": {
+        "cv": -25,
+        "sv": -50,
+        "cpi": 0.9333333333333333,
+        "spi": 0.875,
+        "bottom_up_eac": 1055,
+        "cpi_etc": 696.4285714285714,
+        "cpi_eac": 1071.4285714285713,
+        "cpi_spi_etc": 795.9183673469388,
+        "cpi_spi_eac": 1170.9183673469388,
+        "pm_eac": 1075,
+        "vac_pm": -75,
+        "tcpi_bac": 1.04,
+        "tcpi_pm_eac": 0.9285714285714286
+      }
+    },
+    {
+      "id": "incomplete-progress-evidence",
+      "description": "Missing EV evidence must not be coerced to zero.",
+      "inputs": {
+        "bac": 1000,
+        "pv": 250,
+        "ev": null,
+        "ac": 100
+      },
+      "expected": {
+        "cv": null,
+        "sv": null,
+        "cpi": null,
+        "spi": null,
+        "eac": null,
+        "reason": "missing_ev_evidence",
+        "quality": "incomplete"
+      }
+    },
+    {
+      "id": "pre-start-zero-denominators",
+      "description": "Before planned start, zero denominators yield unavailable ratios.",
+      "inputs": {
+        "bac": 1000,
+        "pv": 0,
+        "ev": 0,
+        "ac": 0
+      },
+      "expected": {
+        "cv": 0,
+        "sv": 0,
+        "cpi": null,
+        "spi": null,
+        "cpi_reason": "ac_not_positive",
+        "spi_reason": "pv_not_positive",
+        "cpi_eac": null
+      }
+    },
+    {
+      "id": "overrun-unattainable-tcpi",
+      "description": "AC exceeds BAC; TCPI to BAC denominator is not positive.",
+      "inputs": {
+        "bac": 1000,
+        "pv": 900,
+        "ev": 800,
+        "ac": 1100,
+        "bottom_up_etc": 300
+      },
+      "expected": {
+        "cv": -300,
+        "sv": -100,
+        "cpi": 0.7272727272727273,
+        "spi": 0.8888888888888888,
+        "bottom_up_eac": 1400,
+        "cpi_etc": 275,
+        "cpi_eac": 1375,
+        "tcpi_bac": null,
+        "tcpi_bac_reason": "target_cost_not_positive",
+        "recovery_state": "unattainable_to_bac"
+      }
+    },
+    {
+      "id": "multi-currency-normalized",
+      "description": "EUR actual is normalized to USD with documented FX before EVM.",
+      "inputs": {
+        "bac_usd": 1000,
+        "pv_usd": 500,
+        "ev_usd": 450,
+        "actual_lines": [
+          { "amount": 300, "currency": "EUR", "fx_to_usd": 1.2, "normalized_usd": 360 },
+          { "amount": 40, "currency": "USD", "fx_to_usd": 1, "normalized_usd": 40 }
+        ]
+      },
+      "expected": {
+        "ac_usd": 400,
+        "cv_usd": 50,
+        "sv_usd": -50,
+        "cpi": 1.125,
+        "spi": 0.9,
+        "cpi_etc_usd": 488.8888888888889,
+        "cpi_eac_usd": 888.8888888888889
+      }
+    },
+    {
+      "id": "weighted-probabilistic-eac",
+      "description": "Documented joint outcomes provide deterministic weighted quantiles.",
+      "inputs": {
+        "ac": 400,
+        "joint_outcomes": [
+          { "probability": 0.2, "remaining_base": 450, "risk": 0, "eac": 850 },
+          { "probability": 0.3, "remaining_base": 500, "risk": 50, "eac": 950 },
+          { "probability": 0.3, "remaining_base": 600, "risk": 150, "eac": 1150 },
+          { "probability": 0.2, "remaining_base": 700, "risk": 300, "eac": 1400 }
+        ],
+        "correlation_basis": "Joint outcomes preserve positive base-cost/risk dependence."
+      },
+      "expected": {
+        "probability_total": 1,
+        "p50_eac": 950,
+        "p80_eac": 1150,
+        "mean_eac": 1080,
+        "quality": "available"
+      }
+    }
+  ]
+}
