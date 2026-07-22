@@ -32,27 +32,36 @@ const PROJECT = "00000000-0000-0000-0000-000000000010";
 
 // ── Flag contract ─────────────────────────────────────────────────────────────
 
-describe("CAP-045 feature flag (LIVING_GRAPH_EVENT_RELATIONSHIPS_PROJECT_IDS)", () => {
-  it("OFF (empty/missing env) → disabled for every project (byte-identical)", () => {
-    expect(isEventRelationshipsEnabledFor(PROJECT, "")).toBe(false);
-    expect(isEventRelationshipsEnabledFor(PROJECT, undefined)).toBe(false);
-    expect(isEventRelationshipsEnabledFor(PROJECT, null)).toBe(false);
-    expect(isEventRelationshipsEnabledFor(PROJECT, "   ")).toBe(false);
+describe("CAP-045 canonical-event view rollout", () => {
+  it("empty/missing env enables every valid project automatically", () => {
+    expect(isEventRelationshipsEnabledFor(PROJECT, "")).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, undefined)).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, null)).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, "   ")).toBe(true);
   });
 
-  it("ON for a listed project → enabled only for that project", () => {
-    const raw = `other-project, ${PROJECT} ,third`;
-    expect(isEventRelationshipsEnabledFor(PROJECT, raw)).toBe(true);
-    expect(isEventRelationshipsEnabledFor("not-listed", raw)).toBe(false);
+  it("supports explicit global enable and emergency rollback values", () => {
+    for (const value of ["1", "true", "yes", "on", " TRUE "]) {
+      expect(isEventRelationshipsEnabledFor(PROJECT, value)).toBe(true);
+    }
+    for (const value of ["0", "false", "no", "off", " FALSE "]) {
+      expect(isEventRelationshipsEnabledFor(PROJECT, value)).toBe(false);
+    }
   });
 
-  it('"all" enables every project (local testing only)', () => {
-    expect(isEventRelationshipsEnabledFor(PROJECT, "all")).toBe(true);
-    expect(isEventRelationshipsEnabledFor("any", "all")).toBe(true);
+  it("fails closed when the global switch has an invalid value", () => {
+    expect(isEventRelationshipsEnabledFor(PROJECT, "enabled-ish")).toBe(false);
   });
 
-  it("empty projectId → disabled even with all", () => {
-    expect(isEventRelationshipsEnabledFor("", "all")).toBe(false);
+  it("an optional denylist quarantines only selected projects", () => {
+    const denylist = `other-project, ${PROJECT} ,third`;
+    expect(isEventRelationshipsEnabledFor(PROJECT, "true", denylist)).toBe(false);
+    expect(isEventRelationshipsEnabledFor("not-listed", "true", denylist)).toBe(true);
+    expect(isEventRelationshipsEnabledFor(PROJECT, "true", "all")).toBe(false);
+  });
+
+  it("empty projectId remains disabled", () => {
+    expect(isEventRelationshipsEnabledFor("", undefined)).toBe(false);
   });
 });
 

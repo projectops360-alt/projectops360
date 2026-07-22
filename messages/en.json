@@ -1901,7 +1901,7 @@
       "objectNodeLabel": "Object",
       "status": {
         "disabled": {
-          "title": "Canonical event view is disabled for this project. Ask an admin to enable it via the LIVING_GRAPH_EVENT_RELATIONSHIPS flag."
+          "title": "The canonical event view was disabled by an administrator for rollback or quarantine. Review LIVING_GRAPH_EVENT_RELATIONSHIPS_ENABLED and the disabled-project list."
         },
         "empty": {
           "title": "No canonical events captured for this project yet. The events view shows canonical history — not operational tasks."
