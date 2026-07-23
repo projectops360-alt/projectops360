@@ -73,7 +73,8 @@ export type ImportEntityType =
   | "schedule_item"
   | "document_reference"
   | "drawing_reference"
-  | "decision";
+  | "decision"
+  | "charter";
 
 export type ImportValidationStatus =
   | "valid"
@@ -151,6 +152,8 @@ export interface CanonicalTask {
   trade: string;
   confidence_score: number;
   source_reference: string;
+  /** Internal AI execution prompt (UX-014: stored, never a user-facing editor field). */
+  prompt_body?: string;
 }
 
 export interface CanonicalMilestone {
@@ -226,8 +229,17 @@ export interface CanonicalRisk {
   source_reference: string;
 }
 
+export interface CanonicalCharter {
+  /** Keys are `project_charters` text columns (CharterFieldKey). Values keep
+   *  the source language — imported content is never auto-translated. */
+  fields: Record<string, string>;
+  confidence_score: number;
+  source_reference: string;
+}
+
 export interface CanonicalImport {
   project: CanonicalProject;
+  charter: CanonicalCharter | null;
   milestones: CanonicalMilestone[];
   tasks: CanonicalTask[];
   dependencies: CanonicalDependency[];
@@ -235,6 +247,8 @@ export interface CanonicalImport {
   materials: CanonicalMaterial[];
   budget_items: CanonicalBudgetItem[];
   risks: CanonicalRisk[];
+  /** Sheets/tables that could not be classified and were not imported. */
+  unparsed_tables: string[];
 }
 
 // ── Parsed file (intermediate representation) ───────────────────────────────

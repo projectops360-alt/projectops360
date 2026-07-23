@@ -261,8 +261,23 @@ Boundaries (must-not) · Related capabilities/ADRs.** New in-depth docs use the
 > Capacity/Labor Capacity). Resource Capacity stays operational under **Resources**, never Settings-only.
 
 ## Adaptive Delivery Framework · Project Import Intelligence · Billing
-- **Status:** Delivery Implemented (~70%); Import Implemented (~75%); Billing Partial (~50%).
+- **Status:** Delivery Implemented (~70%); Import Implemented (~85%); Billing Partial (~50%).
 - **Related:** CAP-039/040/041.
+- **Import full-workbook coverage (2026-07-23):** the wizard understands the
+  official template structure end-to-end: Project Charter key/value sheet →
+  fills empty Charter Center fields as a draft (fill-only-empty, only while
+  `status='draft'`); combined "Milestones & Tasks" sheets derive milestones in
+  first-appearance order (REG-026 preserved); "Task Prompts" merge into
+  `roadmap_tasks.prompt_body` (UX-014: stored internal metadata, never a
+  user-facing editor field); Risk Register maps real titles, 1-5 scales,
+  Rating→severity and Mitigation/Contingency; Data Dependencies, Acceptance
+  Criteria and Governance & Gates land in the charter's `dependencies`,
+  `acceptance_criteria`, `governance_model` and `change_management_process`.
+  Unrecognized sheets are never silently dropped — each produces a warning
+  finding. Official downloadable templates (XLSX + JSON) live in
+  `public/templates/` and are regenerated with
+  `scripts/generate-import-template.mjs`. Guard: `workbook-extract.test.ts`
+  (IMPORT-FULL-WORKBOOK).
 
 ## Product Intelligence Center (this module)
 - **Purpose:** Read the product brain inside the app (DNA, North Star, Principles, ADRs, Modules, Governance).

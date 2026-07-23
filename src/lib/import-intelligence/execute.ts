@@ -22,6 +22,8 @@ import {
 } from "@/lib/events/process-mining-capture";
 import { recalculateCriticalPath } from "@/lib/execution/critical-path-service";
 import { generateImportRecommendations } from "./validate";
+import { CHARTER_FIELDS } from "@/lib/charter/fields";
+import { createCharterForProject } from "@/lib/charter/service";
 import type {
   CanonicalTask,
   CanonicalMilestone,
@@ -30,6 +32,7 @@ import type {
   CanonicalMaterial,
   CanonicalBudgetItem,
   CanonicalRisk,
+  CanonicalCharter,
   CanonicalImport,
   ImportEntityType,
 } from "@/types/import-intelligence";
@@ -89,6 +92,7 @@ export function entitiesToCanonical(entities: ImportEntityRow[]): CanonicalImpor
       case "material": canonical.materials.push(n as CanonicalMaterial); break;
       case "budget_item": canonical.budget_items.push(n as CanonicalBudgetItem); break;
       case "risk": canonical.risks.push(n as CanonicalRisk); break;
+      case "charter": canonical.charter = n as CanonicalCharter; break;
       default: break;
     }
   }
@@ -168,6 +172,43 @@ export async function executeImport(params: {
     ]);
     for (const t of tasks ?? []) existingTaskTitles.add(normTitle(t.title));
     for (const m of milestones ?? []) existingMilestonesByTitle.set(normTitle(m.title), m.id);
+  }
+
+  // ── 1b. Project Charter ────────────────────────────────────────────────────
+  // Fill-only-empty and only while the charter is a draft: the import never
+  // overwrites human-written charter content and never touches a charter that
+  // entered the review/approval lifecycle (those changes go through
+  // updateCharterAction, which handles revision + version bumps).
+  if (canonical.charter && projectId && Object.keys(canonical.charter.fields).length > 0) {
+    const { data: existingCharter } = await supabase
+      .from("project_charters").select("*")
+      .eq("project_id", projectId).eq("organization_id", organizationId).is("deleted_at", null)
+      .maybeSingle();
+    let charterRow = existingCharter as Record<string, unknown> | null;
+    if (!charterRow) {
+      const charterId = await createCharterForProject(
+        supabase, organizationId, projectId, params.userId, canonical.project.name || null,
+      );
+      if (charterId) {
+        const { data } = await supabase.from("project_charters").select("*").eq("id", charterId).maybeSingle();
+        charterRow = data as Record<string, unknown> | null;
+        await track(supabase, organizationId, jobId, "project_charters", charterId);
+      }
+    }
+    if (charterRow && charterRow.status === "draft") {
+      const allowedKeys = new Set(CHARTER_FIELDS.map((f) => f.key as string));
+      const patch: Record<string, string> = {};
+      for (const [k, v] of Object.entries(canonical.charter.fields)) {
+        if (!allowedKeys.has(k)) continue;
+        const current = charterRow[k];
+        if (current == null || String(current).trim() === "") patch[k] = v;
+      }
+      if (Object.keys(patch).length > 0) {
+        const { error: charterError } = await supabase
+          .from("project_charters").update(patch).eq("id", charterRow.id as string);
+        if (!charterError) created["charter_fields"] = Object.keys(patch).length;
+      }
+    }
   }
 
   // ── 2. Milestones ──────────────────────────────────────────────────────────
@@ -347,6 +388,9 @@ export async function executeImport(params: {
         trade_key: task.trade || null,
         cost_code: task.cost_code || null,
         execution_notes: task.assigned_to && !assignedResourceId ? `Imported owner: ${task.assigned_to}` : null,
+        // Internal AI execution prompt (UX-014/PD-013): stored metadata only —
+        // the task editor never renders it as a plain user-facing field.
+        prompt_body: task.prompt_body || null,
         created_by: params.userId,
       })
       .select("id, title, status, milestone_id, assigned_to, assigned_resource_id, project_team_member_id, priority, estimate_hours, start_date, end_date")
@@ -607,6 +651,7 @@ const ROLLBACK_ORDER = [
   "roadmap_tasks",
   "milestones",
   "resources",
+  "project_charters",
 ];
 
 /** Remove every record created by an import job. Hard-deletes link tables,

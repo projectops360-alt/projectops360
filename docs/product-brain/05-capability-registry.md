@@ -51,7 +51,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 | CAP-037 | Meetings (Rhythm Center — canonical; Rythm consolidated via REG-011) | P5 | Implemented | 70% | `lib/rhythm` (`lib/rythm` dormant) |
 | CAP-038 | AI Recommendations | P1 | Partial | 45% | `lib/roadmap/recommendation`, `lib/delivery/ai` |
 | CAP-039 | Adaptive Delivery Framework | P6 | Implemented | 70% | `lib/delivery` |
-| CAP-040 | Project Import Intelligence | P5 | Implemented | 75% | `lib/import-intelligence` |
+| CAP-040 | Project Import Intelligence | P5 | Implemented | 85% | `lib/import-intelligence` |
 | CAP-041 | Billing & Entitlements | P6 | Partial | 50% | `lib/billing` |
 | CAP-042 | Product Intelligence Center | P5 | Implemented | 70% | `lib/product-brain`, `/product-intelligence` |
 | CAP-043 | Evidence Provenance & Traceability | P5 | Implemented (Phase 1) | 70% | `lib/provenance`, `components/provenance` |

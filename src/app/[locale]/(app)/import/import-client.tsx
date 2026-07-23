@@ -12,8 +12,9 @@ import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   UploadCloud, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle,
-  XCircle, Sparkles, ArrowRight, RotateCcw, Ban, Info,
+  XCircle, Sparkles, ArrowRight, RotateCcw, Ban, Info, Download, ScrollText,
 } from "lucide-react";
+import { CHARTER_FIELDS } from "@/lib/charter/fields";
 import { createClient } from "@/lib/supabase/client";
 import {
   createImportJobAction,
@@ -39,6 +40,9 @@ const LABELS = {
     subtitle: "Upload an existing project file and ProjectOps360° will analyze it, extract tasks, milestones, resources, materials, budget, risks, and dependencies, and prepare it for review before importing.",
     dropHint: "Drop a file here or click to browse",
     formats: "Supported: Excel (.xlsx), CSV, JSON, Word (.docx), PDF, TXT, Markdown — up to 25 MB",
+    templateHint: "Not sure how to structure your file? Start from the official template:",
+    templateXlsx: "Download Excel template",
+    templateJson: "Download JSON template",
     mode: "Import mode",
     modeCreate: "Create new project",
     modeMerge: "Merge into existing project",
@@ -50,7 +54,8 @@ const LABELS = {
     reviewTitle: "Review before importing",
     found: (c: Record<string, number>) =>
       `ProjectOps360° found ${c.tasks ?? 0} tasks, ${c.milestones ?? 0} milestones, ${c.dependencies ?? 0} dependencies, ${c.resources ?? 0} resources, ${c.materials ?? 0} materials, ${c.budget_items ?? 0} budget lines, and ${c.risks ?? 0} risks. Review the extracted data before importing.`,
-    tabs: { summary: "Summary", task: "Tasks", milestone: "Milestones", dependency: "Dependencies", resource: "Resources", material: "Materials", budget_item: "Budget", risk: "Risks", warnings: "Warnings", raw: "Raw data" },
+    tabs: { summary: "Summary", task: "Tasks", milestone: "Milestones", dependency: "Dependencies", resource: "Resources", material: "Materials", budget_item: "Budget", risk: "Risks", charter: "Charter", warnings: "Warnings", raw: "Raw data" },
+    charterHint: "These fields will fill the empty fields of the project's Charter Center as a draft. Existing charter content is never overwritten.",
     colInclude: "Import",
     colName: "Name",
     colDetails: "Details",
@@ -88,6 +93,9 @@ const LABELS = {
     subtitle: "Sube un archivo de proyecto existente y ProjectOps360° lo analizará, extraerá tareas, hitos, recursos, materiales, presupuesto, riesgos y dependencias, y lo preparará para revisión antes de importar.",
     dropHint: "Arrastra un archivo aquí o haz clic para buscar",
     formats: "Soportados: Excel (.xlsx), CSV, JSON, Word (.docx), PDF, TXT, Markdown — hasta 25 MB",
+    templateHint: "¿No sabes cómo estructurar tu archivo? Parte de la plantilla oficial:",
+    templateXlsx: "Descargar plantilla Excel",
+    templateJson: "Descargar plantilla JSON",
     mode: "Modo de importación",
     modeCreate: "Crear proyecto nuevo",
     modeMerge: "Fusionar con proyecto existente",
@@ -99,7 +107,8 @@ const LABELS = {
     reviewTitle: "Revisa antes de importar",
     found: (c: Record<string, number>) =>
       `ProjectOps360° encontró ${c.tasks ?? 0} tareas, ${c.milestones ?? 0} hitos, ${c.dependencies ?? 0} dependencias, ${c.resources ?? 0} recursos, ${c.materials ?? 0} materiales, ${c.budget_items ?? 0} partidas de presupuesto y ${c.risks ?? 0} riesgos. Revisa los datos extraídos antes de importar.`,
-    tabs: { summary: "Resumen", task: "Tareas", milestone: "Hitos", dependency: "Dependencias", resource: "Recursos", material: "Materiales", budget_item: "Presupuesto", risk: "Riesgos", warnings: "Advertencias", raw: "Datos crudos" },
+    tabs: { summary: "Resumen", task: "Tareas", milestone: "Hitos", dependency: "Dependencias", resource: "Recursos", material: "Materiales", budget_item: "Presupuesto", risk: "Riesgos", charter: "Charter", warnings: "Advertencias", raw: "Datos crudos" },
+    charterHint: "Estos campos rellenarán los campos vacíos del Charter Center del proyecto como borrador. El contenido existente del charter nunca se sobrescribe.",
     colInclude: "Importar",
     colName: "Nombre",
     colDetails: "Detalles",
@@ -321,6 +330,26 @@ export function ImportClient({
             )}
           </label>
 
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">{t.templateHint}</span>
+            <a
+              href="/templates/ProjectOps360_Project_Import_Template.xlsx"
+              download
+              className="inline-flex items-center gap-1.5 font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              <Download className="h-4 w-4" />
+              {t.templateXlsx}
+            </a>
+            <a
+              href="/templates/ProjectOps360_Project_Import_Template.json"
+              download
+              className="inline-flex items-center gap-1.5 font-medium text-brand-600 hover:underline dark:text-brand-400"
+            >
+              <Download className="h-4 w-4" />
+              {t.templateJson}
+            </a>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-foreground">{t.mode}</label>
@@ -420,7 +449,7 @@ export function ImportClient({
 
           {/* Tabs */}
           <div className="flex flex-wrap gap-1 border-b border-border">
-            {["summary", ...ENTITY_TABS, "warnings", "raw"].map((tab) => {
+            {["summary", ...ENTITY_TABS, ...(entities.some((e) => e.entity_type === "charter") ? ["charter"] : []), "warnings", "raw"].map((tab) => {
               const count =
                 tab === "warnings"
                   ? warnings.length
@@ -470,6 +499,16 @@ export function ImportClient({
               entities={entities.filter((e) => e.entity_type === activeTab)}
               onToggle={handleToggle}
               t={t}
+              disabled={step === "importing"}
+            />
+          )}
+
+          {activeTab === "charter" && (
+            <CharterPreview
+              entity={entities.find((e) => e.entity_type === "charter") ?? null}
+              locale={locale}
+              t={t}
+              onToggle={handleToggle}
               disabled={step === "importing"}
             />
           )}
@@ -630,6 +669,59 @@ function EntityTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ── Charter preview (read-only; include/exclude via the same toggle) ────────
+
+function CharterPreview({
+  entity,
+  locale,
+  t,
+  onToggle,
+  disabled,
+}: {
+  entity: ProjectImportEntity | null;
+  locale: Locale;
+  t: (typeof LABELS)["en"];
+  onToggle: (e: ProjectImportEntity) => void;
+  disabled: boolean;
+}) {
+  if (!entity) {
+    return <p className="px-2 py-6 text-center text-sm text-muted-foreground">—</p>;
+  }
+  const fields = ((entity.normalized_json as { fields?: Record<string, string> })?.fields ?? {});
+  const labelFor = (key: string): string => {
+    const def = CHARTER_FIELDS.find((f) => f.key === key);
+    return def ? def[locale === "es" ? "es" : "en"] : key.replace(/_/g, " ");
+  };
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <ScrollText className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+          <p className="text-sm text-muted-foreground">{t.charterHint}</p>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={entity.will_import}
+            onChange={() => onToggle(entity)}
+            disabled={disabled || entity.validation_status === "invalid"}
+            className="h-4 w-4 rounded border-border accent-brand-600"
+          />
+          {t.colInclude}
+        </label>
+      </div>
+      <dl className="space-y-3">
+        {Object.entries(fields).map(([key, value]) => (
+          <div key={key} className={entity.will_import ? "" : "opacity-45"}>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{labelFor(key)}</dt>
+            <dd className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{value}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
