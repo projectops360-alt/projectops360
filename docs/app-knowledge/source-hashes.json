@@ -6,6 +6,13 @@
     "src/lib/events/backfill-access.ts": "d55dfdbece72ad473b8613b5deb77b89082d920f0c575dc5d94a61f1afb6e46c",
     "src/lib/events/backfill.ts": "83f4e3f01b4c16c0086db956eda95d47178a0ae948cb50273e7e9cc9f6066065"
   },
+  "screen-admin-console": {
+    "src/app/[locale]/(app)/admin/page.tsx": "7aa7dcb02727b8cc5b6c2d4970394dd2737256c5a0c9d3117339abcbe1049853",
+    "src/app/[locale]/(app)/admin/actions.ts": "86f33bf50b376dd1ffa9015075d9d300a79e33377aa740addccde23b5633d2db",
+    "src/components/admin-console/admin-console.tsx": "49007683d4816a888f7a8454e6e68cf1201a8d9f817fb58f91199708e1cd5b8b",
+    "src/lib/admin-console/access.server.ts": "5877e44f3979dde31de8dae093384d84421e04a8eb70e69fb12fe5de1994a54a",
+    "src/lib/admin-console/queries.ts": "d2a18ecb93ae94faf925248d35f6ac0786ea18e3f0ad9575dbc1f7e5dbdd8c45"
+  },
   "screen-admin-living-graph-observability": {
     "src/app/[locale]/(app)/admin/living-graph-observability/page.tsx": "e6f4d4df0db8b3127369d201aa6862ecd81e7c340da44721ab8c0205fa00d5fb",
     "src/components/admin/living-graph-observability-panel.tsx": "c6957aa162d6c8f3509251f0fb10f11ff29812e7ed6d93bf68a96776b47be8c1",
@@ -28,6 +35,28 @@
     "src/app/[locale]/(app)/projects/[projectId]/execution-map/dependency-actions.ts": "2dc5ccd0fe8e059aa2680b3c4b392b2f2434e144ba42bee164bfefa308b7f605",
     "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "56d4a3da658c73e5cefa4e40e4393c265ad95374de7649a8f85cbc6e9b26947d"
   },
+  "screen-execution-map-kpis": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/kpis/page.tsx": "ab21af5033c059750b6af0076cc7e6a562e71b8d1e15370c1038c9782d10a53f",
+    "src/lib/kpi/load-dataset.ts": "4065b7f94e4fe0b210fafd72d4bf51bbbdd50117dacf114db87a2f61e34634cc",
+    "src/lib/kpi/catalog.ts": "b11e78b6fb7707be8caefaea1040e0ead3bdef50fa4a9d233077ce6eb3bf868d",
+    "src/lib/kpi/custom-actions.ts": "c470f21b91e2b2e2b9f52bd829bdc17d0819f3f0c3c085789e4439e299b49842",
+    "src/components/process-mining/custom-kpi-section.tsx": "0ec59f33e0ad1a41767aa816f56ae6a3ac50151e0e84f4a29585cb5271f52e3b"
+  },
+  "screen-execution-map-root-causes": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/root-causes/page.tsx": "7b72d0cbf1a0c56557b98ee5365edfd47002820b64d8c655a2b1a56909f41d5d",
+    "src/lib/process-mining/root-cause/load-analysis.ts": "fddadcf4a744d3a99c0cbf71ed12d5ea77708b02464b708b5a98adf8f497dc8f",
+    "src/components/process-mining/root-cause-view.tsx": "6af4c7d3d2382b19c48e38ef125406825fb5859d7c7874aa058f988505fbf0e0"
+  },
+  "screen-execution-map-variants": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/variants/page.tsx": "549faf57037ed6bff6cc1b81d24e5bec02375aa28327a332bdd845d349b908fd",
+    "src/lib/process-mining/variants/load-analysis.ts": "0c3c0a1e8384b20f3cacb240a1a8b643865dcbac2388cec9c571b3c4d7782eba",
+    "src/components/process-mining/variant-analysis-view.tsx": "d60ea5997e22405d8aaa019af943d29122936335e25b7b57480c84742a68cb1a"
+  },
+  "screen-forgot-password": {
+    "src/app/[locale]/(auth)/forgot-password/page.tsx": "e32280a0da6f2f82be015aaa6c055c4dd82512278ee4432dd6a033b0fb1efc9c",
+    "src/components/auth/forgot-password-form.tsx": "a99b3dbaa37adfe0f38464fc9f4728185a737aa5654acc6ec774babc2490d9d8",
+    "src/app/[locale]/(auth)/actions.ts": "62fd0fbf6002b1be7d531b50b8ffc0bbb2105a81ae852e5276a26e402d2ef44d"
+  },
   "screen-home-dashboard": {
     "src/app/[locale]/(app)/page.tsx": "b957008c7719fbcc2330510273225bab86b5b13997a0901c84c052c26e1ad05e",
     "src/lib/command-center/service.ts": "17809dfccdfac017f1783ca1f3b9d66239e6af7c253cbc2a8f99d1efe52a0199"
@@ -42,6 +71,13 @@
     "src/lib/import-intelligence/parse.ts": "e619443df9f5c910ee22c7d141603a6e967060a26067f770da7bd5ee4726e4fb",
     "src/lib/import-intelligence/validate.ts": "27e4d6992b9ed8ce6fb272f999c412467ea45bcc1df8aed4fe278f2b11b9c5b3"
   },
+  "screen-labor-capacity": {
+    "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/page.tsx": "0948ee78b9d06468c343c94a4ec5b06dced54d71b863884d231ef8261095ba77",
+    "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/labor-capacity-client.tsx": "04c3c0414dff5ee85db5c2fd9c5a72c2c89bcf7c8911e11fd17cf431168d31f9",
+    "src/components/labor/labor-capacity-nav.tsx": "57999f4c50cd0618e28c5df56b167e03bbafe3f684e5e9e0cfefa6dac768f91a",
+    "src/lib/labor/capacity.ts": "0e40895a1e9df1a9b05b8f4e416bc8fbedaf375dbaeceb05270833a98b540f4e",
+    "src/lib/labor/explanation.ts": "f7a1f159d5fe45f209aa533fca0255625611da9feb72a981ec416cc5cdf18d43"
+  },
   "screen-labor-capacity-lookahead": {
     "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/lookahead/page.tsx": "fb0d48a094b4a4db9c185baa6b5866932c643890b13b4d00acddcf86a96ce4e2",
     "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/lookahead/lookahead-client.tsx": "122fb23e6eeaf8cd606d396bfad910c6b8e511bc2fa0f4fe198de6785b6d6c52",
@@ -55,24 +91,11 @@
     "src/lib/labor/lookahead.ts": "10744f2406831da768fa27bc6584fbd2904637d68c20a76155fd402c2a73ff8e",
     "src/lib/labor/crew-idle-risk.ts": "f6de7916359ab49f7e444774c95e1c9af9bf4d7d5554f07153a20944265642e7"
   },
-  "screen-labor-capacity": {
-    "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/page.tsx": "0948ee78b9d06468c343c94a4ec5b06dced54d71b863884d231ef8261095ba77",
-    "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/labor-capacity-client.tsx": "04c3c0414dff5ee85db5c2fd9c5a72c2c89bcf7c8911e11fd17cf431168d31f9",
-    "src/components/labor/labor-capacity-nav.tsx": "57999f4c50cd0618e28c5df56b167e03bbafe3f684e5e9e0cfefa6dac768f91a",
-    "src/lib/labor/capacity.ts": "0e40895a1e9df1a9b05b8f4e416bc8fbedaf375dbaeceb05270833a98b540f4e",
-    "src/lib/labor/explanation.ts": "f7a1f159d5fe45f209aa533fca0255625611da9feb72a981ec416cc5cdf18d43"
-  },
   "screen-landing": {
     "src/app/landing/page.tsx": "8784741a84c3d2984adc3bdc5bbcfb9d5c963c2f91201eb8fa4cac6e990e64c3",
     "src/components/landing/hero.tsx": "b0b9a67fa91a02c5eaddc4d79a6c2104573a1dcd510f7c6606d1773093309f77",
     "src/components/landing/pricing.tsx": "f7079d092dd4326a8e97f064b4ec57e7360cdd19dfa5ff71156e7b71cb829616",
     "src/components/landing/capabilities.tsx": "aa1837daff5769b4db8c2470e0f7c3897907d2696da1ff058834af95bd6f873c"
-  },
-  "screen-living-graph-realtime": {
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/page.tsx": "849bba40d7324eb51bb3ca242475c313f66379c8aedd405e9a556082966b492c",
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/actions.ts": "3b8283ba486c8f96cfc722447e855a372363221fc519758af3604e84e6333caf",
-    "src/lib/living-graph-realtime-ui/load-snapshot.ts": "b81911fe2e1fbaeab3d662e09e06a204b7f89502390b7645c31e6a87530626cc",
-    "src/components/living-graph-realtime/realtime-living-graph.tsx": "d226524aaad7e25a4c3b314ed4dc27caecf33ac4f49eb64b02caf415e66aaba8"
   },
   "screen-living-graph": {
     "src/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/page.tsx": "4e44e67f5c441a895ce607a05e0b600c4574a3a8e110d052fdd68231483c4e29",
@@ -80,6 +103,106 @@
     "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
     "src/components/graph/living-graph-toolbar.tsx": "805492fa744584cfb22f73437ff697a7476bf5bc63841137578df8e5b9b768a7",
     "src/lib/roadmap/living-graph-sync.ts": "a8be6dc9d8e067a55beca8b556b8bffdab532d2dc2dffc0cd0e09c0ce45194b9"
+  },
+  "screen-living-graph-realtime": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/page.tsx": "849bba40d7324eb51bb3ca242475c313f66379c8aedd405e9a556082966b492c",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/actions.ts": "3b8283ba486c8f96cfc722447e855a372363221fc519758af3604e84e6333caf",
+    "src/lib/living-graph-realtime-ui/load-snapshot.ts": "b81911fe2e1fbaeab3d662e09e06a204b7f89502390b7645c31e6a87530626cc",
+    "src/components/living-graph-realtime/realtime-living-graph.tsx": "d226524aaad7e25a4c3b314ed4dc27caecf33ac4f49eb64b02caf415e66aaba8"
+  },
+  "screen-living-graph-view-blocker": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/lib/graph/living-graph-status.ts": "dc5808990706801e98439c9bea0788639ad7a18814d710b865caf3815888de51",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-toolbar.tsx": "805492fa744584cfb22f73437ff697a7476bf5bc63841137578df8e5b9b768a7",
+    "messages/en.json": "1053df2b18a71d0bbfd0ae0936ed4ef8e20bc6436443c6756f0217c3e9e126d8"
+  },
+  "screen-living-graph-view-bottleneck": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-legend.tsx": "a0cc9dfdcd579c6c6c1733ce90bd8e0fb54a6b261e84d8c72c9d7b8804dd6b1a",
+    "src/lib/graph/living-graph-styles.ts": "feee6ec6a8bde4576e05eff5d68545f61e586abba7c46468b600ccf53986b67b"
+  },
+  "screen-living-graph-view-critical-path": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/lib/execution/critical-path.ts": "e7843c799c47c3f9ebb2b37a27493388eb61dedecabc47f03512751533077178",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-node.tsx": "b9be9c9e382eedc75a1726402169c19dec6c485e6293d9bb8b1f07a59156544e",
+    "src/lib/graph/living-graph-styles.ts": "feee6ec6a8bde4576e05eff5d68545f61e586abba7c46468b600ccf53986b67b"
+  },
+  "screen-living-graph-view-labor-capacity": {
+    "src/lib/labor/capacity.ts": "0e40895a1e9df1a9b05b8f4e416bc8fbedaf375dbaeceb05270833a98b540f4e",
+    "src/lib/graph/labor-graph-mapping.ts": "0752aa3067134b14ae289562d56041f2a7b61ed95f9c3dc2c92904cc16d4741e",
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-detail-panel.tsx": "18a2350aed2536f9c6511abfa9515f4734d9175cc76a7005097f51444cd22124"
+  },
+  "screen-living-graph-view-normal": {
+    "src/components/graph/living-graph-toolbar.tsx": "805492fa744584cfb22f73437ff697a7476bf5bc63841137578df8e5b9b768a7",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-node.tsx": "b9be9c9e382eedc75a1726402169c19dec6c485e6293d9bb8b1f07a59156544e",
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-legend.tsx": "a0cc9dfdcd579c6c6c1733ce90bd8e0fb54a6b261e84d8c72c9d7b8804dd6b1a"
+  },
+  "screen-living-graph-view-rework": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/lib/graph/living-graph-styles.ts": "feee6ec6a8bde4576e05eff5d68545f61e586abba7c46468b600ccf53986b67b",
+    "src/components/graph/living-graph-legend.tsx": "a0cc9dfdcd579c6c6c1733ce90bd8e0fb54a6b261e84d8c72c9d7b8804dd6b1a"
+  },
+  "screen-living-graph-view-risk": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/lib/graph/overlay-metadata.ts": "6ff29c5f55b8464e0d984ed823957c2700360a1b4dc292f82dfddd447dcbf3a0",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "docs/product-brain/28-sprint-03-overlay-clarity.md": "ae406ab45e5ce0c249c55eb65717d8fe7c4716ab6f6a513a831c320df62dd19f"
+  },
+  "screen-living-graph-view-sop-candidate": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/lib/graph/overlay-metadata.ts": "6ff29c5f55b8464e0d984ed823957c2700360a1b4dc292f82dfddd447dcbf3a0",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "docs/product-brain/28-sprint-03-overlay-clarity.md": "ae406ab45e5ce0c249c55eb65717d8fe7c4716ab6f6a513a831c320df62dd19f"
+  },
+  "screen-living-graph-view-timeline-playback": {
+    "src/lib/graph/overlay-metadata.ts": "6ff29c5f55b8464e0d984ed823957c2700360a1b4dc292f82dfddd447dcbf3a0",
+    "src/components/graph/living-graph-timeline.tsx": "2bf007d97cb644b7b2e9935c5f61c62f4759309150b15da494f519dd0221d3bc",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "docs/product-brain/28-sprint-03-overlay-clarity.md": "ae406ab45e5ce0c249c55eb65717d8fe7c4716ab6f6a513a831c320df62dd19f"
+  },
+  "screen-living-graph-view-traceability-gap": {
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "src/components/graph/living-graph-node.tsx": "b9be9c9e382eedc75a1726402169c19dec6c485e6293d9bb8b1f07a59156544e",
+    "src/lib/graph/living-graph-styles.ts": "feee6ec6a8bde4576e05eff5d68545f61e586abba7c46468b600ccf53986b67b"
+  },
+  "screen-living-graph-view-variance": {
+    "src/lib/graph/overlay-metadata.ts": "6ff29c5f55b8464e0d984ed823957c2700360a1b4dc292f82dfddd447dcbf3a0",
+    "src/lib/labor/labor-variance.ts": "d6c20a6a1cceedccaf441bdc52024ca931bc9617b3cc9a622b5cf0b1218a7833",
+    "src/lib/labor/productivity-variance.ts": "b57ba22e32f183adcb5e977222489d99d69292b9a9cf8eabcee5b1b5c12c5a2e",
+    "src/lib/labor/variance-cause-classification.ts": "a42222010ab41a7d2a1b593710ca8d954e74f7f50aa278921d8a9e4c5d96899f",
+    "src/lib/graph/labor-graph-mapping.ts": "0752aa3067134b14ae289562d56041f2a7b61ed95f9c3dc2c92904cc16d4741e",
+    "src/components/graph/variance-detail-block.tsx": "24af811f0e0fc41fa72a6b68226b267685654fcfb8b912bfcbb7090b3afb8e57",
+    "docs/product-brain/28-sprint-03-overlay-clarity.md": "ae406ab45e5ce0c249c55eb65717d8fe7c4716ab6f6a513a831c320df62dd19f"
+  },
+  "screen-living-graph-view-whatif-simulation": {
+    "src/lib/graph/overlay-metadata.ts": "6ff29c5f55b8464e0d984ed823957c2700360a1b4dc292f82dfddd447dcbf3a0",
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-simulation-panel.tsx": "096b636659f141dc8a73dd5dd09297a7f87e890f370816c2f7c5b66e718c1f37",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
+    "docs/product-brain/28-sprint-03-overlay-clarity.md": "ae406ab45e5ce0c249c55eb65717d8fe7c4716ab6f6a513a831c320df62dd19f"
+  },
+  "screen-living-graph-view-workface-readiness": {
+    "src/lib/labor/workface-readiness.ts": "919d9cfaa21f3cfc0e04cfaf6fa338ec08fd01edb94240f236bae756821d5f12",
+    "src/lib/labor/lookahead.ts": "10744f2406831da768fa27bc6584fbd2904637d68c20a76155fd402c2a73ff8e",
+    "src/lib/graph/labor-graph-mapping.ts": "0752aa3067134b14ae289562d56041f2a7b61ed95f9c3dc2c92904cc16d4741e",
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-detail-panel.tsx": "18a2350aed2536f9c6511abfa9515f4734d9175cc76a7005097f51444cd22124"
+  },
+  "screen-living-graph-view-workforce-intelligence": {
+    "src/lib/capacity/formulas.ts": "dbc253a1d2fb0650c8b186ef5ed7edadea51b9435c02c72e90873e6f56f3aa80",
+    "src/lib/capacity/service.ts": "713911885bc92d4c2ae06a38d0d2e98aafbbf867fcfa96af1bc81fa5b9606214",
+    "src/lib/graph/workforce-graph-mapping.ts": "23acc6d0335669402bfc93c65cb0261d0ac911fcae213f7b7a625eeab2cb6e3e",
+    "src/lib/graph/living-graph-analysis.ts": "42dcc3cd9b5a53f8947382a2a3738aa36c525f8344a8c1983080526c1df2c165",
+    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb"
   },
   "screen-login": {
     "src/app/[locale]/(auth)/login/page.tsx": "bc052e5ff4e08d75f97412d8299ec9f8850d9f0e581a65cfff9a3ec55d5d3c8d",
@@ -148,9 +271,26 @@
     "src/lib/audit/index.ts": "de183c677f0ab835166633ee7d2484818e185dac6eb44c7725da5c8273a0800b"
   },
   "screen-project-budget": {
-    "src/app/[locale]/(app)/projects/[projectId]/budget/page.tsx": "7a795d84d21dedd7d1b69b08c93d25f45c44b530ab36a00bda2f6c8c722dfb3d",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/page.tsx": "d59c52575c8446fae0eeee6cda48e50c7558893b4d65b9c078083009f213b94a",
     "src/app/[locale]/(app)/projects/[projectId]/budget/budget-client.tsx": "94edbad8807a79fd779d28888015ef223a32923f7560014aa312759e6aedaa4a",
-    "src/app/[locale]/(app)/projects/[projectId]/budget/actions.ts": "77236e0d0857d9f8708549308a9f58ca769515e4af6f22f7fc4f66117ad3946c"
+    "src/app/[locale]/(app)/projects/[projectId]/budget/actions.ts": "77236e0d0857d9f8708549308a9f58ca769515e4af6f22f7fc4f66117ad3946c",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/financial-setup.tsx": "1cabfa6bb456c83ca9fb5c4388768b1ad4f1405bf4da98fed5d4d7ac00efe380",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/setup-actions.ts": "16d950cb50e6cb8290e5f0b74feedc61c7c0a8c43fe0c3a7a7173cdd5c8852bd",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/financial-cockpit.tsx": "873b20b5390ff4324509a2c739ac7062ccd0ae3e5e384d71655addd4846524ad",
+    "src/lib/financial/flags.ts": "3683b0a2a9a9411b7fa3066c96476a9ae2facf3640fba6938005bc9175b8359c",
+    "src/lib/financial/setup-model.ts": "70d044bcc231b31588f9065d73f23a33ced845b4037b0dbdc0a139f01d6ca032",
+    "src/lib/financial/setup-read-model.server.ts": "7756501b9196022c0266d83e4b45abd9f1c11f5b1895314eee45529a6be60168",
+    "src/lib/financial/read-model.server.ts": "2e30169d901ffaa9c405316cc0ea1d674eeaa6cd5ba82ac35ecbe2ce68ba0294",
+    "src/lib/financial/workflow.server.ts": "c46261f0a67c930b130bb8f5833d1db4bc94fc6c3ac18cc1e259a35b46255988",
+    "src/components/layout/project-tabs-config.ts": "2405c07551b9b3416b8774ad3b1407a5e05912d22d441efc5043bd88b2ead29a"
+  },
+  "screen-project-charter": {
+    "src/app/[locale]/(app)/projects/[projectId]/charter/page.tsx": "97ab86ae8ac43fca8e30518d7f6843cccea540d2a2b08a36ccda256a0c00398c",
+    "src/app/[locale]/(app)/projects/[projectId]/charter/charter-client.tsx": "d9c1ee7cfc7f0cdc07f5c9d60aff5cc1a7d28739a4f55d45a076c756fe668206",
+    "src/app/[locale]/(app)/projects/[projectId]/charter/charter-extra.tsx": "162c05163121b3bde5c7f5bcec657d291e6a9b28f2a6455acfded9341b5f16fe",
+    "src/app/[locale]/(app)/projects/[projectId]/charter/actions.ts": "72dad10444334ecac096342700a1ded14d618c3cdee1a1c922c4d04030e0c968",
+    "src/lib/charter/service.ts": "e0cc11dc87f1a21b712199367c9caae4f929fec769b064f0fea4eb92e9f44fb8",
+    "src/lib/charter/fields.ts": "aec9b517800dc3d332bf7d0dd296235876be44be5b90f96470e667665879e326"
   },
   "screen-project-charter-print": {
     "src/app/[locale]/(app)/projects/[projectId]/charter/print/page.tsx": "281ae11f668c8bbe1ed914c44a6bdcdffde0e3878fdd2bc63ccc851c6aa7dc2d",
@@ -161,14 +301,6 @@
     "src/app/[locale]/(app)/projects/[projectId]/charter/summary/page.tsx": "134750505cd58a113183728e711ba7a9c03eb1085f3094e5dabc182f72a055ad",
     "src/app/[locale]/(app)/projects/[projectId]/charter/charter-extra.tsx": "162c05163121b3bde5c7f5bcec657d291e6a9b28f2a6455acfded9341b5f16fe",
     "src/app/[locale]/(app)/projects/[projectId]/charter/actions.ts": "72dad10444334ecac096342700a1ded14d618c3cdee1a1c922c4d04030e0c968"
-  },
-  "screen-project-charter": {
-    "src/app/[locale]/(app)/projects/[projectId]/charter/page.tsx": "97ab86ae8ac43fca8e30518d7f6843cccea540d2a2b08a36ccda256a0c00398c",
-    "src/app/[locale]/(app)/projects/[projectId]/charter/charter-client.tsx": "d9c1ee7cfc7f0cdc07f5c9d60aff5cc1a7d28739a4f55d45a076c756fe668206",
-    "src/app/[locale]/(app)/projects/[projectId]/charter/charter-extra.tsx": "162c05163121b3bde5c7f5bcec657d291e6a9b28f2a6455acfded9341b5f16fe",
-    "src/app/[locale]/(app)/projects/[projectId]/charter/actions.ts": "72dad10444334ecac096342700a1ded14d618c3cdee1a1c922c4d04030e0c968",
-    "src/lib/charter/service.ts": "e0cc11dc87f1a21b712199367c9caae4f929fec769b064f0fea4eb92e9f44fb8",
-    "src/lib/charter/fields.ts": "aec9b517800dc3d332bf7d0dd296235876be44be5b90f96470e667665879e326"
   },
   "screen-project-closeout": {
     "src/app/[locale]/(app)/projects/[projectId]/closeout/page.tsx": "a1a977bc08bdcdc2b5850b5908cb812dd733f43fa2f736a09217fd1654ef0c73",
@@ -225,6 +357,15 @@
     "src/app/[locale]/(app)/projects/[projectId]/drawing-intelligence/actions.ts": "cacf919ada5ea62159d311ee2a0c49caf1792048ffad5496924f128a24eb82e3",
     "src/components/drawing-intelligence/drawing-upload-zone.tsx": "d75d307477d37645bced7f412f52ce253b6f0c9f87847ef5a67c74a70c0359cc"
   },
+  "screen-project-github": {
+    "src/app/[locale]/(app)/projects/[projectId]/github/page.tsx": "56df502b1895bb07b34be8a992b169aad118a08ae18c24bafee2105a8c0386d3",
+    "src/app/[locale]/(app)/projects/[projectId]/github/actions.ts": "fb09a2f3540f11bd6cb0afe4852f97569a7f60d8620327f83842252205846392",
+    "src/components/github-intelligence/github-living-graph.tsx": "949e203add426ca05e6d18c13e445cdd8d7dc6894ab8d2cc346907512f4e1120",
+    "src/lib/github-intelligence/read-model.ts": "7b6716a50d0bda9e0f1f4dd095294f66f750924bc72719e1decf449912b6586e",
+    "src/lib/github-intelligence/readiness.ts": "0a9a5919de5e1ced809b2cca30529fc1b5fb0e7573908019fb9195b1606dd550",
+    "src/lib/github-intelligence/summary.ts": "997a2229d2f801c284e4e296a790e870cefc3232fa137f64c51bb85e48c4d9f9",
+    "src/lib/github-intelligence/software-project-guard.ts": "3d437dee82fbf743e211064f425d54cf7b15fc5bb65bf6568230e15b40e50ced"
+  },
   "screen-project-github-integration": {
     "src/app/[locale]/(app)/projects/[projectId]/settings/integrations/github/page.tsx": "0c9e4e6376c52b5c0281179816404d1bbed051b184305cfabb9585ba0fd495f3",
     "src/app/[locale]/(app)/projects/[projectId]/github/actions.ts": "fb09a2f3540f11bd6cb0afe4852f97569a7f60d8620327f83842252205846392",
@@ -234,15 +375,6 @@
     "src/lib/github-intelligence/config.ts": "892777e1bb2ff8358aa10e14b4fae54a55a8733d6f0717c74a6b0432f6f5017b",
     "src/lib/github-intelligence/read-model.ts": "7b6716a50d0bda9e0f1f4dd095294f66f750924bc72719e1decf449912b6586e",
     "src/lib/github-intelligence/installation.ts": "d6d6eb9e8bc622702399466d41c4908b6ecad982b8876151d4ae483fe5062555"
-  },
-  "screen-project-github": {
-    "src/app/[locale]/(app)/projects/[projectId]/github/page.tsx": "56df502b1895bb07b34be8a992b169aad118a08ae18c24bafee2105a8c0386d3",
-    "src/app/[locale]/(app)/projects/[projectId]/github/actions.ts": "fb09a2f3540f11bd6cb0afe4852f97569a7f60d8620327f83842252205846392",
-    "src/components/github-intelligence/github-living-graph.tsx": "949e203add426ca05e6d18c13e445cdd8d7dc6894ab8d2cc346907512f4e1120",
-    "src/lib/github-intelligence/read-model.ts": "7b6716a50d0bda9e0f1f4dd095294f66f750924bc72719e1decf449912b6586e",
-    "src/lib/github-intelligence/readiness.ts": "0a9a5919de5e1ced809b2cca30529fc1b5fb0e7573908019fb9195b1606dd550",
-    "src/lib/github-intelligence/summary.ts": "997a2229d2f801c284e4e296a790e870cefc3232fa137f64c51bb85e48c4d9f9",
-    "src/lib/github-intelligence/software-project-guard.ts": "3d437dee82fbf743e211064f425d54cf7b15fc5bb65bf6568230e15b40e50ced"
   },
   "screen-project-meeting-detail": {
     "src/app/[locale]/(app)/projects/[projectId]/meetings/[meetingId]/page.tsx": "0f1334c0136c681dfc05c08d13d76a544177722fd7f5c8cbe43a47f17f1ebeac",
