@@ -68,16 +68,8 @@ export async function getFinancialCockpitSummary(
   projectId: string,
 ): Promise<FinancialCockpitSummary | null> {
   const supabase = await createClient();
-  const query = supabase.from as unknown as (table: string) => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        eq: (innerColumn: string, innerValue: string) => {
-          maybeSingle: () => Promise<{ data: FinancialCockpitRow | null; error: { message: string } | null }>;
-        };
-      };
-    };
-  };
-  const { data, error } = await query("financial_project_cockpit")
+  const { data, error } = await supabase
+    .from("financial_project_cockpit")
     .select("*")
     .eq("organization_id", organizationId)
     .eq("project_id", projectId)
@@ -87,31 +79,32 @@ export async function getFinancialCockpitSummary(
     return null;
   }
   if (!data) return null;
+  const row = data as FinancialCockpitRow;
   return {
-    organizationId: data.organization_id,
-    projectId: data.project_id,
-    currency: data.currency ?? "USD",
-    originalBudget: optionalNumeric(data.original_budget),
-    currentBaseline: optionalNumeric(data.current_baseline),
-    authorizedFunding: numeric(data.authorized_funding),
-    releasedFunding: numeric(data.released_funding),
-    currentCommitment: numeric(data.current_commitment),
-    outstandingCommitment: numeric(data.outstanding_commitment),
-    actualCost: numeric(data.actual_cost),
-    openAccrual: numeric(data.open_accrual),
-    settledPayments: numeric(data.settled_payments),
-    remainingReserve: numeric(data.remaining_reserve),
-    approvedChangesNotPosted: numeric(data.approved_changes_not_posted),
-    latestEac: optionalNumeric(data.latest_eac),
-    p50Eac: optionalNumeric(data.p50_eac),
-    p80Eac: optionalNumeric(data.p80_eac),
-    cpi: optionalNumeric(data.cpi),
-    spi: optionalNumeric(data.spi),
-    qualityStatus: data.quality_status ?? "insufficient_inputs",
-    pendingApprovals: numeric(data.pending_approvals),
-    reconciliationExceptions: numeric(data.reconciliation_exceptions),
-    unverifiedActuals: numeric(data.unverified_actuals),
-    currencyMismatches: numeric(data.currency_mismatches),
-    dataDate: data.data_date,
+    organizationId: row.organization_id,
+    projectId: row.project_id,
+    currency: row.currency ?? "USD",
+    originalBudget: optionalNumeric(row.original_budget),
+    currentBaseline: optionalNumeric(row.current_baseline),
+    authorizedFunding: numeric(row.authorized_funding),
+    releasedFunding: numeric(row.released_funding),
+    currentCommitment: numeric(row.current_commitment),
+    outstandingCommitment: numeric(row.outstanding_commitment),
+    actualCost: numeric(row.actual_cost),
+    openAccrual: numeric(row.open_accrual),
+    settledPayments: numeric(row.settled_payments),
+    remainingReserve: numeric(row.remaining_reserve),
+    approvedChangesNotPosted: numeric(row.approved_changes_not_posted),
+    latestEac: optionalNumeric(row.latest_eac),
+    p50Eac: optionalNumeric(row.p50_eac),
+    p80Eac: optionalNumeric(row.p80_eac),
+    cpi: optionalNumeric(row.cpi),
+    spi: optionalNumeric(row.spi),
+    qualityStatus: row.quality_status ?? "insufficient_inputs",
+    pendingApprovals: numeric(row.pending_approvals),
+    reconciliationExceptions: numeric(row.reconciliation_exceptions),
+    unverifiedActuals: numeric(row.unverified_actuals),
+    currencyMismatches: numeric(row.currency_mismatches),
+    dataDate: row.data_date,
   };
 }

@@ -265,6 +265,14 @@ The project's "living memory": knowledge items with authorship, participants, im
 ### Budget (`/budget`)
 Review and edit the budget estimate grouped by category, with subtotals and total. **Quantities and unit costs are editable inline**; subtotals and total recalculate live and persist when you leave the field. **Print / PDF** button. Data comes from `material_requirements` (fed by the BIM takeoff).
 
+The **Financial setup / Control financiero** section on the same project page is the PMO entry point for SAP, software and other cost-bearing projects. Add one line per cost driver (licenses, implementation partner, internal labor, migration, testing, training, cloud, support or contingency), then capture:
+
+- resource or role, cost type, WBS/CBS/control-account references;
+- planned quantity, rate and rate basis (`hour`, `day`, `week`, `month`, `unit` or `fixed`);
+- cadence (`week`, `biweek`, `month` or one-time), number of periods and optional hours per period.
+
+The line total is calculated from the entered rate basis and quantity per cadence period. For example, `100 hours/month × $145/hour × 12 months`, or `1 team × $12,000/month × 6 months`; weekly rates convert to the selected weekly/biweekly/monthly cadence. A resource name reuses or creates the project rate-card entry in **Team & Roles**, so later labor tracking uses the same rate instead of a second catalog. Saving creates a versioned financial estimate, BOE and baseline lines as a **draft** only. Submit for PMO review; an independent approver activates the original/current baseline. No sample amounts are inserted automatically.
+
 ### Drawing Intelligence / BIM (`/drawing-intelligence`)
 Upload drawings/plans (manual or via Autodesk/Procore/Google Drive connectors), process them with AI (OCR + interpretation) and extract **takeoff, insights, risks, RFIs and versions**. Processing modes: *quick_scan / standard_analysis / deep_analysis*. Tabs: upload, library, extractions, risks, rfis, submittals, takeoff, versions, schedule, cost, actions, evidence, logs. Insights can be converted to draft RFI, submittal, inspection, schedule constraint or cost impact. The **takeoff feeds the Budget** (materials).
 

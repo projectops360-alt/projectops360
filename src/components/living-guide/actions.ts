@@ -19,6 +19,7 @@ import { maybeAnswerWithExecutiveBrief } from "@/lib/isabella/executive-brief/ga
 import { isIsabellaToolUseEnabled } from "@/lib/isabella/tools/flag";
 import { maybeAnswerWithTools } from "@/lib/isabella/tools/gateway";
 import { maybeAnswerWithProcessIntelligence } from "@/lib/isabella/process-intelligence-runtime/wiring";
+import { answerScreenHelp, isScreenExplanationIntent } from "@/lib/isabella/screen-help";
 import { getProjectBriefing } from "@/lib/project-briefing/service";
 import type { ProjectBriefingResult } from "@/lib/project-briefing/types";
 import { getPortfolioBriefing } from "@/lib/portfolio-briefing/service";
@@ -49,6 +50,41 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       executionFacts: undefined,
     },
   };
+
+  // Screen explanations are deterministic help for the visible UI. They must
+  // work even when the optional Process Intelligence engines are disabled, and
+  // they must run before briefing/RAG so Isabella cannot describe another page.
+  const screenLanguage: "en" | "es" = (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+  if (input.intent === "explain_screen" || isScreenExplanationIntent(input.query ?? "")) {
+    const help = answerScreenHelp(
+      input.query?.trim() || "explain_screen",
+      {
+        module: safeInput.context.module,
+        screen: safeInput.context.screen,
+        pathname: safeInput.context.pathname,
+        tab: safeInput.context.tab,
+      },
+      screenLanguage,
+    );
+    const screenExpert = resolveExpert({ expertKey: input.expertKey, module: safeInput.context.module });
+    return {
+      answerId: null,
+      grounded: help.confident,
+      answer: help.answer,
+      steps: [],
+      followups: [],
+      tier: help.confident ? "verified" : "best_practice",
+      confidenceScore: help.confident ? 1 : 0.5,
+      language: screenLanguage as Locale,
+      sources: [],
+      expert: {
+        key: screenExpert.key,
+        displayName: screenExpert.displayName,
+        title: screenExpert.title[screenLanguage],
+      },
+      degraded: false,
+    };
+  }
 
   const projectId = input.context.projectId;
 

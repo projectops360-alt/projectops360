@@ -73,6 +73,7 @@ export async function updateWorkspaceUserAction(input: {
   name?: string; email?: string;
   billingSeatType?: string; workspaceRole?: string; status?: string;
   department?: string; jobTitle?: string;
+  resourceId?: string; costRate?: number | null; costUnit?: string | null;
 }): Promise<{ error?: string }> {
   const c = await adminCtx();
   if (!c) return { error: "not_allowed" };
@@ -116,6 +117,43 @@ export async function updateWorkspaceUserAction(input: {
   if (Object.keys(patch).length > 0) {
     const { error } = await c.supabase.from("organization_members").update(patch).eq("id", input.memberId).eq("organization_id", c.org.organizationId);
     if (error) return { error: "unexpected" };
+  }
+
+  // Cost rates belong to the canonical resource, not to organization_members.
+  // A user can be linked to a project resource; when no link exists yet, create
+  // one organization-wide so PMO can start a rate card without changing access.
+  if (input.costRate !== undefined || input.resourceId !== undefined) {
+    const validRate = input.costRate == null ? null : Number(input.costRate);
+    if (validRate != null && (!Number.isFinite(validRate) || validRate < 0 || validRate > 1_000_000)) return { error: "invalid_cost_rate" };
+    const validUnits = ["hour", "day", "week", "month", "unit", "fixed"];
+    if (input.costUnit != null && !validUnits.includes(input.costUnit)) return { error: "invalid_cost_unit" };
+
+    const linkedQuery = input.resourceId
+      ? c.supabase.from("resources").select("id").eq("id", input.resourceId).eq("organization_id", c.org.organizationId).eq("linked_user_id", input.userId).is("deleted_at", null).maybeSingle()
+      : c.supabase.from("resources").select("id").eq("organization_id", c.org.organizationId).eq("linked_user_id", input.userId).is("deleted_at", null).is("project_id", null).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const { data: linkedResource } = await linkedQuery;
+    if (linkedResource) {
+      const { error } = await c.supabase.from("resources").update({
+        cost_rate: validRate,
+        cost_unit: validRate == null ? null : (input.costUnit ?? "hour"),
+      }).eq("id", linkedResource.id).eq("organization_id", c.org.organizationId);
+      if (error) return { error: "unexpected" };
+      await logAudit({ org: c.org, action: "update", entityType: "resources", entityId: linkedResource.id, metadata: { cost_rate_changed: true, cost_unit: validRate == null ? null : (input.costUnit ?? "hour") } });
+    } else if (validRate != null) {
+      const { data: createdResource, error } = await c.supabase.from("resources").insert({
+        organization_id: c.org.organizationId,
+        project_id: null,
+        resource_type: "person",
+        name: input.name?.trim() || input.userId,
+        linked_user_id: input.userId,
+        status: "active",
+        cost_rate: validRate,
+        cost_unit: input.costUnit ?? "hour",
+        metadata: { origin: "workspace_user_rate_card" },
+      }).select("id").single();
+      if (error || !createdResource) return { error: "unexpected" };
+      await logAudit({ org: c.org, action: "create", entityType: "resources", entityId: createdResource.id, metadata: { linked_user_rate_created: true } });
+    }
   }
 
   await logAudit({ org: c.org, action: "update", entityType: "organization_members", entityId: input.memberId, metadata: { ...patch, renamed: input.name ? true : undefined, email_changed: input.email ? true : undefined } });

@@ -15,6 +15,7 @@ import type { IsabellaReasoningTrace } from "@/lib/isabella/reasoning-pipeline/t
 export type IsabellaRoute =
   | "product_help"
   | "factual_project_data"
+  | "financial_summary"
   | "process_mining_summary"
   // Deterministic screen/UI-label explanation (ISABELLA-SCREEN-CONTEXT-EXPLANATION).
   // Answers "explain this screen" / "what does <UI term> mean" from screen context —

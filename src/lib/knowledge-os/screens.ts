@@ -48,6 +48,35 @@ export interface ScreenDefinition {
 export const SCREEN_REGISTRY: ScreenDefinition[] = [
   {
     match: "/projects",
+    projectSubroute: "budget",
+    module: "financial_control",
+    screen: "financial_setup",
+    title: { en: "Financial Setup", es: "Configuración financiera" },
+    workflow: {
+      en: "Build the PMO cost estimate, assign reusable resource rates, planned hours and cadence, then submit the draft for governed review and baseline approval.",
+      es: "Construir el estimado de costos PMO, asignar tarifas reutilizables de recursos, horas planificadas y cadencia, y enviar el borrador a revisión y aprobación del baseline.",
+    },
+    components: {
+      en: [
+        "Estimate title, purpose, currency, AACE class, base date and cutoff date",
+        "Cost-plan lines with type, resource/rate, quantity, rate basis, periods, cadence, unit and planned hours",
+        "Control-account, CBS and WBS traceability references",
+        "Manage rates, SAP/software categories, add line, save draft and submit for review actions",
+      ],
+      es: [
+        "Título, propósito, moneda, clase AACE, fecha base y fecha de corte del estimado",
+        "Líneas del plan de costos con tipo, recurso/tarifa, cantidad, base de tarifa, periodos, cadencia, unidad y horas planificadas",
+        "Referencias de trazabilidad de cuenta de control, CBS y WBS",
+        "Acciones Gestionar tarifas, categorías SAP/software, agregar línea, guardar borrador y enviar a revisión",
+      ],
+    },
+    followups: {
+      en: ["How do I create a labor cost line?", "Where do I manage a person's rate?", "What happens after I submit the estimate for review?"],
+      es: ["¿Cómo creo una línea de costo de mano de obra?", "¿Dónde gestiono la tarifa de una persona?", "¿Qué ocurre después de enviar el estimado a revisión?"],
+    },
+  },
+  {
+    match: "/projects",
     projectSubroute: "execution-map",
     module: "process_mining",
     screen: "process_mining_layer",

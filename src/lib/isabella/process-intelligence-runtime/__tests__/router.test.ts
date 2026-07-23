@@ -42,6 +42,13 @@ describe("deterministic routing", () => {
 // must route to product_help (Knowledge OS / RAG), NEVER daily_diagnosis. This is
 // the reported P0: with Process Intelligence on, "¿cómo funciona el living graph?"
 // returned the Daily Diagnosis briefing.
+describe("explicit financial setup routing", () => {
+  it("routes PMO setup questions to financial_summary", () => {
+    expect(routeIsabellaQuestion("Detalla la configuracion financiera: tarifas, horas y cadencia", P).route).toBe("financial_summary");
+    expect(routeIsabellaQuestion("How much is the SAP project cost plan?", P).route).toBe("financial_summary");
+  });
+});
+
 describe("knowledge / how-it-works routing (never Daily Diagnosis)", () => {
   it("'how it works / what is / para qué sirve' → product_help (EN/ES)", () => {
     for (const q of [
@@ -76,6 +83,7 @@ describe("screen-context explanation priority", () => {
   const RES = { ...P, screenContext: { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" } };
   const TASK = { ...P, screenContext: { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" } };
   const PROCESS = { ...P, screenContext: { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" } };
+  const FINANCIAL = { ...P, screenContext: { module: "financial_control", screen: "financial_setup", pathname: "/projects/p1/budget" } };
 
   it("A · Resources + 'member está unassigned' → screen_context_explanation (not daily_diagnosis)", () => {
     const d = routeIsabellaQuestion("explícame qué significa member está unassigned", RES);
@@ -98,6 +106,9 @@ describe("screen-context explanation priority", () => {
   });
   it("Process Mining screen explanations stay deterministic", () => {
     expect(routeIsabellaQuestion("Explain this screen", PROCESS).route).toBe("screen_context_explanation");
+  });
+  it("Financial setup screen explanations stay deterministic", () => {
+    expect(routeIsabellaQuestion("Explain this screen", FINANCIAL).route).toBe("screen_context_explanation");
   });
   it("UI question is never treated as an engine route", () => {
     expect(isEngineRoute("screen_context_explanation")).toBe(false);

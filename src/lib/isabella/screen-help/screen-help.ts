@@ -54,7 +54,8 @@ type ScreenHelpTerm =
   | "reserve"
   | "forecast"
   | "approval_queue"
-  | "quality";
+  | "quality"
+  | "setup";
 
 export interface ScreenHelpAnswer {
   answer: string;
@@ -122,6 +123,7 @@ function detectTerm(question: string): ScreenHelpTerm {
   if (/forecast|pronostico|proyeccion|\beac\b|\bp50\b|\bp80\b/.test(q)) return "forecast";
   if (/approval\s+queue|cola\s+de\s+(control|aprobacion)|pending\s+approval/.test(q)) return "approval_queue";
   if (/quality|calidad|reconciliation|reconciliacion/.test(q)) return "quality";
+  if (/financial\s+setup|configuraci[oó]n financiera|rate card|tarifas?|planned hours?|horas? planificadas?|AACE|BOE|cadencia/.test(q)) return "setup";
   if (/unassigned|sin\s+asignar|missing\s+assignment|pendiente\s+de\s+asignar|owner\s+unassigned|sin\s+responsable|sin\s+due[nñ]o/.test(q)) return "unassigned";
   if (/\bmember\b|\bmiembro\b/.test(q)) return "member";
   if (/permission|permiso/.test(q)) return "permission";
@@ -216,8 +218,12 @@ function taskContent(term: ScreenHelpTerm, es: boolean): string {
     : "This screen shows the task detail and its execution. I can explain a specific field — for example owner/responsible, status, or blockers.";
 }
 
-function financialContent(term: ScreenHelpTerm, es: boolean): string {
+function financialContent(term: ScreenHelpTerm, es: boolean, ctx?: ScreenHelpContext): string {
   const definitions: Partial<Record<ScreenHelpTerm, { en: string; es: string }>> = {
+    setup: {
+      en: "**Financial setup** is the PMO capture point for a project estimate: title, purpose, scope, currency, dates, AACE class, and cost lines. Each line can record a resource, rate basis (hour/day/week/month/unit/fixed), quantity, cadence (weekly/biweekly/monthly/one-time), periods, planned hours, and WBS/CBS/control-account references. SAP and software categories organize the estimate; they do not invent amounts. Save keeps a draft, Submit for review starts the control workflow, and an independent human approver activates the BOE and baseline.",
+      es: "La **configuración financiera** es el punto de captura PMO del estimado del proyecto: título, propósito, alcance, moneda, fechas, clase AACE y líneas de costo. Cada línea puede registrar recurso, base de tarifa (hora/día/semana/mes/unidad/fijo), cantidad, cadencia (semanal/quincenal/mensual/una sola vez), periodos, horas planificadas y referencias WBS/CBS/cuenta de control. Las categorías SAP y software organizan el estimado; no inventan importes. Guardar conserva un borrador, Enviar a revisión inicia el control y un aprobador humano independiente activa el BOE y el baseline.",
+    },
     baseline: {
       en: "The **current baseline** is the active, approved cost plan. The original budget remains immutable; approved posted changes create a new baseline version instead of rewriting history.",
       es: "El **baseline actual** es el plan de costo activo y aprobado. El presupuesto original permanece inmutable; los cambios aprobados y posteados crean una nueva versión sin reescribir la historia.",
@@ -259,7 +265,11 @@ function financialContent(term: ScreenHelpTerm, es: boolean): string {
       es: "El **estado de calidad** expone baseline faltante, actuals sin verificar, exclusiones por moneda y excepciones de reconciliación. La evidencia faltante nunca se convierte en cero ni se oculta.",
     },
   };
-  const definition = definitions[term];
+  const explicitScreen = norm(ctx?.screen ?? "");
+  const pathname = norm(ctx?.pathname ?? "");
+  const isSetupScreen = explicitScreen.includes("financial_setup") || (!explicitScreen && /\/budget\b/.test(pathname));
+  const resolvedTerm = term === "screen" && isSetupScreen ? "setup" : term;
+  const definition = definitions[resolvedTerm];
   if (definition) return es ? definition.es : definition.en;
   return es
     ? [
@@ -281,6 +291,7 @@ function financialContent(term: ScreenHelpTerm, es: boolean): string {
         "- **Payments** represent cash and remain separate from recognized cost.",
         "- **Reserves, forecast, and CPI/SPI** use canonical projections with explicit quality.",
         "- **Control queue** shows pending human decisions and segregation of duties.",
+        "- **Financial setup** lets the PMO capture estimate, rates, quantities, cadence, planned hours, and WBS/CBS references before review.",
         "",
         "The existing material estimate remains below; this view creates neither a second budget nor another Gantt. Isabella may only explain, compare, and trace financial evidence.",
       ].join("\n");
@@ -389,7 +400,7 @@ export function answerScreenHelp(
   if (area === "resources") return { answer: resourcesContent(term, es), area, term, confident: true };
   if (area === "task") return { answer: taskContent(term, es), area, term, confident: true };
   if (area === "process_mining") return { answer: processMiningContent(term, es, ctx), area, term, confident: true };
-  if (area === "financial") return { answer: financialContent(term, es), area, term, confident: true };
+  if (area === "financial") return { answer: financialContent(term, es, ctx), area, term, confident: true };
 
   // Unknown or a screen we do not have deterministic content for → never guess.
   return { answer: safetyClarification(es), area, term, confident: false };
