@@ -127,15 +127,17 @@ export default async function ProjectBudgetPage({
           summary={financialSummary}
         />
       ) : null}
-      <BudgetReportClient
-        locale={locale}
-        projectId={projectId}
-        projectName={projectName}
-        categories={categories}
-        grandTotal={Math.round(grandTotal * 100) / 100}
-        currency={currency}
-        stats={{ lineCount, unquantified, uncosted }}
-      />
+      {categories.length > 0 || !financialFeatures.writers ? (
+        <BudgetReportClient
+          locale={locale}
+          projectId={projectId}
+          projectName={projectName}
+          categories={categories}
+          grandTotal={Math.round(grandTotal * 100) / 100}
+          currency={currency}
+          stats={{ lineCount, unquantified, uncosted }}
+        />
+      ) : null}
     </>
   );
 }
