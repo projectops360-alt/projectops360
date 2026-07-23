@@ -15,7 +15,8 @@ separate truths and must not be summed as if they were interchangeable.
 ## Protected rollout rules
 
 - Development and preview use stage only; production remains untouched until G9.
-- `FINANCIAL_PILOT_PROJECT_IDS` is an explicit allowlist; an empty value disables the capability.
+- `FINANCIAL_PILOT_PROJECT_IDS=all` enables every existing and newly created project; an empty
+  value disables the capability and explicit IDs remain available for quarantine/recovery operations.
 - Foundation, writers, projections, UI and Isabella flags are independent and default OFF.
 - Writes require authenticated server context, capability, project scope, evidence, expected state,
   idempotency and the existing canonical event gateway.
@@ -35,8 +36,17 @@ separate truths and must not be summed as if they were interchangeable.
 | G5 | Approved | PMO-first Core integration and Isabella boundaries |
 | G6 | Approved | P7–P9 authorized under stage-first controls |
 | G7 | Accepted in stage | Additive schema, writers, RLS and projections |
-| G8 | Pending stage UAT | Workflows, cockpit, reports and Isabella integration |
-| G9 | Not authorized | Pilot evidence, calibration, NFR, approvals and staged release |
+| G8 | Accepted in stage | PMO setup, rate management, cockpit and Isabella screen guidance validated |
+| G9 | Authorized for production | All existing and newly created projects; rollback remains flag-only |
+
+## Production activation
+
+Production enables foundation, writers, projections, UI and Isabella for every existing and newly
+created project. Process Mining canonical event capture and the read-only canonical relationship view
+are also enabled by default for every project. Global switches remain the immediate rollback controls;
+project-specific deny/quarantine controls remain available where supported. Isabella Process
+Intelligence is enabled so financial and Process Mining explanations use deterministic screen and
+project evidence; human approval, posting and causality boundaries remain unchanged.
 
 ## Evidence map
 

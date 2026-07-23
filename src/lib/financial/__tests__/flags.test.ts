@@ -21,7 +21,6 @@ describe("financial feature flags", () => {
       projections: "true",
       ui: "true",
       isabella: "true",
-      nodeEnv: "development",
     })).toEqual({
       pilot: true,
       foundation: true,
@@ -38,8 +37,8 @@ describe("financial feature flags", () => {
     }).ui).toBe(false);
   });
 
-  it("rejects all-project activation in production", () => {
-    expect(isFinancialPilotProject("project-1", "all", "production")).toBe(false);
-    expect(isFinancialPilotProject("project-1", "all", "development")).toBe(true);
+  it("enables existing and newly created projects when configured for all", () => {
+    expect(isFinancialPilotProject("project-1", "all")).toBe(true);
+    expect(isFinancialPilotProject("new-project", "all")).toBe(true);
   });
 });

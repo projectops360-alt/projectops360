@@ -5,7 +5,6 @@ export interface FinancialFeatureEnvironment {
   ui?: string;
   isabella?: string;
   pilotProjectIds?: string;
-  nodeEnv?: string;
 }
 
 function explicitlyEnabled(value: string | undefined): boolean {
@@ -15,11 +14,10 @@ function explicitlyEnabled(value: string | undefined): boolean {
 export function isFinancialPilotProject(
   projectId: string,
   rawProjectIds: string | undefined,
-  nodeEnv = "production",
 ): boolean {
   const raw = rawProjectIds?.trim() ?? "";
   if (!projectId || !raw) return false;
-  if (raw === "all") return nodeEnv !== "production";
+  if (raw === "all") return true;
   return raw.split(",").map((item) => item.trim()).filter(Boolean).includes(projectId);
 }
 
@@ -30,7 +28,6 @@ export function getFinancialFeatureState(
   const pilot = isFinancialPilotProject(
     projectId,
     environment.pilotProjectIds,
-    environment.nodeEnv,
   );
   return {
     pilot,
@@ -59,6 +56,5 @@ export function getFinancialFeatureStateFromProcess(projectId: string) {
     ui: process.env.FINANCIAL_UI_ENABLED,
     isabella: process.env.FINANCIAL_ISABELLA_ENABLED,
     pilotProjectIds: process.env.FINANCIAL_PILOT_PROJECT_IDS,
-    nodeEnv: process.env.NODE_ENV,
   });
 }
