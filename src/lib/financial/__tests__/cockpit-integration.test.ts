@@ -11,6 +11,7 @@ describe("P8 Core integration contracts", () => {
     expect(page).toContain("getFinancialFeatureStateFromProcess");
     expect(page).toContain("<FinancialCockpit");
     expect(page).toContain("<BudgetReportClient");
+    expect(page).toContain("categories.length > 0 || !financialFeatures.writers");
     expect(cockpit).toContain('t("livingGraph")');
     expect(cockpit).toContain('t("reports")');
     expect(cockpit).toContain("grid-cols-1");
