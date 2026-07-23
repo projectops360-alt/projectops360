@@ -6,8 +6,10 @@ import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
 import { getFinancialFeatureStateFromProcess } from "@/lib/financial/flags";
 import { getFinancialCockpitSummary } from "@/lib/financial/read-model.server";
+import { getFinancialSetupDraft } from "@/lib/financial/setup-read-model.server";
 import { BudgetReportClient, type BudgetCategory, type BudgetLine } from "./budget-client";
 import { FinancialCockpit } from "./financial-cockpit";
+import { FinancialSetup, type FinancialSetupResource } from "./financial-setup";
 
 export default async function ProjectBudgetPage({
   params,
@@ -85,9 +87,38 @@ export default async function ProjectBudgetPage({
   const financialSummary = financialFeatures.ui
     ? await getFinancialCockpitSummary(org.organizationId, projectId)
     : null;
+  const financialSetupDraft = financialFeatures.writers
+    ? await getFinancialSetupDraft(org.organizationId, projectId)
+    : null;
+  const { data: projectResources } = financialFeatures.writers
+    ? await supabase
+      .from("resources")
+      .select("id, name, resource_type, cost_rate, cost_unit")
+      .eq("organization_id", org.organizationId)
+      .or(`project_id.eq.${projectId},project_id.is.null`)
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .order("name", { ascending: true })
+    : { data: [] };
+  const financialSetupResources: FinancialSetupResource[] = (projectResources ?? []).map((resource) => ({
+    id: resource.id,
+    name: resource.name,
+    resourceType: resource.resource_type,
+    costRate: resource.cost_rate == null ? null : Number(resource.cost_rate),
+    costUnit: resource.cost_unit,
+  }));
 
   return (
     <>
+      {financialFeatures.writers ? (
+        <FinancialSetup
+          locale={locale}
+          projectId={projectId}
+          role={org.role}
+          resources={financialSetupResources}
+          draft={financialSetupDraft}
+        />
+      ) : null}
       {financialSummary ? (
         <FinancialCockpit
           locale={locale}

@@ -108,6 +108,12 @@ export const TAB_GROUPS: TabGroup[] = [
         icon: Route,
         matchPattern: "/projects/[projectId]/roadmap",
       },
+      {
+        titleKey: "financialControl",
+        href: "/projects/[projectId]/budget",
+        icon: FileBarChart,
+        matchPattern: "/projects/[projectId]/budget",
+      },
     ],
   },
   {

@@ -103,6 +103,17 @@ describe("PD-009 — Resource Capacity is operational, under Resources (not Sett
   });
 });
 
+describe("Financial control discoverability", () => {
+  it("places Financial Control under Planning", () => {
+    expect(itemKeys("planning")).toContain("financialControl");
+  });
+
+  it("routes Financial Control to the canonical project budget surface", () => {
+    const financialControl = TAB_ITEMS.find((item) => item.titleKey === "financialControl");
+    expect(financialControl?.href).toBe("/projects/[projectId]/budget");
+  });
+});
+
 describe("Settings boundary — Settings is not the home for operational modules", () => {
   const operational = [
     "drawingIntelligence",
@@ -146,6 +157,7 @@ describe("Core routes preserved in the grouped nav", () => {
     "/projects/[projectId]/resource-capacity",
     "/projects/[projectId]/drawing-intelligence",
     "/projects/[projectId]/rhythm",
+    "/projects/[projectId]/budget",
   ];
 
   it.each(mustExist)("nav still exposes %s", (href) => {

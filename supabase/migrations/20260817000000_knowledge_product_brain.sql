@@ -20,6 +20,7 @@ WITH pkg AS (
     (NULL, 'pi-process-mining-layer-truth', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-process-mining-reading-views', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-isabella-process-mining-sources', 'product_intelligence', 'published', 'en'),
+    (NULL, 'pi-import-milestone-order-integrity', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-living-graph-what-is', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-critical-path-source-of-truth', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-focus-mode', 'product_intelligence', 'published', 'en'),
@@ -30,6 +31,7 @@ WITH pkg AS (
     (NULL, 'pi-workboard-task-cards', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-project-memory', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-projectops-scribe', 'product_intelligence', 'published', 'en'),
+    (NULL, 'pi-pmo-financial-setup', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-variance-baseline', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-timeline-playback', 'product_intelligence', 'published', 'en'),
     (NULL, 'pi-whatif-sandbox', 'product_intelligence', 'published', 'en'),
@@ -57,6 +59,7 @@ ver AS (
     ('pi-process-mining-layer-truth', 'verified', 'isabella-process-mining-layer-training.md -> Deterministic project and event data; CAP-045'),
     ('pi-process-mining-reading-views', 'verified', 'isabella-process-mining-layer-training.md -> Reading the Process Mining Layer; CAP-046'),
     ('pi-isabella-process-mining-sources', 'verified', 'isabella-process-mining-layer-training.md -> Purpose and response policy; Product Constitution section 11'),
+    ('pi-import-milestone-order-integrity', 'verified', 'import-order-integrity.md; 10-regression-log.md → REG-026'),
     ('pi-living-graph-what-is', 'verified', '12-living-graph-strategy.md → Overview; 22-modules.md → Living Graph'),
     ('pi-critical-path-source-of-truth', 'verified', 'Product Decision — Critical Path Source of Truth; 12-living-graph-strategy.md → Critical Path'),
     ('pi-focus-mode', 'verified', '27-sprint-02-living-graph-focus.md → Decisions; ADR-002'),
@@ -67,6 +70,7 @@ ver AS (
     ('pi-workboard-task-cards', 'verified', 'Sprint #1 — Operational Clarity; 22-modules.md → Workboard'),
     ('pi-project-memory', 'verified', '17-project-memory.md; 22-modules.md → Project Memory'),
     ('pi-projectops-scribe', 'verified', 'REG-009; 17-project-memory.md → ProjectOps Scribe'),
+    ('pi-pmo-financial-setup', 'verified', 'AACE 18R-97 adapter; financial setup workflow; Project Budget → Financial Control'),
     ('pi-variance-baseline', 'verified', '12-living-graph-strategy.md → Variance; overlay-metadata'),
     ('pi-timeline-playback', 'verified', '12-living-graph-strategy.md → Timeline; overlay-metadata (countDistinctEventDays)'),
     ('pi-whatif-sandbox', 'verified', '12-living-graph-strategy.md → What-if Simulation; PD What-if sandbox'),
@@ -110,6 +114,12 @@ Verify: ask Isabella a current-status question, a how-it-works question and Expl
     ('pi-isabella-process-mining-sources', 'es', 'Que tres fuentes usa Isabella para Process Mining?', 'Isabella usa tres fuentes gobernadas: (1) queries deterministas y acotados por RBAC a datos y eventos del proyecto para hechos actuales; (2) Product Brain vectorizado y lexical para significado y reglas del producto; y (3) contexto determinista de pantalla/programa para la vista implementada que observa el usuario. Los datos actuales superan a la documentacion para estado; Product Brain explica semantica pero no inventa conteos; el layout explica controles pero nunca es verdad de negocio. Isabella separa afirmaciones canonicas, derivadas, estadisticas y de guia.
 Fuente: isabella-process-mining-layer-training.md -> Contrato de fuentes y politica de respuesta.
 Verifica: pregunta por estado actual, por como funciona la capa y luego pide Explica esta pantalla desde Process Mining.'),
+    ('pi-import-milestone-order-integrity', 'en', 'Why can an imported milestone appear before P0, and how is it fixed?', 'Imported milestone order is project data. ProjectOps360° preserves the canonical source sequence in project_import_entities.source_order and writes it to milestones.order_index; the Living Graph renders that order and must never infer precedence from UUIDs, timestamps, database return order, or visual node position. If the order is wrong, verify the source file, import source_order, project milestone order_index, and graph projection—in that order. Repair only the verified project''s milestone indexes, then query and compare the exact final sequence. Do not drag nodes to hide corrupted data and do not modify tasks, dependencies, events, other projects, or saved layouts.
+Source: import-order-integrity.md; REG-026.
+Verify: inspect the project''s milestones ordered by order_index, then open Execution Map → Living Graph → Milestones.'),
+    ('pi-import-milestone-order-integrity', 'es', '¿Por qué un hito importado puede aparecer antes de P0 y cómo se corrige?', 'El orden de los hitos importados es un dato del proyecto. ProjectOps360° conserva la secuencia canónica en project_import_entities.source_order y la escribe en milestones.order_index; el Living Graph representa ese orden y nunca debe inferir precedencia por UUIDs, fechas, orden de retorno de la base de datos ni posición visual. Si el orden está mal, verifica en este orden: archivo fuente, source_order de la importación, order_index de los hitos y proyección del grafo. Corrige únicamente los índices de hitos del proyecto verificado y luego consulta y compara la secuencia final exacta. No arrastres nodos para ocultar datos corruptos ni modifiques tareas, dependencias, eventos, otros proyectos o layouts guardados.
+Fuente: import-order-integrity.md; REG-026.
+Verifica: consulta los hitos del proyecto ordenados por order_index y luego abre Execution Map → Living Graph → Hitos.'),
     ('pi-living-graph-what-is', 'en', 'What is the Living Graph?', 'In ProjectOps360°, the Living Graph is the primary project-intelligence surface: an interactive process map of milestones, tasks, dependencies, people, and risk, rendered as a graph you can explore, filter, and focus. It is the protagonist of the Execution Map page — controls, filters, legends, and insights support the graph, they do not compete with it. It is where Critical Path, blockers, waiting work, overlays (risk, SOP candidates, variance, timeline, what-if, workforce capacity) and Focus Mode live.
 Source: 12-living-graph-strategy.md → Overview.
 Verify: open a project → Execution Map → Living Graph.'),
@@ -170,6 +180,12 @@ Verify: Project → Project Memory → ProjectOps Scribe → Dictate/Paste → A
     ('pi-projectops-scribe', 'es', '¿Qué es ProjectOps Scribe?', 'ProjectOps Scribe es el asistente de captura de la Memoria del Proyecto. Escribes, pegas o dictas una nota (dictado por voz del navegador); la IA la estructura en acciones, decisiones, riesgos y seguimientos propuestos, cada uno con un extracto textual de origen; tú revisas y apruebas; los elementos aprobados se guardan en la Memoria del Proyecto y pueden crear las entidades correspondientes. Nada se crea sin aprobación humana y la transcripción original se conserva como evidencia.
 Fuente: 17-project-memory.md → ProjectOps Scribe (restaurado en REG-009).
 Verifica: Proyecto → Memoria del Proyecto → ProjectOps Scribe → Dictar/Pegar → Analizar → revisar → Guardar.'),
+    ('pi-pmo-financial-setup', 'en', 'How does PMO financial setup work for SAP and software projects?', 'Financial setup is the PMO capture point for a project estimate. It records the estimate title, purpose, scope, currency, dates, AACE estimate class, and cost lines. Each line can represent labor, software, cloud, subcontractor, material, equipment, or other cost and records a resource, rate basis (hour/day/week/month/unit/fixed), quantity, cadence (weekly/biweekly/monthly/one-time), periods, planned hours, and WBS/CBS/control-account references. Rate times quantity creates the planned amount; hours per period times periods creates planned hours. SAP/software categories organize the estimate but never invent amounts. Save creates a draft, Submit for review begins the controlled workflow, and an independent human approver activates the BOE and baseline. Isabella can explain, compare, and trace this evidence; she cannot approve, post, release, reopen, or execute financial actions.
+Source: AACE 18R-97 adapter; financial setup workflow.
+Verify: Project → Financial Control → Financial setup → review the estimate, line model, BOE, and baseline status.'),
+    ('pi-pmo-financial-setup', 'es', 'Como funciona la configuracion financiera PMO para proyectos SAP y software?', 'La configuracion financiera es el punto de captura PMO del estimado del proyecto. Registra titulo, proposito, alcance, moneda, fechas, clase de estimado AACE y lineas de costo. Cada linea puede representar mano de obra, software, nube, subcontrato, material, equipo u otro costo y registra recurso, base de tarifa (hora/dia/semana/mes/unidad/fijo), cantidad, cadencia (semanal/quincenal/mensual/una sola vez), periodos, horas planificadas y referencias WBS/CBS/cuenta de control. Tarifa por cantidad crea el importe planificado; horas por periodo por periodos crea las horas planificadas. Las categorias SAP/software organizan el estimado pero nunca inventan importes. Guardar crea un borrador, Enviar a revision inicia el flujo controlado y un aprobador humano independiente activa el BOE y el baseline. Isabella puede explicar, comparar y rastrear esta evidencia; no puede aprobar, postear, liberar, reabrir ni ejecutar acciones financieras.
+Fuente: Adaptador AACE 18R-97; flujo de configuracion financiera.
+Verifica: Proyecto → Control financiero → Configuracion financiera → revisa estimado, lineas, BOE y estado del baseline.'),
     ('pi-variance-baseline', 'en', 'What does Variance View require?', 'The Variance overlay requires a real, approved baseline to compare against. Without an approved baseline there is nothing to measure variance from, so the overlay shows an honest empty state with a call to action to set up a baseline — it never fabricates a baseline or a variance number.
 Source: 12-living-graph-strategy.md → Variance.
 Verify: Living Graph → Variance overlay; if empty, follow the "set up a baseline" CTA.'),

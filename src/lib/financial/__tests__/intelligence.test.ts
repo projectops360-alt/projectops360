@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFinancialIntelligenceContext } from "../intelligence";
+import { buildFinancialIntelligenceContext, buildFinancialSetupIntelligence } from "../intelligence";
 import type { FinancialCockpitSummary } from "../read-model.server";
 
 const summary: FinancialCockpitSummary = {
@@ -51,5 +51,22 @@ describe("Isabella financial context", () => {
         "probabilistic_forecast_unavailable",
       ]),
     );
+  });
+
+  it("exposes PMO setup lines, cadence, hours, and approval state", () => {
+    const setup = buildFinancialSetupIntelligence({
+      estimate: { id: "estimate-1", status: "submitted", title: "SAP rollout", purpose: "PMO cost plan", currency: "USD", classificationValue: "3" },
+      boe: { status: "submitted" },
+      baselineStatuses: { original_budget: "active", current_baseline: "active" },
+      lines: [{
+        name: "SAP consultant", costType: "labor", resourceName: "Consultant", quantity: 40,
+        quantityUnit: "hours", rate: 125, rateUnit: "hour", periodBasis: "week", periodCount: 4,
+        hoursPerPeriod: 40, controlAccountRef: "CA-01", cbsCode: "CBS-01", wbsRef: "WBS-01",
+      }],
+    });
+    expect(setup.status).toBe("active");
+    expect(setup.totalAmount).toBe(20000);
+    expect(setup.totalPlannedHours).toBe(160);
+    expect(setup.lines[0]).toMatchObject({ rate: 125, periodBasis: "week", plannedHours: 160 });
   });
 });

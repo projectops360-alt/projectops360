@@ -50,6 +50,12 @@ export default async function TeamPage({
   }
 
   const profileById = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
+  const resourceByUserId = new Map<string, NonNullable<typeof resourcesRes.data>[number]>();
+  for (const resource of resourcesRes.data ?? []) {
+    if (!resource.linked_user_id) continue;
+    const current = resourceByUserId.get(resource.linked_user_id);
+    if (!current || (current.project_id != null && resource.project_id == null)) resourceByUserId.set(resource.linked_user_id, resource);
+  }
   const members: TeamMember[] = memberRows.map((m) => ({
     memberId: m.id,
     userId: m.user_id,
@@ -61,6 +67,9 @@ export default async function TeamPage({
     status: (m.status as string) ?? "active",
     department: (m.department as string) ?? null,
     jobTitle: (m.job_title as string) ?? null,
+    resourceId: resourceByUserId.get(m.user_id)?.id ?? null,
+    costRate: resourceByUserId.get(m.user_id)?.cost_rate != null ? Number(resourceByUserId.get(m.user_id)!.cost_rate) : null,
+    costUnit: resourceByUserId.get(m.user_id)?.cost_unit ?? null,
     isYou: m.user_id === org.userId,
   }));
 

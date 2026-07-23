@@ -20,6 +20,8 @@ const RE_WANTS_STATUS_OR_CAUSE = /what.*happen|qu[eé] .*(pasa|pasando|atenci[o�
 const RE_PROCESS_MINING_SUBJECT = /process mining|min(?:er[ií]a|ado) de procesos|capa de procesos|canonical events?|eventos? can[oó]nicos?|event history|historial de eventos|milestone (?:process )?flow|flujo de hitos|task cases?|casos? de tarea/i;
 const RE_PROCESS_MINING_FACT = /\bsummary|resumen|status|estado|how many|cu[aá]nt|count|conteo|events?|eventos?|cases?|casos?|transitions?|transiciones?|integrity|integridad|history|historial|findings?|hallazgos?|delay|retraso|rework|retrabajo|bottleneck|cuello de botella/i;
 
+const RE_FINANCIAL_SETUP_ASK = /configuraci[oó]n financiera|financial setup|financial control|control financiero|rate cards?|tarifas?|cost model|modelo de costos?|cost plan|plan de costos?|planned hours?|horas? planificadas?|horas? por periodo|AACE|BOE|estimado financiero|financial estimate|budget lines?|l[ií]neas? de (presupuesto|costo)|cadencia|quincenal|biweekly|monthly cost|costo mensual|costo semanal|costo por persona|cost per (user|person|hour)|SAP project financial|finanzas? del proyecto/i;
+
 export interface IsabellaRouteDecision {
   route: IsabellaRoute;
   scope: { milestoneId?: string; taskId?: string };
@@ -61,11 +63,19 @@ export function routeIsabellaQuestion(
     // We have deterministic content for Resources/participants and task surfaces;
     // unknown/ambiguous screens still route here so the runtime can ask a safe
     // clarification instead of guessing another screen.
-    if (area === "resources" || area === "task" || area === "process_mining" || area === "unknown") {
+    if (area === "resources" || area === "task" || area === "process_mining" || area === "financial" || area === "unknown") {
       return { route: "screen_context_explanation", scope, needsClarification: false };
     }
     // A known-but-uncovered screen → RAG (product knowledge), never an engine.
     return { route: "product_help", scope, needsClarification: false };
+  }
+
+  // The PMO financial setup is a deterministic project-data answer, not a
+  // generic project briefing. Keep explicit setup questions on the canonical
+  // financial context so Isabella can describe rates, cadence, hours, BOE and
+  // baseline state from the project package.
+  if (RE_FINANCIAL_SETUP_ASK.test(q)) {
+    return decide("financial_summary", scope, hasScope);
   }
 
   // Current-project Process Mining facts are deterministic aggregates from the

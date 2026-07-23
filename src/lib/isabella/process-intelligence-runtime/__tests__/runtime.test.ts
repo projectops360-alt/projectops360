@@ -99,10 +99,39 @@ describe("engine orchestration", () => {
   });
 });
 
+describe("financial setup explanation", () => {
+  it("answers financial setup from sanitized PMO facts instead of a generic project summary", async () => {
+    const context = ctx();
+    context.financialContext = {
+      projectId: "p1",
+      asOfDate: "2026-07-22",
+      facts: [{ key: "current_baseline", value: 20000, source: "financial_baseline_versions", quality: "verified" }],
+      setup: {
+        status: "active", estimateId: "e1", title: "SAP rollout", purpose: "PMO cost plan", currency: "USD",
+        estimateClass: "3", totalAmount: 20000, totalPlannedHours: 160, lineCount: 1, boeStatus: "approved",
+        baselineStatuses: { original_budget: "active", current_baseline: "active" },
+        lines: [{ name: "SAP consultant", costType: "labor", resourceName: "Consultant", quantity: 40, quantityUnit: "hours", rate: 125, rateUnit: "hour", periodBasis: "week", periodCount: 4, amount: 20000, amountPerPeriod: 5000, plannedHours: 160, controlAccountRef: "CA-01", cbsCode: "CBS-01", wbsRef: "WBS-01" }],
+      },
+      limitations: ["financial_context_is_read_only"],
+      allowedOperations: ["explain", "compare", "trace"],
+      prohibitedOperations: ["approve", "post", "release", "reopen", "execute"],
+    };
+    context.evidencePackets.push({ ...packet(), evidenceId: "financial-setup:p1:e1", evidenceType: "status_report", title: "Financial setup and rate model", sourceKind: "deterministic_project_data", citationRef: "financial_setup:p1", summary: "setup facts" });
+    const r = await runIsabellaProcessIntelligence(req("Detalla la configuracion financiera del proyecto"), { buildContext: async () => context });
+    expect(r.status).toBe("answered");
+    expect(r.route).toBe("financial_summary");
+    expect(r.answer).toMatch(/PMO financial setup/);
+    expect(r.answer).toMatch(/SAP consultant/);
+    expect(r.answer).toMatch(/planned hours \*\*160/);
+    expect(r.answer.toLowerCase()).toMatch(/cannot approve|no puede aprobar/);
+  });
+});
+
 describe("screen-context explanation (never Daily Diagnosis, no engine, no DB)", () => {
   const RES = { screenContext: { module: "project_team", screen: "project_participants", pathname: "/projects/p1/team" } };
   const TASK = { screenContext: { module: "workboard", screen: "task_detail", pathname: "/projects/p1/workboard" } };
   const PROCESS = { screenContext: { module: "process_mining", screen: "living_graph", pathname: "/projects/p1/execution-map/living-graph" } };
+  const FINANCIAL = { screenContext: { module: "financial_control", screen: "financial_setup", pathname: "/projects/p1/budget" } };
 
   it("Resources 'unassigned' → answered from screen context, never builds diagnosis", async () => {
     let called = 0;
@@ -146,6 +175,17 @@ describe("screen-context explanation (never Daily Diagnosis, no engine, no DB)",
     expect(called).toBe(0);
     expect(result.answer).toMatch(/Task cases/);
     expect(result.answer).toMatch(/Full audit/);
+  });
+
+  it("Financial setup help explains the current screen without building context", async () => {
+    let called = 0;
+    const result = await runIsabellaProcessIntelligence(req("Explain this screen", FINANCIAL), {
+      buildContext: async () => { called += 1; return ctx(); },
+    });
+    expect(result.route).toBe("screen_context_explanation");
+    expect(called).toBe(0);
+    expect(result.answer).toMatch(/Financial setup/);
+    expect(result.answer).toMatch(/rate/i);
   });
 });
 

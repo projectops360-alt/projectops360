@@ -123,7 +123,7 @@ export async function runIsabellaProcessIntelligence(
     context = await build({
       projectId: request.projectId,
       locale: language,
-      include: ["project", "tasks", "milestones", "blockers", "process_mining_summary"],
+      include: ["project", "tasks", "milestones", "blockers", "process_mining_summary", "financial_summary"],
       focus: decision.scope.taskId ? { taskId: decision.scope.taskId } : decision.scope.milestoneId ? { milestoneId: decision.scope.milestoneId } : undefined,
     });
   } catch {
@@ -152,6 +152,10 @@ function synthesize(
   audit: (over: Partial<IsabellaProcessIntelligenceAudit>) => IsabellaProcessIntelligenceAudit,
   started: number,
 ): IsabellaProcessIntelligenceResult {
+  if (route === "financial_summary") {
+    return synthesizeFinancialSummary(context, language, audit, started);
+  }
+
   if (route === "process_mining_summary") {
     return synthesizeProcessMiningSummary(context, language, audit, started);
   }
@@ -218,6 +222,127 @@ function synthesize(
     evidenceRefs, citations: plan.citations, limitations: plan.limitations,
     reasoningTrace: planTrace,
     audit: audit({ enginesUsed: ["daily_diagnosis", "root_cause", "recommendations"], resultStatus: plan.status, confidence: analysis.confidence, evidenceRefCount: evidenceRefs.length, citationCount: plan.citations.length, limitationsCount: plan.limitations.length, executionMs: Date.now() - started }),
+  };
+}
+
+function financialValue(value: number | string | null | undefined, currency: string, language: RuntimeLanguage): string {
+  if (value == null) return language === "es" ? "no disponible" : "not available";
+  if (typeof value === "number") {
+    return `${currency} ${new Intl.NumberFormat(language === "es" ? "es-ES" : "en-US", { maximumFractionDigits: 2 }).format(value)}`;
+  }
+  return value;
+}
+
+function financialStatus(status: string, language: RuntimeLanguage): string {
+  const labels: Record<string, { es: string; en: string }> = {
+    not_configured: { es: "no configurado", en: "not configured" },
+    draft: { es: "borrador", en: "draft" },
+    submitted: { es: "enviado a revisión", en: "submitted for review" },
+    active: { es: "activo", en: "active" },
+  };
+  return labels[status]?.[language] ?? status;
+}
+
+function financialCadence(value: string, language: RuntimeLanguage): string {
+  const labels: Record<string, { es: string; en: string }> = {
+    week: { es: "semanal", en: "weekly" },
+    biweek: { es: "quincenal", en: "biweekly" },
+    month: { es: "mensual", en: "monthly" },
+    one_time: { es: "una sola vez", en: "one-time" },
+  };
+  return labels[value]?.[language] ?? value;
+}
+
+function synthesizeFinancialSummary(
+  context: IsabellaProcessContext,
+  language: RuntimeLanguage,
+  audit: (over: Partial<IsabellaProcessIntelligenceAudit>) => IsabellaProcessIntelligenceAudit,
+  started: number,
+): IsabellaProcessIntelligenceResult {
+  const es = language === "es";
+  const financial = context.financialContext;
+  if (!financial) {
+    return {
+      status: "unavailable",
+      route: "financial_summary",
+      answer: es
+        ? "No tengo disponible el contexto financiero autorizado para este proyecto. Verifica que Control financiero esté habilitado para la organización."
+        : "The authorized financial context is not available for this project. Verify that Financial Control is enabled for the organization.",
+      limitations: context.limitations,
+      audit: audit({ route: "financial_summary", resultStatus: "unavailable", limitationsCount: context.limitations.length, executionMs: Date.now() - started }),
+    };
+  }
+
+  const setup = financial.setup ?? {
+    status: "not_configured" as const,
+    estimateId: null,
+    title: null,
+    purpose: null,
+    currency: "USD",
+    estimateClass: null,
+    totalAmount: null,
+    totalPlannedHours: null,
+    lineCount: 0,
+    boeStatus: null,
+    baselineStatuses: {},
+    lines: [],
+  };
+  const facts = new Map(financial.facts.map((fact) => [fact.key, fact.value]));
+  const refs = context.evidencePackets
+    .filter((packet) => packet.title === "Financial control summary" || packet.title === "Financial setup and rate model")
+    .map((packet) => packet.citationRef ?? packet.evidenceId);
+  const lines = setup?.lines ?? [];
+  const setupConfigured = setup && setup.status !== "not_configured";
+  const answerLines = es
+    ? [
+        "**Configuración financiera PMO**",
+        `- Estado del paquete: **${financialStatus(setup?.status ?? "not_configured", language)}**.`,
+        setupConfigured
+          ? `- Estimado: **${setup.title}** · clase AACE **${setup.estimateClass ?? "no especificada"}** · moneda **${setup.currency}** · total **${financialValue(setup.totalAmount, setup.currency, language)}**.`
+          : "- Este proyecto todavía no tiene un paquete de configuración financiera capturado desde Control financiero.",
+        setupConfigured
+          ? `- Estructura: **${setup.lineCount}** líneas de costo · horas planificadas **${setup.totalPlannedHours ?? "no capturadas"}** · BOE **${setup.boeStatus ?? "no disponible"}**.`
+          : "- Para empezar, abre **Proyecto → Control financiero → Configuración financiera**.",
+        setupConfigured && lines.length > 0 ? "- Líneas y modelo de costo:" : "",
+        ...lines.slice(0, 12).map((line) => `  - **${line.name}** (${line.costType}${line.resourceName ? ` · ${line.resourceName}` : ""}): ${financialValue(line.amount, setup.currency, language)} · tarifa ${financialValue(line.rate, setup.currency, language)}/${line.rateUnit} · ${financialCadence(line.periodBasis, language)} × ${line.periodCount} · horas ${line.plannedHours ?? "n/a"}${line.wbsRef || line.cbsCode || line.controlAccountRef ? ` · trazabilidad ${line.wbsRef ?? ""}${line.cbsCode ? ` / ${line.cbsCode}` : ""}${line.controlAccountRef ? ` / ${line.controlAccountRef}` : ""}` : ""}.`),
+        setupConfigured ? `- Baselines: ${Object.entries(setup.baselineStatuses).map(([type, status]) => `${type}=${status}`).join(", ") || "no disponibles"}.` : "",
+        `- Cockpit actual: baseline ${financialValue(facts.get("current_baseline") as number | string | null, setup?.currency ?? "USD", language)} · compromiso ${financialValue(facts.get("current_commitment") as number | string | null, setup?.currency ?? "USD", language)} · costo real ${financialValue(facts.get("actual_cost") as number | string | null, setup?.currency ?? "USD", language)}.`,
+        "- Flujo: PMO captura y guarda el borrador; luego lo envía a revisión; un aprobador humano independiente activa el BOE/baseline. Isabella solo explica, compara y rastrea; no aprueba, postea ni ejecuta.",
+      ]
+    : [
+        "**PMO financial setup**",
+        `- Package status: **${financialStatus(setup?.status ?? "not_configured", language)}**.`,
+        setupConfigured
+          ? `- Estimate: **${setup.title}** · AACE class **${setup.estimateClass ?? "not specified"}** · currency **${setup.currency}** · total **${financialValue(setup.totalAmount, setup.currency, language)}**.`
+          : "- This project does not yet have a financial setup package captured from Financial Control.",
+        setupConfigured
+          ? `- Structure: **${setup.lineCount}** cost lines · planned hours **${setup.totalPlannedHours ?? "not entered"}** · BOE **${setup.boeStatus ?? "not available"}**.`
+          : "- To start, open **Project → Financial Control → Financial setup**.",
+        setupConfigured && lines.length > 0 ? "- Lines and cost model:" : "",
+        ...lines.slice(0, 12).map((line) => `  - **${line.name}** (${line.costType}${line.resourceName ? ` · ${line.resourceName}` : ""}): ${financialValue(line.amount, setup.currency, language)} · rate ${financialValue(line.rate, setup.currency, language)}/${line.rateUnit} · ${financialCadence(line.periodBasis, language)} × ${line.periodCount} · hours ${line.plannedHours ?? "n/a"}${line.wbsRef || line.cbsCode || line.controlAccountRef ? ` · trace ${line.wbsRef ?? ""}${line.cbsCode ? ` / ${line.cbsCode}` : ""}${line.controlAccountRef ? ` / ${line.controlAccountRef}` : ""}` : ""}.`),
+        setupConfigured ? `- Baselines: ${Object.entries(setup.baselineStatuses).map(([type, status]) => `${type}=${status}`).join(", ") || "not available"}.` : "",
+        `- Current cockpit: baseline ${financialValue(facts.get("current_baseline") as number | string | null, setup?.currency ?? "USD", language)} · commitment ${financialValue(facts.get("current_commitment") as number | string | null, setup?.currency ?? "USD", language)} · actual cost ${financialValue(facts.get("actual_cost") as number | string | null, setup?.currency ?? "USD", language)}.`,
+        "- Workflow: PMO captures and saves the draft; submits it for review; an independent human approver activates the BOE/baseline. Isabella only explains, compares, and traces; she cannot approve, post, or execute.",
+      ];
+  const answer = answerLines.filter(Boolean).join("\n");
+  return {
+    status: "answered",
+    route: "financial_summary",
+    answer,
+    structuredResult: { setup, facts: Object.fromEntries(financial.facts.map((fact) => [fact.key, fact.value])) },
+    evidenceRefs: [...new Set(refs)],
+    citations: context.citations.filter((citation) => citation.sourceLabel === "PMO financial setup" || citation.sourceLabel === "Canonical financial projections"),
+    limitations: financial.limitations,
+    audit: audit({
+      route: "financial_summary",
+      enginesUsed: ["financial_summary"],
+      resultStatus: "answered",
+      confidence: "verified",
+      evidenceRefCount: new Set(refs).size,
+      citationCount: context.citations.length,
+      limitationsCount: financial.limitations.length,
+      executionMs: Date.now() - started,
+    }),
   };
 }
 

@@ -342,6 +342,23 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
 
   // ── Overlays that require real data ────────────────────────────────────────
   {
+    slug: "pi-pmo-financial-setup",
+    domain: DOMAIN,
+    tier: "verified",
+    sourceRef: "AACE 18R-97 adapter; financial setup workflow; Project Budget → Financial Control",
+    authority: "module_strategy",
+    en: {
+      title: "How does PMO financial setup work for SAP and software projects?",
+      body:
+        "Financial setup is the PMO capture point for a project estimate. It records the estimate title, purpose, scope, currency, dates, AACE estimate class, and cost lines. Each line can represent labor, software, cloud, subcontractor, material, equipment, or other cost and records a resource, rate basis (hour/day/week/month/unit/fixed), quantity, cadence (weekly/biweekly/monthly/one-time), periods, planned hours, and WBS/CBS/control-account references. Rate times quantity creates the planned amount; hours per period times periods creates planned hours. SAP/software categories organize the estimate but never invent amounts. Save creates a draft, Submit for review begins the controlled workflow, and an independent human approver activates the BOE and baseline. Isabella can explain, compare, and trace this evidence; she cannot approve, post, release, reopen, or execute financial actions.\nSource: AACE 18R-97 adapter; financial setup workflow.\nVerify: Project → Financial Control → Financial setup → review the estimate, line model, BOE, and baseline status.",
+    },
+    es: {
+      title: "Como funciona la configuracion financiera PMO para proyectos SAP y software?",
+      body:
+        "La configuracion financiera es el punto de captura PMO del estimado del proyecto. Registra titulo, proposito, alcance, moneda, fechas, clase de estimado AACE y lineas de costo. Cada linea puede representar mano de obra, software, nube, subcontrato, material, equipo u otro costo y registra recurso, base de tarifa (hora/dia/semana/mes/unidad/fijo), cantidad, cadencia (semanal/quincenal/mensual/una sola vez), periodos, horas planificadas y referencias WBS/CBS/cuenta de control. Tarifa por cantidad crea el importe planificado; horas por periodo por periodos crea las horas planificadas. Las categorias SAP/software organizan el estimado pero nunca inventan importes. Guardar crea un borrador, Enviar a revision inicia el flujo controlado y un aprobador humano independiente activa el BOE y el baseline. Isabella puede explicar, comparar y rastrear esta evidencia; no puede aprobar, postear, liberar, reabrir ni ejecutar acciones financieras.\nFuente: Adaptador AACE 18R-97; flujo de configuracion financiera.\nVerifica: Proyecto → Control financiero → Configuracion financiera → revisa estimado, lineas, BOE y estado del baseline.",
+    },
+  },
+  {
     slug: "pi-variance-baseline",
     domain: DOMAIN,
     tier: "verified",

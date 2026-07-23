@@ -38,6 +38,7 @@ export interface TeamMember {
   memberId: string; userId: string; role: string; name: string; isYou: boolean;
   email: string | null; seatType: string | null; workspaceRole: string | null;
   status: string; department: string | null; jobTitle: string | null;
+  resourceId: string | null; costRate: number | null; costUnit: string | null;
 }
 export interface TeamProject { id: string; name: string }
 export interface TeamResource {
@@ -366,6 +367,8 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
   const [status, setStatus] = useState(member.status);
   const [dept, setDept] = useState(member.department ?? "");
   const [jobTitle, setJobTitle] = useState(member.jobTitle ?? "");
+  const [costRate, setCostRate] = useState(member.costRate != null ? String(member.costRate) : "");
+  const [costUnit, setCostUnit] = useState(member.costUnit ?? "hour");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -380,6 +383,8 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
     account_exists_invite_required: tt("That account already exists. Ask the user to accept a verified invitation instead.", "Esa cuenta ya existe. Pide al usuario aceptar una invitación verificada."),
     cannot_change_self_status: tt("You can't change your own status.", "No puedes cambiar tu propio estado."),
     cannot_remove_self: tt("You can't remove yourself.", "No puedes removerte a ti mismo."),
+    invalid_cost_rate: tt("Enter a valid non-negative cost rate.", "Introduce una tarifa de costo válida y no negativa."),
+    invalid_cost_unit: tt("Choose a valid rate unit.", "Elige una unidad de tarifa válida."),
     has_activity: tt("This user already has activity in the system, so it can't be permanently deleted (it would orphan tasks). Use \"Remove\" instead — they lose access but their history stays intact.", "Este usuario ya tiene actividad en el sistema, así que no se puede eliminar definitivamente (dejaría tareas huérfanas). Usa \"Remover\" — pierde el acceso pero su historial queda intacto."),
     unexpected: tt("Something went wrong.", "Algo salió mal."),
   };
@@ -390,6 +395,9 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
       memberId: member.memberId, userId: member.userId,
       name,
       billingSeatType: seat, workspaceRole: wsRole, status, department: dept, jobTitle,
+      resourceId: member.resourceId ?? undefined,
+      costRate: costRate.trim() === "" ? null : Number(costRate),
+      costUnit,
     });
     setSaving(false);
     if (r.error) setError(r.error); else onSaved();
@@ -429,6 +437,22 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
           <Field label={tt("Department", "Departamento")}><input value={dept} onChange={(e) => setDept(e.target.value)} maxLength={80} className={inputCls} /></Field>
         </div>
         <Field label={tt("Job title", "Cargo")}><input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={80} className={inputCls} /></Field>
+        <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-900 dark:bg-brand-950/20">
+          <p className="mb-2 text-xs font-semibold text-foreground">{tt("Financial rate card", "Tarifa financiera")}</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={tt("Cost rate", "Tarifa de costo")}><input type="number" min="0" step="0.01" value={costRate} onChange={(e) => setCostRate(e.target.value)} placeholder="0.00" className={inputCls} /></Field>
+            <Field label={tt("Per", "Por")}>
+              <select value={costUnit} onChange={(e) => setCostUnit(e.target.value)} className={inputCls}>
+                {["hour", "day", "week", "month", "unit", "fixed"].map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+              </select>
+            </Field>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {member.resourceId
+              ? tt("Stored on this user's linked resource and reused by Financial setup.", "Se guarda en el recurso vinculado de este usuario y se reutiliza en Configuración financiera.")
+              : tt("Saving a rate creates an organization-wide person resource linked to this user.", "Guardar una tarifa crea un recurso de persona organizacional vinculado a este usuario.")}
+          </p>
+        </div>
 
       </div>
 
