@@ -133,6 +133,21 @@
       "approval_state": "approved (M8 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M8 gate"
+    },
+    {
+      "id": "pmo-pi-m9-uat-release-readiness",
+      "milestone": "M9",
+      "version": 1,
+      "file": "M9-uat-release-readiness.md",
+      "sources": [
+        "docs/product-brain/capabilities/CAP-047-pmo-process-intelligence-command-center.md",
+        "docs/pmo-process-intelligence/UAT-plan.md",
+        "docs/pmo-process-intelligence/FINAL-REPORT.md"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M9 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M9 gate"
     }
   ]
 }

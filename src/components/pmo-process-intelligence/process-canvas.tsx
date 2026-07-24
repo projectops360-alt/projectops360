@@ -81,26 +81,28 @@ export function ProcessCanvas({
   // initial view stays legible (usable-at-200-nodes target).
   const defaultMin = model.nodes.length > 60 ? 2 : 1;
   // Saved view (presentation only — UX-007/PD-008 pattern): filters persist
-  // per organization + level in localStorage; never business data.
+  // per organization + level in localStorage; never business data. Restored
+  // via lazy initializers (no effect-driven setState).
   const viewKey = `pmo-pi-view:${model.scope.organizationId}:${model.scope.level}`;
-  const [minFrequency, setMinFrequency] = useState(defaultMin);
-  const [reworkOnly, setReworkOnly] = useState(false);
+  const readSavedView = (): { minFrequency?: number; reworkOnly?: boolean } => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(window.localStorage.getItem(viewKey) ?? "{}") as {
+        minFrequency?: number;
+        reworkOnly?: boolean;
+      };
+    } catch {
+      return {}; // corrupted saved view — defaults stand
+    }
+  };
+  const [minFrequency, setMinFrequency] = useState(() => {
+    const saved = readSavedView();
+    return typeof saved.minFrequency === "number" ? saved.minFrequency : defaultMin;
+  });
+  const [reworkOnly, setReworkOnly] = useState(() => readSavedView().reworkOnly === true);
   const [variantId, setVariantId] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [selection, setSelection] = useState<Selection>(null);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(viewKey);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { minFrequency?: number; reworkOnly?: boolean };
-      if (typeof saved.minFrequency === "number") setMinFrequency(saved.minFrequency);
-      if (typeof saved.reworkOnly === "boolean") setReworkOnly(saved.reworkOnly);
-    } catch {
-      /* corrupted saved view — ignore, defaults stand */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewKey]);
 
   useEffect(() => {
     try {
