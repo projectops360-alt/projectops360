@@ -15,6 +15,7 @@ import { getOrgContext } from "@/lib/auth";
 import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
 import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts";
 import { loadPmoPiFlowModel } from "@/lib/pmo-process-intelligence/read-model.server";
+import { loadPmoPiFinanceOverlay } from "@/lib/pmo-process-intelligence/financial-read.server";
 import { CommandCenterShell } from "@/components/pmo-process-intelligence/command-center-shell";
 import type { Locale } from "@/types/database";
 
@@ -41,6 +42,17 @@ export default async function ProcessIntelligencePage({
   const result = await loadPmoPiFlowModel((locale as Locale) ?? "en", project ?? null);
   if (result.status === "unauthorized") notFound();
 
+  // Financial overlay (M5): read-only cockpit rows for the projects in scope.
+  const scopedIds =
+    result.status === "ok"
+      ? result.focusProject
+        ? [result.focusProject.id]
+        : result.projects.map((p) => p.id)
+      : [];
+  const finance = scopedIds.length > 0 ? await loadPmoPiFinanceOverlay(org.organizationId, scopedIds) : null;
+  const projectNames: Record<string, string> = {};
+  if (result.status === "ok") for (const p of result.projects) projectNames[p.id] = p.title;
+
   return (
     <CommandCenterShell
       locale={locale === "es" ? "es" : "en"}
@@ -52,6 +64,8 @@ export default async function ProcessIntelligencePage({
       truncated={result.status === "ok" ? result.truncated : false}
       projects={result.status === "ok" ? result.projects : []}
       focusProject={result.status === "ok" ? result.focusProject : null}
+      finance={finance}
+      projectNames={projectNames}
     />
   );
 }
