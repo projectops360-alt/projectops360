@@ -60,7 +60,7 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 
 | CAP-046 | Project Intelligence Engine (Variants · Root Cause Miner · KPI Engine) | P2/P4 | Implemented | 75% | `lib/process-mining`, `lib/kpi` ([CAP-046](capabilities/CAP-046-project-intelligence-engine.md), PD-019 — consumes the PEG, no second pipeline; custom KPIs persisted in `kpi_definitions`, migración 20260843 aplicada; falta alerting sobre targets) |
 
-| CAP-047 | PMO Process Intelligence Command Center | P1 | Implemented — UAT-ready (M1-M9 closed; flag OFF; awaiting PMO UAT + rollout decision) | 85% | `lib/pmo-process-intelligence` ([CAP-047](capabilities/CAP-047-pmo-process-intelligence-command-center.md) — flag `PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED` OFF; PMO Command Center actual protegido y default; reusa PEG/CAP-046/EVM/capacity/Knowledge OS; 73 tests guard PMO-PI-*; UAT-plan + FINAL-REPORT en docs/pmo-process-intelligence/) |
+| CAP-047 | PMO Process Intelligence Command Center | P1 | Implemented locally — Living Graph interaction parity awaiting UAT (flag OFF) | 95% | `lib/pmo-process-intelligence` ([CAP-047](capabilities/CAP-047-pmo-process-intelligence-command-center.md) — interactive React Flow canvas; organization→stage→project→milestone→activity; live Isabella context; Technical Event Explorer preserved; flag `pmo_process_intelligence_dashboard` OFF) |
 
 `*` CAP-003 is "complete" only in the sense that it was fully superseded by Knowledge OS.
 

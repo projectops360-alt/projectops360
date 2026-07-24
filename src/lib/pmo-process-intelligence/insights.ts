@@ -11,6 +11,10 @@
 import type { PmoPiEvidencePackage, PmoPiFlowModel } from "./contracts";
 import type { PmoPiFinanceOverlayModel } from "./financial-overlay";
 import type { PmoPiOverlaysData } from "./overlays-read.server";
+import { executiveActivityLabel } from "./executive-projection";
+
+export const PMO_PI_KNOWLEDGE_VERSION = "pmo-pi-knowledge-v1";
+export const PMO_PI_RULE_SNAPSHOT_VERSION = "pmo-pi-rules-v1";
 
 export type PmoPiInsightRule =
   | "bottleneck_pressure"
@@ -31,8 +35,11 @@ export interface PmoPiInsight {
   impact: { kind: "time" | "cost" | "risk" | "capacity"; en: string; es: string };
   horizon: "immediate" | "short_term" | "mid_term";
   affected: { type: string; id: string }[];
+  affectedProjectCount: number;
   recommendedAction: { en: string; es: string };
   evidence: PmoPiEvidencePackage;
+  knowledgeVersion: string;
+  ruleSnapshotVersion: string;
   /** Optional deep actions the UI can wire. */
   openInMapActivities?: string[];
   simulateHint?: "budget" | "risk" | "capacity";
@@ -56,6 +63,10 @@ export function buildInsights(input: {
     quality: number,
   ): PmoPiEvidencePackage => ({
     sourceEventIds: partial.sourceEventIds ?? [],
+    technicalEventTypes: partial.technicalEventTypes ?? [],
+    affectedCaseCount: partial.affectedCaseCount,
+    cutoffDate: partial.cutoffDate ?? generatedAt,
+    knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
     formulas: partial.formulas,
     projections: partial.projections,
     timestamps: partial.timestamps ?? [{ recordedAt: generatedAt }],
@@ -69,14 +80,18 @@ export function buildInsights(input: {
     const q = flow.quality.dataQualityScore;
     const bottleneck = flow.nodes.find((n) => n.bottleneckScore >= 0.7);
     if (bottleneck) {
+      const stage = {
+        en: executiveActivityLabel(bottleneck.activity, "en"),
+        es: executiveActivityLabel(bottleneck.activity, "es"),
+      };
       insights.push({
         id: `bottleneck:${bottleneck.id}`,
         rule: "bottleneck_pressure",
         severity: "warning",
         confidence: q,
         title: {
-          en: `Waiting concentrates before "${bottleneck.activity}"`,
-          es: `La espera se concentra antes de "${bottleneck.activity}"`,
+          en: `${bottleneck.caseCount} projects show delays before ${stage.en.toLowerCase()}`,
+          es: `${bottleneck.caseCount} proyectos presentan retrasos antes de ${stage.es.toLowerCase()}`,
         },
         summary: {
           en: `${bottleneck.caseCount} case(s) wait on average ${fmtH(bottleneck.avgIncomingWaitingMs)} before this activity — the highest waiting pressure in scope.`,
@@ -89,6 +104,7 @@ export function buildInsights(input: {
         },
         horizon: "short_term",
         affected: [{ type: "activity", id: bottleneck.id }],
+        affectedProjectCount: bottleneck.caseCount,
         recommendedAction: {
           en: "Inspect the handoff feeding this activity and rebalance ownership or batch size.",
           es: "Inspecciona el traspaso que alimenta esta actividad y rebalancea responsables o tamaño de lote.",
@@ -98,23 +114,31 @@ export function buildInsights(input: {
             formulas: ["bottleneckScore = normalized(avg incoming wait × frequency)"],
             projections: ["project_event_log → buildFlowModel"],
             timestamps: [{ recordedAt: generatedAt }],
+            technicalEventTypes: [bottleneck.activity],
+            affectedCaseCount: bottleneck.caseCount,
           },
           q,
         ),
         openInMapActivities: [bottleneck.id],
+        knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
+        ruleSnapshotVersion: PMO_PI_RULE_SNAPSHOT_VERSION,
       });
     }
 
     const rework = [...flow.nodes].sort((a, b) => b.reworkOccurrences - a.reworkOccurrences)[0];
     if (rework && rework.reworkOccurrences > 0) {
+      const stage = {
+        en: executiveActivityLabel(rework.activity, "en"),
+        es: executiveActivityLabel(rework.activity, "es"),
+      };
       insights.push({
         id: `rework:${rework.id}`,
         rule: "rework_hotspot",
         severity: "warning",
         confidence: q,
         title: {
-          en: `"${rework.activity}" repeats within the same cases`,
-          es: `"${rework.activity}" se repite dentro de los mismos casos`,
+          en: `Repeated work is concentrated in ${stage.en.toLowerCase()}`,
+          es: `El retrabajo se concentra en ${stage.es.toLowerCase()}`,
         },
         summary: {
           en: `${rework.reworkOccurrences} repetition(s) of this activity were recorded inside single cases — a rework loop, not new work.`,
@@ -127,6 +151,7 @@ export function buildInsights(input: {
         },
         horizon: "short_term",
         affected: [{ type: "activity", id: rework.id }],
+        affectedProjectCount: rework.caseCount,
         recommendedAction: {
           en: "Trace the return path in the map and address its trigger (quality gate, unclear acceptance).",
           es: "Rastrea el camino de retorno en el mapa y ataca su disparador (gate de calidad, aceptación poco clara).",
@@ -135,10 +160,14 @@ export function buildInsights(input: {
           {
             formulas: ["rework = activity re-occurrence within one case"],
             projections: ["project_event_log → buildFlowModel"],
+            technicalEventTypes: [rework.activity],
+            affectedCaseCount: rework.caseCount,
           },
           q,
         ),
         openInMapActivities: [rework.id],
+        knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
+        ruleSnapshotVersion: PMO_PI_RULE_SNAPSHOT_VERSION,
       });
     }
   }
@@ -168,6 +197,7 @@ export function buildInsights(input: {
           },
           horizon: isOverrun ? "mid_term" : "immediate",
           affected: [{ type: "project", id: a.projectId }],
+          affectedProjectCount: 1,
           recommendedAction: {
             en: "Review the cost drivers in the Budget Command Center and simulate a corrective scenario.",
             es: "Revisa los generadores de costo en el Budget Command Center y simula un escenario correctivo.",
@@ -182,6 +212,8 @@ export function buildInsights(input: {
             0.9,
           ),
           simulateHint: "budget",
+          knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
+          ruleSnapshotVersion: PMO_PI_RULE_SNAPSHOT_VERSION,
         });
       }
     }
@@ -213,6 +245,7 @@ export function buildInsights(input: {
           { type: "risk", id: s.riskId },
           { type: "task", id: s.linkedTaskId },
         ],
+        affectedProjectCount: 1,
         recommendedAction: {
           en: "Prioritize its mitigation plan; simulate closing it to see the exposure change.",
           es: "Prioriza su plan de mitigación; simula cerrarlo para ver el cambio de exposición.",
@@ -226,6 +259,8 @@ export function buildInsights(input: {
           0.85,
         ),
         simulateHint: "risk",
+        knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
+        ruleSnapshotVersion: PMO_PI_RULE_SNAPSHOT_VERSION,
       });
     }
 
@@ -252,6 +287,7 @@ export function buildInsights(input: {
         },
         horizon: "short_term",
         affected: [{ type: "project", id: worst.projectId }],
+        affectedProjectCount: 1,
         recommendedAction: {
           en: "Rebalance assignments in Resource Capacity; simulate a capacity increase to compare.",
           es: "Rebalancea asignaciones en Resource Capacity; simula un aumento de capacidad para comparar.",
@@ -264,6 +300,8 @@ export function buildInsights(input: {
           0.8,
         ),
         simulateHint: "capacity",
+        knowledgeVersion: PMO_PI_KNOWLEDGE_VERSION,
+        ruleSnapshotVersion: PMO_PI_RULE_SNAPSHOT_VERSION,
       });
     }
   }

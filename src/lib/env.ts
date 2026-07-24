@@ -114,7 +114,9 @@ export const env = {
    * lazily loaded module. Never expose to the browser via NEXT_PUBLIC.
    */
   PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED:
-    process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED ?? "",
+    process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED ??
+    process.env.pmo_process_intelligence_dashboard ??
+    "",
   PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED:
     process.env.PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED ?? "",
 

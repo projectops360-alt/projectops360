@@ -19,7 +19,8 @@ import { outcomeForStatus } from "@/lib/process-mining/variants/load-analysis";
 import { buildFlowModel } from "./flow-projection";
 import { casesByProject, casesBySubject, type PmoPiEventRow } from "./case-mapping";
 import { scopeToOrganization } from "./scope";
-import type { PmoPiFlowModel } from "./contracts";
+import type { PmoPiCase, PmoPiFlowModel } from "./contracts";
+import type { PmoPiProjectDirectoryEntry } from "./executive-projection";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,10 +31,11 @@ export type PmoPiFlowLoadResult =
   | {
       status: "ok";
       model: PmoPiFlowModel;
+      cases: PmoPiCase[];
       truncated: boolean;
-      projects: { id: string; title: string }[];
+      projects: PmoPiProjectDirectoryEntry[];
       /** Set when drilled into one project. */
-      focusProject: { id: string; title: string } | null;
+      focusProject: PmoPiProjectDirectoryEntry | null;
     }
   | { status: "unauthorized" }
   | { status: "error" };
@@ -55,16 +57,70 @@ export async function loadPmoPiFlowModel(
 
   const { data: projects, error: projectsError } = await supabase
     .from("projects")
-    .select("id, slug, title_i18n, status")
+    .select("id, slug, title_i18n, status, project_type, start_date, target_end_date")
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null);
   if (projectsError || !projects) return { status: "error" };
 
-  const projectList = projects.map((p) => ({
-    id: p.id as string,
-    title: getI18nValue(p.title_i18n, locale) || (p.slug as string),
-    status: p.status as ProjectStatus,
+  const baseProjectList = projects.map((project) => ({
+    id: project.id as string,
+    title:
+      getI18nValue(project.title_i18n, locale) || (project.slug as string),
+    status: project.status as ProjectStatus,
+    projectType: (project.project_type as string | null) ?? "general",
+    startDate: (project.start_date as string | null) ?? null,
+    targetEndDate: (project.target_end_date as string | null) ?? null,
   }));
+  const projectIds = baseProjectList.map((project) => project.id);
+  const { data: charters } = projectIds.length > 0
+    ? await supabase
+        .from("project_charters")
+        .select("project_id, project_manager_id, sponsor_id")
+        .eq("organization_id", org.organizationId)
+        .in("project_id", projectIds)
+        .is("deleted_at", null)
+    : { data: [] };
+  const stakeholderIds = [
+    ...new Set(
+      (charters ?? []).flatMap((charter) => [
+        charter.project_manager_id as string | null,
+        charter.sponsor_id as string | null,
+      ]).filter((id): id is string => id !== null),
+    ),
+  ];
+  const { data: stakeholders } = stakeholderIds.length > 0
+    ? await supabase
+        .from("stakeholders")
+        .select("id, name")
+        .eq("organization_id", org.organizationId)
+        .in("id", stakeholderIds)
+        .is("deleted_at", null)
+    : { data: [] };
+  const stakeholderNames = new Map(
+    (stakeholders ?? []).map((stakeholder) => [
+      stakeholder.id as string,
+      stakeholder.name as string,
+    ]),
+  );
+  const charterByProject = new Map(
+    (charters ?? []).map((charter) => [
+      charter.project_id as string,
+      charter,
+    ]),
+  );
+  const projectList: Array<PmoPiProjectDirectoryEntry & { status: ProjectStatus }> =
+    baseProjectList.map((project) => {
+      const charter = charterByProject.get(project.id);
+      return {
+        ...project,
+        projectManager: charter?.project_manager_id
+          ? stakeholderNames.get(charter.project_manager_id as string) ?? null
+          : null,
+        sponsor: charter?.sponsor_id
+          ? stakeholderNames.get(charter.sponsor_id as string) ?? null
+          : null,
+      };
+    });
 
   // Drill-down target must belong to the caller's org (deny-by-default).
   const focus = focusProjectId ? projectList.find((p) => p.id === focusProjectId) ?? null : null;
@@ -77,7 +133,14 @@ export async function loadPmoPiFlowModel(
       [],
       new Date().toISOString(),
     );
-    return { status: "ok", model: empty, truncated: false, projects: [], focusProject: null };
+    return {
+      status: "ok",
+      model: empty,
+      cases: [],
+      truncated: false,
+      projects: [],
+      focusProject: null,
+    };
   }
 
   const { data: eventRows, error: eventsError } = await supabase
@@ -136,9 +199,10 @@ export async function loadPmoPiFlowModel(
     return {
       status: "ok",
       model,
+      cases,
       truncated: rows.length >= MAX_EVENTS,
-      projects: projectList.map((p) => ({ id: p.id, title: p.title })),
-      focusProject: focus ? { id: focus.id, title: focus.title } : null,
+      projects: projectList,
+      focusProject: focus ?? null,
     };
   } catch (err) {
     console.error("[pmo-pi] flow projection failed:", err);

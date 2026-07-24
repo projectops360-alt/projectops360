@@ -10,16 +10,21 @@ import { describe, it, expect, afterEach } from "vitest";
 import { isPmoProcessIntelligenceEnabled, canAccessProcessIntelligence } from "../flags";
 
 const KEY = "PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED";
+const LEGACY_KEY = "pmo_process_intelligence_dashboard";
 const original = process.env[KEY];
+const legacyOriginal = process.env[LEGACY_KEY];
 
 afterEach(() => {
   if (original === undefined) delete process.env[KEY];
   else process.env[KEY] = original;
+  if (legacyOriginal === undefined) delete process.env[LEGACY_KEY];
+  else process.env[LEGACY_KEY] = legacyOriginal;
 });
 
 describe("PMO Process Intelligence flag (CAP-047)", () => {
   it("is OFF by default — absent, empty and non-'true' values all disable it", () => {
     delete process.env[KEY];
+    delete process.env[LEGACY_KEY];
     expect(isPmoProcessIntelligenceEnabled()).toBe(false);
     process.env[KEY] = "";
     expect(isPmoProcessIntelligenceEnabled()).toBe(false);
@@ -34,8 +39,15 @@ describe("PMO Process Intelligence flag (CAP-047)", () => {
     expect(isPmoProcessIntelligenceEnabled()).toBe(true);
   });
 
+  it("keeps the legacy lowercase server flag compatible", () => {
+    delete process.env[KEY];
+    process.env[LEGACY_KEY] = "true";
+    expect(isPmoProcessIntelligenceEnabled()).toBe(true);
+  });
+
   it("never grants access with the flag OFF, regardless of role", () => {
     delete process.env[KEY];
+    delete process.env[LEGACY_KEY];
     for (const role of ["owner", "admin", "member", "viewer"]) {
       expect(canAccessProcessIntelligence(role)).toBe(false);
     }

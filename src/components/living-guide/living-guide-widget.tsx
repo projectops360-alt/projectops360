@@ -21,6 +21,11 @@ import type { GuideContext } from "@/lib/knowledge-os/types";
 import { resolveExpert } from "@/lib/knowledge-os/experts";
 import { IsabellaExperience } from "@/components/isabella";
 import { ISABELLA_ASK_EVENT, type IsabellaAskDetail } from "@/lib/isabella/ask-isabella";
+import {
+  ISABELLA_SCREEN_CONTEXT_EVENT,
+  readIsabellaScreenContext,
+  type IsabellaScreenContextDetail,
+} from "@/lib/isabella/screen-context-event";
 import { LivingGuidePanel } from "./living-guide-panel";
 import { LivingGuideAvatar } from "./living-guide-avatar";
 
@@ -39,8 +44,15 @@ export function LivingGuideWidget({
 }) {
   const [open, setOpen] = useState(false);
   const [initialAsk, setInitialAsk] = useState<IsabellaAskDetail | null>(null);
+  const [screenContext, setScreenContext] =
+    useState<Partial<GuideContext> | null>(null);
   const isEs = locale === "es";
-  const expert = resolveExpert({ module: context.module });
+  const effectiveContext: GuideContext = {
+    ...context,
+    ...screenContext,
+    processGraph: screenContext?.processGraph ?? context.processGraph,
+  };
+  const expert = resolveExpert({ module: effectiveContext.module });
 
   // UX-014 — "Ask Isabella about this task" (and other in-app AI actions) open
   // Isabella here via a window event, the single mechanism for opening her with
@@ -53,6 +65,25 @@ export function LivingGuideWidget({
     }
     window.addEventListener(ISABELLA_ASK_EVENT, onAsk);
     return () => window.removeEventListener(ISABELLA_ASK_EVENT, onAsk);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    function onScreenContext(event: Event) {
+      const detail = (event as CustomEvent<IsabellaScreenContextDetail>).detail;
+      setScreenContext(detail?.context ?? null);
+    }
+    window.addEventListener(ISABELLA_SCREEN_CONTEXT_EVENT, onScreenContext);
+    queueMicrotask(() => {
+      if (active) setScreenContext(readIsabellaScreenContext());
+    });
+    return () => {
+      active = false;
+      window.removeEventListener(
+        ISABELLA_SCREEN_CONTEXT_EVENT,
+        onScreenContext,
+      );
+    };
   }, []);
 
   function handleClose() {
@@ -76,7 +107,7 @@ export function LivingGuideWidget({
 
       {/* Immersive experience (default) */}
       {open && immersive && (
-        <IsabellaExperience locale={locale} baseContext={context} initialAsk={initialAsk} onClose={handleClose} voiceLiveEnabled={voiceLiveEnabled} />
+        <IsabellaExperience locale={locale} baseContext={effectiveContext} initialAsk={initialAsk} onClose={handleClose} voiceLiveEnabled={voiceLiveEnabled} />
       )}
 
       {/* Classic slide-over (back-compat fallback) */}
@@ -88,7 +119,7 @@ export function LivingGuideWidget({
             aria-hidden
           />
           <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col border-l border-border shadow-2xl">
-            <LivingGuidePanel locale={locale} context={context} onClose={handleClose} />
+            <LivingGuidePanel locale={locale} context={effectiveContext} onClose={handleClose} />
           </div>
         </>
       )}

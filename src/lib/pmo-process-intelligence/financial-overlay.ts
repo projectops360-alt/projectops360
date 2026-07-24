@@ -36,6 +36,7 @@ export interface PmoPiFinancialAlert {
 export interface PmoPiFinanceRow {
   projectId: string;
   currency: string;
+  originalBudget: number | null;
   baseline: number | null;
   authorizedFunding: number;
   releasedFunding: number;
@@ -93,6 +94,7 @@ export function buildFinanceOverlayModel(
     rows.push({
       projectId: s.projectId,
       currency: s.currency,
+      originalBudget: s.originalBudget,
       baseline: bac,
       authorizedFunding: s.authorizedFunding,
       releasedFunding: s.releasedFunding,

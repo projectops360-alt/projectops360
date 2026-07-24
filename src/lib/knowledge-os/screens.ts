@@ -76,6 +76,47 @@ export const SCREEN_REGISTRY: ScreenDefinition[] = [
     },
   },
   {
+    match: "/process-intelligence",
+    module: "process_mining",
+    screen: "process_intelligence_canvas",
+    title: {
+      en: "PMO Process Intelligence Canvas",
+      es: "Canvas PMO de Process Intelligence",
+    },
+    workflow: {
+      en: "Navigate the authorized organization process from five executive stages into projects, milestones and activities while preserving filters, evidence and analytical layers.",
+      es: "Navegar el proceso autorizado de la organización desde cinco etapas ejecutivas hasta proyectos, hitos y actividades, conservando filtros, evidencia y capas analíticas.",
+    },
+    components: {
+      en: [
+        "Interactive React Flow canvas with pan, zoom, drag, selection and semantic zoom",
+        "Initiate, Plan, Execute, Control and Close process supernodes",
+        "Process, Finance, Risk, Resources, Dependencies, Benefits and What-if layers",
+        "Search and focus, breadcrumbs, minimap, fit view and saved layouts",
+        "Node and connection evidence drawers with Isabella screen context",
+      ],
+      es: [
+        "Canvas interactivo React Flow con pan, zoom, arrastre, selección y zoom semántico",
+        "Supernodos Iniciar, Planificar, Ejecutar, Controlar y Cerrar",
+        "Capas Proceso, Finanzas, Riesgos, Recursos, Dependencias, Beneficios y What-if",
+        "Búsqueda y enfoque, breadcrumbs, minimapa, fit view y layouts guardados",
+        "Drawers de evidencia para nodos y conexiones con contexto de Isabella",
+      ],
+    },
+    followups: {
+      en: [
+        "How many nodes are visible?",
+        "Which visible node is performing worst?",
+        "Explain the node I am pointing to.",
+      ],
+      es: [
+        "¿Cuántos nodos hay visibles?",
+        "¿Cuál nodo visible está peor?",
+        "Explícame el nodo que estoy señalando.",
+      ],
+    },
+  },
+  {
     match: "/projects",
     projectSubroute: "execution-map",
     module: "process_mining",
