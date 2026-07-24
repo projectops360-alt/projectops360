@@ -86,6 +86,20 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M9 (2026-07-23): CLOSED — module UAT-READY.** Final QA run: repo suite
+  **2369 tests green**, typecheck green, production build green, module lint
+  clean (the repository's ~100 pre-existing lint errors are outside this
+  module and outside CI, which runs typecheck+test+build). Fixed the one
+  module lint error (saved-view restore now uses lazy initializers, no
+  effect-driven setState). Deliverables: `UAT-plan.md` (15 UAT scenarios,
+  structured current-vs-beta comparison criteria per spec §16, staged
+  rollout plan, rollback), `FINAL-REPORT.md` (the master prompt's FINAL
+  OUTPUT), Isabella final snapshot M9 + manifest (9 packages total, all
+  pending staging ingestion). **Remaining HUMAN steps (cannot be
+  autonomous):** PMO UAT sign-off, staging activation + cross-tenant
+  probes, merge/rollout decision, screenshots during UAT. The current
+  dashboard remains default; the flag remains OFF; no deploy, merge or
+  push was performed.
 - **M8 (2026-07-23): CLOSED (with declared deviations).** Production
   adapters were real since M4-M6 (there were never mocks to replace — PEG,
   cockpit, risks, deps, capacity, all RLS-scoped + barriers). Realtime:
