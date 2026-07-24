@@ -86,6 +86,23 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M4 (2026-07-23): CLOSED.** Process Intelligence Canvas: analytical SVG map
+  (dagre layout, motion-free) over the pure flow model — edge thickness =
+  frequency, dominant path solid brand, secondary lighter, rework dashed red
+  WITH text marker (never color alone), calculated bottleneck badges (score
+  ≥ 0.7). Zoom controls, min-frequency LOD filter (usable-at-200-nodes),
+  variant isolation, rework-only filter, evidence drawer (metrics + data
+  quality + events used/seen + formula + temporal≠causal limitation), saved
+  views in localStorage (presentation-only, UX-007/PD-008 pattern).
+  Drill-down org→project via `?project=` (cases switch from project journeys
+  to business-object journeys — real domain objects, PD-018 §0.4).
+  Read-only server adapter `read-model.server.ts` mirrors the CAP-046
+  load-analysis pattern (RLS SELECTs + org barrier + 20k window disclosed
+  when truncated; foreign ?project= → notFound). Shell now derives
+  presentation KPIs from the model (dominant share, rework %, bottleneck
+  count) — Portfolio Health/CPI/Critical Risks stay honestly unavailable
+  until M5/M6. Gates: 13 new tests (PMO-PI-CANVAS, PMO-PI-CASE-MAPPING),
+  module 39/39 green, typecheck green. Isabella package M4 versioned.
 - **M3 (2026-07-23): CLOSED.** Independent route
   `/[locale]/(app)/process-intelligence` (server gate: flag + owner/admin →
   otherwise `notFound()`, same denial pattern as /admin; route-level code
