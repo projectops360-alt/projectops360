@@ -20,8 +20,10 @@ import {
 } from "lucide-react";
 import type { PmoPiFilters, PmoPiFlowModel } from "@/lib/pmo-process-intelligence/contracts";
 import type { PmoPiFinanceOverlayModel } from "@/lib/pmo-process-intelligence/financial-overlay";
+import type { PmoPiOverlaysData } from "@/lib/pmo-process-intelligence/overlays-read.server";
 import { ProcessCanvas, activityLabel } from "./process-canvas";
 import { FinanceOverlay } from "./finance-overlay";
+import { BenefitsPanel, DependenciesPanel, ResourcesPanel, RiskPanel } from "./overlays-panels";
 
 type OverlayKey = PmoPiFilters["overlay"];
 
@@ -65,6 +67,7 @@ export function CommandCenterShell({
   projects = [],
   focusProject = null,
   finance = null,
+  overlays = null,
   projectNames = {},
 }: {
   locale: "en" | "es";
@@ -77,6 +80,7 @@ export function CommandCenterShell({
   projects?: { id: string; title: string }[];
   focusProject?: { id: string; title: string } | null;
   finance?: PmoPiFinanceOverlayModel | null;
+  overlays?: PmoPiOverlaysData | null;
   projectNames?: Record<string, string>;
 }) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
@@ -94,7 +98,7 @@ export function CommandCenterShell({
     { key: "rework_rate", label: tt("Rework", "Retrabajo"), value: kpis.reworkPct != null ? `${kpis.reworkPct}%` : null, hint: tt("of transitions are returns", "de las transiciones son retornos") },
     { key: "bottlenecks", label: tt("Bottlenecks", "Cuellos de Botella"), value: kpis.bottleneckCount != null ? String(kpis.bottleneckCount) : null, hint: tt("calculated from waiting", "calculados desde esperas") },
     { key: "cpi", label: "CPI", value: finance?.portfolioCpi != null ? finance.portfolioCpi.toFixed(2) : null, hint: tt("portfolio ΣEV/ΣAC", "portafolio ΣEV/ΣAC") },
-    { key: "critical_risks", label: tt("Critical Risks", "Riesgos Críticos"), value: null, hint: noData },
+    { key: "critical_risks", label: tt("Critical Risks", "Riesgos Críticos"), value: overlays ? String(overlays.risk.criticalOpenCount) : null, hint: tt("open, from the risk register", "abiertos, del registro de riesgos") },
   ];
 
   return (
@@ -236,6 +240,14 @@ export function CommandCenterShell({
                 <p className="max-w-md text-sm text-muted-foreground">{noData}</p>
               </div>
             )
+          ) : overlay === "risk" && overlays ? (
+            <RiskPanel overlay={overlays.risk} projectNames={projectNames} locale={locale} />
+          ) : overlay === "resources" && overlays ? (
+            <ResourcesPanel capacity={overlays.capacity} projectNames={projectNames} locale={locale} />
+          ) : overlay === "dependencies" && overlays ? (
+            <DependenciesPanel overlay={overlays.dependencies} projectNames={projectNames} locale={locale} />
+          ) : overlay === "benefits" ? (
+            <BenefitsPanel locale={locale} />
           ) : overlay !== "process" ? (
             <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
               <p className="max-w-md text-sm text-muted-foreground">

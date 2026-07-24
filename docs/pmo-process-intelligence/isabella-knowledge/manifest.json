@@ -85,6 +85,21 @@
       "approval_state": "approved (M5 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M5 gate"
+    },
+    {
+      "id": "pmo-pi-m6-overlays-cross-domain",
+      "milestone": "M6",
+      "version": 1,
+      "file": "M6-overlays-cross-domain.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/overlays.ts",
+        "src/lib/pmo-process-intelligence/overlays-read.server.ts",
+        "src/components/pmo-process-intelligence/overlays-panels.tsx"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M6 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M6 gate"
     }
   ]
 }
