@@ -1,0 +1,153 @@
+{
+  "stream": "pmo-process-intelligence",
+  "description": "Versioned Isabella learning stream for CAP-047. Packages are global-scope and tenant-safe (no tenant data). Ingestion reuses the Knowledge OS (knowledge_packages/versions/localizations/chunks) into the non-production environment first; rollback = re-point is_current to the previous version.",
+  "governance": {
+    "tier": "learned_pattern",
+    "tenant_isolation": "global packages only; runtime tenant signals are designed in M7 and stored per-tenant",
+    "rollback": "previous knowledge_package_versions row remains; demote current version to restore",
+    "no_auto_finetune": true,
+    "feedback_requires_reviewable_version": true
+  },
+  "packages": [
+    {
+      "id": "pmo-pi-m1-scope-glossary-governance",
+      "milestone": "M1",
+      "version": 1,
+      "file": "M1-scope-glossary-governance.md",
+      "sources": [
+        "docs/product-brain/capabilities/CAP-047-pmo-process-intelligence-command-center.md",
+        "Project360 spec: PMO Process Intelligence Module Specification v1 (2026-07-23)"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M1 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M1 gate"
+    },
+    {
+      "id": "pmo-pi-m2-contracts-semantics-formulas",
+      "milestone": "M2",
+      "version": 1,
+      "file": "M2-contracts-semantics-formulas.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/contracts.ts",
+        "src/lib/pmo-process-intelligence/flow-projection.ts",
+        "src/lib/pmo-process-intelligence/scope.ts",
+        "src/lib/pmo-process-intelligence/financial-snapshot.ts",
+        "src/lib/financial/calculations.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M2 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M2 gate"
+    },
+    {
+      "id": "pmo-pi-m3-ui-routes-interactions",
+      "milestone": "M3",
+      "version": 1,
+      "file": "M3-ui-routes-interactions.md",
+      "sources": [
+        "src/app/[locale]/(app)/process-intelligence/page.tsx",
+        "src/components/pmo-process-intelligence/command-center-shell.tsx",
+        "src/app/[locale]/(app)/page.tsx (Header switcher)"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M3 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M3 gate"
+    },
+    {
+      "id": "pmo-pi-m4-canvas-patterns-bottlenecks",
+      "milestone": "M4",
+      "version": 1,
+      "file": "M4-canvas-patterns-bottlenecks.md",
+      "sources": [
+        "src/components/pmo-process-intelligence/process-canvas.tsx",
+        "src/lib/pmo-process-intelligence/flow-projection.ts",
+        "src/lib/pmo-process-intelligence/case-mapping.ts",
+        "src/lib/pmo-process-intelligence/read-model.server.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M4 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M4 gate"
+    },
+    {
+      "id": "pmo-pi-m5-financial-intelligence",
+      "milestone": "M5",
+      "version": 1,
+      "file": "M5-financial-intelligence.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/financial-overlay.ts",
+        "src/lib/pmo-process-intelligence/financial-read.server.ts",
+        "src/components/pmo-process-intelligence/finance-overlay.tsx"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M5 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M5 gate"
+    },
+    {
+      "id": "pmo-pi-m6-overlays-cross-domain",
+      "milestone": "M6",
+      "version": 1,
+      "file": "M6-overlays-cross-domain.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/overlays.ts",
+        "src/lib/pmo-process-intelligence/overlays-read.server.ts",
+        "src/components/pmo-process-intelligence/overlays-panels.tsx"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M6 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M6 gate"
+    },
+    {
+      "id": "pmo-pi-m7-insights-whatif-feedback",
+      "milestone": "M7",
+      "version": 1,
+      "file": "M7-insights-whatif-feedback.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/insights.ts",
+        "src/lib/pmo-process-intelligence/whatif.ts",
+        "src/components/pmo-process-intelligence/isabella-panel.tsx",
+        "src/components/pmo-process-intelligence/whatif-panel.tsx",
+        "src/app/[locale]/(app)/process-intelligence/actions.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M7 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M7 gate"
+    },
+    {
+      "id": "pmo-pi-m8-realtime-reliability",
+      "milestone": "M8",
+      "version": 1,
+      "file": "M8-realtime-reliability.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/realtime.ts",
+        "src/components/pmo-process-intelligence/realtime-refresh.tsx",
+        "src/app/[locale]/(app)/process-intelligence/actions.ts",
+        "src/lib/pmo-process-intelligence/read-model.server.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M8 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M8 gate"
+    },
+    {
+      "id": "pmo-pi-m9-uat-release-readiness",
+      "milestone": "M9",
+      "version": 1,
+      "file": "M9-uat-release-readiness.md",
+      "sources": [
+        "docs/product-brain/capabilities/CAP-047-pmo-process-intelligence-command-center.md",
+        "docs/pmo-process-intelligence/UAT-plan.md",
+        "docs/pmo-process-intelligence/FINAL-REPORT.md"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M9 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M9 gate"
+    }
+  ]
+}

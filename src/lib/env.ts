@@ -107,6 +107,16 @@ export const env = {
   FINANCIAL_ISABELLA_ENABLED: process.env.FINANCIAL_ISABELLA_ENABLED ?? "",
   /** Explicit comma-separated pilot projects; "all" is rejected in production. */
   FINANCIAL_PILOT_PROJECT_IDS: process.env.FINANCIAL_PILOT_PROJECT_IDS ?? "",
+  /**
+   * PMO Process Intelligence Command Center (CAP-047). Server-side, default
+   * OFF. The current PMO Command Center dashboard stays the default view;
+   * this flag only exposes the "Process Intelligence Beta" switcher and its
+   * lazily loaded module. Never expose to the browser via NEXT_PUBLIC.
+   */
+  PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED:
+    process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED ?? "",
+  PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED:
+    process.env.PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

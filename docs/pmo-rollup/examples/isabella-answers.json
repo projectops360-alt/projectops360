@@ -1,0 +1,59 @@
+{
+  "knowledgeVersion": "pmo-rollup-knowledge-1.0.0",
+  "examples": [
+    {
+      "question": "¿Cuántos días acumulados de retraso tenemos?",
+      "snapshotId": "pmo-snapshot-example-schedule",
+      "answer": "accumulated_delay_days: 30. Corte 2026-03-31T23:59:59.000Z. Confianza del snapshot 100%. El retraso real, la exposición futura por riesgo y la espera de proceso permanecen separados.",
+      "metricIds": [
+        "accumulated_delay_days"
+      ],
+      "confidence": 1,
+      "evidence": [
+        {
+          "metricId": "accumulated_delay_days",
+          "value": 30,
+          "formulaVersion": "pmo-rollup-1.0.0",
+          "asOf": "2026-03-31T23:59:59.000Z",
+          "explanation": "Sum of positive schedule variance only; early projects do not cancel late projects."
+        }
+      ]
+    },
+    {
+      "question": "¿Cuántos días de exposición futura tenemos por riesgos?",
+      "snapshotId": "pmo-snapshot-example-risk",
+      "answer": "expected_risk_delay_days: 10. Corte 2026-03-31T23:59:59.000Z. Confianza del snapshot 100%. El retraso real, la exposición futura por riesgo y la espera de proceso permanecen separados.",
+      "metricIds": [
+        "expected_risk_delay_days"
+      ],
+      "confidence": 1,
+      "evidence": [
+        {
+          "metricId": "expected_risk_delay_days",
+          "value": 10,
+          "formulaVersion": "pmo-rollup-1.0.0",
+          "asOf": "2026-03-31T23:59:59.000Z",
+          "explanation": "One shared risk is deduplicated by risk_id before probability is multiplied by schedule impact."
+        }
+      ]
+    },
+    {
+      "question": "¿Cuál es la espera promedio del proceso?",
+      "snapshotId": "pmo-snapshot-example-process",
+      "answer": "average_waiting_time_days: 2. Corte 2026-03-31T23:59:59.000Z. Confianza del snapshot 100%. El retraso real, la exposición futura por riesgo y la espera de proceso permanecen separados.",
+      "metricIds": [
+        "average_waiting_time_days"
+      ],
+      "confidence": 1,
+      "evidence": [
+        {
+          "metricId": "average_waiting_time_days",
+          "value": 2,
+          "formulaVersion": "pmo-rollup-1.0.0",
+          "asOf": "2026-03-31T23:59:59.000Z",
+          "explanation": "Average waiting time is calculated from eligible process cases and is not schedule delay."
+        }
+      ]
+    }
+  ]
+}

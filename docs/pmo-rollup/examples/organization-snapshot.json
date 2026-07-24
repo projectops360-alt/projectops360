@@ -1,0 +1,40 @@
+{
+  "contractVersion": 1,
+  "snapshotId": "pmo-snapshot-example-organization",
+  "organizationId": "org-a",
+  "hierarchyLevel": "organization",
+  "asOf": "2026-03-31T23:59:59.000Z",
+  "periodStart": "2026-01-01",
+  "periodEnd": "2026-03-31",
+  "reportingCurrency": "USD",
+  "metrics": {
+    "total_projects": {
+      "value": 3,
+      "aggregationMethod": "count-distinct",
+      "formulaVersion": "pmo-rollup-1.0.0",
+      "coveragePercent": 100,
+      "confidenceScore": 1
+    },
+    "approved_budget": {
+      "value": 600,
+      "aggregationMethod": "sum",
+      "formulaVersion": "pmo-rollup-1.0.0",
+      "reportingCurrency": "USD",
+      "coveragePercent": 100
+    },
+    "unique_risks": {
+      "value": 1,
+      "aggregationMethod": "count-distinct",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    }
+  },
+  "lineage": {
+    "token": "pmo-lineage-example-organization",
+    "deduplicationRules": [
+      "project_id",
+      "risk_id",
+      "resource_id+period_start+period_end",
+      "case_id"
+    ]
+  }
+}

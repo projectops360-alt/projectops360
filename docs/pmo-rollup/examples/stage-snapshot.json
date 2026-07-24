@@ -1,0 +1,23 @@
+{
+  "contractVersion": 1,
+  "snapshotId": "pmo-snapshot-example-stage-execute",
+  "organizationId": "org-a",
+  "hierarchyLevel": "organization",
+  "stageId": "execute",
+  "asOf": "2026-03-31T23:59:59.000Z",
+  "stageAggregate": {
+    "stageId": "execute",
+    "currentProjectCount": 2,
+    "projectsActiveInPeriod": 3,
+    "accumulatedDelayDays": 30,
+    "averageDelayLateProjects": 15,
+    "reworkRate": 25,
+    "approvedBudget": null,
+    "actualCost": null,
+    "confidenceScore": 0.72,
+    "warnings": [
+      "project_financials_not_stage_allocated:p-a",
+      "project_financials_not_stage_allocated:p-b"
+    ]
+  }
+}
