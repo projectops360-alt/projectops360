@@ -54,6 +54,22 @@
       "approval_state": "approved (M3 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M3 gate"
+    },
+    {
+      "id": "pmo-pi-m4-canvas-patterns-bottlenecks",
+      "milestone": "M4",
+      "version": 1,
+      "file": "M4-canvas-patterns-bottlenecks.md",
+      "sources": [
+        "src/components/pmo-process-intelligence/process-canvas.tsx",
+        "src/lib/pmo-process-intelligence/flow-projection.ts",
+        "src/lib/pmo-process-intelligence/case-mapping.ts",
+        "src/lib/pmo-process-intelligence/read-model.server.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M4 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M4 gate"
     }
   ]
 }

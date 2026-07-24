@@ -14,14 +14,19 @@ import { setRequestLocale } from "next-intl/server";
 import { getOrgContext } from "@/lib/auth";
 import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
 import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts";
+import { loadPmoPiFlowModel } from "@/lib/pmo-process-intelligence/read-model.server";
 import { CommandCenterShell } from "@/components/pmo-process-intelligence/command-center-shell";
+import type { Locale } from "@/types/database";
 
 export default async function ProcessIntelligencePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ project?: string }>;
 }) {
   const { locale } = await params;
+  const { project } = await searchParams;
   setRequestLocale(locale);
 
   const org = await getOrgContext();
@@ -31,12 +36,22 @@ export default async function ProcessIntelligencePage({
   const orgName =
     org.organizationName[locale as "en" | "es"] ?? org.organizationName.en ?? org.organizationSlug;
 
+  // Read-only projection over the PEG (RLS-scoped + org barrier). An invalid
+  // or foreign ?project= is treated exactly like no access to the module.
+  const result = await loadPmoPiFlowModel((locale as Locale) ?? "en", project ?? null);
+  if (result.status === "unauthorized") notFound();
+
   return (
     <CommandCenterShell
       locale={locale === "es" ? "es" : "en"}
       base={base}
       organizationName={orgName}
       initialFilters={DEFAULT_PMO_PI_FILTERS}
+      model={result.status === "ok" ? result.model : null}
+      loadFailed={result.status === "error"}
+      truncated={result.status === "ok" ? result.truncated : false}
+      projects={result.status === "ok" ? result.projects : []}
+      focusProject={result.status === "ok" ? result.focusProject : null}
     />
   );
 }
