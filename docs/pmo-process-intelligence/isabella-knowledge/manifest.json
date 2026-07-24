@@ -1,0 +1,27 @@
+{
+  "stream": "pmo-process-intelligence",
+  "description": "Versioned Isabella learning stream for CAP-047. Packages are global-scope and tenant-safe (no tenant data). Ingestion reuses the Knowledge OS (knowledge_packages/versions/localizations/chunks) into the non-production environment first; rollback = re-point is_current to the previous version.",
+  "governance": {
+    "tier": "learned_pattern",
+    "tenant_isolation": "global packages only; runtime tenant signals are designed in M7 and stored per-tenant",
+    "rollback": "previous knowledge_package_versions row remains; demote current version to restore",
+    "no_auto_finetune": true,
+    "feedback_requires_reviewable_version": true
+  },
+  "packages": [
+    {
+      "id": "pmo-pi-m1-scope-glossary-governance",
+      "milestone": "M1",
+      "version": 1,
+      "file": "M1-scope-glossary-governance.md",
+      "sources": [
+        "docs/product-brain/capabilities/CAP-047-pmo-process-intelligence-command-center.md",
+        "Project360 spec: PMO Process Intelligence Module Specification v1 (2026-07-23)"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M1 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M1 gate"
+    }
+  ]
+}

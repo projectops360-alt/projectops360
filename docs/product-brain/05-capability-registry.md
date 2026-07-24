@@ -60,6 +60,8 @@ Status values: Implemented · Partial · Prototype · Documented · Missing · D
 
 | CAP-046 | Project Intelligence Engine (Variants · Root Cause Miner · KPI Engine) | P2/P4 | Implemented | 75% | `lib/process-mining`, `lib/kpi` ([CAP-046](capabilities/CAP-046-project-intelligence-engine.md), PD-019 — consumes the PEG, no second pipeline; custom KPIs persisted in `kpi_definitions`, migración 20260843 aplicada; falta alerting sobre targets) |
 
+| CAP-047 | PMO Process Intelligence Command Center | P1 | In progress (M1 closed — governance/flag/discovery) | 5% | `lib/pmo-process-intelligence` ([CAP-047](capabilities/CAP-047-pmo-process-intelligence-command-center.md) — flag `PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED` OFF por defecto; el PMO Command Center actual queda protegido y default; reusa PEG/CAP-046/EVM/capacity/Knowledge OS) |
+
 `*` CAP-003 is "complete" only in the sense that it was fully superseded by Knowledge OS.
 
 ---
