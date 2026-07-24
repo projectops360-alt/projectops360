@@ -1,6 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
+import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
 import { getCommandCenterSummary, band, type CommandCenterData, type HealthBand } from "@/lib/command-center/service";
 import {
   UploadCloud, Sparkles, BarChart3, Gauge, FolderKanban, Ban, Route, Wallet, Scale,
@@ -36,6 +37,7 @@ export default async function HomePage({
   const tt = (en: string, es: string) => (isEs ? es : en);
 
   const org = await getOrgContext();
+  const showProcessIntelligence = canAccessProcessIntelligence(org.role);
   const data = await getCommandCenterSummary(org.organizationId, locale);
   // Locale prefix used to build hrefs (e.g. `${base}/reports`). Must be EMPTY
   // for the default locale — localizedHref(locale, "") returns "/" (correct as
@@ -61,7 +63,7 @@ export default async function HomePage({
   if (!data.hasProjects) {
     return (
       <div className="space-y-6">
-        <Header tt={tt} base={base} />
+        <Header tt={tt} base={base} showProcessIntelligence={showProcessIntelligence} />
         {auth === "confirmed" && <EmailConfirmedBanner tt={tt} />}
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
           <Gauge className="h-10 w-10 text-muted-foreground" />
@@ -80,7 +82,7 @@ export default async function HomePage({
 
   return (
     <div className="space-y-6">
-      <Header tt={tt} base={base} />
+      <Header tt={tt} base={base} showProcessIntelligence={showProcessIntelligence} />
       {auth === "confirmed" && <EmailConfirmedBanner tt={tt} />}
 
       {/* KPI cards — each drills into its related view */}
@@ -398,7 +400,7 @@ function statusEs(s: string): string {
   return ({ Available: "Disponible", Overloaded: "Sobrecargado", Unconfirmed: "Sin confirmar", Underallocated: "Subutilizado", Missing: "Faltante" } as Record<string, string>)[s] ?? s;
 }
 
-function Header({ tt, base }: { tt: (en: string, es: string) => string; base: string }) {
+function Header({ tt, base, showProcessIntelligence = false }: { tt: (en: string, es: string) => string; base: string; showProcessIntelligence?: boolean }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -410,6 +412,21 @@ function Header({ tt, base }: { tt: (en: string, es: string) => string; base: st
           {tt("AI-powered control tower for schedule, budget, resources, materials, risks, decisions, and execution intelligence.",
             "Torre de control con IA para cronograma, presupuesto, recursos, materiales, riesgos, decisiones e inteligencia de ejecución.")}
         </p>
+        {/* CAP-047: comparison switcher — rendered ONLY when the flag is ON and
+            the role is authorized. The current dashboard stays the default. */}
+        {showProcessIntelligence && (
+          <div className="mt-2 inline-flex items-center rounded-lg border border-border p-0.5 text-xs font-medium">
+            <span aria-current="page" className="rounded-md bg-muted px-2.5 py-1 text-foreground">
+              {tt("Current Dashboard", "Dashboard Actual")}
+            </span>
+            <Link
+              href={`${base}/process-intelligence`}
+              className="rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {tt("Process Intelligence Beta", "Process Intelligence Beta")}
+            </Link>
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href={`${base}/import`} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"><UploadCloud className="h-4 w-4" />{tt("Import", "Importar")}</Link>
