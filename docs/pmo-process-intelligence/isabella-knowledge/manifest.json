@@ -39,6 +39,21 @@
       "approval_state": "approved (M2 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M2 gate"
+    },
+    {
+      "id": "pmo-pi-m3-ui-routes-interactions",
+      "milestone": "M3",
+      "version": 1,
+      "file": "M3-ui-routes-interactions.md",
+      "sources": [
+        "src/app/[locale]/(app)/process-intelligence/page.tsx",
+        "src/components/pmo-process-intelligence/command-center-shell.tsx",
+        "src/app/[locale]/(app)/page.tsx (Header switcher)"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M3 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M3 gate"
     }
   ]
 }

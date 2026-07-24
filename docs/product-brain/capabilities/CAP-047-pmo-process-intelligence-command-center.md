@@ -86,6 +86,20 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M3 (2026-07-23): CLOSED.** Independent route
+  `/[locale]/(app)/process-intelligence` (server gate: flag + owner/admin →
+  otherwise `notFound()`, same denial pattern as /admin; route-level code
+  splitting keeps it lazy). Minimal approved integration in the home
+  dashboard `Header()`: a two-option switcher rendered ONLY when
+  `canAccessProcessIntelligence(role)` — with the flag OFF the current
+  dashboard renders byte-identically. Responsive shell
+  (`command-center-shell.tsx`): executive header + Beta badge, one-click
+  return, 6-KPI bar with honest "no data in scope" states, 7 overlay tabs,
+  dominant canvas region with tabular fallback toggle, Isabella panel
+  stating the evidence rule, route `loading.tsx`/`error.tsx` (error state
+  never shows partial data). Motion-free by design (reduced-motion safe);
+  status never color-only. Gates: 7 render guards (PMO-PI-SHELL) + module
+  26/26 tests green, typecheck green. Isabella package M3 versioned.
 - **M2 (2026-07-23): CLOSED.** Canonical contracts typed + versioned
   (`contracts.ts`, `PMO_PI_CONTRACT_VERSION`): event contract as a projection
   over the PEG (no second event store), flow read model (nodes/edges/waiting/
