@@ -27,6 +27,7 @@ export function AppFrame({
   canViewAdminConsole?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [compactViewport, setCompactViewport] = useState(false);
 
   // Hydrate the persisted preference after mount. We intentionally start at
   // `false` on the server/first render to avoid an SSR hydration mismatch,
@@ -39,6 +40,14 @@ export function AppFrame({
     }
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => setCompactViewport(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
   function toggle() {
     setCollapsed((prev) => {
       const next = !prev;
@@ -49,12 +58,14 @@ export function AppFrame({
     });
   }
 
+  const effectiveCollapsed = collapsed || compactViewport;
+
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} />
-      <div className={cn("transition-[padding] duration-200", collapsed ? "pl-16" : "pl-64")}>
+      <Sidebar collapsed={effectiveCollapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} />
+      <div className={cn("transition-[padding] duration-200", effectiveCollapsed ? "pl-16" : "pl-64")}>
         {header}
-        <main className="p-6">{children}</main>
+        <main className="p-3 sm:p-4 lg:p-6">{children}</main>
       </div>
     </div>
   );

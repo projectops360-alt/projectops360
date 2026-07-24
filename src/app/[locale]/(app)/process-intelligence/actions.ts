@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +23,21 @@ const feedbackSchema = z.object({
   rule: z.string().min(1).max(60),
   decision: z.enum(["accepted", "rejected", "deferred"]),
   reason: z.string().max(1000).optional().default(""),
+  title: z.string().min(1).max(500),
+  confidence: z.number().min(0).max(1),
+  severity: z.enum(["info", "warning", "critical"]),
+  contextScope: z.string().min(1).max(300),
+  affectedProjectCount: z.number().int().min(0),
+  knowledgeVersion: z.string().min(1).max(100),
+  ruleSnapshotVersion: z.string().min(1).max(100),
+  evidence: z.object({
+    formulas: z.array(z.string().max(500)).max(20),
+    projections: z.array(z.string().max(200)).max(20),
+    technicalEventTypes: z.array(z.string().max(200)).max(20),
+    affectedCaseCount: z.number().int().min(0).nullable(),
+    cutoffDate: z.string().max(100).nullable(),
+    dataQualityScore: z.number().min(0).max(1),
+  }),
 });
 
 export async function recordInsightFeedbackAction(input: {
@@ -29,6 +45,21 @@ export async function recordInsightFeedbackAction(input: {
   rule: string;
   decision: string;
   reason?: string;
+  title: string;
+  confidence: number;
+  severity: "info" | "warning" | "critical";
+  contextScope: string;
+  affectedProjectCount: number;
+  knowledgeVersion: string;
+  ruleSnapshotVersion: string;
+  evidence: {
+    formulas: string[];
+    projections: string[];
+    technicalEventTypes: string[];
+    affectedCaseCount: number | null;
+    cutoffDate: string | null;
+    dataQualityScore: number;
+  };
 }): Promise<{ error?: string }> {
   let org;
   try {
@@ -39,6 +70,9 @@ export async function recordInsightFeedbackAction(input: {
   if (!canAccessProcessIntelligence(org.role)) return { error: "not_authorized" };
   const parsed = feedbackSchema.safeParse(input);
   if (!parsed.success) return { error: "validation_error" };
+  const evidenceDigest = createHash("sha256")
+    .update(JSON.stringify(parsed.data.evidence))
+    .digest("hex");
 
   await logAudit({
     org,
@@ -49,8 +83,21 @@ export async function recordInsightFeedbackAction(input: {
       rule: parsed.data.rule,
       decision: parsed.data.decision,
       reason: parsed.data.reason || null,
+      original_recommendation: parsed.data.title,
+      confidence: parsed.data.confidence,
+      severity: parsed.data.severity,
+      organization_context: parsed.data.contextScope,
+      affected_project_count: parsed.data.affectedProjectCount,
+      evidence: parsed.data.evidence,
+      evidence_digest: evidenceDigest,
+      knowledge_version: parsed.data.knowledgeVersion,
+      rule_snapshot_version: parsed.data.ruleSnapshotVersion,
+      outcome_status: "pending_review",
+      calibration_scope: "organization_isolated",
+      rollback_supported: true,
+      behavior_changed: false,
       module: "pmo-process-intelligence",
-      contract_version: 1,
+      contract_version: 2,
     },
   });
   return {};

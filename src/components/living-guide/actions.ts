@@ -27,6 +27,10 @@ import type { PortfolioBriefingResult } from "@/lib/portfolio-briefing/types";
 import { getProjectProvenanceSummary, getEntityProvenance } from "@/lib/provenance/service";
 import { formatProvenanceForPrompt } from "@/lib/provenance/engine";
 import type { Locale } from "@/types/database";
+import {
+  maybeAnswerWithProcessGraphContext,
+  sanitizeProcessGraphScreenContext,
+} from "@/lib/pmo-process-intelligence/process-graph-assistant.server";
 
 // Lightweight (NON-authorization) hint that the user is asking about source /
 // provenance / traceability — used only to decide whether to spend a few count
@@ -48,8 +52,31 @@ export async function askLivingGuideAction(input: AskGuideInput): Promise<GuideA
       // Never trust client-supplied server-stamped facts — only the server sets them.
       provenanceFacts: undefined,
       executionFacts: undefined,
+      processGraph: sanitizeProcessGraphScreenContext(
+        input.context.processGraph,
+        org.organizationId,
+      ),
     },
   };
+
+  if (safeInput.context.processGraph) {
+    const graphLanguage: "en" | "es" =
+      (input.answerLanguage ?? input.locale) === "es" ? "es" : "en";
+    const graphExpert = resolveExpert({
+      expertKey: input.expertKey,
+      module: "process_mining",
+    });
+    const graphAnswer = await maybeAnswerWithProcessGraphContext(
+      org,
+      safeInput,
+      {
+        key: graphExpert.key,
+        displayName: graphExpert.displayName,
+        title: graphExpert.title[graphLanguage],
+      },
+    );
+    if (graphAnswer) return graphAnswer;
+  }
 
   // Screen explanations are deterministic help for the visible UI. They must
   // work even when the optional Process Intelligence engines are disabled, and

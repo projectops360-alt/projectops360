@@ -81,8 +81,23 @@ describe("buildInsights (CAP-047 M7)", () => {
       expect(i.confidence, i.id).toBeGreaterThan(0);
       expect(i.confidence, i.id).toBeLessThanOrEqual(1);
       expect(i.affected.length, i.id).toBeGreaterThan(0);
+      expect(i.affectedProjectCount, i.id).toBeGreaterThan(0);
       expect(i.title.en.length && i.title.es.length, i.id).toBeTruthy();
       expect(i.recommendedAction.en.length && i.recommendedAction.es.length, i.id).toBeTruthy();
+      expect(i.knowledgeVersion, i.id).toBe("pmo-pi-knowledge-v1");
+      expect(i.ruleSnapshotVersion, i.id).toBe("pmo-pi-rules-v1");
+    }
+  });
+
+  it("uses executive language first and keeps technical events inside evidence", () => {
+    const processInsights = insights.filter((item) =>
+      ["bottleneck_pressure", "rework_hotspot"].includes(item.rule),
+    );
+    for (const item of processInsights) {
+      expect(item.title.en).not.toMatch(/TaskStarted|TaskCompleted|GateApproved/);
+      expect(item.title.es).not.toMatch(/TaskStarted|TaskCompleted|GateApproved/);
+      expect(item.evidence.technicalEventTypes?.length).toBeGreaterThan(0);
+      expect(item.evidence.cutoffDate).toBe("2026-07-23T00:00:00Z");
     }
   });
 

@@ -13,7 +13,10 @@ const AUTHORIZED_ROLES = new Set(["owner", "admin"]);
 
 /** True only when the flag is explicitly enabled ("true"). Default OFF. */
 export function isPmoProcessIntelligenceEnabled(): boolean {
-  return process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED === "true";
+  return (
+    process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED === "true" ||
+    process.env.pmo_process_intelligence_dashboard === "true"
+  );
 }
 
 /**
