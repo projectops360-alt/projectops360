@@ -69,9 +69,12 @@ type Selection =
 export function ProcessCanvas({
   model,
   locale,
+  highlightActivities = null,
 }: {
   model: PmoPiFlowModel;
   locale: "en" | "es";
+  /** Activities to emphasize (e.g. from an Isabella recommendation). */
+  highlightActivities?: string[] | null;
 }) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
   // LOD default: with very large graphs raise the frequency floor so the
@@ -256,7 +259,10 @@ export function ProcessCanvas({
 
           {/* Nodes */}
           {placed.nodes.map((n) => {
-            const dimmed = variant ? !variant.signature.includes(n.id) : false;
+            const highlighted = highlightActivities?.includes(n.id) ?? false;
+            const dimmed =
+              (variant ? !variant.signature.includes(n.id) : false) ||
+              (highlightActivities != null && highlightActivities.length > 0 && !highlighted);
             const selected = selection?.kind === "node" && selection.node.id === n.id;
             const isBottleneck = n.bottleneckScore >= 0.7;
             return (
@@ -270,13 +276,15 @@ export function ProcessCanvas({
                   width={NODE_W}
                   height={NODE_H}
                   rx={10}
-                  strokeWidth={selected ? 2.5 : 1.5}
+                  strokeWidth={selected || highlighted ? 2.5 : 1.5}
                   className={`fill-card ${
-                    selected
-                      ? "stroke-brand-600"
-                      : n.onDominantPath
-                        ? "stroke-brand-400"
-                        : "stroke-border"
+                    highlighted
+                      ? "stroke-amber-500"
+                      : selected
+                        ? "stroke-brand-600"
+                        : n.onDominantPath
+                          ? "stroke-brand-400"
+                          : "stroke-border"
                   }`}
                 />
                 <text x={12} y={22} className="fill-foreground text-[12px] font-semibold">
