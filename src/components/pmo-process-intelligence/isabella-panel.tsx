@@ -24,21 +24,51 @@ const SEV: Record<PmoPiInsight["severity"], { en: string; es: string }> = {
 export function IsabellaPanel({
   insights,
   locale,
+  scopeLabel,
   onOpenInMap,
   onSimulate,
 }: {
   insights: PmoPiInsight[];
   locale: "en" | "es";
+  scopeLabel?: string;
   onOpenInMap?: (activities: string[]) => void;
   onSimulate?: (hint: string) => void;
 }) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   async function sendFeedback(insight: PmoPiInsight, decision: "accepted" | "rejected" | "deferred") {
     setFeedback((f) => ({ ...f, [insight.id]: decision }));
-    await recordInsightFeedbackAction({ insightId: insight.id, rule: insight.rule, decision });
+    const result = await recordInsightFeedbackAction({
+      insightId: insight.id,
+      rule: insight.rule,
+      decision,
+      reason: reasons[insight.id],
+      title: insight.title[locale],
+      confidence: insight.confidence,
+      severity: insight.severity,
+      contextScope: scopeLabel ?? "organization",
+      affectedProjectCount: insight.affectedProjectCount,
+      knowledgeVersion: insight.knowledgeVersion,
+      ruleSnapshotVersion: insight.ruleSnapshotVersion,
+      evidence: {
+        formulas: insight.evidence.formulas,
+        projections: insight.evidence.projections,
+        technicalEventTypes: insight.evidence.technicalEventTypes ?? [],
+        affectedCaseCount: insight.evidence.affectedCaseCount ?? null,
+        cutoffDate: insight.evidence.cutoffDate ?? null,
+        dataQualityScore: insight.evidence.dataQualityScore,
+      },
+    });
+    if (result.error) {
+      setFeedback((current) => {
+        const next = { ...current };
+        delete next[insight.id];
+        return next;
+      });
+    }
   }
 
   return (
@@ -48,6 +78,9 @@ export function IsabellaPanel({
         Isabella Intelligence
         <span className="ml-auto text-xs font-normal normal-case">{insights.length}</span>
       </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {tt("Executive scope", "Alcance ejecutivo")}: {scopeLabel ?? tt("Organization", "Organización")}
+      </p>
 
       {insights.length === 0 ? (
         <div className="mt-4 py-10 text-center">
@@ -71,6 +104,7 @@ export function IsabellaPanel({
                 <p className="mt-1 text-xs text-muted-foreground">{ins.summary[locale]}</p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   {tt("Confidence", "Confianza")}: {Math.round(ins.confidence * 100)}% ·{" "}
+                  {tt("Affected projects", "Proyectos afectados")}: {ins.affectedProjectCount} ·{" "}
                   {tt("Impact", "Impacto")}: {ins.impact[locale]} ·{" "}
                   {tt("Horizon", "Horizonte")}: {ins.horizon.replace(/_/g, " ")}
                 </p>
@@ -111,12 +145,26 @@ export function IsabellaPanel({
                   <div className="mt-2 space-y-1 rounded-lg bg-muted/40 p-2 text-[11px] text-muted-foreground">
                     <p><span className="font-semibold">{tt("Formulas", "Fórmulas")}:</span> {ins.evidence.formulas.join(" · ")}</p>
                     <p><span className="font-semibold">{tt("Sources", "Fuentes")}:</span> {ins.evidence.projections.join(", ")}</p>
+                    <p><span className="font-semibold">{tt("Technical events", "Eventos técnicos")}:</span> {(ins.evidence.technicalEventTypes ?? []).join(", ") || tt("Not applicable", "No aplica")}</p>
+                    <p><span className="font-semibold">{tt("Cases and cutoff", "Casos y fecha de corte")}:</span> {ins.evidence.affectedCaseCount ?? ins.affectedProjectCount} · {ins.evidence.cutoffDate ?? tt("Unknown", "Desconocida")}</p>
                     {ins.evidence.assumptions.length > 0 && (
                       <p><span className="font-semibold">{tt("Assumptions", "Supuestos")}:</span> {ins.evidence.assumptions.join(", ")}</p>
                     )}
                     <p><span className="font-semibold">{tt("Limitations", "Limitaciones")}:</span> {ins.evidence.limitations.join(", ")}</p>
                     <p><span className="font-semibold">{tt("Data quality", "Calidad de datos")}:</span> {Math.round(ins.evidence.dataQualityScore * 100)}%</p>
                     <p><span className="font-semibold">{tt("Affected", "Afectados")}:</span> {ins.affected.map((a) => `${a.type}:${a.id.slice(0, 8)}`).join(", ")}</p>
+                    <p><span className="font-semibold">{tt("Knowledge version", "Versión de conocimiento")}:</span> {ins.knowledgeVersion} · {ins.ruleSnapshotVersion}</p>
+                    {!given ? (
+                      <label className="block pt-1">
+                        <span className="font-semibold">{tt("Optional reason", "Motivo opcional")}</span>
+                        <textarea
+                          value={reasons[ins.id] ?? ""}
+                          onChange={(event) => setReasons((current) => ({ ...current, [ins.id]: event.target.value }))}
+                          maxLength={1000}
+                          className="mt-1 min-h-16 w-full rounded-md border border-border bg-background p-2 text-xs text-foreground"
+                        />
+                      </label>
+                    ) : null}
                   </div>
                 )}
 

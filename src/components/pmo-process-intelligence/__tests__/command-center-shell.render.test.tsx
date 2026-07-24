@@ -1,16 +1,6 @@
-// ============================================================================
-// CAP-047 M3 — Command Center shell render guards (guard: PMO-PI-SHELL)
-// ============================================================================
-// Pins the visual-foundation contract: one-click return to the current
-// (default) dashboard, Beta labeling, the 7 analytical overlays, HONEST
-// unavailable KPI states (no invented numbers), the Isabella evidence rule
-// stated in the panel, and full EN/ES rendering (UX-012).
-// ============================================================================
-
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-// RealtimeRefresh (M8) uses the App Router — mock it for static rendering.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: () => {} }),
 }));
@@ -24,54 +14,89 @@ function render(locale: "en" | "es", base = ""): string {
       locale={locale}
       base={base}
       organizationName="Acme"
+      organizationId="00000000-0000-4000-8000-000000000001"
+      userId="00000000-0000-4000-8000-000000000002"
       initialFilters={DEFAULT_PMO_PI_FILTERS}
+      hierarchy={{
+        organizationId: "00000000-0000-4000-8000-000000000001",
+        milestones: [],
+        activities: [],
+        dependencies: [],
+        truncated: false,
+        limitations: [],
+      }}
     />,
   );
 }
 
-describe("CommandCenterShell (CAP-047 M3)", () => {
+describe("CommandCenterShell executive redesign", () => {
   const en = render("en");
 
-  it("offers a one-click return to the current dashboard (default view)", () => {
+  it("preserves the current dashboard and labels the new view as beta", () => {
     expect(en).toContain('href="/"');
     expect(en).toContain("Current Dashboard");
+    expect(en).toContain("Executive Portfolio Flow");
+    expect(en).toContain("Process Intelligence Beta");
+
     const es = render("es", "/es");
     expect(es).toContain('href="/es"');
     expect(es).toContain("Dashboard Actual");
   });
 
-  it("labels itself Beta and never claims to be the default", () => {
-    expect(en).toContain("Beta");
-    expect(en).toContain("PMO Process Intelligence");
-  });
-
-  it("renders the 7 analytical overlays as tabs", () => {
-    for (const label of ["Process", "Risk", "Finance", "Resources", "Dependencies", "Benefits", "What-if"]) {
+  it("renders the seven analytical overlays as tabs", () => {
+    for (const label of [
+      "Process",
+      "Risk",
+      "Finance",
+      "Resources",
+      "Dependencies",
+      "Benefits",
+      "What-if",
+    ]) {
       expect(en).toContain(label);
     }
     expect(en.match(/role="tab"/g)?.length).toBe(7);
   });
 
-  it("KPI bar declares honest unavailable states instead of inventing numbers", () => {
-    expect(en).toContain("no data in scope");
-    expect(en).not.toMatch(/\b\d+(\.\d+)?%/); // no fabricated percentages
+  it("declares empty scope honestly instead of inventing portfolio health", () => {
+    expect(en).toContain("5 visible nodes");
+    expect(en).toContain("0 projects in the current view");
+    expect(en).not.toContain("100/100");
   });
 
-  it("states the Isabella evidence rule in the panel", () => {
+  it("states the Isabella evidence rule", () => {
     expect(en).toContain("Isabella Intelligence");
     expect(en).toContain("no recommendation exists without evidence");
   });
 
-  it("renders fully in Spanish without Spanglish leaks (UX-012)", () => {
+  it("renders the executive surface in Spanish", () => {
     const es = render("es", "/es");
-    expect(es).toContain("Vista de tabla");
+    expect(es).toContain("Flujo Ejecutivo del Portafolio");
+    expect(es).toContain("Tabla accesible");
     expect(es).toContain("Riesgo");
-    expect(es).toContain("sin datos en alcance");
+    expect(es).toContain("5 nodos visibles");
     expect(es).toContain("ninguna recomendación existe sin evidencia");
   });
 
-  it("offers a tabular fallback toggle", () => {
-    expect(en).toContain("Table view");
-    expect(en).toContain('aria-pressed="false"');
+  it("offers the accessible table fallback", () => {
+    expect(en).toContain("Accessible table");
+    expect(en).toContain(
+      'aria-label="Interactive Process Intelligence canvas"',
+    );
+  });
+
+  it("keeps technical event names out of the default executive view", () => {
+    expect(en).not.toContain("Task Status Changed");
+    expect(en).not.toContain("Task Dependency Added");
+    expect(en).toContain("Advanced · Technical Events");
+  });
+
+  it("renders the shared React Flow interaction surface", () => {
+    expect(en).toContain('data-testid="rf__wrapper"');
+    expect(en).toContain('data-testid="rf__minimap"');
+    expect(en).toContain("Search and focus");
+    expect(en).toContain("Save Layout");
+    expect(en).toContain("Primary flow");
+    expect(en).not.toContain("Observed main route");
   });
 });

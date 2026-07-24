@@ -1,11 +1,11 @@
 # CAP-047 — PMO Process Intelligence Command Center
 
-**Status:** In progress (M1 closed) · **Priority:** P1 · **Flag:** `PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED` (server-side, default OFF)
+**Status:** Implemented locally — executive redesign awaiting UAT · **Priority:** P1 · **Flag:** `pmo_process_intelligence_dashboard` (server-side, default OFF)
 **Source of truth:** `Project360` spec *PMO Process Intelligence Module Specification v1* (2026-07-23) + Autonomous Master Prompt. This doc freezes the approved scope (M1-T1) and records the binding governance for the autonomous build.
 
 ## 1. Vision (frozen)
 
-An executive, data-first PMO dashboard based on process mining. It explains **how work actually flows** across the portfolio: dominant paths, variants, rework, waiting, bottlenecks, financial deviation (EVM), risk propagation, capacity pressure, dependencies and benefits — with Isabella as an evidence-backed virtual PMO director and non-persistent What-if simulation. Professional, light, legible, analytical. **Not a video game**: no galaxies, decorative 3D, particles, neon overload or cinematic effects.
+An executive, data-first PMO dashboard based on process mining. Its default view is a five-stage **Executive Portfolio Flow** rendered as an interactive React Flow canvas that reuses the Living Graph engine and interaction patterns. The five stage supernodes are draggable, selectable, expandable and drillable; pan, wheel/pinch zoom, semantic zoom, minimap, interactive evidence edges, breadcrumbs, search/focus, saved layouts, keyboard navigation and Isabella screen-context synchronization are required behavior. Risk, finance, resources, dependencies and benefits modify the same canvas; tables are supporting detail/fallback. The event-level canvas is preserved under **Advanced → Technical Event Explorer**.
 
 ## 2. Non-destructive coexistence (binding — dashboard protection strategy)
 
@@ -85,6 +85,21 @@ Per milestone, a versioned knowledge package is produced under `docs/pmo-process
 All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `test:run` · `build` green; current dashboard intact and default (protected by tests); flag OFF; Isabella final snapshot + calibration report; final implementation report with evidence and rollback instructions.
 
 ## Milestone log
+
+- **Blocking interaction-parity correction (2026-07-23): CLOSED LOCALLY.**
+  Replaced the static executive SVG as the default Beta surface with a
+  domain-adapted React Flow canvas using the Living Graph engine, viewport,
+  Dagre layout and shared layout controls. Added drag, pan, wheel/pinch zoom,
+  semantic LOD, hover relationship emphasis, node/edge selection, multiselect,
+  expand/collapse, double-click drill-down, canonical breadcrumbs,
+  context menu, search/focus, fit/reset/fullscreen, scoped layout persistence,
+  keyboard navigation, minimap, accessible fallback and reduced-motion
+  behavior. Isabella now receives explicit live graph context and the server
+  re-resolves every entity inside the authenticated tenant. The supported
+  canonical hierarchy is Organization → Stage → Project → Milestone →
+  Activity; portfolio/program/workstream are not fabricated because no
+  canonical taxonomy exists. Evidence:
+  `docs/pmo-process-intelligence/LIVING-GRAPH-PARITY-REPORT.md`.
 
 - **M9 (2026-07-23): CLOSED — module UAT-READY.** Final QA run: repo suite
   **2369 tests green**, typecheck green, production build green, module lint

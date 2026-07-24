@@ -1,38 +1,59 @@
 "use client";
 
-// ============================================================================
-// PMO Process Intelligence Command Center — responsive shell (CAP-047 · M3/M4)
-// ============================================================================
-// Executive header + one-click return switcher, KPI bar, overlay tabs,
-// dominant central canvas (M4 Process Canvas) with drill-down breadcrumbs and
-// tabular fallback, Isabella panel. Every region renders HONEST states: KPIs
-// without a data source declare themselves unavailable instead of inventing
-// numbers. Data-first and motion-free (reduced-motion safe); status is never
-// communicated by color alone. Business truth comes exclusively from the
-// PmoPiFlowModel contract — this component derives presentation only.
-// ============================================================================
-
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, ArrowLeft, Banknote, GitBranch, LayoutList,
-  Network, ShieldAlert, Table2, Target, Users,
+  Activity,
+  ArrowLeft,
+  Banknote,
+  ChevronRight,
+  GitBranch,
+  Home,
+  LayoutList,
+  Network,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  SlidersHorizontal,
+  Target,
+  Users,
 } from "lucide-react";
-import type { PmoPiFilters, PmoPiFlowModel } from "@/lib/pmo-process-intelligence/contracts";
+import type {
+  PmoPiFilters,
+  PmoPiFlowModel,
+} from "@/lib/pmo-process-intelligence/contracts";
 import type { PmoPiFinanceOverlayModel } from "@/lib/pmo-process-intelligence/financial-overlay";
 import type { PmoPiOverlaysData } from "@/lib/pmo-process-intelligence/overlays-read.server";
 import type { PmoPiInsight } from "@/lib/pmo-process-intelligence/insights";
 import type { WhatIfInputs } from "@/lib/pmo-process-intelligence/whatif";
-import { ProcessCanvas, activityLabel } from "./process-canvas";
+import type { ProcessGraphHierarchyModel } from "@/lib/pmo-process-intelligence/process-graph.types";
+import {
+  EXECUTIVE_STAGE_ORDER,
+  executiveStageLabel,
+  type PmoPiExecutivePortfolioModel,
+  type PmoPiExecutiveProject,
+} from "@/lib/pmo-process-intelligence/executive-projection";
 import { FinanceOverlay } from "./finance-overlay";
-import { BenefitsPanel, DependenciesPanel, ResourcesPanel, RiskPanel } from "./overlays-panels";
+import {
+  BenefitsPanel,
+  DependenciesPanel,
+  ResourcesPanel,
+  RiskPanel,
+} from "./overlays-panels";
 import { IsabellaPanel } from "./isabella-panel";
 import { WhatIfPanel } from "./whatif-panel";
 import { RealtimeRefresh } from "./realtime-refresh";
+import { TechnicalEventExplorer } from "./technical-event-explorer";
+import { ProcessIntelligenceCanvas } from "./process-intelligence-canvas";
 
 type OverlayKey = PmoPiFilters["overlay"];
 
-const OVERLAYS: { key: OverlayKey; icon: React.ReactNode; en: string; es: string }[] = [
+const OVERLAYS: {
+  key: OverlayKey;
+  icon: React.ReactNode;
+  en: string;
+  es: string;
+}[] = [
   { key: "process", icon: <Network className="h-4 w-4" />, en: "Process", es: "Proceso" },
   { key: "risk", icon: <ShieldAlert className="h-4 w-4" />, en: "Risk", es: "Riesgo" },
   { key: "finance", icon: <Banknote className="h-4 w-4" />, en: "Finance", es: "Finanzas" },
@@ -42,318 +63,677 @@ const OVERLAYS: { key: OverlayKey; icon: React.ReactNode; en: string; es: string
   { key: "whatif", icon: <Activity className="h-4 w-4" />, en: "What-if", es: "What-if" },
 ];
 
-/** Presentation-only KPI derivation from the flow model (no business logic). */
 export function deriveKpis(model: PmoPiFlowModel | null): {
   dominantSharePct: number | null;
   reworkPct: number | null;
   bottleneckCount: number | null;
 } {
   if (!model || model.nodes.length === 0) {
-    return { dominantSharePct: null, reworkPct: null, bottleneckCount: null };
+    return {
+      dominantSharePct: null,
+      reworkPct: null,
+      bottleneckCount: null,
+    };
   }
-  const top = [...model.variants.variants].sort((a, b) => b.caseCount - a.caseCount)[0] ?? null;
-  const totalEdgeFreq = model.edges.reduce((s, e) => s + e.frequency, 0);
-  const reworkFreq = model.edges.filter((e) => e.isRework).reduce((s, e) => s + e.frequency, 0);
+  const top = [...model.variants.variants].sort(
+    (left, right) => right.caseCount - left.caseCount,
+  )[0] ?? null;
+  const totalEdgeFrequency = model.edges.reduce(
+    (sum, edge) => sum + edge.frequency,
+    0,
+  );
+  const reworkFrequency = model.edges
+    .filter((edge) => edge.isRework)
+    .reduce((sum, edge) => sum + edge.frequency, 0);
   return {
     dominantSharePct: top ? Math.round(top.frequencyPct) : null,
-    reworkPct: totalEdgeFreq > 0 ? Math.round((reworkFreq / totalEdgeFreq) * 100) : null,
-    bottleneckCount: model.nodes.filter((n) => n.bottleneckScore >= 0.7).length,
+    reworkPct:
+      totalEdgeFrequency > 0
+        ? Math.round((reworkFrequency / totalEdgeFrequency) * 100)
+        : null,
+    bottleneckCount: model.nodes.filter(
+      (node) => node.bottleneckScore >= 0.7,
+    ).length,
   };
+}
+
+function emptyExecutiveModel(
+  technicalModel: PmoPiFlowModel | null,
+): PmoPiExecutivePortfolioModel {
+  return {
+    stages: EXECUTIVE_STAGE_ORDER.map((key) => ({
+      key,
+      projectIds: [],
+      projectCount: 0,
+      activeProjectCount: 0,
+      averageCycleTimeMs: null,
+      targetCycleTimeMs: null,
+      outsideSlaProjectCount: null,
+      reworkOccurrences: 0,
+      baselineBudget: 0,
+      actualCost: 0,
+      eac: 0,
+      forecastVariance: 0,
+      activeRisks: 0,
+      overallocatedResources: 0,
+      trend: "unavailable" as const,
+      status: "insufficient" as const,
+    })),
+    connections: [],
+    variants: [],
+    bottlenecks: [],
+    reworkLoops: [],
+    projects: [],
+    portfolioHealthScore: null,
+    generatedAt: technicalModel?.generatedAt ?? new Date(0).toISOString(),
+    dataQualityScore: technicalModel?.quality.dataQualityScore ?? 0,
+    limitations: ["executive_projection_unavailable"],
+  };
+}
+
+interface CommandCenterShellProps {
+  locale: "en" | "es";
+  base: string;
+  organizationName: string;
+  organizationId: string;
+  userId: string;
+  initialFilters: PmoPiFilters;
+  executiveModel?: PmoPiExecutivePortfolioModel | null;
+  organizationModel?: PmoPiFlowModel | null;
+  focusExecutiveModel?: PmoPiExecutivePortfolioModel | null;
+  focusModel?: PmoPiFlowModel | null;
+  focusProject?: PmoPiExecutiveProject | null;
+  focusMode?: boolean;
+  initialTechnicalView?: boolean;
+  model?: PmoPiFlowModel | null;
+  loadFailed?: boolean;
+  truncated?: boolean;
+  projects?: { id: string; title: string }[];
+  finance?: PmoPiFinanceOverlayModel | null;
+  overlays?: PmoPiOverlaysData | null;
+  insights?: PmoPiInsight[];
+  projectNames?: Record<string, string>;
+  hierarchy: ProcessGraphHierarchyModel;
 }
 
 export function CommandCenterShell({
   locale,
   base,
   organizationName,
+  organizationId,
+  userId,
   initialFilters,
+  executiveModel,
+  organizationModel,
+  focusExecutiveModel = null,
+  focusModel = null,
+  focusProject = null,
+  focusMode = false,
+  initialTechnicalView = false,
   model,
   loadFailed = false,
   truncated = false,
-  projects = [],
-  focusProject = null,
   finance = null,
   overlays = null,
   insights = [],
   projectNames = {},
-}: {
-  locale: "en" | "es";
-  base: string;
-  organizationName: string;
-  initialFilters: PmoPiFilters;
-  model?: PmoPiFlowModel | null;
-  loadFailed?: boolean;
-  truncated?: boolean;
-  projects?: { id: string; title: string }[];
-  focusProject?: { id: string; title: string } | null;
-  finance?: PmoPiFinanceOverlayModel | null;
-  overlays?: PmoPiOverlaysData | null;
-  insights?: PmoPiInsight[];
-  projectNames?: Record<string, string>;
-}) {
+  hierarchy,
+}: CommandCenterShellProps) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
+  const technicalModel = organizationModel ?? model ?? null;
+  const organizationExecutive =
+    executiveModel ?? emptyExecutiveModel(technicalModel);
+  const activeExecutive =
+    focusMode && focusExecutiveModel ? focusExecutiveModel : organizationExecutive;
+  const activeTechnical = focusMode && focusModel ? focusModel : technicalModel;
   const [overlay, setOverlay] = useState<OverlayKey>(initialFilters.overlay);
   const [tableView, setTableView] = useState(false);
-  const [highlight, setHighlight] = useState<string[] | null>(null);
-  const flow = model ?? null;
-  const kpis = deriveKpis(flow);
+  const [technicalView, setTechnicalView] = useState(initialTechnicalView);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    focusMode ? null : focusProject?.id ?? null,
+  );
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo ?? "");
 
-  const noData = tt("no data in scope", "sin datos en alcance");
+  const storageKey = `pmo-pi-executive-view:${organizationName}`;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = window.sessionStorage.getItem(storageKey);
+        if (!saved) return;
+        const parsed = JSON.parse(saved) as {
+          overlay?: OverlayKey;
+          dateFrom?: string;
+          dateTo?: string;
+        };
+        if (parsed.overlay) setOverlay(parsed.overlay);
+        if (parsed.dateFrom) setDateFrom(parsed.dateFrom);
+        if (parsed.dateTo) setDateTo(parsed.dateTo);
+      } catch {
+        // Session state is optional presentation context.
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [storageKey]);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        storageKey,
+        JSON.stringify({ overlay, dateFrom, dateTo }),
+      );
+    } catch {
+      // Session state is optional presentation context.
+    }
+  }, [storageKey, overlay, dateFrom, dateTo]);
+
+  const visibleProjects = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase(locale);
+    return activeExecutive.projects.filter((project) => {
+      return (
+        normalizedSearch.length === 0 ||
+        project.title.toLocaleLowerCase(locale).includes(normalizedSearch)
+      );
+    });
+  }, [
+    activeExecutive.projects,
+    locale,
+    search,
+  ]);
+
   const route = `${base}/process-intelligence`;
 
-  const kpiCards: { key: string; label: string; value: string | null; hint: string }[] = [
-    { key: "portfolio_health", label: tt("Portfolio Health", "Salud del Portafolio"), value: null, hint: noData },
-    { key: "dominant_path_share", label: tt("Dominant Path", "Ruta Dominante"), value: kpis.dominantSharePct != null ? `${kpis.dominantSharePct}%` : null, hint: tt("of cases follow it", "de los casos la siguen") },
-    { key: "rework_rate", label: tt("Rework", "Retrabajo"), value: kpis.reworkPct != null ? `${kpis.reworkPct}%` : null, hint: tt("of transitions are returns", "de las transiciones son retornos") },
-    { key: "bottlenecks", label: tt("Bottlenecks", "Cuellos de Botella"), value: kpis.bottleneckCount != null ? String(kpis.bottleneckCount) : null, hint: tt("calculated from waiting", "calculados desde esperas") },
-    { key: "cpi", label: "CPI", value: finance?.portfolioCpi != null ? finance.portfolioCpi.toFixed(2) : null, hint: tt("portfolio ΣEV/ΣAC", "portafolio ΣEV/ΣAC") },
-    { key: "critical_risks", label: tt("Critical Risks", "Riesgos Críticos"), value: overlays ? String(overlays.risk.criticalOpenCount) : null, hint: tt("open, from the risk register", "abiertos, del registro de riesgos") },
-  ];
+  function resetView() {
+    setOverlay("process");
+    setTableView(false);
+    setTechnicalView(false);
+    setSelectedProjectId(null);
+    setSearch("");
+    setDateFrom("");
+    setDateTo("");
+    try {
+      window.sessionStorage.removeItem(storageKey);
+    } catch {
+      // Optional presentation state.
+    }
+  }
 
   return (
-    <div className="space-y-4">
-      {/* ── Header + one-click return switcher ── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-foreground">
-            <Network className="h-6 w-6 text-brand-500" />
-            {tt("PMO Process Intelligence", "PMO Process Intelligence")}
-            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-              Beta
-            </span>
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            {tt(
-              `How work actually flows across ${organizationName}: dominant paths, variants, rework, bottlenecks, budget and risk — every number backed by evidence.`,
-              `Cómo fluye realmente el trabajo en ${organizationName}: rutas dominantes, variantes, retrabajo, cuellos de botella, presupuesto y riesgo — cada número con evidencia.`,
-            )}
-          </p>
-          <div className="mt-2 inline-flex items-center rounded-lg border border-border p-0.5 text-xs font-medium">
-            <Link
-              href={base || "/"}
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
+    <div className="space-y-4 bg-slate-50/40 text-slate-950">
+      <header className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950">
+                {tt(
+                  "Executive Portfolio Flow",
+                  "Flujo Ejecutivo del Portafolio",
+                )}
+              </h1>
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                Beta
+              </span>
+            </div>
+            <p className="mt-1 max-w-3xl text-sm text-slate-600">
+              {tt(
+                `A ten-second executive view of how ${organizationName} is moving, where pressure is accumulating and what requires action.`,
+                `Una lectura ejecutiva en diez segundos de cómo avanza ${organizationName}, dónde se concentra la presión y qué requiere acción.`,
+              )}
+            </p>
+            <div className="mt-3 inline-flex items-center rounded-lg border border-slate-300 bg-slate-50 p-1 text-xs font-semibold">
+              <Link
+                href={base || "/"}
+                className="rounded-md px-3 py-1.5 text-slate-600 hover:bg-white hover:text-slate-950"
+              >
+                {tt("Current Dashboard", "Dashboard Actual")}
+              </Link>
+              <span
+                aria-current="page"
+                className="rounded-md bg-emerald-700 px-3 py-1.5 text-white"
+              >
+                Process Intelligence Beta
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setTechnicalView(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
             >
-              <ArrowLeft className="h-3 w-3" />
-              {tt("Current Dashboard", "Dashboard Actual")}
-            </Link>
-            <span aria-current="page" className="rounded-md bg-muted px-2.5 py-1 text-foreground">
-              {tt("Process Intelligence Beta", "Process Intelligence Beta")}
+              <SlidersHorizontal className="h-4 w-4" />
+              {tt(
+                "Advanced · Technical Events",
+                "Avanzado · Eventos técnicos",
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={resetView}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            >
+              <RotateCcw className="h-4 w-4" />
+              {tt("Reset View", "Restablecer vista")}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <nav
+        aria-label={tt("Scope breadcrumbs", "Ruta de alcance")}
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
+      >
+        <Link
+          href={route}
+          className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline"
+        >
+          <Home className="h-4 w-4" />
+          Global PMO
+        </Link>
+        <ChevronRight className="h-4 w-4 text-slate-400" />
+        <span className="text-slate-600">
+          {tt("All portfolios", "Todos los portafolios")}
+        </span>
+        <ChevronRight className="h-4 w-4 text-slate-400" />
+        <span className="text-slate-600">
+          {tt("All programs", "Todos los programas")}
+        </span>
+        {focusProject ? (
+          <>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <span className="font-semibold text-slate-950">
+              {focusProject.title}
             </span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <button
-            type="button"
-            onClick={() => setTableView((v) => !v)}
-            aria-pressed={tableView}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          </>
+        ) : null}
+        {focusMode ? (
+          <Link
+            href={route}
+            className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline"
           >
-            {tableView ? <Network className="h-4 w-4" /> : <Table2 className="h-4 w-4" />}
-            {tableView ? tt("Map view", "Vista de mapa") : tt("Table view", "Vista de tabla")}
-          </button>
-          <RealtimeRefresh focusProjectId={focusProject?.id ?? null} locale={locale} />
-        </div>
-      </div>
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {tt("Back to Organization", "Volver a la organización")}
+          </Link>
+        ) : null}
+      </nav>
 
-      {truncated && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-          {tt(
-            "The event window was truncated at 20,000 events — oldest history is not included in this view.",
-            "La ventana de eventos se truncó en 20,000 eventos — la historia más antigua no está incluida en esta vista.",
-          )}
-        </p>
-      )}
-
-      {/* ── Executive KPI bar ── */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {kpiCards.map((k) => (
-          <div key={k.key} className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground">{k.label}</p>
-            {k.value != null ? (
-              <p className="mt-1 text-2xl font-bold text-foreground">{k.value}</p>
-            ) : (
-              <p className="mt-1 text-2xl font-bold text-muted-foreground/50" aria-label={noData}>—</p>
+      <section
+        aria-label={tt("Portfolio filters", "Filtros del portafolio")}
+        className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-[1.5fr_repeat(5,minmax(0,1fr))]"
+      >
+        <label className="relative">
+          <span className="sr-only">{tt("Global Search", "Búsqueda global")}</span>
+          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={tt(
+              "Search projects…",
+              "Buscar proyectos…",
             )}
-            <p className="text-[11px] text-muted-foreground">{k.value != null ? k.hint : noData}</p>
-          </div>
-        ))}
+            className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          />
+        </label>
+        <select
+          aria-label={tt("Portfolio", "Portafolio")}
+          disabled
+          className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+        >
+          <option>{tt("All portfolios", "Todos los portafolios")}</option>
+        </select>
+        <select
+          aria-label={tt("Program", "Programa")}
+          disabled
+          className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+        >
+          <option>{tt("All programs", "Todos los programas")}</option>
+        </select>
+        <select
+          aria-label={tt("Project", "Proyecto")}
+          value={selectedProjectId ?? ""}
+          onChange={(event) =>
+            setSelectedProjectId(event.target.value || null)
+          }
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">{tt("All projects", "Todos los proyectos")}</option>
+          {organizationExecutive.projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.title}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          aria-label={tt("From date", "Fecha desde")}
+          value={dateFrom}
+          onChange={(event) => setDateFrom(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          aria-label={tt("To date", "Fecha hasta")}
+          value={dateTo}
+          onChange={(event) => setDateTo(event.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        />
       </section>
 
-      {/* ── Overlay tabs ── */}
-      <div role="tablist" aria-label={tt("Analytical overlays", "Capas analíticas")} className="flex flex-wrap gap-1 border-b border-border">
-        {OVERLAYS.map((o) => (
-          <button
-            key={o.key}
-            role="tab"
-            aria-selected={overlay === o.key}
-            onClick={() => setOverlay(o.key)}
-            className={`inline-flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${
-              overlay === o.key
-                ? "border-b-2 border-brand-500 text-brand-600 dark:text-brand-400"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {o.icon}
-            {tt(o.en, o.es)}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Main region: dominant canvas + Isabella panel ── */}
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-        <section
-          aria-label={tt("Process Intelligence Canvas", "Canvas de Process Intelligence")}
-          className="min-h-[460px] rounded-2xl border border-border bg-card p-5"
-        >
-          {/* Drill-down breadcrumbs: organization → project (filters preserved
-              by re-loading the same route with ?project=) */}
-          <nav aria-label={tt("Drill-down", "Navegación de detalle")} className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-            {focusProject ? (
-              <>
-                <Link href={route} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-                  {organizationName}
-                </Link>
-                <span className="text-muted-foreground">/</span>
-                <span className="font-medium text-foreground">{focusProject.title}</span>
-                <span className="text-muted-foreground">
-                  · {tt("cases = object journeys", "casos = recorridos de objetos")}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-medium text-foreground">{organizationName}</span>
-                <span className="text-muted-foreground">
-                  · {tt("cases = project journeys", "casos = recorridos de proyectos")}
-                </span>
-                {projects.length > 0 && (
-                  <span className="ml-auto inline-flex items-center gap-1.5 text-muted-foreground">
-                    {tt("Drill into", "Ver detalle de")}
-                    <DrillSelect route={route} projects={projects} placeholder={tt("project…", "proyecto…")} />
-                  </span>
-                )}
-              </>
-            )}
-          </nav>
-
-          {loadFailed ? (
-            <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
-              <p className="max-w-md text-sm text-muted-foreground">
-                {tt(
-                  "The process projection could not be loaded. No partial data was displayed.",
-                  "La proyección de proceso no pudo cargarse. No se mostraron datos parciales.",
-                )}
-              </p>
-            </div>
-          ) : overlay === "finance" ? (
-            finance ? (
-              <FinanceOverlay model={finance} projectNames={projectNames} locale={locale} />
-            ) : (
-              <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
-                <p className="max-w-md text-sm text-muted-foreground">{noData}</p>
-              </div>
-            )
-          ) : overlay === "risk" && overlays ? (
-            <RiskPanel overlay={overlays.risk} projectNames={projectNames} locale={locale} />
-          ) : overlay === "resources" && overlays ? (
-            <ResourcesPanel capacity={overlays.capacity} projectNames={projectNames} locale={locale} />
-          ) : overlay === "dependencies" && overlays ? (
-            <DependenciesPanel overlay={overlays.dependencies} projectNames={projectNames} locale={locale} />
-          ) : overlay === "benefits" ? (
-            <BenefitsPanel locale={locale} />
-          ) : overlay === "whatif" ? (
-            <WhatIfPanel
-              inputs={{
-                financeRows: finance?.rows ?? [],
-                criticalRiskCount: overlays?.risk.criticalOpenCount ?? 0,
-                systemicRisks: overlays?.risk.systemic ?? [],
-                capacity: overlays?.capacity ?? [],
-              } satisfies WhatIfInputs}
-              projectNames={projectNames}
-              locale={locale}
-            />
-          ) : overlay !== "process" ? (
-            <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
-              <p className="max-w-md text-sm text-muted-foreground">
-                {tt(
-                  `The ${OVERLAYS.find((o) => o.key === overlay)?.en} overlay activates on top of the process map when its data adapter is in scope.`,
-                  `La capa de ${OVERLAYS.find((o) => o.key === overlay)?.es} se activa sobre el mapa de proceso cuando su adaptador de datos esté en alcance.`,
-                )}
-              </p>
-            </div>
-          ) : tableView ? (
-            <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                <LayoutList className="h-4 w-4" />
-                {tt("Tabular view", "Vista tabular")}
-              </h2>
-              <table className="mt-3 w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="px-3 py-2">{tt("Activity", "Actividad")}</th>
-                    <th className="px-3 py-2">{tt("Frequency", "Frecuencia")}</th>
-                    <th className="px-3 py-2">{tt("Cases", "Casos")}</th>
-                    <th className="px-3 py-2">{tt("Rework", "Retrabajo")}</th>
-                    <th className="px-3 py-2">{tt("Bottleneck score", "Cuello de botella")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!flow || flow.nodes.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-10 text-center text-sm text-muted-foreground">{noData}</td>
-                    </tr>
-                  ) : (
-                    flow.nodes.map((n) => (
-                      <tr key={n.id} className="border-b border-border last:border-0">
-                        <td className="px-3 py-2 font-medium text-foreground">{activityLabel(n.activity)}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{n.frequency}×</td>
-                        <td className="px-3 py-2 text-muted-foreground">{n.caseCount}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{n.reworkOccurrences > 0 ? `↩ ×${n.reworkOccurrences}` : "—"}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{n.bottleneckScore.toFixed(2)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : flow ? (
-            <ProcessCanvas model={flow} locale={locale} highlightActivities={highlight} />
-          ) : (
-            <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
-              <Network className="h-10 w-10 text-muted-foreground/50" />
-              <p className="max-w-md text-sm text-muted-foreground">{noData}</p>
-            </div>
+      {truncated ? (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {tt(
+            "The event window reached 20,000 records. The dashboard remains usable, but older history is not included.",
+            "La ventana alcanzó 20.000 eventos. El dashboard sigue disponible, pero la historia más antigua no está incluida.",
           )}
-        </section>
+        </p>
+      ) : null}
 
-        {/* Isabella Intelligence — evidence-complete insights only (M7) */}
-        <IsabellaPanel
-          insights={insights}
+      {technicalView ? (
+        activeTechnical ? (
+          <TechnicalEventExplorer
+            model={activeTechnical}
+            locale={locale}
+            tableView={tableView}
+            onToggleTable={() => setTableView((current) => !current)}
+            onBack={() => setTechnicalView(false)}
+          />
+        ) : (
+          <EmptyState
+            text={tt(
+              "No technical event projection is available.",
+              "No hay una proyección técnica de eventos disponible.",
+            )}
+          />
+        )
+      ) : (
+        <>
+          <div
+            role="tablist"
+            aria-label={tt("Analytical overlays", "Capas analíticas")}
+            className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2"
+          >
+            {OVERLAYS.map((item) => (
+              <button
+                key={item.key}
+                role="tab"
+                aria-selected={overlay === item.key}
+                onClick={() => {
+                  setOverlay(item.key);
+                  setTableView(false);
+                }}
+                className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-3 text-sm font-semibold ${
+                  overlay === item.key
+                    ? "border-emerald-600 text-emerald-700"
+                    : "border-transparent text-slate-600 hover:text-slate-950"
+                }`}
+              >
+                {item.icon}
+                {tt(item.en, item.es)}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_340px]">
+            <main
+              aria-label={tt(
+                "Process Intelligence executive view",
+                "Vista ejecutiva de Process Intelligence",
+              )}
+              className="min-w-0 rounded-2xl border border-slate-200 bg-white p-2 sm:p-5"
+            >
+              {loadFailed ? (
+                <EmptyState
+                  text={tt(
+                    "The executive projection could not be loaded. No partial analytical data was displayed.",
+                    "La proyección ejecutiva no pudo cargarse. No se mostraron datos analíticos parciales.",
+                  )}
+                />
+              ) : overlay !== "whatif" && tableView ? (
+                <ExecutiveTable
+                  projects={visibleProjects}
+                  locale={locale}
+                  onSelectProject={setSelectedProjectId}
+                />
+              ) : overlay !== "whatif" ? (
+                <>
+                  <ProcessIntelligenceCanvas
+                    locale={locale}
+                    base={base}
+                    route={route}
+                    organizationId={organizationId}
+                    userId={userId}
+                    organizationName={organizationName}
+                    executiveModel={activeExecutive}
+                    hierarchy={hierarchy}
+                    layer={overlay}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    search={search}
+                    projectFilterIds={[]}
+                    focusProjectId={
+                      focusMode
+                        ? focusProject?.id ?? null
+                        : selectedProjectId
+                    }
+                    onOpenTechnicalEvents={() => setTechnicalView(true)}
+                  />
+                  {overlay !== "process" ? (
+                    <details className="mt-5 rounded-xl border border-slate-200 bg-slate-50">
+                      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">
+                        {tt(
+                          "Open analytical detail for this overlay",
+                          "Abrir detalle analítico de esta capa",
+                        )}
+                      </summary>
+                      <div className="border-t border-slate-200 bg-white p-4">
+                        {overlay === "finance" && finance ? (
+                          <FinanceOverlay
+                            model={finance}
+                            projectNames={projectNames}
+                            locale={locale}
+                          />
+                        ) : overlay === "risk" && overlays ? (
+                          <RiskPanel
+                            overlay={overlays.risk}
+                            projectNames={projectNames}
+                            locale={locale}
+                          />
+                        ) : overlay === "resources" && overlays ? (
+                          <ResourcesPanel
+                            capacity={overlays.capacity}
+                            projectNames={projectNames}
+                            locale={locale}
+                          />
+                        ) : overlay === "dependencies" && overlays ? (
+                          <DependenciesPanel
+                            overlay={overlays.dependencies}
+                            projectNames={projectNames}
+                            locale={locale}
+                          />
+                        ) : overlay === "benefits" ? (
+                          <BenefitsPanel locale={locale} />
+                        ) : (
+                          <EmptyState
+                            text={tt(
+                              "No detail is available for this analytical layer.",
+                              "No hay detalle disponible para esta capa analítica.",
+                            )}
+                          />
+                        )}
+                      </div>
+                    </details>
+                  ) : null}
+                </>
+              ) : overlay === "whatif" ? (
+                <WhatIfPanel
+                  inputs={{
+                    financeRows: finance?.rows ?? [],
+                    criticalRiskCount:
+                      overlays?.risk.criticalOpenCount ?? 0,
+                    systemicRisks: overlays?.risk.systemic ?? [],
+                    capacity: overlays?.capacity ?? [],
+                  } satisfies WhatIfInputs}
+                  projectNames={projectNames}
+                  locale={locale}
+                />
+              ) : (
+                <EmptyState
+                  text={tt(
+                    "No data is available for this analytical layer.",
+                    "No hay datos disponibles para esta capa analítica.",
+                  )}
+                />
+              )}
+
+              {overlay !== "whatif" ? (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                  <p className="text-xs text-slate-600">
+                    {visibleProjects.length}{" "}
+                    {tt("projects in the current view", "proyectos en la vista actual")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTableView((current) => !current)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    {tableView ? (
+                      <Network className="h-4 w-4" />
+                    ) : (
+                      <LayoutList className="h-4 w-4" />
+                    )}
+                    {tableView
+                      ? tt("Executive flow", "Flujo ejecutivo")
+                      : tt("Accessible table", "Tabla accesible")}
+                  </button>
+                </div>
+              ) : null}
+            </main>
+
+            <IsabellaPanel
+              insights={insights}
+              locale={locale}
+              scopeLabel={
+                focusProject
+                  ? focusProject.title
+                  : tt("Organization", "Organización")
+              }
+              onOpenInMap={() => {
+                setOverlay("process");
+                setTableView(false);
+                setTechnicalView(false);
+              }}
+              onSimulate={() => setOverlay("whatif")}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex justify-end">
+        <RealtimeRefresh
+          focusProjectId={focusMode ? focusProject?.id ?? null : null}
           locale={locale}
-          onOpenInMap={(activities) => {
-            setOverlay("process");
-            setTableView(false);
-            setHighlight(activities);
-          }}
-          onSimulate={() => setOverlay("whatif")}
         />
       </div>
+
     </div>
   );
 }
 
-/** Client-side project drill-down selector (navigates with ?project=). */
-function DrillSelect({ route, projects, placeholder }: { route: string; projects: { id: string; title: string }[]; placeholder: string }) {
+function ExecutiveTable({
+  projects,
+  locale,
+  onSelectProject,
+}: {
+  projects: PmoPiExecutiveProject[];
+  locale: "en" | "es";
+  onSelectProject: (projectId: string) => void;
+}) {
+  const tt = (en: string, es: string) => (locale === "es" ? es : en);
   return (
-    <select
-      defaultValue=""
-      onChange={(e) => {
-        if (e.target.value) window.location.assign(`${route}?project=${e.target.value}`);
-      }}
-      className="rounded-md border border-border bg-background px-1.5 py-1 text-xs"
-    >
-      <option value="">{placeholder}</option>
-      {projects.map((p) => (
-        <option key={p.id} value={p.id}>{p.title}</option>
-      ))}
-    </select>
+    <div className="overflow-x-auto">
+      <div className="mb-3">
+        <h2 className="text-lg font-bold text-slate-950">
+          {tt("Projects in scope", "Proyectos en alcance")}
+        </h2>
+        <p className="text-sm text-slate-600">
+          {tt(
+            "Keyboard-accessible fallback with the same executive facts.",
+            "Fallback accesible por teclado con los mismos datos ejecutivos.",
+          )}
+        </p>
+      </div>
+      <table className="min-w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs text-slate-600">
+          <tr>
+            <th className="px-3 py-2">{tt("Project", "Proyecto")}</th>
+            <th className="px-3 py-2">{tt("Stage", "Etapa")}</th>
+            <th className="px-3 py-2">{tt("Health", "Salud")}</th>
+            <th className="px-3 py-2">EAC</th>
+            <th className="px-3 py-2">{tt("Critical risks", "Riesgos críticos")}</th>
+            <th className="px-3 py-2">{tt("Resources", "Recursos")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map((project) => (
+            <tr key={project.id} className="border-t border-slate-200">
+              <td className="px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onSelectProject(project.id)}
+                  className="font-semibold text-emerald-700 hover:underline"
+                >
+                  {project.title}
+                </button>
+              </td>
+              <td className="px-3 py-2 text-slate-700">
+                {executiveStageLabel(project.currentStage, locale)}
+              </td>
+              <td className="px-3 py-2 text-slate-700">
+                {project.healthScore}/100
+              </td>
+              <td className="px-3 py-2 text-slate-700">
+                {project.eac == null
+                  ? "—"
+                  : new Intl.NumberFormat(
+                      locale === "es" ? "es-US" : "en-US",
+                      {
+                        style: "currency",
+                        currency: "USD",
+                        maximumFractionDigits: 0,
+                      },
+                    ).format(project.eac)}
+              </td>
+              <td className="px-3 py-2 text-slate-700">
+                {project.criticalRisks}
+              </td>
+              <td className="px-3 py-2 text-slate-700">
+                {project.overallocatedResources}
+              </td>
+            </tr>
+          ))}
+          {projects.length === 0 ? (
+            <tr>
+              <td
+                colSpan={6}
+                className="px-3 py-10 text-center text-sm text-slate-500"
+              >
+                {tt(
+                  "No projects match the current filters.",
+                  "Ningún proyecto coincide con los filtros actuales.",
+                )}
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+      <p className="max-w-lg text-sm text-slate-600">{text}</p>
+    </div>
   );
 }

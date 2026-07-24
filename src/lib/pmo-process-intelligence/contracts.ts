@@ -112,6 +112,11 @@ export interface PmoPiFlowModel {
 
 export interface PmoPiEvidencePackage {
   sourceEventIds: string[];
+  /** Technical event names stay inside Evidence/Technical View only. */
+  technicalEventTypes?: string[];
+  affectedCaseCount?: number;
+  cutoffDate?: string;
+  knowledgeVersion?: string;
   /** Human-readable formulas actually used (e.g. "CPI = EV / AC"). */
   formulas: string[];
   /** Projections/read models consulted (e.g. financial_project_cockpit). */

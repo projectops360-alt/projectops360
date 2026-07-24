@@ -65,6 +65,12 @@ export interface GuideContext {
   // Isabella explains WHY a task moves, is blocked, delayed, or at risk —
   // never inventing counts or causes. Populated in askLivingGuideAction.
   executionFacts?: string;
+  /**
+   * Live presentation context from the Process Intelligence canvas. It is a
+   * lookup/navigation hint only. The server re-derives tenant, authorization
+   * and every business metric before using it in an answer.
+   */
+  processGraph?: import("@/lib/pmo-process-intelligence/process-graph.types").ProcessGraphScreenContext;
 }
 
 /** One retrieved chunk with provenance, after hybrid fusion. */

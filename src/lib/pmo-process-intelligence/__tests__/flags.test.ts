@@ -9,7 +9,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { isPmoProcessIntelligenceEnabled, canAccessProcessIntelligence } from "../flags";
 
-const KEY = "PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED";
+const KEY = "pmo_process_intelligence_dashboard";
 const original = process.env[KEY];
 
 afterEach(() => {

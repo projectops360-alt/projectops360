@@ -113,8 +113,8 @@ export const env = {
    * this flag only exposes the "Process Intelligence Beta" switcher and its
    * lazily loaded module. Never expose to the browser via NEXT_PUBLIC.
    */
-  PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED:
-    process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED ?? "",
+  pmo_process_intelligence_dashboard:
+    process.env.pmo_process_intelligence_dashboard ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"
