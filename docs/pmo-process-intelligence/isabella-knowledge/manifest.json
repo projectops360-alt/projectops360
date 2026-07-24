@@ -22,6 +22,23 @@
       "approval_state": "approved (M1 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M1 gate"
+    },
+    {
+      "id": "pmo-pi-m2-contracts-semantics-formulas",
+      "milestone": "M2",
+      "version": 1,
+      "file": "M2-contracts-semantics-formulas.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/contracts.ts",
+        "src/lib/pmo-process-intelligence/flow-projection.ts",
+        "src/lib/pmo-process-intelligence/scope.ts",
+        "src/lib/pmo-process-intelligence/financial-snapshot.ts",
+        "src/lib/financial/calculations.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M2 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M2 gate"
     }
   ]
 }
