@@ -3214,5 +3214,15 @@
     "colSubscribers": "Empresas",
     "enterprise": "Enterprise",
     "noPlans": "No hay planes definidos."
+  },
+  "pwa": {
+    "title": "Instala ProjectOps360°",
+    "body": "Añade ProjectOps360° a este dispositivo para usarla como app a pantalla completa y con acceso más rápido.",
+    "install": "Instalar app",
+    "later": "Ahora no",
+    "dismiss": "Descartar invitación de instalación",
+    "iosBody": "Añade ProjectOps360° a tu pantalla de inicio para usarla como app a pantalla completa.",
+    "iosStepShare": "Compartir",
+    "iosStepAdd": "Añadir a pantalla de inicio"
   }
 }
