@@ -86,4 +86,17 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M2 (2026-07-23): CLOSED.** Canonical contracts typed + versioned
+  (`contracts.ts`, `PMO_PI_CONTRACT_VERSION`): event contract as a projection
+  over the PEG (no second event store), flow read model (nodes/edges/waiting/
+  rework/bottleneck/dominant path), evidence package, executive financial
+  snapshot and filters. Pure engines: `buildFlowModel` (delegates variants to
+  CAP-046), `buildFinancialSnapshot` (delegates ALL EVM math to
+  `lib/financial` — CPI/SPI/TCPI/ETC/EAC/VAC; honest unavailable states),
+  `scopeToOrganization`/`scopeToProjects` (defense-in-depth tenant barrier).
+  Double-counting prevented structurally (separate actuals/commitments/
+  accruals + test); baseline history stays in the immutable canonical model
+  (read-only). Gates: 19 unit tests green (guards PMO-PI-FLOW-PROJECTION,
+  PMO-PI-TENANT-SCOPE, PMO-PI-FINANCIAL-SNAPSHOT), typecheck green, no UI
+  yet, no schema changes. Isabella package M2 versioned (pending ingestion).
 - **M1 (2026-07-23): CLOSED.** Scope/vision frozen (this doc §1-§4), inventory completed (§4 table), metrics defined (§5), risk register + change control recorded (§6-§7), flag created OFF with guard test `src/lib/pmo-process-intelligence/__tests__/flags.test.ts` (PMO-PI-FLAG-OFF), Isabella knowledge package M1 versioned (pending ingestion). No production behavior changed.
