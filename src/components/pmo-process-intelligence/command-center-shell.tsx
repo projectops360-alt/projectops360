@@ -15,15 +15,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Activity, ArrowLeft, Banknote, GitBranch, Landmark, LayoutList,
-  Network, ShieldAlert, Sparkles, Table2, Target, Users,
+  Activity, ArrowLeft, Banknote, GitBranch, LayoutList,
+  Network, ShieldAlert, Table2, Target, Users,
 } from "lucide-react";
 import type { PmoPiFilters, PmoPiFlowModel } from "@/lib/pmo-process-intelligence/contracts";
 import type { PmoPiFinanceOverlayModel } from "@/lib/pmo-process-intelligence/financial-overlay";
 import type { PmoPiOverlaysData } from "@/lib/pmo-process-intelligence/overlays-read.server";
+import type { PmoPiInsight } from "@/lib/pmo-process-intelligence/insights";
+import type { WhatIfInputs } from "@/lib/pmo-process-intelligence/whatif";
 import { ProcessCanvas, activityLabel } from "./process-canvas";
 import { FinanceOverlay } from "./finance-overlay";
 import { BenefitsPanel, DependenciesPanel, ResourcesPanel, RiskPanel } from "./overlays-panels";
+import { IsabellaPanel } from "./isabella-panel";
+import { WhatIfPanel } from "./whatif-panel";
 
 type OverlayKey = PmoPiFilters["overlay"];
 
@@ -68,6 +72,7 @@ export function CommandCenterShell({
   focusProject = null,
   finance = null,
   overlays = null,
+  insights = [],
   projectNames = {},
 }: {
   locale: "en" | "es";
@@ -81,11 +86,13 @@ export function CommandCenterShell({
   focusProject?: { id: string; title: string } | null;
   finance?: PmoPiFinanceOverlayModel | null;
   overlays?: PmoPiOverlaysData | null;
+  insights?: PmoPiInsight[];
   projectNames?: Record<string, string>;
 }) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
   const [overlay, setOverlay] = useState<OverlayKey>(initialFilters.overlay);
   const [tableView, setTableView] = useState(false);
+  const [highlight, setHighlight] = useState<string[] | null>(null);
   const flow = model ?? null;
   const kpis = deriveKpis(flow);
 
@@ -248,6 +255,17 @@ export function CommandCenterShell({
             <DependenciesPanel overlay={overlays.dependencies} projectNames={projectNames} locale={locale} />
           ) : overlay === "benefits" ? (
             <BenefitsPanel locale={locale} />
+          ) : overlay === "whatif" ? (
+            <WhatIfPanel
+              inputs={{
+                financeRows: finance?.rows ?? [],
+                criticalRiskCount: overlays?.risk.criticalOpenCount ?? 0,
+                systemicRisks: overlays?.risk.systemic ?? [],
+                capacity: overlays?.capacity ?? [],
+              } satisfies WhatIfInputs}
+              projectNames={projectNames}
+              locale={locale}
+            />
           ) : overlay !== "process" ? (
             <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
               <p className="max-w-md text-sm text-muted-foreground">
@@ -293,7 +311,7 @@ export function CommandCenterShell({
               </table>
             </div>
           ) : flow ? (
-            <ProcessCanvas model={flow} locale={locale} />
+            <ProcessCanvas model={flow} locale={locale} highlightActivities={highlight} />
           ) : (
             <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
               <Network className="h-10 w-10 text-muted-foreground/50" />
@@ -302,23 +320,17 @@ export function CommandCenterShell({
           )}
         </section>
 
-        {/* Isabella Intelligence panel (recommendations arrive in M7 — until
-            then the contract is stated instead of fabricated content) */}
-        <aside aria-label="Isabella Intelligence" className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-purple-500" />
-            Isabella Intelligence
-          </h2>
-          <div className="mt-4 flex flex-col items-center gap-2 py-10 text-center">
-            <Landmark className="h-8 w-8 text-muted-foreground/50" />
-            <p className="max-w-[240px] text-sm text-muted-foreground">
-              {tt(
-                "Recommendations appear here only with linked evidence, confidence and limitations — never without.",
-                "Las recomendaciones aparecen aquí solo con evidencia vinculada, confianza y limitaciones — nunca sin ellas.",
-              )}
-            </p>
-          </div>
-        </aside>
+        {/* Isabella Intelligence — evidence-complete insights only (M7) */}
+        <IsabellaPanel
+          insights={insights}
+          locale={locale}
+          onOpenInMap={(activities) => {
+            setOverlay("process");
+            setTableView(false);
+            setHighlight(activities);
+          }}
+          onSimulate={() => setOverlay("whatif")}
+        />
       </div>
     </div>
   );

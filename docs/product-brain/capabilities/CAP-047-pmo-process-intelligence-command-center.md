@@ -86,6 +86,25 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M7 (2026-07-23): CLOSED (with declared deviations).** Isabella
+  Intelligence + What-if. Insight engine (`insights.ts`): six deterministic
+  rules (bottleneck, rework, CPI, VAC<0, systemic risk, capacity pressure) —
+  NO LLM; evidence contract enforced BY CONSTRUCTION and by the BLOCKING
+  test (100% of insights carry formulas + projections + timestamps +
+  confidence-from-data-quality + limitations incl. temporal≠causality +
+  affected entities + bilingual action). Panel actions: View evidence
+  (expandable), Open in map (highlights activities in the canvas — closes
+  the M6 deferred deep-link), Simulate (jumps to What-if). Governed
+  feedback: accept/reject/defer → `audit_logs` via the existing logAudit
+  (no new schema); NEVER changes behavior by itself (CAP-047 §8 gate).
+  What-if (`whatif.ts`): pure ephemeral simulation — budget delta moves BAC
+  (EAC unchanged → honest VAC response), risks assumed mitigated,
+  availability delta clamped 0-100; current vs simulated labeled side by
+  side; NOTHING persists (purity + never-mutates tests). **Declared
+  deviations:** schedule and benefits simulation unavailable (no data model
+  in scope — declared in result.limitations). Gates: 9 new tests (guards
+  PMO-PI-INSIGHT-EVIDENCE blocking, PMO-PI-WHATIF), module 69/69 green,
+  typecheck green. Isabella package M7 versioned.
 - **M6 (2026-07-23): CLOSED (with declared deviations).** Overlays wired into
   the shell tabs. Risk: open-risk exposure by project/severity + systemic
   risks via BFS over RECORDED task_dependencies only (linked task required —

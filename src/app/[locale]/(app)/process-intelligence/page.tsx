@@ -17,6 +17,7 @@ import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts
 import { loadPmoPiFlowModel } from "@/lib/pmo-process-intelligence/read-model.server";
 import { loadPmoPiFinanceOverlay } from "@/lib/pmo-process-intelligence/financial-read.server";
 import { loadPmoPiOverlays } from "@/lib/pmo-process-intelligence/overlays-read.server";
+import { buildInsights } from "@/lib/pmo-process-intelligence/insights";
 import { CommandCenterShell } from "@/components/pmo-process-intelligence/command-center-shell";
 import type { Locale } from "@/types/database";
 
@@ -55,6 +56,15 @@ export default async function ProcessIntelligencePage({
   const projectNames: Record<string, string> = {};
   if (result.status === "ok") for (const p of result.projects) projectNames[p.id] = p.title;
 
+  // Isabella insights (M7): deterministic rules over the loaded read models.
+  const insights = buildInsights({
+    flow: result.status === "ok" ? result.model : null,
+    finance,
+    overlays,
+    projectNames,
+    generatedAt: result.status === "ok" ? result.model.generatedAt : new Date().toISOString(),
+  });
+
   return (
     <CommandCenterShell
       locale={locale === "es" ? "es" : "en"}
@@ -68,6 +78,7 @@ export default async function ProcessIntelligencePage({
       focusProject={result.status === "ok" ? result.focusProject : null}
       finance={finance}
       overlays={overlays}
+      insights={insights}
       projectNames={projectNames}
     />
   );

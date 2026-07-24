@@ -53,7 +53,7 @@ describe("CommandCenterShell (CAP-047 M3)", () => {
 
   it("states the Isabella evidence rule in the panel", () => {
     expect(en).toContain("Isabella Intelligence");
-    expect(en).toContain("linked evidence, confidence and limitations");
+    expect(en).toContain("no recommendation exists without evidence");
   });
 
   it("renders fully in Spanish without Spanglish leaks (UX-012)", () => {
@@ -61,7 +61,7 @@ describe("CommandCenterShell (CAP-047 M3)", () => {
     expect(es).toContain("Vista de tabla");
     expect(es).toContain("Riesgo");
     expect(es).toContain("sin datos en alcance");
-    expect(es).toContain("evidencia vinculada, confianza y limitaciones");
+    expect(es).toContain("ninguna recomendación existe sin evidencia");
   });
 
   it("offers a tabular fallback toggle", () => {
