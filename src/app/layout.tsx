@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,17 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
+  // iOS ignores the web manifest; these are what give it a standalone shell and
+  // a proper name on the Home Screen.
+  appleWebApp: {
+    capable: true,
+    title: "ProjectOps360",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#022826",
 };
 
 export default function RootLayout({
