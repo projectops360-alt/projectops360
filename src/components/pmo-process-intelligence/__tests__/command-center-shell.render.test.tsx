@@ -7,8 +7,14 @@
 // stated in the panel, and full EN/ES rendering (UX-012).
 // ============================================================================
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+
+// RealtimeRefresh (M8) uses the App Router — mock it for static rendering.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {} }),
+}));
+
 import { CommandCenterShell } from "../command-center-shell";
 import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts";
 

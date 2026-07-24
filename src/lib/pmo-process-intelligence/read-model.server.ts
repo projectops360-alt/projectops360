@@ -110,6 +110,7 @@ export async function loadPmoPiFlowModel(
       );
 
   try {
+    const startedAt = Date.now();
     const model = buildFlowModel(
       {
         organizationId: org.organizationId,
@@ -118,6 +119,19 @@ export async function loadPmoPiFlowModel(
       },
       cases,
       new Date().toISOString(),
+    );
+    // Deterministic observability (LGRE pattern): one JSON line, no PII.
+    console.log(
+      JSON.stringify({
+        event: "pmo_pi_projection_built",
+        level: focus ? "project" : "organization",
+        events: rows.length,
+        cases: cases.length,
+        nodes: model.nodes.length,
+        edges: model.edges.length,
+        truncated: rows.length >= MAX_EVENTS,
+        durationMs: Date.now() - startedAt,
+      }),
     );
     return {
       status: "ok",

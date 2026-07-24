@@ -86,6 +86,22 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M8 (2026-07-23): CLOSED (with declared deviations).** Production
+  adapters were real since M4-M6 (there were never mocks to replace — PEG,
+  cockpit, risks, deps, capacity, all RLS-scoped + barriers). Realtime:
+  signature polling (count + max sequence per scope via
+  `getPmoPiSignatureAction`, flag+role gated) → `router.refresh()` ONLY on
+  a real change; deterministic error backoff 20s→120s with a degraded
+  indicator in text; pauses on hidden tab; timers cleaned on unmount (no
+  leaks). Observability: one deterministic JSON line per projection build
+  (LGRE pattern, no PII). Performance by design: static SVG, zero
+  animation, memoized layout, LOD filter, route-level splitting; no new
+  tracking vendor. **Declared deviations:** DB-backed negative RLS tests
+  (cross-tenant probes against a live database) belong to the operator
+  smoke phase — unit-level barriers are tested; realtime granularity is
+  the projection (full re-render of the route's server payload), declared
+  as the incremental unit. Gates: 8 new tests (PMO-PI-REALTIME) — module
+  73/73 green, typecheck green. Isabella package M8 versioned.
 - **M7 (2026-07-23): CLOSED (with declared deviations).** Isabella
   Intelligence + What-if. Insight engine (`insights.ts`): six deterministic
   rules (bottleneck, rework, CPI, VAC<0, systemic risk, capacity pressure) —

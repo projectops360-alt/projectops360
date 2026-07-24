@@ -28,6 +28,7 @@ import { FinanceOverlay } from "./finance-overlay";
 import { BenefitsPanel, DependenciesPanel, ResourcesPanel, RiskPanel } from "./overlays-panels";
 import { IsabellaPanel } from "./isabella-panel";
 import { WhatIfPanel } from "./whatif-panel";
+import { RealtimeRefresh } from "./realtime-refresh";
 
 type OverlayKey = PmoPiFilters["overlay"];
 
@@ -139,15 +140,18 @@ export function CommandCenterShell({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setTableView((v) => !v)}
-          aria-pressed={tableView}
-          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
-        >
-          {tableView ? <Network className="h-4 w-4" /> : <Table2 className="h-4 w-4" />}
-          {tableView ? tt("Map view", "Vista de mapa") : tt("Table view", "Vista de tabla")}
-        </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => setTableView((v) => !v)}
+            aria-pressed={tableView}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+          >
+            {tableView ? <Network className="h-4 w-4" /> : <Table2 className="h-4 w-4" />}
+            {tableView ? tt("Map view", "Vista de mapa") : tt("Table view", "Vista de tabla")}
+          </button>
+          <RealtimeRefresh focusProjectId={focusProject?.id ?? null} locale={locale} />
+        </div>
       </div>
 
       {truncated && (

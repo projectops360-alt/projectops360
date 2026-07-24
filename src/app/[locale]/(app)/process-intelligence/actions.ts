@@ -13,7 +13,9 @@
 import { z } from "zod";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { createClient } from "@/lib/supabase/server";
 import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
+import { composeSignature } from "@/lib/pmo-process-intelligence/realtime";
 
 const feedbackSchema = z.object({
   insightId: z.string().min(1).max(200),
@@ -52,4 +54,38 @@ export async function recordInsightFeedbackAction(input: {
     },
   });
   return {};
+}
+
+// ── Realtime scope signature (M8) ───────────────────────────────────────────
+// A cheap RLS-scoped aggregate the client polls; the page only re-renders
+// when the signature changes (no render storms). Same flag + role gate.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function getPmoPiSignatureAction(input: {
+  projectId?: string | null;
+}): Promise<{ error?: string; signature?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  if (!canAccessProcessIntelligence(org.role)) return { error: "not_authorized" };
+  const projectId = input.projectId ?? null;
+  if (projectId !== null && !UUID_RE.test(projectId)) return { error: "validation_error" };
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("project_event_log")
+    .select("sequence_number", { count: "exact" })
+    .eq("organization_id", org.organizationId)
+    .order("sequence_number", { ascending: false })
+    .limit(1);
+  if (projectId) query = query.eq("project_id", projectId);
+  const { data, count, error } = await query;
+  if (error) return { error: "unexpected" };
+
+  const maxSequence = (data?.[0]?.sequence_number as number | undefined) ?? null;
+  return { signature: composeSignature(count ?? 0, maxSequence) };
 }

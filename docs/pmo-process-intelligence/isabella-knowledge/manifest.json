@@ -117,6 +117,22 @@
       "approval_state": "approved (M7 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M7 gate"
+    },
+    {
+      "id": "pmo-pi-m8-realtime-reliability",
+      "milestone": "M8",
+      "version": 1,
+      "file": "M8-realtime-reliability.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/realtime.ts",
+        "src/components/pmo-process-intelligence/realtime-refresh.tsx",
+        "src/app/[locale]/(app)/process-intelligence/actions.ts",
+        "src/lib/pmo-process-intelligence/read-model.server.ts"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M8 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M8 gate"
     }
   ]
 }
