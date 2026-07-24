@@ -16,6 +16,7 @@ import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/fla
 import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts";
 import { loadPmoPiFlowModel } from "@/lib/pmo-process-intelligence/read-model.server";
 import { loadPmoPiFinanceOverlay } from "@/lib/pmo-process-intelligence/financial-read.server";
+import { loadPmoPiOverlays } from "@/lib/pmo-process-intelligence/overlays-read.server";
 import { CommandCenterShell } from "@/components/pmo-process-intelligence/command-center-shell";
 import type { Locale } from "@/types/database";
 
@@ -50,6 +51,7 @@ export default async function ProcessIntelligencePage({
         : result.projects.map((p) => p.id)
       : [];
   const finance = scopedIds.length > 0 ? await loadPmoPiFinanceOverlay(org.organizationId, scopedIds) : null;
+  const overlays = scopedIds.length > 0 ? await loadPmoPiOverlays(org, scopedIds) : null;
   const projectNames: Record<string, string> = {};
   if (result.status === "ok") for (const p of result.projects) projectNames[p.id] = p.title;
 
@@ -65,6 +67,7 @@ export default async function ProcessIntelligencePage({
       projects={result.status === "ok" ? result.projects : []}
       focusProject={result.status === "ok" ? result.focusProject : null}
       finance={finance}
+      overlays={overlays}
       projectNames={projectNames}
     />
   );

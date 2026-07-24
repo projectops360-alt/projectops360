@@ -86,6 +86,21 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M6 (2026-07-23): CLOSED (with declared deviations).** Overlays wired into
+  the shell tabs. Risk: open-risk exposure by project/severity + systemic
+  risks via BFS over RECORDED task_dependencies only (linked task required —
+  propagation never inferred); Critical Risks KPI fed from the register.
+  Resources: reuses the canonical capacity engine per project (availability,
+  overallocated people, at-risk milestones, unassigned critical tasks;
+  honest no-inputs state). Dependencies: per-project counts + unblock hubs
+  (top out-degree) + declared limitation (only intra-project deps exist in
+  the data model). Benefits/Strategy: DECLARED no-data state — no benefits
+  data model exists yet; nothing is faked. Severity/status always in text.
+  **Declared deviations:** "Open in Process Map" deep-link deferred to M7
+  (recommendation highlighting covers it); benefits/strategy data model out
+  of scope (logged as future capability). Gates: 10 new tests
+  (PMO-PI-OVERLAYS, PMO-PI-OVERLAY-PANELS), module 60/60 green, typecheck
+  green. Isabella package M6 versioned.
 - **M5 (2026-07-23): CLOSED (with declared deviations).** Finance overlay =
   Budget Command Center over `financial_project_cockpit` (single financial
   source of truth, read-only): per-project baseline/committed/actual/accrued
