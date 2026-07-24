@@ -99,7 +99,9 @@ describe("extractCanonicalImport", () => {
     );
     expect(c.materials[0]).toMatchObject({ name: "CAT6A cable", quantity: 2500, unit: "ft" });
     expect(c.budget_items[0].estimated_cost).toBe(120000);
-    expect(c.risks[0]).toMatchObject({ probability: "high", impact: "high" });
+    // "Critical" impact is preserved as critical (risks.impact supports it);
+    // probability stays clamped to low/medium/high.
+    expect(c.risks[0]).toMatchObject({ probability: "high", impact: "critical" });
   });
 
   it("extracts from a structured JSON file", () => {

@@ -1,0 +1,87 @@
+{
+  "project": {
+    "name": "My Project Name — Replace this title / Reemplaza este título",
+    "description": "Short project description. / Descripción corta del proyecto.",
+    "start_date": "2026-08-01",
+    "target_finish_date": "2026-10-30"
+  },
+  "charter": {
+    "purpose": "Why does this project exist? / ¿Por qué existe este proyecto?",
+    "business_problem": "What problem does it solve? / ¿Qué problema resuelve?",
+    "objectives": "Specific and measurable objectives. / Objetivos específicos y medibles.",
+    "in_scope": "What is included. / Qué está incluido.",
+    "out_of_scope": "What is explicitly excluded. / Qué queda explícitamente fuera.",
+    "key_assumptions": "What you assume to be true. / Lo que asumes como cierto.",
+    "primary_constraints": "Time, budget, people limits. / Límites de tiempo, presupuesto, personas.",
+    "success_metrics": "How success is measured. / Cómo se mide el éxito.",
+    "definition_of_done": "When is the project complete? / ¿Cuándo está completo el proyecto?",
+    "governance": "How decisions are made and escalated. / Cómo se decide y escala."
+  },
+  "milestones": [
+    {
+      "name": "Foundation / Fundación",
+      "status": "planned"
+    },
+    {
+      "name": "Build / Construcción",
+      "status": "planned"
+    }
+  ],
+  "tasks": [
+    {
+      "task id": "T1.1",
+      "task": "Define scope / Definir alcance",
+      "objective": "Freeze the project scope. / Congelar el alcance del proyecto.",
+      "milestone": "Foundation / Fundación",
+      "estimate": "2 días",
+      "status": "Not Started",
+      "priority": "High",
+      "owner": "Ana Torres",
+      "prompt": "TASK T1.1 — Instructions for an AI assistant. / Instrucciones para un asistente de IA."
+    },
+    {
+      "task id": "T2.1",
+      "task": "Build the first deliverable / Construir el primer entregable",
+      "objective": "First increment of value. / Primer incremento de valor.",
+      "milestone": "Build / Construcción",
+      "estimate": "1 semana",
+      "status": "Not Started",
+      "priority": "High",
+      "owner": "Ana Torres",
+      "predecessors": "T1.1"
+    }
+  ],
+  "risks": [
+    {
+      "risk id": "R01",
+      "risk": "Scope creep",
+      "description": "New features alter the approved plan. / Nuevas features alteran el plan aprobado.",
+      "probability (1-5)": 4,
+      "impact (1-5)": 5,
+      "rating": "Critical",
+      "mitigation / contingency": "Freeze scope; changes go through change control. / Congelar alcance; cambios por control de cambios."
+    }
+  ],
+  "resources": [
+    {
+      "name": "Ana Torres",
+      "role": "Product Manager",
+      "unit cost": 60
+    }
+  ],
+  "budget": [
+    {
+      "item": "Engineering labor / Mano de obra de ingeniería",
+      "category": "labor",
+      "estimated cost": 25000
+    }
+  ],
+  "materials": [
+    {
+      "material": "Concrete / Concreto",
+      "quantity": 20,
+      "unit": "m3",
+      "unit cost": 150
+    }
+  ]
+}

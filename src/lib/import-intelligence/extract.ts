@@ -22,14 +22,14 @@ import type { ProjectType } from "@/types/execution";
 
 const FIELD_SYNONYMS: Record<string, string[]> = {
   name: ["name", "task", "task name", "title", "activity", "item", "description of work", "nombre", "tarea", "actividad", "título", "titulo", "partida", "concepto"],
-  description: ["description", "details", "notes", "scope", "descripción", "descripcion", "detalle", "detalles", "notas", "alcance"],
+  description: ["description", "details", "notes", "scope", "objective", "descripción", "descripcion", "detalle", "detalles", "notas", "alcance", "objetivo"],
   status: ["status", "state", "estado", "estatus"],
   priority: ["priority", "prioridad"],
   phase: ["phase", "stage", "fase", "etapa"],
   milestone: ["milestone", "hito"],
   start: ["start", "start date", "planned start", "begin", "from", "inicio", "fecha inicio", "fecha de inicio", "comienzo"],
   finish: ["finish", "end", "end date", "due", "due date", "planned finish", "to", "fin", "fecha fin", "fecha de fin", "término", "termino", "entrega", "fecha entrega"],
-  duration: ["duration", "duration days", "days", "duración", "duracion", "días", "dias"],
+  duration: ["duration", "duration days", "days", "estimate", "estimated duration", "duración", "duracion", "días", "dias", "estimación", "estimacion", "estimado"],
   hours: ["hours", "estimated hours", "effort", "labor hours", "horas", "horas estimadas", "esfuerzo"],
   assignee: ["assigned to", "assignee", "owner", "responsible", "resource", "who", "asignado", "asignado a", "responsable", "encargado", "dueño", "dueno"],
   predecessor: ["predecessor", "predecessors", "depends on", "dependency", "dependencies", "after", "blocked by", "predecesor", "predecesores", "predecesora", "depende de", "dependencia", "dependencias"],
@@ -123,6 +123,14 @@ function toNumber(v: string | undefined): number | null {
   const cleaned = v.replace(/[$€£\s,]/g, "").replace(/^\((.*)\)$/, "-$1");
   const n = parseFloat(cleaned);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Duration cell → days. Handles "1.5 días", "2 days", "3 semanas" (weeks ×7). */
+function toDurationDays(v: string | undefined): number | null {
+  const n = toNumber(v);
+  if (n == null) return null;
+  if (v && /semana|week/i.test(v)) return n * 7;
+  return n;
 }
 
 function toIsoDate(v: string | undefined): string {
@@ -235,9 +243,30 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
   };
   if (col.name === -1) return;
 
+  // A combined "Milestones & Tasks" sheet: a milestone code column plus a
+  // separate "Milestone Name" column → derive canonical milestones in first-
+  // appearance order (REG-026: array order becomes source_order → order_index).
+  const milestoneNameCol = table.headers.findIndex((h) =>
+    /milestone\s*name|nombre\s*(del?\s*)?hito/i.test(h),
+  );
+  // Internal AI execution prompt column (e.g. "Prompt Ready to Copy").
+  // UX-014: stored on the task, never rendered as a user-facing editor field.
+  const promptCol = table.headers.findIndex((h) => /prompt/i.test(h));
+  // Per-row acceptance criterion → appended to the description (kept as content).
+  const acceptanceCol = table.headers.findIndex((h) =>
+    /acceptance|criterio.*aceptaci/i.test(h),
+  );
+
   // Base confidence from how many schedule columns were recognized
   const recognized = Object.values(col).filter((c) => c >= 0).length;
   const baseConfidence = Math.min(0.95, 0.5 + recognized * 0.05);
+
+  const seenMilestoneCodes = new Set(
+    ctx.result.milestones.map((m) => m.source_id.toLowerCase()),
+  );
+  const seenMilestoneNames = new Set(
+    ctx.result.milestones.map((m) => m.name.toLowerCase().trim()),
+  );
 
   for (const [rowIdx, row] of table.rows.entries()) {
     const name = cell(row, col.name);
@@ -246,18 +275,53 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
     const sourceId = cell(row, col.wbs) || `task-${ctx.taskCounter.n}`;
     const start = toIsoDate(cell(row, col.start));
     const finish = toIsoDate(cell(row, col.finish));
-    let duration = toNumber(cell(row, col.duration));
+    let duration = toDurationDays(cell(row, col.duration));
     if (duration == null && start && finish) {
       const d = (Date.parse(finish) - Date.parse(start)) / 86_400_000 + 1;
       if (Number.isFinite(d) && d > 0) duration = Math.round(d);
     }
 
+    // Derive the milestone entity + point the task at the milestone NAME
+    // (execute matches milestones by title, not by code).
+    let milestoneRef = cell(row, col.milestone);
+    if (milestoneNameCol >= 0) {
+      const msCode = milestoneRef;
+      const msName = cell(row, milestoneNameCol);
+      if (msName) {
+        milestoneRef = msName;
+        const codeKey = (msCode || msName).toLowerCase();
+        const nameKey = msName.toLowerCase().trim();
+        if (!seenMilestoneCodes.has(codeKey) && !seenMilestoneNames.has(nameKey)) {
+          seenMilestoneCodes.add(codeKey);
+          seenMilestoneNames.add(nameKey);
+          ctx.result.milestones.push({
+            source_id: msCode || `ms-${ctx.result.milestones.length + 1}`,
+            name: msName,
+            description: "",
+            phase: cell(row, col.phase),
+            target_date: "",
+            status: "planned",
+            confidence_score: 0.9,
+            source_reference: `${table.name} · row ${rowIdx + 2}`,
+          });
+        }
+      }
+    }
+
+    let description = cell(row, col.description);
+    const acceptance = cell(row, acceptanceCol);
+    if (acceptance && acceptance !== description) {
+      description = description
+        ? `${description}\n\nAcceptance / Aceptación: ${acceptance}`
+        : `Acceptance / Aceptación: ${acceptance}`;
+    }
+
     const task: CanonicalTask = {
       source_id: sourceId,
       name,
-      description: cell(row, col.description),
+      description,
       phase: cell(row, col.phase),
-      milestone: cell(row, col.milestone),
+      milestone: milestoneRef,
       status: normalizeStatus(cell(row, col.status)),
       priority: normalizePriority(cell(row, col.priority)),
       planned_start: start,
@@ -273,6 +337,8 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
       confidence_score: baseConfidence,
       source_reference: `${table.name} · row ${rowIdx + 2}`,
     };
+    const promptBody = cell(row, promptCol);
+    if (promptBody) task.prompt_body = promptBody;
     ctx.result.tasks.push(task);
 
     // Explicit predecessor column → dependencies (split on , ; /)
@@ -422,22 +488,40 @@ function extractBudgetFromTable(table: ParsedTable, ctx: ExtractionContext): voi
 }
 
 function extractRisksFromTable(table: ParsedTable, ctx: ExtractionContext): void {
-  // Risk registers usually call the title column "Risk"/"Riesgo".
-  let nameCol = findColumn(table.headers, "name");
+  // Risk registers usually call the title column "Risk"/"Riesgo". Prefer an
+  // exact header over containment so "Risk ID"/"Risk Score" never win.
+  let nameCol = table.headers.findIndex((h) => /^(risk|riesgo|issue|problema)$/i.test(h.trim()));
+  if (nameCol === -1) nameCol = findColumn(table.headers, "name");
   if (nameCol === -1) {
-    nameCol = table.headers.findIndex((h) => /risk|riesgo|issue|problema/i.test(h));
+    nameCol = table.headers.findIndex(
+      (h) => /risk|riesgo|issue|problema/i.test(h) && !/\b(id|score|rating)\b/i.test(h),
+    );
   }
   if (nameCol === -1 && table.headers.length > 0) nameCol = 0;
+  // "Mitigation / Contingency" over the shorter "Response"/"Plan" columns.
+  let mitigationCol = table.headers.findIndex((h) => /mitigation|mitigaci|contingen/i.test(h));
+  if (mitigationCol === -1) mitigationCol = findColumn(table.headers, "mitigation");
   const col = {
     name: nameCol,
+    id: table.headers.findIndex((h) => /^(risk\s*)?id$/i.test(h.trim())),
     description: findColumn(table.headers, "description"),
     probability: findColumn(table.headers, "probability"),
     impact: findColumn(table.headers, "impact"),
-    mitigation: findColumn(table.headers, "mitigation"),
+    severity: table.headers.findIndex((h) => /rating|calificaci|nivel de riesgo/i.test(h)),
+    mitigation: mitigationCol,
   };
   if (col.name === -1) return;
-  const level = (v: string): string => {
+  const level = (v: string, allowCritical = false): string => {
     const n = normalizeHeader(v);
+    // Numeric 1-5 scales (probability/impact matrices)
+    const num = parseFloat(n);
+    if (Number.isFinite(num) && /^\d+(\.\d+)?$/.test(n)) {
+      if (num >= 5 && allowCritical) return "critical";
+      if (num >= 4) return "high";
+      if (num <= 2) return "low";
+      return "medium";
+    }
+    if (allowCritical && ["critical", "crítica", "critico", "crítico"].some((k) => n.includes(k))) return "critical";
     if (["high", "alta", "alto", "critical", "crítica", "critico", "crítico"].some((k) => n.includes(k))) return "high";
     if (["low", "baja", "bajo"].some((k) => n.includes(k))) return "low";
     return "medium";
@@ -445,14 +529,15 @@ function extractRisksFromTable(table: ParsedTable, ctx: ExtractionContext): void
   for (const [rowIdx, row] of table.rows.entries()) {
     const title = cell(row, col.name);
     if (!title) continue;
-    const impact = level(cell(row, col.impact));
+    const impact = level(cell(row, col.impact), true);
+    const severityRaw = cell(row, col.severity);
     ctx.result.risks.push({
-      source_id: `risk-${ctx.result.risks.length + 1}`,
+      source_id: cell(row, col.id) || `risk-${ctx.result.risks.length + 1}`,
       title,
       description: cell(row, col.description),
       probability: level(cell(row, col.probability)),
       impact,
-      severity: impact,
+      severity: severityRaw ? level(severityRaw, true) : impact,
       mitigation: cell(row, col.mitigation),
       linked_task_source_id: "",
       confidence_score: 0.8,
@@ -487,6 +572,156 @@ function extractResourcesFromTable(table: ParsedTable, ctx: ExtractionContext): 
   }
 }
 
+// ── Project Charter extraction ──────────────────────────────────────────────
+// A charter sheet is a key/value table ("Field"/"Definition"). Source labels
+// map onto project_charters text columns; unmapped labels are preserved in
+// `background` so nothing the user wrote is dropped. First match wins, so
+// more specific patterns come first (e.g. out_of_scope before in_scope).
+
+const CHARTER_KEY_PATTERNS: [string, RegExp][] = [
+  ["out_of_scope", /out.?of.?scope|fuera del alcance|no alcance|non.?goals?/i],
+  ["in_scope", /in.?scope|dentro del alcance|alcance/i],
+  ["executive_summary", /executive summary|resumen ejecutivo/i],
+  ["background", /background|antecedentes|context/i],
+  ["business_case", /business (case|problem)|caso de negocio|problema de negocio|justificaci/i],
+  ["business_drivers", /drivers?|impulsores/i],
+  ["project_goal", /purpose|goal|meta del proyecto|prop[óo]sito|objetivo (general|del proyecto)/i],
+  ["objectives", /^objectives?$|^objetivos?$/i],
+  ["assumptions", /assumptions?|supuestos?/i],
+  ["limitations", /limitations?|limitaciones/i],
+  ["constraints", /constraints?|restricci/i],
+  ["dependencies", /dependenc/i],
+  ["major_deliverables", /deliverables?|entregables?/i],
+  ["acceptance_criteria", /acceptance|definition of done|criterios? de aceptaci|dod/i],
+  ["success_criteria", /success|[ée]xito|outcome|resultado|metrics?|m[ée]tricas|kpi/i],
+  ["knowledge_transfer_expectations", /knowledge transfer|transferencia de conocimiento/i],
+  ["governance_model", /governance|gobernanza/i],
+  ["decision_making_process", /decision|decisiones/i],
+  ["escalation_process", /escalation|escalamiento|escalaci/i],
+  ["reporting_cadence", /reporting|cadencia|reportes?/i],
+  ["change_management_process", /change (management|control)|gesti[óo]n de cambios|control de cambios/i],
+  ["risk_management_process", /risk management|gesti[óo]n de riesgos/i],
+  ["quality_management_process", /quality|calidad/i],
+  ["communication_management_process", /communication|comunicaci/i],
+  ["issue_management_process", /issue management|gesti[óo]n de incidencias/i],
+];
+
+function charterKeyFor(label: string): string | null {
+  for (const [key, pattern] of CHARTER_KEY_PATTERNS) {
+    if (pattern.test(label)) return key;
+  }
+  return null;
+}
+
+function ensureCharter(ctx: ExtractionContext, sourceReference: string): NonNullable<CanonicalImport["charter"]> {
+  if (!ctx.result.charter) {
+    ctx.result.charter = { fields: {}, confidence_score: 0.85, source_reference: sourceReference };
+  }
+  return ctx.result.charter;
+}
+
+function appendCharterField(ctx: ExtractionContext, key: string, value: string, sourceReference: string): void {
+  if (!value.trim()) return;
+  const charter = ensureCharter(ctx, sourceReference);
+  charter.fields[key] = charter.fields[key] ? `${charter.fields[key]}\n\n${value.trim()}` : value.trim();
+}
+
+export function isCharterTable(table: ParsedTable): boolean {
+  if (/charter|acta de constituci|carta del proyecto/i.test(table.name)) return true;
+  const headerBlob = [table.headers.join(" "), ...(table.rows[0] ? [table.rows[0].join(" ")] : [])].join(" ");
+  return /\bfield\b.*\bdefinition\b|\bcampo\b.*\bdefinici/i.test(headerBlob);
+}
+
+/** Key/value charter sheet → project_charters text fields. */
+function extractCharterFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  // The title row often becomes the "headers"; scan headers + rows uniformly.
+  const allRows = [table.headers, ...table.rows];
+  for (const row of allRows) {
+    const label = (row[0] ?? "").trim();
+    const value = (row[1] ?? "").trim();
+    if (!label || !value) continue;
+    if (/^(field|campo)$/i.test(label) && /^(definition|definici[óo]n|value|valor)$/i.test(value)) continue;
+    const key = charterKeyFor(label);
+    if (key) {
+      appendCharterField(ctx, key, value, table.name);
+    } else {
+      // Preserve unmapped labels verbatim in background — never drop content.
+      appendCharterField(ctx, "background", `${label}: ${value}`, table.name);
+    }
+  }
+}
+
+export function isGovernanceTable(table: ParsedTable): boolean {
+  return /governance|gates?\b|gobernanza|control de cambios/i.test(table.name);
+}
+
+/** Stage gates + change-control rules → charter governance text fields. */
+function extractGovernanceFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  const allRows = [table.headers, ...table.rows];
+  for (const row of allRows) {
+    const first = (row[0] ?? "").trim();
+    if (!first) continue;
+    if (/^G\d+$/i.test(first)) {
+      const [, gateName, milestone, approver, evidence] = row.map((c) => (c ?? "").trim());
+      const parts = [
+        `${first}${gateName ? ` — ${gateName}` : ""}${milestone ? ` (${milestone})` : ""}`,
+        approver ? `Approver / Aprueba: ${approver}` : "",
+        evidence ? `Exit: ${evidence}` : "",
+      ].filter(Boolean);
+      appendCharterField(ctx, "governance_model", parts.join(" · "), table.name);
+    } else if (/^CR[-.]?\d+$/i.test(first)) {
+      const text = (row[1] ?? "").trim();
+      if (text) appendCharterField(ctx, "change_management_process", `${first} — ${text}`, table.name);
+    }
+  }
+}
+
+export function isDataDependenciesTable(table: ParsedTable): boolean {
+  if (/data dependenc|dependencias de datos/i.test(table.name)) return true;
+  const headerBlob = [table.headers.join(" "), ...(table.rows[0] ? [table.rows[0].join(" ")] : [])].join(" ");
+  return /data\s*\/?\s*service|servicio de datos/i.test(headerBlob);
+}
+
+/** Data/service dependency register → charter `dependencies` text field. */
+function extractDataDependenciesFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  const allRows = [table.headers, ...table.rows];
+  for (const row of allRows) {
+    const id = (row[0] ?? "").trim();
+    const name = (row[1] ?? "").trim();
+    if (!name || /^(id)$/i.test(id) || /data\s*\/?\s*service/i.test(name)) continue;
+    const [, , required, blocking, criticality, status, owner, rule] = row.map((c) => (c ?? "").trim());
+    const parts = [
+      `${id ? `${id} — ` : ""}${name}`,
+      required ? `Requires / Requiere: ${required}` : "",
+      blocking ? `Blocking / Bloquea: ${blocking}` : "",
+      criticality ? `Criticality / Criticidad: ${criticality}` : "",
+      status ? `Status / Estado: ${status}` : "",
+      owner ? `Owner: ${owner}` : "",
+      rule ? `Rule / Regla: ${rule}` : "",
+    ].filter(Boolean);
+    appendCharterField(ctx, "dependencies", parts.join(" · "), table.name);
+  }
+}
+
+export function isAcceptanceCriteriaTable(table: ParsedTable): boolean {
+  return /acceptance criteria|criterios de aceptaci/i.test(table.name);
+}
+
+/** Acceptance criteria register → charter `acceptance_criteria` text field. */
+function extractAcceptanceCriteriaFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  const allRows = [table.headers, ...table.rows];
+  for (const row of allRows) {
+    const id = (row[0] ?? "").trim();
+    const criterion = (row[1] ?? "").trim();
+    if (!criterion) continue;
+    // Skip the header row ("ID" / "Acceptance Criterion" / "Criterio…")
+    if (/^id$/i.test(id) || /^(acceptance criterion|criterios? de aceptaci[óo]n)$/i.test(criterion)) continue;
+    const [, , milestone, severity] = row.map((c) => (c ?? "").trim());
+    const suffix = [milestone, severity].filter(Boolean).join(" · ");
+    appendCharterField(ctx, "acceptance_criteria", `${id ? `${id} ` : ""}${suffix ? `(${suffix}) ` : ""}— ${criterion}`, table.name);
+  }
+}
+
 // ── JSON extraction ─────────────────────────────────────────────────────────
 
 function extractFromJson(json: unknown, ctx: ExtractionContext): void {
@@ -502,6 +737,18 @@ function extractFromJson(json: unknown, ctx: ExtractionContext): void {
     ctx.result.project.target_finish_date = toIsoDate(
       str(projectObj.target_finish_date) || str(projectObj.end_date) || str(projectObj.endDate),
     );
+  }
+
+  // Charter: `{ "charter": { "purpose": "...", "in_scope": "..." } }` — keys
+  // may be canonical project_charters columns or human labels (EN/ES).
+  const charterObj = obj.charter ?? obj.project_charter ?? obj.acta;
+  if (charterObj && typeof charterObj === "object" && !Array.isArray(charterObj)) {
+    for (const [label, value] of Object.entries(charterObj as Record<string, unknown>)) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const key = charterKeyFor(label.replace(/_/g, " ")) ?? charterKeyFor(label);
+      if (key) appendCharterField(ctx, key, value, "json:charter");
+      else appendCharterField(ctx, "background", `${label}: ${value}`, "json:charter");
+    }
   }
 
   const arrays: { key: string[]; toTable: (items: Record<string, unknown>[]) => ParsedTable }[] = [
@@ -582,6 +829,7 @@ export function emptyCanonicalImport(): CanonicalImport {
       location: "",
       status: "planned",
     },
+    charter: null,
     milestones: [],
     tasks: [],
     dependencies: [],
@@ -589,6 +837,7 @@ export function emptyCanonicalImport(): CanonicalImport {
     materials: [],
     budget_items: [],
     risks: [],
+    unparsed_tables: [],
   };
 }
 
@@ -601,7 +850,31 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
   }
 
   for (const table of parsed.tables) {
+    // Charter-family sheets are routed by shape/name before generic
+    // classification — they are key/value or register sheets, not entity rows.
+    if (isCharterTable(table)) {
+      extractCharterFromTable(table, ctx);
+      continue;
+    }
+    if (isGovernanceTable(table)) {
+      extractGovernanceFromTable(table, ctx);
+      continue;
+    }
+    if (isDataDependenciesTable(table)) {
+      extractDataDependenciesFromTable(table, ctx);
+      continue;
+    }
+    if (isAcceptanceCriteriaTable(table)) {
+      extractAcceptanceCriteriaFromTable(table, ctx);
+      continue;
+    }
     const { type } = classifyTable(table);
+    if (type === "unknown" && !/summary|resumen|portada|overview|dashboard|read ?me|l[ée]eme|instrucciones|instructions/i.test(table.name)) {
+      // Honesty: the review step must SAY a sheet was not understood instead
+      // of silently dropping it.
+      ctx.result.unparsed_tables.push(table.name);
+      continue;
+    }
     dispatchTable(table, type, ctx);
   }
 
@@ -624,6 +897,7 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
     if (!existing.assigned_to && task.assigned_to) existing.assigned_to = task.assigned_to;
     if (!existing.description && task.description) existing.description = task.description;
     if (!existing.milestone && task.milestone) existing.milestone = task.milestone;
+    if (!existing.prompt_body && task.prompt_body) existing.prompt_body = task.prompt_body;
     // Redirect dependency references from the duplicate to the kept task
     for (const dep of ctx.result.dependencies) {
       if (dep.successor_source_id === task.source_id) dep.successor_source_id = existing.source_id;

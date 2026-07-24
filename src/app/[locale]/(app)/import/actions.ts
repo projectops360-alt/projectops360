@@ -264,6 +264,22 @@ export async function analyzeImportJobAction(input: {
     pushAll("material", canonical.materials);
     pushAll("budget_item", canonical.budget_items);
     pushAll("risk", canonical.risks);
+    if (canonical.charter) {
+      const v = statusFor("charter", "charter");
+      entityRows.push({
+        organization_id: org.organizationId,
+        import_job_id: job.id,
+        entity_type: "charter",
+        source_key: "charter",
+        extracted_json: canonical.charter,
+        normalized_json: canonical.charter,
+        confidence_score: canonical.charter.confidence_score,
+        source_reference: canonical.charter.source_reference,
+        validation_status: v.status,
+        validation_warnings_json: v.warnings,
+        will_import: v.status !== "invalid",
+      });
+    }
 
     const orderedEntityRows = entityRows.map((entity, sourceOrder) => ({
       ...entity,
@@ -299,6 +315,7 @@ export async function analyzeImportJobAction(input: {
       materials: canonical.materials.length,
       budget_items: canonical.budget_items.length,
       risks: canonical.risks.length,
+      charter: canonical.charter ? 1 : 0,
     };
     const avgConfidence =
       canonical.tasks.length > 0

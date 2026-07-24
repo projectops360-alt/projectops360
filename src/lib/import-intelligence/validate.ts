@@ -191,6 +191,44 @@ export function validateCanonicalImport(canonical: CanonicalImport): ImportValid
     seenMilestones.add(mk);
   }
 
+  // ── Charter ────────────────────────────────────────────────────────────────
+  if (canonical.charter) {
+    setStatus("charter", "charter", "valid");
+    const fieldCount = Object.keys(canonical.charter.fields).length;
+    findings.push({
+      severity: "info",
+      validation_type: "charter_detected",
+      message_i18n: {
+        en: `A Project Charter was detected (${fieldCount} field(s)). It will fill the empty fields of the project's Charter Center as a draft.`,
+        es: `Se detectó un Project Charter (${fieldCount} campo(s)). Rellenará los campos vacíos del Charter Center del proyecto como borrador.`,
+      },
+      affected_entity_type: "charter",
+      affected_source_id: "charter",
+      recommended_action_i18n: {
+        en: "Review and approve the charter in the Charter Center after import.",
+        es: "Revisa y aprueba el charter en el Charter Center después de importar.",
+      },
+    });
+  }
+
+  // ── Unrecognized sheets (honesty: never silently drop a tab) ──────────────
+  for (const sheetName of canonical.unparsed_tables) {
+    findings.push({
+      severity: "warning",
+      validation_type: "unrecognized_sheet",
+      message_i18n: {
+        en: `Sheet "${sheetName}" was not recognized and will NOT be imported.`,
+        es: `La hoja "${sheetName}" no fue reconocida y NO se importará.`,
+      },
+      affected_entity_type: null,
+      affected_source_id: null,
+      recommended_action_i18n: {
+        en: "Use the downloadable template headers, or rename the sheet/columns to a recognizable structure (tasks, milestones, risks, budget, materials, resources, charter).",
+        es: "Usa los encabezados de la plantilla descargable, o renombra la hoja/columnas a una estructura reconocible (tareas, hitos, riesgos, presupuesto, materiales, recursos, charter).",
+      },
+    });
+  }
+
   // ── Project-level ──────────────────────────────────────────────────────────
   if (canonical.tasks.length === 0 && canonical.milestones.length === 0) {
     findings.push({
