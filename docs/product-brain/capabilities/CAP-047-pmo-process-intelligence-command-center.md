@@ -86,6 +86,23 @@ All global acceptance criteria of the spec (§15) met; `npm run typecheck` · `t
 
 ## Milestone log
 
+- **M5 (2026-07-23): CLOSED (with declared deviations).** Finance overlay =
+  Budget Command Center over `financial_project_cockpit` (single financial
+  source of truth, read-only): per-project baseline/committed/actual/accrued
+  (SEPARATE columns, never summed) + reserve + latest EAC + P50/P80 + CPI/SPI
+  + derived TCPI (EV = CPI×AC, declared) + VAC = BAC−EAC (negative labeled
+  "overrun" in text) + status date. Six deterministic alert rules (CPI<0.9,
+  SPI<0.9, VAC<0, reconciliation exceptions, unverified actuals, currency
+  mismatches) — every alert carries formula + observed values + status date
+  + source; severity in text AND icon. Portfolio CPI = ΣEV/ΣAC feeds the KPI
+  bar. Adapter `financial-read.server.ts` reuses the canonical per-project
+  cockpit read model + org barrier. **Declared deviations (soft blockers):**
+  burn-rate/cash-flow time series and on-map financial overlays deferred —
+  the cockpit projection carries no time series (logged for M8/M9 review);
+  baseline VERSION number not exposed by the cockpit view (immutable history
+  stays in `financial_baseline_versions`). Gates: 11 new tests
+  (PMO-PI-FINANCE-ALERTS, PMO-PI-FINANCE-UI), module 50/50 green, typecheck
+  green. Isabella package M5 versioned.
 - **M4 (2026-07-23): CLOSED.** Process Intelligence Canvas: analytical SVG map
   (dagre layout, motion-free) over the pure flow model — edge thickness =
   frequency, dominant path solid brand, secondary lighter, rework dashed red

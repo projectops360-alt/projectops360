@@ -70,6 +70,21 @@
       "approval_state": "approved (M4 gate, 2026-07-23)",
       "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
       "authored_by": "autonomous build (Fabel) — reviewed via M4 gate"
+    },
+    {
+      "id": "pmo-pi-m5-financial-intelligence",
+      "milestone": "M5",
+      "version": 1,
+      "file": "M5-financial-intelligence.md",
+      "sources": [
+        "src/lib/pmo-process-intelligence/financial-overlay.ts",
+        "src/lib/pmo-process-intelligence/financial-read.server.ts",
+        "src/components/pmo-process-intelligence/finance-overlay.tsx"
+      ],
+      "tenant_safe": true,
+      "approval_state": "approved (M5 gate, 2026-07-23)",
+      "ingestion_status": "pending — apply to staging Knowledge OS with the corpus workflow; production only after module approval",
+      "authored_by": "autonomous build (Fabel) — reviewed via M5 gate"
     }
   ]
 }

@@ -19,7 +19,9 @@ import {
   Network, ShieldAlert, Sparkles, Table2, Target, Users,
 } from "lucide-react";
 import type { PmoPiFilters, PmoPiFlowModel } from "@/lib/pmo-process-intelligence/contracts";
+import type { PmoPiFinanceOverlayModel } from "@/lib/pmo-process-intelligence/financial-overlay";
 import { ProcessCanvas, activityLabel } from "./process-canvas";
+import { FinanceOverlay } from "./finance-overlay";
 
 type OverlayKey = PmoPiFilters["overlay"];
 
@@ -62,6 +64,8 @@ export function CommandCenterShell({
   truncated = false,
   projects = [],
   focusProject = null,
+  finance = null,
+  projectNames = {},
 }: {
   locale: "en" | "es";
   base: string;
@@ -72,6 +76,8 @@ export function CommandCenterShell({
   truncated?: boolean;
   projects?: { id: string; title: string }[];
   focusProject?: { id: string; title: string } | null;
+  finance?: PmoPiFinanceOverlayModel | null;
+  projectNames?: Record<string, string>;
 }) {
   const tt = (en: string, es: string) => (locale === "es" ? es : en);
   const [overlay, setOverlay] = useState<OverlayKey>(initialFilters.overlay);
@@ -87,7 +93,7 @@ export function CommandCenterShell({
     { key: "dominant_path_share", label: tt("Dominant Path", "Ruta Dominante"), value: kpis.dominantSharePct != null ? `${kpis.dominantSharePct}%` : null, hint: tt("of cases follow it", "de los casos la siguen") },
     { key: "rework_rate", label: tt("Rework", "Retrabajo"), value: kpis.reworkPct != null ? `${kpis.reworkPct}%` : null, hint: tt("of transitions are returns", "de las transiciones son retornos") },
     { key: "bottlenecks", label: tt("Bottlenecks", "Cuellos de Botella"), value: kpis.bottleneckCount != null ? String(kpis.bottleneckCount) : null, hint: tt("calculated from waiting", "calculados desde esperas") },
-    { key: "cpi", label: "CPI", value: null, hint: noData },
+    { key: "cpi", label: "CPI", value: finance?.portfolioCpi != null ? finance.portfolioCpi.toFixed(2) : null, hint: tt("portfolio ΣEV/ΣAC", "portafolio ΣEV/ΣAC") },
     { key: "critical_risks", label: tt("Critical Risks", "Riesgos Críticos"), value: null, hint: noData },
   ];
 
@@ -222,6 +228,14 @@ export function CommandCenterShell({
                 )}
               </p>
             </div>
+          ) : overlay === "finance" ? (
+            finance ? (
+              <FinanceOverlay model={finance} projectNames={projectNames} locale={locale} />
+            ) : (
+              <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
+                <p className="max-w-md text-sm text-muted-foreground">{noData}</p>
+              </div>
+            )
           ) : overlay !== "process" ? (
             <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-2 text-center">
               <p className="max-w-md text-sm text-muted-foreground">
