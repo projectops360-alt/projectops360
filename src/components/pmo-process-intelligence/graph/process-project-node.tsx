@@ -71,7 +71,7 @@ function ProjectNode({ data, selected }: NodeProps<ProcessGraphFlowNode>) {
       <p className="mt-2 truncate border-t border-slate-100 pt-2 text-[10px] font-medium text-slate-500">
         {entity.status.replaceAll("_", " ")}
       </p>
-      {hovered ? <ProcessNodeTooltip entity={entity} locale={locale} /> : null}
+      <ProcessNodeTooltip entity={entity} locale={locale} active={hovered} />
     </div>
   );
 }

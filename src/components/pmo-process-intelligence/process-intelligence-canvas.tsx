@@ -48,6 +48,11 @@ import {
   type ProcessGraphFlowEdge,
   type ProcessGraphFlowNode,
 } from "./graph/process-graph-flow-types";
+import {
+  applyEdgeInteraction,
+  applyNodeInteraction,
+  mergeStructuralNodes,
+} from "./graph/process-graph-node-sync";
 import { useProcessGraphLayout } from "./graph/use-process-graph-layout";
 import { useProcessGraphState } from "./graph/use-process-graph-state";
 
@@ -121,6 +126,7 @@ function ProcessIntelligenceCanvasInner({
   const rootRef = useRef<HTMLDivElement>(null);
   const nodeClickTimerRef = useRef<number | null>(null);
   const movingViewportRef = useRef<Viewport>(graph.viewport);
+  const draggingRef = useRef(false);
   const [manualPositions, setManualPositions] = useState<
     Map<string, ProcessGraphSavedPosition>
   >(() => new Map());
@@ -200,13 +206,17 @@ function ProcessIntelligenceCanvasInner({
     projection.connections,
   ]);
 
-  const derivedNodes = useMemo<ProcessGraphFlowNode[]>(
+  // Structural nodes carry identity, layout position and content only. Hover /
+  // dimming / selection are deliberately excluded so that pointer movement never
+  // rebuilds the node array: recreating nodes drops React Flow's `measured`
+  // dimensions (causing the jitter) and resets `position` mid-drag (making nodes
+  // impossible to move). Interaction state is applied in-place further below.
+  const structuralNodes = useMemo<ProcessGraphFlowNode[]>(
     () =>
       projection.entities.map((entity) => ({
         id: entity.id,
         type: entity.kind,
         position: positions.get(entity.id) ?? { x: 0, y: 0 },
-        selected: selectedSet.has(entity.id),
         draggable: true,
         focusable: true,
         data: {
@@ -214,9 +224,8 @@ function ProcessIntelligenceCanvasInner({
           semanticZoom,
           layer,
           expanded: expandedNodeIds.has(entity.id),
-          hovered: hoveredNodeId === entity.id,
-          dimmed:
-            relatedNodeIds.size > 0 && !relatedNodeIds.has(entity.id),
+          hovered: false,
+          dimmed: false,
           locale,
           onToggleExpanded: (nodeId: string) => {
             toggleExpanded(nodeId);
@@ -228,61 +237,97 @@ function ProcessIntelligenceCanvasInner({
       })),
     [
       expandedNodeIds,
-      hoveredNodeId,
       layer,
       locale,
       motionDuration,
       positions,
       projection.entities,
-      relatedNodeIds,
-      selectedSet,
       semanticZoom,
       toggleExpanded,
       zoomTo,
     ],
   );
-  const derivedEdges = useMemo<ProcessGraphFlowEdge[]>(
+  const structuralEdges = useMemo<ProcessGraphFlowEdge[]>(
     () =>
-      projection.connections.map((connection) => {
-        const activeNode =
-          graph.hoveredNodeId ?? graph.selectedNodeIds[0] ?? null;
+      projection.connections.map((connection) => ({
+        id: connection.id,
+        source: connection.source,
+        target: connection.target,
+        type: "processGraph" as const,
+        focusable: true,
+        data: {
+          connection,
+          hovered: false,
+          dimmed: false,
+          locale,
+        },
+      })),
+    [locale, projection.connections],
+  );
+
+  const [nodes, setNodes, onNodesChange] =
+    useNodesState<ProcessGraphFlowNode>(structuralNodes);
+  const [edges, setEdges] =
+    useEdgesState<ProcessGraphFlowEdge>(structuralEdges);
+
+  // Structure sync: merge onto the live nodes so measured dimensions survive, and
+  // never overwrite a position while the user is dragging.
+  useEffect(() => {
+    setNodes((current) =>
+      mergeStructuralNodes(current, structuralNodes, draggingRef.current),
+    );
+  }, [setNodes, structuralNodes]);
+  useEffect(() => {
+    setEdges((current) => {
+      const previous = new Map(current.map((edge) => [edge.id, edge]));
+      return projection.connections.map((connection) => {
+        const prior = previous.get(connection.id);
         return {
           id: connection.id,
           source: connection.source,
           target: connection.target,
-          type: "processGraph",
-          selected: graph.selectedEdgeIds.includes(connection.id),
+          type: "processGraph" as const,
           focusable: true,
+          selected: prior?.selected ?? false,
           data: {
             connection,
-            hovered: graph.hoveredEdgeId === connection.id,
-            dimmed:
-              graph.hoveredEdgeId != null
-                ? graph.hoveredEdgeId !== connection.id
-                : activeNode != null &&
-                  connection.source !== activeNode &&
-                  connection.target !== activeNode,
             locale,
+            hovered: prior?.data?.hovered ?? false,
+            dimmed: prior?.data?.dimmed ?? false,
           },
         };
+      });
+    });
+  }, [locale, projection.connections, setEdges]);
+
+  // Interaction sync: patches hover / dimming / selection in place. Nodes whose
+  // interaction state did not change keep their exact object identity, so React
+  // Flow neither re-measures them nor repositions them.
+  useEffect(() => {
+    setNodes((current) =>
+      applyNodeInteraction(current, {
+        hoveredNodeId,
+        relatedNodeIds,
+        selectedNodeIds: selectedSet,
       }),
-    [
-      graph.hoveredEdgeId,
-      graph.hoveredNodeId,
-      graph.selectedEdgeIds,
-      graph.selectedNodeIds,
-      locale,
-      projection.connections,
-    ],
-  );
-
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState<ProcessGraphFlowNode>(derivedNodes);
-  const [edges, setEdges] =
-    useEdgesState<ProcessGraphFlowEdge>(derivedEdges);
-
-  useEffect(() => setNodes(derivedNodes), [derivedNodes, setNodes]);
-  useEffect(() => setEdges(derivedEdges), [derivedEdges, setEdges]);
+    );
+  }, [hoveredNodeId, relatedNodeIds, selectedSet, setNodes]);
+  useEffect(() => {
+    const activeNodeId = hoveredNodeId ?? graph.selectedNodeIds[0] ?? null;
+    setEdges((current) =>
+      applyEdgeInteraction(current, {
+        hoveredEdgeId: graph.hoveredEdgeId,
+        activeNodeId,
+        selectedEdgeIds: graph.selectedEdgeIds,
+      }),
+    );
+  }, [
+    graph.hoveredEdgeId,
+    graph.selectedEdgeIds,
+    graph.selectedNodeIds,
+    hoveredNodeId,
+    setEdges,
+  ]);
 
   const layoutScope = useMemo<ProcessGraphLayoutScope>(
     () => ({
@@ -559,11 +604,22 @@ function ProcessIntelligenceCanvasInner({
       },
       [graph],
     );
+  const handleNodeDragStart: OnNodeDrag<ProcessGraphFlowNode> = useCallback(() => {
+    draggingRef.current = true;
+    // Hover highlighting during a drag only produces flicker: the pointer keeps
+    // crossing nodes while the cursor is captured by the dragged one.
+    graph.setHoveredNodeId(null);
+    graph.setHoveredEdgeId(null);
+  }, [graph]);
   const handleNodeDrag: OnNodeDrag<ProcessGraphFlowNode> = useCallback(() => {
+    draggingRef.current = true;
     setHasUnsavedLayout(true);
   }, []);
   const handleNodeDragStop: OnNodeDrag<ProcessGraphFlowNode> = useCallback(
     (_event, node) => {
+      draggingRef.current = false;
+      // Persist the dropped position into the layout source so the next
+      // structural sync reproduces it instead of snapping back to auto-layout.
       setManualPositions((current) => {
         const next = new Map(current);
         next.set(node.id, node.position);
@@ -775,8 +831,12 @@ function ProcessIntelligenceCanvasInner({
           onNodeClick={handleNodeClick}
           onNodeDoubleClick={handleNodeDoubleClick}
           onNodeContextMenu={handleNodeContextMenu}
-          onNodeMouseEnter={(_event, node) => graph.setHoveredNodeId(node.id)}
+          onNodeMouseEnter={(_event, node) => {
+            if (draggingRef.current) return;
+            graph.setHoveredNodeId(node.id);
+          }}
           onNodeMouseLeave={() => graph.setHoveredNodeId(null)}
+          onNodeDragStart={handleNodeDragStart}
           onNodeDrag={handleNodeDrag}
           onNodeDragStop={handleNodeDragStop}
           onEdgeClick={(event, edge) =>

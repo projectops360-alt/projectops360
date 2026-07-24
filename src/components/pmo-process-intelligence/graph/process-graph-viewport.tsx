@@ -43,6 +43,7 @@ export function ProcessGraphViewport({
   onNodeContextMenu,
   onNodeMouseEnter,
   onNodeMouseLeave,
+  onNodeDragStart,
   onNodeDrag,
   onNodeDragStop,
   onEdgeClick,
@@ -60,6 +61,7 @@ export function ProcessGraphViewport({
   onNodeContextMenu: NodeMouseHandler<ProcessGraphFlowNode>;
   onNodeMouseEnter: NodeMouseHandler<ProcessGraphFlowNode>;
   onNodeMouseLeave: NodeMouseHandler<ProcessGraphFlowNode>;
+  onNodeDragStart: OnNodeDrag<ProcessGraphFlowNode>;
   onNodeDrag: OnNodeDrag<ProcessGraphFlowNode>;
   onNodeDragStop: OnNodeDrag<ProcessGraphFlowNode>;
   onEdgeClick: EdgeMouseHandler<ProcessGraphFlowEdge>;
@@ -82,6 +84,7 @@ export function ProcessGraphViewport({
         onNodeContextMenu={onNodeContextMenu}
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
+        onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onEdgeClick={onEdgeClick}
