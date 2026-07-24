@@ -35,7 +35,7 @@ function ActivityNode({ data, selected }: NodeProps<ProcessGraphFlowNode>) {
           {Math.round(entity.metrics.progressPercent ?? 0)}%
         </span>
       </div>
-      {hovered ? <ProcessNodeTooltip entity={entity} locale={locale} /> : null}
+      <ProcessNodeTooltip entity={entity} locale={locale} active={hovered} />
     </div>
   );
 }

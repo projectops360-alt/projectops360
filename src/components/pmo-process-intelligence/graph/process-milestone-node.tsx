@@ -56,7 +56,7 @@ function MilestoneNode({ data, selected }: NodeProps<ProcessGraphFlowNode>) {
         <span>{entity.status.replaceAll("_", " ")}</span>
         <span className="font-bold text-slate-800">{Math.round(progress)}%</span>
       </div>
-      {hovered ? <ProcessNodeTooltip entity={entity} locale={locale} /> : null}
+      <ProcessNodeTooltip entity={entity} locale={locale} active={hovered} />
     </div>
   );
 }

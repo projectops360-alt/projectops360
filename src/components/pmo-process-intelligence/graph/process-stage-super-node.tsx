@@ -102,7 +102,7 @@ function StageNode({ data, selected }: NodeProps<ProcessGraphFlowNode>) {
           {Math.round((metrics.dataQualityScore ?? 0) * 100)}% data
         </span>
       </div>
-      {hovered ? <ProcessNodeTooltip entity={entity} locale={locale} /> : null}
+      <ProcessNodeTooltip entity={entity} locale={locale} active={hovered} />
     </div>
   );
 }
