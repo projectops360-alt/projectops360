@@ -115,6 +115,8 @@ export const env = {
    */
   PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED:
     process.env.PMO_PROCESS_INTELLIGENCE_DASHBOARD_ENABLED ?? "",
+  PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED:
+    process.env.PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

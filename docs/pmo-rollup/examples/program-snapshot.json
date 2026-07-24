@@ -1,0 +1,33 @@
+{
+  "contractVersion": 1,
+  "snapshotId": "pmo-snapshot-example-program-1",
+  "organizationId": "org-a",
+  "hierarchyLevel": "program",
+  "entityId": "program-1",
+  "asOf": "2026-03-31T23:59:59.000Z",
+  "metrics": {
+    "total_projects": {
+      "value": 2,
+      "aggregationMethod": "count-distinct",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    },
+    "approved_budget": {
+      "value": 300,
+      "aggregationMethod": "sum",
+      "reportingCurrency": "USD",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    }
+  },
+  "childEntities": [
+    {
+      "hierarchyLevel": "project",
+      "entityId": "p-a",
+      "projectIds": ["p-a"]
+    },
+    {
+      "hierarchyLevel": "project",
+      "entityId": "p-b",
+      "projectIds": ["p-b"]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "contractVersion": 1,
+  "snapshotId": "pmo-snapshot-example-project-a",
+  "organizationId": "org-a",
+  "hierarchyLevel": "project",
+  "entityId": "p-a",
+  "asOf": "2026-03-31T23:59:59.000Z",
+  "metrics": {
+    "total_projects": {
+      "value": 1,
+      "aggregationMethod": "count-distinct",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    },
+    "accumulated_delay_days": {
+      "value": 10,
+      "aggregationMethod": "sum",
+      "calendarType": "business-days",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    },
+    "portfolio_cpi": {
+      "value": 0.9,
+      "numerator": 90,
+      "denominator": 100,
+      "aggregationMethod": "ratio-of-sums",
+      "formulaVersion": "pmo-rollup-1.0.0"
+    }
+  }
+}
