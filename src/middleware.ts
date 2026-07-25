@@ -158,7 +158,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all paths except static files and images
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Match all paths except static files and images.
+    //
+    // The PWA entry points (sw.js, manifest.webmanifest, offline.html) must be
+    // excluded too: next-intl would rewrite them to /<locale>/… (404) and the
+    // auth guard would bounce anonymous visitors to /login, which silently
+    // breaks service worker registration and therefore installability.
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|offline\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
