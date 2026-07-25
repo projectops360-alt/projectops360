@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
-import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
+import { AppPwaInstallPrompt } from "@/components/pwa/pwa-install-prompt.app";
 
 type Props = {
   children: React.ReactNode;
@@ -27,7 +27,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <NextIntlClientProvider messages={messages}>
       {children}
-      <PwaInstallPrompt />
+      <AppPwaInstallPrompt />
     </NextIntlClientProvider>
   );
 }
