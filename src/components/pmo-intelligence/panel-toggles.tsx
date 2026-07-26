@@ -18,7 +18,7 @@
 // ============================================================================
 
 import { useTranslations } from "next-intl";
-import { PanelLeft, Sparkles } from "lucide-react";
+import { BookOpen, PanelLeft, PanelRight, Sparkles } from "lucide-react";
 
 export interface PmoPanelTogglesProps {
   isabellaOpen: boolean;
@@ -27,6 +27,22 @@ export interface PmoPanelTogglesProps {
   insightCount: number;
   overviewOpen: boolean;
   onToggleOverview: () => void;
+  /**
+   * Right rail. Only meaningful while the what-if lens is active, so the
+   * control is omitted rather than shown disabled — a toggle for a panel that
+   * cannot exist is noise.
+   */
+  simulationRailAvailable?: boolean;
+  simulationRailOpen?: boolean;
+  onToggleSimulationRail?: () => void;
+  /**
+   * Opens the acronym reference.
+   *
+   * Always available, because it depends on no data. The inline annotated term
+   * only reaches someone who already has the number on screen; "where are the
+   * acronyms and what do they mean?" needed an entry point of its own.
+   */
+  onOpenGlossary?: () => void;
 }
 
 export function PmoPanelToggles({
@@ -35,6 +51,10 @@ export function PmoPanelToggles({
   insightCount,
   overviewOpen,
   onToggleOverview,
+  simulationRailAvailable = false,
+  simulationRailOpen = true,
+  onToggleSimulationRail,
+  onOpenGlossary,
 }: PmoPanelTogglesProps) {
   const t = useTranslations("pmoIntelligence");
 
@@ -70,6 +90,35 @@ export function PmoPanelToggles({
         {/* The count is read as "Isabella · 3 findings", never as a bare badge. */}
         {t("panelIsabellaWithCount", { count: insightCount })}
       </button>
+
+      {simulationRailAvailable && onToggleSimulationRail ? (
+        <button
+          type="button"
+          onClick={onToggleSimulationRail}
+          aria-pressed={simulationRailOpen}
+          title={simulationRailOpen ? t("panelHideSimulation") : t("panelShowSimulation")}
+          className={`flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            simulationRailOpen
+              ? "border-slate-300 bg-slate-100 text-slate-700"
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          <PanelRight className="h-3.5 w-3.5" aria-hidden />
+          {t("panelSimulation")}
+        </button>
+      ) : null}
+
+      {onOpenGlossary ? (
+        <button
+          type="button"
+          onClick={onOpenGlossary}
+          title={t("panelGlossaryHint")}
+          className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <BookOpen className="h-3.5 w-3.5 text-blue-600" aria-hidden />
+          {t("panelGlossary")}
+        </button>
+      ) : null}
     </>
   );
 }

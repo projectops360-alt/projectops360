@@ -92,3 +92,7 @@ storageState.json
 
 .vercel
 .env*
+
+# Local dev server output
+.dev.log
+.extract-report.json
