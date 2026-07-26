@@ -3352,12 +3352,6 @@
     "annotationVac": "Variance at completion: {amount} {currency}",
     "annotationCpi": "Cost performance index: {cpi}",
     "annotationFinanceIncomplete": "Financial baseline incomplete",
-    "annotationFinanceAlert.cpi_below_threshold": "Cost performance below threshold",
-    "annotationFinanceAlert.spi_below_threshold": "Schedule performance below threshold",
-    "annotationFinanceAlert.eac_exceeds_baseline": "Forecast exceeds the baseline",
-    "annotationFinanceAlert.reconciliation_exceptions": "Reconciliation exceptions recorded",
-    "annotationFinanceAlert.unverified_actuals": "Unverified actual costs",
-    "annotationFinanceAlert.currency_mismatches": "Currency mismatches recorded",
     "annotationCapacityNoInputs": "No capacity inputs recorded",
     "annotationAvailability": "Workforce availability {percent}% ({engine})",
     "annotationOverallocated": "{count} overallocated resources ({engine})",
@@ -3501,6 +3495,14 @@
     "kpiOutcomeLensOnly": "Switched lens. This figure is portfolio-wide, so it selects no individual node.",
     "kpiOutcomeLensNoNodes": "Switched lens, but nothing in the current scope matched. Widen the filters or the date range.",
     "kpiOutcomeNothing": "Nothing in the current scope matched this indicator.",
-    "kpiOutcomeDismiss": "Dismiss"
+    "kpiOutcomeDismiss": "Dismiss",
+    "annotationFinanceAlert": {
+      "cpi_below_threshold": "Cost performance below threshold",
+      "spi_below_threshold": "Schedule performance below threshold",
+      "eac_exceeds_baseline": "Forecast exceeds the baseline",
+      "reconciliation_exceptions": "Reconciliation exceptions recorded",
+      "unverified_actuals": "Unverified actual costs",
+      "currency_mismatches": "Currency mismatches recorded"
+    }
   }
 }
