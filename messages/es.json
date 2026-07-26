@@ -3352,12 +3352,6 @@
     "annotationVac": "Variación al término: {amount} {currency}",
     "annotationCpi": "Índice de desempeño del costo: {cpi}",
     "annotationFinanceIncomplete": "Línea base financiera incompleta",
-    "annotationFinanceAlert.cpi_below_threshold": "Desempeño del costo bajo el umbral",
-    "annotationFinanceAlert.spi_below_threshold": "Desempeño del cronograma bajo el umbral",
-    "annotationFinanceAlert.eac_exceeds_baseline": "El pronóstico supera la línea base",
-    "annotationFinanceAlert.reconciliation_exceptions": "Excepciones de conciliación registradas",
-    "annotationFinanceAlert.unverified_actuals": "Costos reales sin verificar",
-    "annotationFinanceAlert.currency_mismatches": "Discrepancias de moneda registradas",
     "annotationCapacityNoInputs": "Sin insumos de capacidad registrados",
     "annotationAvailability": "Disponibilidad de la fuerza de trabajo {percent}% ({engine})",
     "annotationOverallocated": "{count} recursos sobreasignados ({engine})",
@@ -3501,6 +3495,14 @@
     "kpiOutcomeLensOnly": "Se cambió el lente. Esta cifra es de todo el portafolio, así que no selecciona ningún nodo concreto.",
     "kpiOutcomeLensNoNodes": "Se cambió el lente, pero nada en el alcance actual coincidió. Amplía los filtros o el rango de fechas.",
     "kpiOutcomeNothing": "Nada en el alcance actual coincidió con este indicador.",
-    "kpiOutcomeDismiss": "Descartar"
+    "kpiOutcomeDismiss": "Descartar",
+    "annotationFinanceAlert": {
+      "cpi_below_threshold": "Desempeño del costo bajo el umbral",
+      "spi_below_threshold": "Desempeño del cronograma bajo el umbral",
+      "eac_exceeds_baseline": "El pronóstico supera la línea base",
+      "reconciliation_exceptions": "Excepciones de conciliación registradas",
+      "unverified_actuals": "Costos reales sin verificar",
+      "currency_mismatches": "Discrepancias de moneda registradas"
+    }
   }
 }
