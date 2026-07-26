@@ -74,12 +74,30 @@
     "live": "En vivo",
     "activeMemory": "Memoria activa · siempre buscable",
     "cards": {
-      "charter": { "label": "ACTUAL", "title": "Charter y Gob." },
-      "framework": { "label": "FASE 02", "title": "Framework" },
-      "plan": { "label": "FASE 03", "title": "Plan y Equipo" },
-      "execution": { "label": "ACTIVA", "title": "Ejecución" },
-      "memory": { "label": "FASE 05", "title": "Memoria Viva" },
-      "reporting": { "label": "FASE 06", "title": "Reporting" }
+      "charter": {
+        "label": "ACTUAL",
+        "title": "Charter y Gob."
+      },
+      "framework": {
+        "label": "FASE 02",
+        "title": "Framework"
+      },
+      "plan": {
+        "label": "FASE 03",
+        "title": "Plan y Equipo"
+      },
+      "execution": {
+        "label": "ACTIVA",
+        "title": "Ejecución"
+      },
+      "memory": {
+        "label": "FASE 05",
+        "title": "Memoria Viva"
+      },
+      "reporting": {
+        "label": "FASE 06",
+        "title": "Reporting"
+      }
     },
     "stats": {
       "decisions": "Decisiones",
@@ -137,12 +155,30 @@
     "eyebrow": "Metodología",
     "title": "Un solo framework. Todas las metodologías que tus proyectos necesitan.",
     "nodes": {
-      "charter": { "title": "Charter", "sub": "Gobernanza" },
-      "framework": { "title": "Framework", "sub": "Ágil / Waterfall" },
-      "plan": { "title": "Plan y Equipo", "sub": "Capacidad" },
-      "execution": { "title": "Ejecución", "sub": "En progreso" },
-      "memory": { "title": "Memoria Viva", "sub": "Buscable" },
-      "reporting": { "title": "Reporting", "sub": "Trazabilidad" }
+      "charter": {
+        "title": "Charter",
+        "sub": "Gobernanza"
+      },
+      "framework": {
+        "title": "Framework",
+        "sub": "Ágil / Waterfall"
+      },
+      "plan": {
+        "title": "Plan y Equipo",
+        "sub": "Capacidad"
+      },
+      "execution": {
+        "title": "Ejecución",
+        "sub": "En progreso"
+      },
+      "memory": {
+        "title": "Memoria Viva",
+        "sub": "Buscable"
+      },
+      "reporting": {
+        "title": "Reporting",
+        "sub": "Trazabilidad"
+      }
     },
     "stats": {
       "traceability": "de trazabilidad promedio en los programas activos de la beta privada.",
@@ -156,11 +192,32 @@
     "titleAccent": "ciclo del proyecto.",
     "lead": "ProjectOps 360° ayuda a los equipos a gestionar y preservar la comunicación del proyecto en correo, reuniones, Microsoft Teams, Slack, comentarios, actualizaciones y otros canales.",
     "channelsLabel": "En tus canales",
-    "channels": ["Correo", "Reuniones", "Microsoft Teams", "Slack", "Comentarios", "Actualizaciones"],
+    "channels": [
+      "Correo",
+      "Reuniones",
+      "Microsoft Teams",
+      "Slack",
+      "Comentarios",
+      "Actualizaciones"
+    ],
     "connectedLabel": "Cada conversación relevante pasa a formar parte del registro del proyecto — conectada a",
-    "connected": ["Hitos", "Tareas", "Riesgos", "Incidencias", "Decisiones", "Responsables", "Resultados"],
+    "connected": [
+      "Hitos",
+      "Tareas",
+      "Riesgos",
+      "Incidencias",
+      "Decisiones",
+      "Responsables",
+      "Resultados"
+    ],
     "memoryLabel": "Una memoria de comunicación confiable que responde",
-    "answers": ["Qué se habló", "Qué se decidió", "Quién participó", "Qué está pendiente", "Qué requiere acción"],
+    "answers": [
+      "Qué se habló",
+      "Qué se decidió",
+      "Quién participó",
+      "Qué está pendiente",
+      "Qué requiere acción"
+    ],
     "closingPre": "Con IA, ProjectOps 360° convierte la comunicación dispersa en ",
     "closingAccent": "inteligencia de proyecto estructurada",
     "closingPost": "."
@@ -170,11 +227,30 @@
     "title": "Hecho para proyectos del mundo real, ",
     "titleAccent": "no solo equipos de software.",
     "lead": "ProjectOps 360° está diseñado para cualquier proyecto donde importen la claridad, la coordinación, el control de riesgos, la comunicación y la disciplina de ejecución.",
-    "tags": ["Construcción", "Ingeniería", "Operaciones", "Implementación tecnológica", "Transformación de negocio", "Manufactura", "Software"],
+    "tags": [
+      "Construcción",
+      "Ingeniería",
+      "Operaciones",
+      "Implementación tecnológica",
+      "Transformación de negocio",
+      "Manufactura",
+      "Software"
+    ],
     "predictiveTitle": "Predictivo y controlado",
-    "predictive": ["Planificación predictiva", "Aprobaciones", "Documentación", "Control estricto"],
+    "predictive": [
+      "Planificación predictiva",
+      "Aprobaciones",
+      "Documentación",
+      "Control estricto"
+    ],
     "agileTitle": "Ágil y adaptable",
-    "agile": ["Coordinación ágil", "Decisiones rápidas", "Ajustes en campo", "Resolución de incidencias", "Comunicación continua"],
+    "agile": [
+      "Coordinación ágil",
+      "Decisiones rápidas",
+      "Ajustes en campo",
+      "Resolución de incidencias",
+      "Comunicación continua"
+    ],
     "closingPre": "ProjectOps 360° soporta ambos — en ",
     "closingAccent": "un solo sistema operativo de proyectos inteligente",
     "closingPost": "."
@@ -210,7 +286,14 @@
     "titleAccent": "Potenciado por IA.",
     "lead": "ProjectOps 360° está hecho para project managers que quieren más que seguimiento de tareas.",
     "body": "La IA trabaja en todo el sistema para ayudarte a definir el alcance, estructurar el trabajo, detectar riesgos, resumir la comunicación, preservar la memoria del proyecto y recomendar la siguiente mejor acción.",
-    "chips": ["Definir alcance", "Estructurar el trabajo", "Detectar riesgos", "Resumir comunicación", "Preservar memoria", "Siguiente mejor acción"],
+    "chips": [
+      "Definir alcance",
+      "Estructurar el trabajo",
+      "Detectar riesgos",
+      "Resumir comunicación",
+      "Preservar memoria",
+      "Siguiente mejor acción"
+    ],
     "noReplace": "Pero la IA no reemplaza tu experiencia.",
     "sharper": "Te da mejor visibilidad, análisis más rápido y mayor soporte a la decisión — para que tu criterio sea más agudo, no menos importante.",
     "closing": "ProjectOps 360° te ayuda a liderar proyectos con inteligencia, control y confianza.",
@@ -239,7 +322,12 @@
     "name": "Daniela Ortiz",
     "role": "Directora de PMO · NorthPeak",
     "replacesLabel": "Cuatro herramientas, una plataforma",
-    "replaces": ["Planificación", "Entrega", "Memoria de proyecto", "Reportes"]
+    "replaces": [
+      "Planificación",
+      "Entrega",
+      "Memoria de proyecto",
+      "Reportes"
+    ]
   },
   "cta": {
     "badge": "Beta privada · cupos limitados",
@@ -252,5 +340,15 @@
   "footer": {
     "privacy": "Privacidad",
     "copyright": "© 2026 ProjectOps 360°"
+  },
+  "pwa": {
+    "title": "Instala ProjectOps360°",
+    "body": "Añade ProjectOps360° a este dispositivo para usarla como app a pantalla completa y con acceso más rápido.",
+    "install": "Instalar app",
+    "later": "Ahora no",
+    "dismiss": "Descartar invitación de instalación",
+    "iosBody": "Añade ProjectOps360° a tu pantalla de inicio para usarla como app a pantalla completa.",
+    "iosStepShare": "Compartir",
+    "iosStepAdd": "Añadir a pantalla de inicio"
   }
 }

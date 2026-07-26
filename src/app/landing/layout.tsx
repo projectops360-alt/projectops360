@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Hanken_Grotesk } from "next/font/google";
 import "@/components/landing/landing.css";
 import { LandingI18nProvider } from "@/components/landing/i18n/provider";
+import { LandingPwaInstallPrompt } from "@/components/landing/landing-pwa-install-prompt";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -26,7 +27,10 @@ export const metadata: Metadata = {
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className={`${bricolage.variable} ${hanken.variable} lp-root min-h-screen w-full overflow-x-hidden`}>
-      <LandingI18nProvider>{children}</LandingI18nProvider>
+      <LandingI18nProvider>
+        {children}
+        <LandingPwaInstallPrompt />
+      </LandingI18nProvider>
     </div>
   );
 }
