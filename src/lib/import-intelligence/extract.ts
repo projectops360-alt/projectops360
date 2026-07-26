@@ -790,14 +790,32 @@ function jsonArrayToTable(name: string, items: Record<string, unknown>[]): Parse
 
 // ── Project-level detection ─────────────────────────────────────────────────
 
+/**
+ * Count whole-word occurrences of a keyword.
+ *
+ * Raw substring counting is not usable here. Several keywords are two letters
+ * ("ai", "ia"), and in Spanish "ia" sits inside ingenier[ia], licenc[ia],
+ * garant[ia], transferenc[ia] — ordinary words in any construction document.
+ * A Spanish infrastructure plan therefore scored `ai_native_execution` well
+ * past the threshold and was classified as an AI project, which then decides
+ * which modules the imported project gets.
+ *
+ * Lookarounds rather than \b because the blob is already accent-stripped but
+ * may still carry non-ASCII, and \b would treat those as boundaries.
+ */
+function countWholeWord(blob: string, keyword: string): number {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matches = blob.match(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "gu"));
+  return matches ? matches.length : 0;
+}
+
 export function detectProjectType(text: string): { type: ProjectType; score: number } {
   const blob = normalizeHeader(text.slice(0, 50_000));
   let best: { type: ProjectType; score: number } = { type: "general", score: 0 };
   for (const [type, keywords] of Object.entries(PROJECT_TYPE_KEYWORDS) as [ProjectType, string[]][]) {
     let score = 0;
     for (const kw of keywords) {
-      const occurrences = blob.split(normalizeHeader(kw)).length - 1;
-      score += Math.min(occurrences, 5);
+      score += Math.min(countWholeWord(blob, normalizeHeader(kw)), 5);
     }
     if (score > best.score) best = { type, score };
   }

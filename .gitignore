@@ -89,3 +89,10 @@ storageState.json
 **/.tmp-*.mjs
 **/_tmp-*.test.tsx
 **/_tmp-*.tsx
+
+.vercel
+.env*
+
+# Local dev server output
+.dev.log
+.extract-report.json

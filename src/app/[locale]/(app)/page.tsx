@@ -3,6 +3,11 @@ import Link from "next/link";
 import { getOrgContext } from "@/lib/auth";
 import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
 import { canAccessPmoLivingGraph } from "@/lib/pmo-living-graph/flags";
+import {
+  shouldServeIntelligenceCenterAtRoot,
+  shouldShowDashboardSwitcher,
+} from "@/lib/pmo-living-graph/single-dashboard";
+import { PmoIntelligenceCenterView } from "@/components/pmo-living-graph/intelligence-center-view";
 import { getCommandCenterSummary, band, type CommandCenterData, type HealthBand } from "@/lib/command-center/service";
 import {
   UploadCloud, Sparkles, BarChart3, Gauge, FolderKanban, Ban, Route, Wallet, Scale,
@@ -29,17 +34,37 @@ export default async function HomePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ auth?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale } = await params;
-  const { auth } = await searchParams;
+  const rawSearchParams = await searchParams;
+  const authParam = rawSearchParams.auth;
+  const auth = Array.isArray(authParam) ? authParam[0] : authParam;
   setRequestLocale(locale);
   const isEs = locale === "es";
   const tt = (en: string, es: string) => (isEs ? es : en);
 
   const org = await getOrgContext();
-  const showProcessIntelligence = canAccessProcessIntelligence(org.role);
-  const showPmoLivingGraph = canAccessPmoLivingGraph(org.role);
+
+  // SINGLE-DASHBOARD-MODE: the root serves the PMO Intelligence Center for the
+  // roles entitled to it. Members and viewers deliberately keep the Command
+  // Center here — Dashboard 3's owner/admin gate covers portfolio finance,
+  // cross-project risk and capacity, and handing those roles a 404 on the
+  // application's home page would be a worse regression than the duplication
+  // this mode removes. Nothing below is deleted; it is simply not reached.
+  if (shouldServeIntelligenceCenterAtRoot(org.role)) {
+    return (
+      <PmoIntelligenceCenterView
+        org={org}
+        locale={locale}
+        searchParams={rawSearchParams}
+      />
+    );
+  }
+
+  const showSwitcher = shouldShowDashboardSwitcher();
+  const showProcessIntelligence = showSwitcher && canAccessProcessIntelligence(org.role);
+  const showPmoLivingGraph = showSwitcher && canAccessPmoLivingGraph(org.role);
   const data = await getCommandCenterSummary(org.organizationId, locale);
   // Locale prefix used to build hrefs (e.g. `${base}/reports`). Must be EMPTY
   // for the default locale — localizedHref(locale, "") returns "/" (correct as

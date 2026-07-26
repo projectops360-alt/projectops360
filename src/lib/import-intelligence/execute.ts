@@ -380,6 +380,19 @@ export async function executeImport(params: {
         start_date: task.planned_start || null,
         end_date: task.planned_finish || null,
         duration_days: task.duration_days,
+        // One figure from the source file, two readers. `estimate_hours` is the
+        // generic effort estimate that the CPM, the generic capacity engine,
+        // process mining and Isabella all read; `estimated_labor_hours` is the
+        // construction-specific crew figure used by readiness and reports.
+        //
+        // Writing only the second one dropped the estimate for every imported
+        // project as far as scheduling and capacity were concerned — a software
+        // import lost it entirely, since nothing there reads the labour field.
+        //
+        // These are two lenses on one effort, never two quantities to add.
+        // Nothing in the product sums them; the "never combine the two capacity
+        // engines" rule is about hours vs headcount (CAP-048 §5), not these.
+        estimate_hours: task.estimated_hours,
         estimated_labor_hours: task.estimated_hours,
         assigned_resource_id: assignedResourceId,
         assignment_type: assignedResourceId ? "person" : null,

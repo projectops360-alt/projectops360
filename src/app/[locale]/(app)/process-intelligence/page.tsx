@@ -7,12 +7,20 @@
 // The current PMO Command Center at "/" remains the default dashboard; this
 // route is reached exclusively through its comparison switcher and links
 // back with one click. Route-level code splitting keeps it lazy.
+//
+// SINGLE-DASHBOARD-MODE: when that mode is on this SURFACE is retired and the
+// route 404s for everyone — the same denial it already performs when its own
+// flag is off, so no new failure shape appears. The MODULE behind it is
+// untouched and still very much alive: ADR-012 has Dashboard 3 composing
+// loadPmoPiFlowModel, loadPmoPiFinanceOverlay, loadPmoPiOverlays and
+// buildInsights, so deleting it would break the dashboard that replaced it.
 // ============================================================================
 
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { getOrgContext } from "@/lib/auth";
 import { canAccessProcessIntelligence } from "@/lib/pmo-process-intelligence/flags";
+import { isProcessIntelligenceRouteRetired } from "@/lib/pmo-living-graph/single-dashboard";
 import { DEFAULT_PMO_PI_FILTERS } from "@/lib/pmo-process-intelligence/contracts";
 import { loadPmoPiFlowModel } from "@/lib/pmo-process-intelligence/read-model.server";
 import { loadPmoPiFinanceOverlay } from "@/lib/pmo-process-intelligence/financial-read.server";
@@ -43,6 +51,10 @@ export default async function ProcessIntelligencePage({
   const { locale } = await params;
   const { project, focus, view, overlay } = await searchParams;
   setRequestLocale(locale);
+
+  // Checked before the org read: with the surface retired there is nothing to
+  // authorize, and this route must not do work it will discard.
+  if (isProcessIntelligenceRouteRetired()) notFound();
 
   const org = await getOrgContext();
   if (!canAccessProcessIntelligence(org.role)) notFound();

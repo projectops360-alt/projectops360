@@ -32,7 +32,6 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   ReactFlowProvider,
@@ -40,7 +39,8 @@ import {
   useNodesState,
   useReactFlow,
 } from "@xyflow/react";
-import { AlertTriangle, ArrowLeft, Info, Network, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Info, Network, X } from "lucide-react";
+import { AcronymGlossary } from "@/components/acronyms/acronym-glossary";
 import type {
   GraphEdge,
   GraphFilters,
@@ -112,7 +112,16 @@ import { PmoHealthPanel } from "@/components/pmo-intelligence/health-panel";
 import { PmoFocusPanel } from "@/components/pmo-intelligence/focus-panel";
 import { PmoCriticalPathDrawer } from "@/components/pmo-intelligence/critical-path-drawer";
 import { PmoInsightsPanel } from "@/components/pmo-intelligence/insights-panel";
-import { PmoWhatIfPanel } from "@/components/pmo-intelligence/whatif-panel";
+// CAP-049: the scenario builder replaces the read-only What-if panel on this
+// lens. The old panel is untouched and still serves Dashboard 2.
+import { SimulationPanel } from "@/components/pmo-simulation/simulation-panel";
+import type { SimTargetOption } from "@/components/pmo-simulation/intervention-editor";
+import type { SimResult } from "@/lib/pmo-simulation/contracts";
+import {
+  classifyNodesForCompare,
+  COMPARE_COLORS,
+  type CompareState,
+} from "@/lib/pmo-simulation/presentation";
 import { PmoTopActions } from "@/components/pmo-intelligence/top-actions";
 import { PmoPanelToggles } from "@/components/pmo-intelligence/panel-toggles";
 import type { PmoIntelligenceLayerProps } from "@/components/pmo-intelligence/layer-contract";
@@ -604,6 +613,70 @@ function ShellBody({
     [selectedNodeId],
   );
 
+  // The acronym reference. Opened from the toolbar, independent of any result:
+  // it is the answer to "where are the acronyms", which the inline annotated
+  // term could never give — reaching one required already having the number.
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  // Right rail visibility. Defaults open so entering the lens still lands on
+  // the scenario; collapsing gives the canvas the full width.
+  const [simulationRailOpen, setSimulationRailOpen] = useState(true);
+
+  // ── Simulation (CAP-049) ────────────────────────────────────────────────
+  // The last run's result, plus the nodes it touched. Held here so Compare mode
+  // can tint the canvas; the panel owns the scenario itself.
+  const [simulationResult, setSimulationResult] = useState<SimResult | null>(null);
+  const [simulationFocusIds, setSimulationFocusIds] = useState<string[]>([]);
+
+  const handleSimulationChange = useCallback(
+    (nodeIds: string[], result: SimResult | null) => {
+      setSimulationResult(result);
+      setSimulationFocusIds(nodeIds);
+    },
+    [],
+  );
+
+  // Compare colours come from the pure classifier, so the canvas cannot invent
+  // a verdict the results table does not also show.
+  const compareStates = useMemo(
+    () => (simulationResult ? classifyNodesForCompare(simulationResult) : null),
+    [simulationResult],
+  );
+
+  /** Interventions can only target entities that genuinely exist in the graph. */
+  const simulationTargets = useMemo<SimTargetOption[]>(() => {
+    const kindMap: Record<string, SimTargetOption["kind"] | undefined> = {
+      project: "project",
+      milestone: "milestone",
+      task: "task",
+      risk: "risk",
+      resource: "resource",
+    };
+    // Project titles come from the project nodes themselves, so the picker and
+    // the canvas can never disagree about what a project is called.
+    const projectTitleById = new Map(
+      nodes
+        .filter((node) => node.kind === "project" && node.canonicalEntityId)
+        .map((node) => [node.canonicalEntityId, node.label]),
+    );
+
+    return nodes
+      .map((node) => {
+        const kind = kindMap[node.kind];
+        if (!kind || !node.canonicalEntityId) return null;
+        return {
+          kind,
+          id: node.canonicalEntityId,
+          label: node.label,
+          // Without this the picker lists every project's milestones together
+          // and "M1" could belong to any of them.
+          projectId: node.projectId,
+          projectLabel: node.projectId ? projectTitleById.get(node.projectId) ?? null : null,
+        };
+      })
+      .filter((option): option is SimTargetOption => option !== null);
+    // Ordering is the picker's job — see `groupTargetsByProject`.
+  }, [nodes]);
+
   // ── Interaction patch ───────────────────────────────────────────────────
   // Lens emphasis rides this pass rather than the structural one on purpose:
   // switching lens must not rebuild the node array, or React Flow loses its
@@ -630,6 +703,30 @@ function ShellBody({
     blastHopsById,
     lensProjection,
   ]);
+
+  // ── Compare mode tint (CAP-049) ─────────────────────────────────────────
+  // Runs AFTER the interaction pass so it layers on top of it, and only when a
+  // simulation has actually been run. With no result the canvas is untouched —
+  // the graph must look exactly as it did before the feature existed.
+  useEffect(() => {
+    if (!compareStates) return;
+    setFlowNodes((current) =>
+      current.map((node) => {
+        const state = compareStates.get(node.id) as CompareState | undefined;
+        if (!state) return node;
+        const focused = simulationFocusIds.length === 0 || simulationFocusIds.includes(node.id);
+        return {
+          ...node,
+          style: {
+            ...node.style,
+            borderColor: COMPARE_COLORS[state],
+            borderWidth: state === "unchanged" ? 1 : 2,
+            opacity: focused ? 1 : 0.35,
+          },
+        };
+      }),
+    );
+  }, [compareStates, simulationFocusIds, setFlowNodes]);
 
   useEffect(() => {
     setFlowEdges((current) =>
@@ -1196,13 +1293,8 @@ function ShellBody({
                 onAskIsabella={() => handleAskIsabella(t("askDefaultQuestion"))}
               />
             ) : null}
-            <Link
-              href={`${base}/`}
-              className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-              {t("backToDashboards")}
-            </Link>
+            {/* "Back to dashboards" removed: this is now the only dashboard, so
+                the link pointed at the screen the user was already on. */}
           </div>
         </div>
 
@@ -1328,6 +1420,10 @@ function ShellBody({
               insightCount={dashboard.insights.length}
               overviewOpen={panels.overview}
               onToggleOverview={() => handleTogglePanel("overview")}
+              simulationRailAvailable={scope.activeLens === "whatif"}
+              simulationRailOpen={simulationRailOpen}
+              onToggleSimulationRail={() => setSimulationRailOpen((open) => !open)}
+              onOpenGlossary={() => setGlossaryOpen(true)}
             />
           ) : null}
         </GraphToolbar>
@@ -1337,8 +1433,35 @@ function ShellBody({
         {/* Left rail: health, focus, and the scenario controls. All three read
             the composed model and none of them recomputes anything (ADR-012).
             Collapsible — when it is closed the canvas takes the width. */}
+        {intelligence && !panels.overview ? (
+          // Same reasoning as the right rail: collapsed is a strip, not a void.
+          <aside className="flex w-9 shrink-0 flex-col items-center gap-2 border-r border-slate-200 bg-slate-50 py-2">
+            <button
+              type="button"
+              onClick={() => handleTogglePanel("overview")}
+              title={t("expandRail")}
+              className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+              <span className="sr-only">{t("expandRail")}</span>
+            </button>
+            <span className="select-none text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl]">
+              {t("overviewRailLabel")}
+            </span>
+          </aside>
+        ) : null}
+
         {intelligence && panels.overview ? (
           <aside className="flex w-[260px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2">
+            <button
+              type="button"
+              onClick={() => handleTogglePanel("overview")}
+              title={t("collapseRail")}
+              className="self-start rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+              <span className="sr-only">{t("collapseRail")}</span>
+            </button>
             <PmoHealthPanel
               health={dashboard.health}
               activeLens={scope.activeLens}
@@ -1350,11 +1473,6 @@ function ShellBody({
               onSelectFocus={handleSelectFocus}
               resolvedNodeIds={focusResolvedNodeIds}
             />
-            {/* The what-if lens frames the canvas for a scenario; the controls
-                that actually run `simulateWhatIf` live here, on that lens. */}
-            {scope.activeLens === "whatif" ? (
-              <PmoWhatIfPanel whatIf={dashboard.whatIf} locale={locale} />
-            ) : null}
           </aside>
         ) : null}
 
@@ -1462,6 +1580,54 @@ function ShellBody({
           />
         ) : null}
 
+        {/* The what-if lens frames the canvas for a scenario. The RESULTS of
+            that scenario live here, on the right, next to the graph they
+            explain; the builder that produces them is a wide modal opened from
+            this rail. Configuration needs room, consultation needs proximity —
+            one 260px column could not serve both. Every figure shown comes from
+            `lib/pmo-simulation`, which reads the portfolio and writes only to
+            its own tables. */}
+        {scope.activeLens === "whatif" ? (
+          simulationRailOpen ? (
+            <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-slate-50 p-2.5">
+              {/* Collapse control on the rail itself, not only in the toolbar:
+                  the user who wants the canvas back is looking AT the panel. */}
+              <button
+                type="button"
+                onClick={() => setSimulationRailOpen(false)}
+                title={t("collapseRail")}
+                className="mb-1.5 self-end rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+                <span className="sr-only">{t("collapseRail")}</span>
+              </button>
+              <SimulationPanel
+                locale={locale}
+                targets={simulationTargets}
+                onAffectedNodesChange={handleSimulationChange}
+                autoOpenConfig
+              />
+            </aside>
+          ) : (
+            // Collapsed: a strip that still says what is behind it. A panel that
+            // vanishes with no trace reads as a feature that broke.
+            <aside className="flex w-9 shrink-0 flex-col items-center gap-2 border-l border-slate-200 bg-slate-50 py-2">
+              <button
+                type="button"
+                onClick={() => setSimulationRailOpen(true)}
+                title={t("expandRail")}
+                className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+                <span className="sr-only">{t("expandRail")}</span>
+              </button>
+              <span className="select-none text-[10px] font-bold uppercase tracking-wider text-slate-500 [writing-mode:vertical-rl]">
+                {t("simulationRailLabel")}
+              </span>
+            </aside>
+          )
+        ) : null}
+
         <GraphSidePanel
           locale={locale}
           base={base}
@@ -1470,6 +1636,10 @@ function ShellBody({
           onClose={closePanel}
         />
       </div>
+
+      {/* The acronym reference. Reachable from the toolbar at any time, with no
+          simulation run and nothing selected. */}
+      <AcronymGlossary open={glossaryOpen} onClose={() => setGlossaryOpen(false)} />
 
       {/* The critical path drawer sits at the bottom, across the full width:
           it is about the portfolio's schedule, not about one panel's selection,

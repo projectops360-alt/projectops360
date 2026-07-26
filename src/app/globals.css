@@ -219,19 +219,33 @@ body {
   #charter-report-print,
   #charter-report-print *,
   #reports-result-print,
-  #reports-result-print * {
+  #reports-result-print *,
+  #pmo-simulation-print,
+  #pmo-simulation-print * {
     visibility: visible;
   }
   #status-report-print,
   #budget-report-print,
   #closeout-report-print,
   #charter-report-print,
-  #reports-result-print {
+  #reports-result-print,
+  #pmo-simulation-print {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
     padding: 0;
+  }
+  /* The simulation result prints from inside a modal, so the dialog's own
+     scroll and max-height must not clip the table at one page. */
+  #pmo-simulation-print .overflow-x-auto,
+  #pmo-simulation-print .overflow-y-auto {
+    overflow: visible;
+  }
+  #pmo-simulation-print table {
+    width: 100%;
+    table-layout: auto;
+    font-size: 9px;
   }
   #reports-result-print {
     color: #0f172a;
