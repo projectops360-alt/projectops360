@@ -89,3 +89,6 @@ storageState.json
 **/.tmp-*.mjs
 **/_tmp-*.test.tsx
 **/_tmp-*.tsx
+
+.vercel
+.env*

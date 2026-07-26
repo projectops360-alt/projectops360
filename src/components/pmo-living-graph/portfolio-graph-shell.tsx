@@ -32,7 +32,6 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   ReactFlowProvider,
@@ -40,7 +39,7 @@ import {
   useNodesState,
   useReactFlow,
 } from "@xyflow/react";
-import { AlertTriangle, ArrowLeft, Info, Network, X } from "lucide-react";
+import { AlertTriangle, Info, Network, X } from "lucide-react";
 import type {
   GraphEdge,
   GraphFilters,
@@ -1196,13 +1195,8 @@ function ShellBody({
                 onAskIsabella={() => handleAskIsabella(t("askDefaultQuestion"))}
               />
             ) : null}
-            <Link
-              href={`${base}/`}
-              className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-              {t("backToDashboards")}
-            </Link>
+            {/* "Back to dashboards" removed: this is now the only dashboard, so
+                the link pointed at the screen the user was already on. */}
           </div>
         </div>
 

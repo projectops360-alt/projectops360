@@ -8,7 +8,7 @@ import { LivingGuideWidget } from "@/components/living-guide";
 import { isProductBrainAllowedEmail } from "@/lib/product-brain/access.server";
 import { isPlatformAdmin } from "@/lib/admin-console/access.server";
 import { isIsabellaVoiceEnabled } from "@/lib/isabella/voice/flag";
-import { canAccessPmoLivingGraph } from "@/lib/pmo-living-graph/flags";
+import { shouldShowIntelligenceCenterNavEntry } from "@/lib/pmo-living-graph/single-dashboard";
 import type { Locale } from "@/types/database";
 
 export default async function AppLayout({
@@ -36,6 +36,12 @@ export default async function AppLayout({
     redirect(locale === routing.defaultLocale ? "/login" : `/${locale}/login`);
   }
 
+  // SINGLE-DASHBOARD-MODE: with the mode on, Dashboard 3 IS the root route and
+  // already sits at the top of the sidebar, so a second entry pointing at the
+  // same screen is removed. With the mode off this resolves to the unchanged
+  // canAccessPmoLivingGraph gate and navigation is exactly what it was.
+  const canViewPmoLivingGraph = shouldShowIntelligenceCenterNavEntry(org.role);
+
   return (
     <AppShell
       user={{
@@ -51,7 +57,7 @@ export default async function AppLayout({
       }}
       canViewProductBrain={isProductBrainAllowedEmail(org.email)}
       canViewAdminConsole={await isPlatformAdmin(org.email)}
-      canViewPmoLivingGraph={canAccessPmoLivingGraph(org.role)}
+      canViewPmoLivingGraph={canViewPmoLivingGraph}
     >
       {children}
       {/* Isabella is present app-wide, so she persists across navigation and her
