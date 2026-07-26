@@ -16,6 +16,7 @@ export function AppFrame({
   role,
   canViewProductBrain = false,
   canViewAdminConsole = false,
+  canViewPmoLivingGraph = false,
 }: {
   header: React.ReactNode;
   children: React.ReactNode;
@@ -25,6 +26,8 @@ export function AppFrame({
   canViewProductBrain?: boolean;
   /** Server-computed platform-admin flag for the Admin Console. */
   canViewAdminConsole?: boolean;
+  /** Server-computed flag for the PMO Living Graph (CAP-048). Off ⇒ item hidden. */
+  canViewPmoLivingGraph?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [compactViewport, setCompactViewport] = useState(false);
@@ -62,7 +65,7 @@ export function AppFrame({
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar collapsed={effectiveCollapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} />
+      <Sidebar collapsed={effectiveCollapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} canViewPmoLivingGraph={canViewPmoLivingGraph} />
       <div className={cn("transition-[padding] duration-200", effectiveCollapsed ? "pl-16" : "pl-64")}>
         {header}
         <main className="p-3 sm:p-4 lg:p-6">{children}</main>

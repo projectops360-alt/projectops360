@@ -15,6 +15,7 @@ import {
   CreditCard,
   Brain,
   ShieldCheck,
+  Waypoints,
 } from "lucide-react";
 
 export type NavItem = {
@@ -33,7 +34,7 @@ export type NavItem = {
  * the item only when the matching flag is true. Hiding is UX-only — every
  * gated route + its server actions enforce access server-side.
  */
-export type InternalGate = "productBrain" | "adminConsole";
+export type InternalGate = "productBrain" | "adminConsole" | "pmoLivingGraph";
 
 export const sidebarNav: NavItem[] = [
   { title: "commandCenter", href: "/", icon: LayoutDashboard },
@@ -61,4 +62,8 @@ export const bottomNav: NavItem[] = [
 export const internalNav: (NavItem & { gate: InternalGate })[] = [
   { title: "productIntelligence", href: "/product-intelligence", icon: Brain, gate: "productBrain" },
   { title: "adminConsole", href: "/admin", icon: ShieldCheck, gate: "adminConsole" },
+  // CAP-048 — third dashboard, additive. With PMO_LIVING_GRAPH_ENABLED off the
+  // gate is false, this entry is filtered out, and navigation is byte-for-byte
+  // what it was before.
+  { title: "pmoLivingGraph", href: "/pmo-living-graph", icon: Waypoints, gate: "pmoLivingGraph" },
 ];

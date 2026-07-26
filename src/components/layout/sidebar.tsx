@@ -63,7 +63,7 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
 }
 
 // ── Sidebar component ─────────────────────────────────────────────────────────────
-export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain = false, canViewAdminConsole = false }: { collapsed?: boolean; onToggle?: () => void; role?: string; canViewProductBrain?: boolean; canViewAdminConsole?: boolean }) {
+export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain = false, canViewAdminConsole = false, canViewPmoLivingGraph = false }: { collapsed?: boolean; onToggle?: () => void; role?: string; canViewProductBrain?: boolean; canViewAdminConsole?: boolean; canViewPmoLivingGraph?: boolean }) {
   void role;
   const pathname = usePathname();
   const tNav = useTranslations("nav");
@@ -79,6 +79,7 @@ export function Sidebar({ collapsed = false, onToggle, role, canViewProductBrain
   const gateFlags: Record<InternalGate, boolean> = {
     productBrain: canViewProductBrain,
     adminConsole: canViewAdminConsole,
+    pmoLivingGraph: canViewPmoLivingGraph,
   };
   const internalItems = internalNav.filter((item) => gateFlags[item.gate]);
 
