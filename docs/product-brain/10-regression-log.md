@@ -815,7 +815,7 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
-## REG-024 — Los motores genéricos quedaron ciegos a datos que sí existían
+## REG-032 — Los motores genéricos quedaron ciegos a datos que sí existían
 
 **Fecha:** 2026-07-26 · **Estado:** cerrada · **Guards:** `PMO-SIM-EVM-SOURCE`,
 `IMPORT-TASK-HOURS-BOTH-FIELDS`, `IMPORT-PROJECT-TYPE-WORD-BOUNDARY`
@@ -844,7 +844,7 @@ que un dato no existe es una aserción con fecha de caducidad, no un hecho.
 
 ---
 
-## REG-025 — Trabajo guardado que no se podía recuperar
+## REG-033 — Trabajo guardado que no se podía recuperar
 
 **Fecha:** 2026-07-26 · **Estado:** cerrada · **Guards:**
 `PMO-SIM-MULTIPLE-SCENARIOS`, `PMO-SIM-NO-SILENT-DROP`, `PMO-SIM-NO-RAW-ERROR-CODES`,
