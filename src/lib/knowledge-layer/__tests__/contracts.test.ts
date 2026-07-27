@@ -3,6 +3,8 @@ import { authorizeKnowledgeAction, canTransitionKnowledgeObject, createKnowledge
 import { KNOWLEDGE_OBJECT_TYPES } from "../types";
 
 const baseProposal = {
+  // ADR-013. Scope is stated, never inferred from whether a project is present.
+  scope: "project" as const,
   projectId: "11111111-1111-4111-8111-111111111111",
   knowledgeType: "finding" as const,
   idempotencyKey: "manual:finding:one",

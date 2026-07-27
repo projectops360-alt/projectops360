@@ -26,7 +26,10 @@ function provenance(value: unknown): KnowledgeProvenanceInput {
 
 function objectRow(value: Record<string, unknown>): KnowledgeObjectReadModel {
   return {
-    id: String(value.id), organizationId: String(value.organization_id), projectId: String(value.project_id),
+    id: String(value.id), organizationId: String(value.organization_id),
+    scope: (value.scope_type ?? "project") as KnowledgeObjectReadModel["scope"],
+    projectId: value.project_id == null ? null : String(value.project_id),
+    ownerUserId: value.owner_user_id == null ? null : String(value.owner_user_id),
     knowledgeType: value.knowledge_type as KnowledgeObjectReadModel["knowledgeType"], status: value.current_status as KnowledgeObjectReadModel["status"],
     currentVersionNo: Number(value.current_version_no), activeVersionNo: value.active_version_no == null ? null : Number(value.active_version_no),
     title: String(value.title), summary: String(value.summary), body: String(value.body), structuredContent: (value.structured_content ?? {}) as Record<string, unknown>,

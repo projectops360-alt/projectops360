@@ -44,6 +44,8 @@ function proposal(input: {
   evidence: KnowledgeEvidenceInput[];
 }): CreateKnowledgeObjectInput {
   const result: CreateKnowledgeObjectInput = {
+    // Process discovery is delivery learning about one project's execution.
+    scope: "project",
     projectId: input.projectId,
     knowledgeType: input.knowledgeType,
     idempotencyKey: `process-discovery-backfill:${PROCESS_DISCOVERY_KNOWLEDGE_BACKFILL_VERSION}:${input.slug}:seq-${input.maxSequence}`,

@@ -79,7 +79,18 @@ export function projectKnowledgeObjectsToCanonicalGraph(
   const edges: CanonicalGraphEdge[] = [];
   const evidenceNodes = new Map<string, CanonicalGraphNode>();
 
-  for (const object of [...objects].sort((left, right) => left.id.localeCompare(right.id))) {
+  // The canonical graph is project-scoped: every node and edge it emits carries
+  // a project. Organization-scoped knowledge (ADR-013) has no project by
+  // construction and is therefore not projectable here — it belongs to
+  // organization-rooted lenses. Filtering explicitly, rather than coercing a
+  // null project, keeps the omission visible instead of producing a node that
+  // claims to belong to a project it does not.
+  const projectScoped = objects.filter(
+    (object): object is KnowledgeObjectReadModel & { projectId: string } =>
+      object.scope === "project" && object.projectId != null,
+  );
+
+  for (const object of [...projectScoped].sort((left, right) => left.id.localeCompare(right.id))) {
     const objectEvidence = evidenceByObjectVersion.get(`${object.id}:${object.currentVersionNo}`) ?? [];
     const objectNodeId = canonicalGraphNodeId("knowledge_object", object.id);
     nodes.push({

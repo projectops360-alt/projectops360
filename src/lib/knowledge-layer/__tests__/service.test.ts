@@ -4,6 +4,7 @@ import { KnowledgeLayerError, KnowledgeLayerService } from "../service";
 
 const context = { organizationId: "11111111-1111-4111-8111-111111111111", userId: "22222222-2222-4222-8222-222222222222", role: "member" as const };
 const proposal = {
+  scope: "project" as const,
   projectId: "33333333-3333-4333-8333-333333333333", knowledgeType: "finding" as const, idempotencyKey: "manual:finding:one",
   title: "Finding", summary: "Supported finding", body: "Body", confidence: "medium" as const,
   confidenceReason: "Evidence is partial.", provenance: { captureMethod: "direct" as const, sourceKind: "review", sourceRef: "r-1" },
@@ -16,6 +17,8 @@ function repository(): KnowledgeLayerRepository {
     create: vi.fn().mockResolvedValue({ knowledgeObjectId: "k", versionNo: 1, status: "proposed", deduped: false }),
     revise: vi.fn(), transition: vi.fn().mockResolvedValue({ knowledgeObjectId: "k", versionNo: 1, status: "validated", deduped: false }),
     list: vi.fn().mockResolvedValue([]), history: vi.fn().mockResolvedValue({ versions: [], evidence: [], transitions: [] }),
+    listOrganizationScoped: vi.fn().mockResolvedValue([]),
+    createRelation: vi.fn(), resolveRelation: vi.fn(), listRelations: vi.fn().mockResolvedValue([]),
   };
 }
 

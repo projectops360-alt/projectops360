@@ -5,7 +5,10 @@ import { createSupabaseKnowledgeLayerRepository } from "./repository";
 import { KnowledgeLayerService } from "./service";
 import type {
   CreateKnowledgeObjectInput,
+  CreateKnowledgeRelationInput,
   KnowledgeObjectListFilter,
+  KnowledgeRelationListFilter,
+  ResolveKnowledgeRelationInput,
   ReviseKnowledgeObjectInput,
   TransitionKnowledgeObjectInput,
 } from "./types";
@@ -51,4 +54,30 @@ export async function listProjectKnowledgeObjects(projectId: string, filter?: Kn
 export async function getProjectKnowledgeObjectHistory(projectId: string, knowledgeObjectId: string) {
   const { context, service } = await runtime();
   return service.history(context, projectId, knowledgeObjectId);
+}
+
+/**
+ * Organization-scoped knowledge (ADR-013).
+ *
+ * A separate entry point from the project listing on purpose: a project view
+ * cannot return governance objects by leaving an argument out.
+ */
+export async function listOrganizationKnowledgeObjects(filter?: KnowledgeObjectListFilter) {
+  const { context, service } = await runtime();
+  return service.listOrganizationScoped(context, filter);
+}
+
+export async function relateKnowledgeObjects(input: CreateKnowledgeRelationInput) {
+  const { context, service } = await runtime();
+  return service.relate(context, input);
+}
+
+export async function resolveKnowledgeRelation(input: ResolveKnowledgeRelationInput) {
+  const { context, service } = await runtime();
+  return service.resolveRelation(context, input);
+}
+
+export async function listKnowledgeRelations(filter?: KnowledgeRelationListFilter) {
+  const { context, service } = await runtime();
+  return service.listRelations(context, filter);
 }
