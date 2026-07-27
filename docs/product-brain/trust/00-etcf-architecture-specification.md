@@ -1,9 +1,12 @@
 # Enterprise Trust & Compliance Framework (ETCF)
 
 **Architecture & Governance Specification · v1.0**
-**Status:** Draft for executive review · **Date:** 2026-07-26
+**Status:** APPROVED — frozen at Enterprise Trust Baseline v1.0 · **Date:** 2026-07-26
 **Classification:** Internal — shareable with prospective enterprise customers under NDA
 **Scope:** Architecture and governance only. No code, no schema, no implementation.
+**Companions:** [Enterprise Trust Strategy](01-enterprise-trust-strategy.md) ·
+[Enterprise Trust Charter](02-enterprise-trust-charter.md) ·
+[Programme entry point](README.md)
 
 ---
 
@@ -779,10 +782,16 @@ Proposed layout inside the Product Brain. The Product Brain is already the
 governing source of truth and overrides chat and prompts (ADR-007); ETCF inherits
 that authority rather than creating a parallel one.
 
+Files marked **[baseline]** exist and are frozen at Enterprise Trust Baseline
+v1.0. Everything else is the proposed layout for Phase 2 onward.
+
 ```
 docs/product-brain/trust/
-├── 00-etcf-architecture-specification.md   ← this document
-├── README.md                                  entry point, ownership, review cadence
+├── README.md                               [baseline] entry point, status, reading order
+├── CHANGELOG.md                            [baseline] version history
+├── 00-etcf-architecture-specification.md   [baseline] ← this document
+├── 01-enterprise-trust-strategy.md         [baseline] board-level strategy
+├── 02-enterprise-trust-charter.md          [baseline] the programme's constitution
 │
 ├── policies/                                  WHAT we commit to (executive-approved)
 │   ├── POL-001-information-security.md

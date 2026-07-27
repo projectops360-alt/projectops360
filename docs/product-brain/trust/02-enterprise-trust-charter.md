@@ -1,7 +1,11 @@
 # Enterprise Trust Charter
 
 **Version 1.0** · The constitution of the Enterprise Trust Program
-**Ratified:** _pending executive approval_ · **Review:** annually, and on trigger
+**Status:** APPROVED — frozen at Enterprise Trust Baseline v1.0 · **Date:** 2026-07-26
+**Review:** annually, and on trigger (see [Review Cycle](#review-cycle))
+**Companions:** [ETCF Architecture & Governance Specification](00-etcf-architecture-specification.md) ·
+[Enterprise Trust Strategy](01-enterprise-trust-strategy.md) ·
+[Programme entry point](README.md)
 
 ---
 

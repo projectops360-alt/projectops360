@@ -1,8 +1,11 @@
 # Enterprise Trust Strategy
 
 **Version 1.0** · Board-level strategic reference
-**Date:** 2026-07-26 · **Classification:** Internal — Board, Executive, Investor
-**Companion to:** [ETCF Architecture & Governance Specification](00-etcf-architecture-specification.md)
+**Status:** APPROVED — frozen at Enterprise Trust Baseline v1.0 · **Date:** 2026-07-26
+**Classification:** Internal — Board, Executive, Investor
+**Companions:** [ETCF Architecture & Governance Specification](00-etcf-architecture-specification.md) ·
+[Enterprise Trust Charter](02-enterprise-trust-charter.md) ·
+[Programme entry point](README.md)
 **Owner:** _unassigned — see Recommendation 1_
 
 ---
