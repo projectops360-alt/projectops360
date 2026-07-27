@@ -72,6 +72,11 @@ function orderFromId(id: string): number {
 /** Deterministic section grouping for the left navigation tree. */
 function sectionForId(id: string): string {
   if (id.startsWith("adrs/")) return "ADRs";
+  // The Enterprise Trust programme is its own namespace. Without this its
+  // documents fall into the catch-all "Docs" bucket, where their numbering
+  // collides with the top-level overview docs and the reading order the
+  // programme depends on is lost.
+  if (id.startsWith("trust/")) return "Enterprise Trust";
   if (/README$/i.test(id)) return "Folders";
   if (id === "module-documentation-template") return "Modules";
   const base = id.split("/").pop() ?? id;
@@ -100,6 +105,7 @@ const SECTION_ORDER = [
   "Modules",
   "Registries",
   "Governance",
+  "Enterprise Trust",
   "Strategy",
   "ADRs",
   "Folders",

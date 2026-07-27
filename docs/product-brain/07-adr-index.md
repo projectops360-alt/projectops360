@@ -14,6 +14,19 @@ for any major architectural decision and for any change that would contradict an
 | [ADR-006](adrs/ADR-006-independent-status-dimensions.md) | Execution/Dependency/Health/Risk are independent dimensions | Accepted | P4 |
 | [ADR-007](adrs/ADR-007-product-brain-is-source-of-truth.md) | Product Brain is the source of truth for product evolution | Accepted | All |
 | [ADR-009](adrs/ADR-009-reconcile-capacity-engines.md) | Reconcile Resource Capacity (generic) & Labor Capacity (construction) engines | Accepted | P3 |
+| [ADR-012](adrs/ADR-012-pmo-intelligence-center-orchestration.md) | PMO Intelligence Center orchestrates existing engines; it computes no metric of its own | Accepted | P2/P4 |
+| [ADR-013](adrs/ADR-013-governance-knowledge-scope.md) | **Governance knowledge is scoped explicitly, not by a nullable project** | Accepted | All |
+| [ADR-014](adrs/ADR-014-governance-objects-are-knowledge-objects.md) | Governance objects are knowledge objects, namespaced | Accepted | All |
+| [ADR-015](adrs/ADR-015-normative-layer-in-knowledge-packages.md) | The normative layer lives in knowledge packages, not in knowledge objects | Accepted | All |
+| [ADR-016](adrs/ADR-016-trust-views-are-living-graph-lenses.md) | The trust views are Living Graph lenses, not a compliance graph | Accepted | P2 |
+| [ADR-017](adrs/ADR-017-trust-knowledge-in-retrieval-corpus.md) | Trust knowledge enters the retrieval corpus under purpose-bound authorization | Accepted | P1/P5 |
+| [ADR-018](adrs/ADR-018-isabella-reasons-live-over-the-graph.md) | Isabella reasons live over the graph for status, by retrieval for definitions | Accepted | P1 |
+| [ADR-019](adrs/ADR-019-automatic-findings-originate-in-the-evidence-layer.md) | Automatic findings originate in the evidence layer, never in the AI | Accepted | P1/P4 |
+
+> **ADR-013 … ADR-019** resolve the seven open architectural decisions raised by the
+> Enterprise Knowledge Intelligence specification. They are registered here rather than in a
+> trust-specific register: a second ADR registry would itself be a second source of truth.
+> See the [EKI Architecture Decision Gate](trust/04-eki-architecture-decision-gate.md).
 
 ## Proposed / future ADRs (not yet written)
 - ADR-008 — RBAC model on `master` (reconcile `feat/rythm` RBAC vs permissive org-context).

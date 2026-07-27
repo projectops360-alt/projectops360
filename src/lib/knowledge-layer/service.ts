@@ -1,14 +1,19 @@
 import {
   authorizeKnowledgeAction,
   createKnowledgeObjectSchema,
+  createKnowledgeRelationSchema,
+  resolveKnowledgeRelationSchema,
   reviseKnowledgeObjectSchema,
   transitionKnowledgeObjectSchema,
 } from "./contracts";
 import type { KnowledgeLayerRepository } from "./repository";
 import type {
   CreateKnowledgeObjectInput,
+  CreateKnowledgeRelationInput,
   KnowledgeActorContext,
   KnowledgeObjectListFilter,
+  KnowledgeRelationListFilter,
+  ResolveKnowledgeRelationInput,
   ReviseKnowledgeObjectInput,
   TransitionKnowledgeObjectInput,
 } from "./types";
@@ -72,6 +77,49 @@ export class KnowledgeLayerService {
     if (!zUuid(projectId)) throw new KnowledgeLayerError("invalid_project_id");
     if (!zUuid(knowledgeObjectId)) throw new KnowledgeLayerError("invalid_knowledge_object_id");
     return this.repository.history(context, projectId, knowledgeObjectId);
+  }
+
+  /**
+   * Organization-scoped knowledge (ADR-013).
+   *
+   * Separate from `list` rather than a filter on it, so a project view cannot
+   * accidentally include governance objects by omitting a parameter. The two
+   * scopes are asked for explicitly or not at all.
+   */
+  async listOrganizationScoped(context: KnowledgeActorContext, filter?: KnowledgeObjectListFilter) {
+    assertAuthorized(context, "read");
+    return this.repository.listOrganizationScoped(context, filter);
+  }
+
+  async relate(context: KnowledgeActorContext, input: CreateKnowledgeRelationInput) {
+    // Asserting a relation is a proposal about how knowledge connects, which is
+    // the same authority as proposing knowledge. Confirming one that requires
+    // approval is enforced by the repository recording the approver, and by the
+    // database refusing an endpoint the relation type does not accept.
+    assertAuthorized(context, "propose");
+    const parsed = createKnowledgeRelationSchema.safeParse(input);
+    if (!parsed.success) throw new KnowledgeLayerError("invalid_knowledge_relation", parsed.error.issues[0]?.message);
+    return this.repository.createRelation(context, parsed.data);
+  }
+
+  /**
+   * Accept or resolve a contradiction.
+   *
+   * Requires validate authority, not propose: recording that an inconsistency
+   * is acceptable is a judgement about the knowledge, not a contribution to it.
+   * A contradiction is never deleted, and there is no path back to `unresolved`.
+   */
+  async resolveRelation(context: KnowledgeActorContext, input: ResolveKnowledgeRelationInput) {
+    assertAuthorized(context, "validate");
+    const parsed = resolveKnowledgeRelationSchema.safeParse(input);
+    if (!parsed.success) throw new KnowledgeLayerError("invalid_knowledge_relation_resolution", parsed.error.issues[0]?.message);
+    return this.repository.resolveRelation(context, parsed.data);
+  }
+
+  async listRelations(context: KnowledgeActorContext, filter?: KnowledgeRelationListFilter) {
+    assertAuthorized(context, "read");
+    if (filter?.objectId && !zUuid(filter.objectId)) throw new KnowledgeLayerError("invalid_knowledge_object_id");
+    return this.repository.listRelations(context, filter);
   }
 }
 

@@ -60,6 +60,8 @@ export function mapMpfFindingToKnowledgeProposal(finding: MpfFinding): CreateKno
   ]);
 
   return {
+    // A Milestone Process Flow finding concerns one project's execution.
+    scope: "project",
     projectId: finding.projectId,
     knowledgeType: "finding",
     idempotencyKey: `mpf-finding:${finding.findingId}`,

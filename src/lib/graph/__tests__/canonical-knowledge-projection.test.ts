@@ -6,7 +6,8 @@ import { validateCanonicalGraph } from "../canonical-graph-validator";
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const projectId = "22222222-2222-4222-8222-222222222222";
 const knowledgeObject: KnowledgeObjectReadModel = {
-  id: "33333333-3333-4333-8333-333333333333", organizationId, projectId, knowledgeType: "finding", status: "validated",
+  id: "33333333-3333-4333-8333-333333333333", organizationId, scope: "project", projectId, ownerUserId: null,
+  knowledgeType: "finding", status: "validated",
   currentVersionNo: 2, activeVersionNo: 1, title: "Repeated approval delay", summary: "Approval waits repeat", body: "Body",
   structuredContent: {}, confidence: "high", confidenceReason: "Canonical event evidence", evidenceCount: 1,
   provenance: { captureMethod: "derived", sourceKind: "milestone_process_flow", sourceRef: "finding-1", engineName: "mpf" },

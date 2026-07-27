@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { KNOWLEDGE_RELATION_SPECS } from "./contracts";
 import type {
   CreateKnowledgeObjectInput,
+  CreateKnowledgeRelationInput,
   KnowledgeActorContext,
   KnowledgeEvidenceInput,
   KnowledgeEvidenceRecord,
@@ -9,7 +11,10 @@ import type {
   KnowledgeObjectMutationResult,
   KnowledgeObjectReadModel,
   KnowledgeProvenanceInput,
+  KnowledgeRelationListFilter,
+  KnowledgeRelationRecord,
   KnowledgeTransitionRecord,
+  ResolveKnowledgeRelationInput,
   KnowledgeVersionRecord,
   ReviseKnowledgeObjectInput,
   TransitionKnowledgeObjectInput,
@@ -20,7 +25,12 @@ export interface KnowledgeLayerRepository {
   revise(context: KnowledgeActorContext, input: ReviseKnowledgeObjectInput): Promise<KnowledgeObjectMutationResult>;
   transition(context: KnowledgeActorContext, input: TransitionKnowledgeObjectInput): Promise<KnowledgeObjectMutationResult>;
   list(context: KnowledgeActorContext, projectId: string, filter?: KnowledgeObjectListFilter): Promise<KnowledgeObjectReadModel[]>;
+  /** Organization-scoped knowledge (ADR-013). Never returns project-scoped rows. */
+  listOrganizationScoped(context: KnowledgeActorContext, filter?: KnowledgeObjectListFilter): Promise<KnowledgeObjectReadModel[]>;
   history(context: KnowledgeActorContext, projectId: string, knowledgeObjectId: string): Promise<KnowledgeObjectHistory>;
+  createRelation(context: KnowledgeActorContext, input: CreateKnowledgeRelationInput): Promise<KnowledgeRelationRecord>;
+  resolveRelation(context: KnowledgeActorContext, input: ResolveKnowledgeRelationInput): Promise<KnowledgeRelationRecord>;
+  listRelations(context: KnowledgeActorContext, filter?: KnowledgeRelationListFilter): Promise<KnowledgeRelationRecord[]>;
 }
 
 function toRpcEvidence(evidence: KnowledgeEvidenceInput[]) {
@@ -90,7 +100,9 @@ function readModel(value: unknown): KnowledgeObjectReadModel {
   return {
     id: String(row.id),
     organizationId: String(row.organization_id),
-    projectId: String(row.project_id),
+    scope: (row.scope_type ?? "project") as KnowledgeObjectReadModel["scope"],
+    projectId: row.project_id == null ? null : String(row.project_id),
+    ownerUserId: row.owner_user_id == null ? null : String(row.owner_user_id),
     knowledgeType: row.knowledge_type as KnowledgeObjectReadModel["knowledgeType"],
     status: row.current_status as KnowledgeObjectReadModel["status"],
     currentVersionNo: Number(row.current_version_no),
@@ -158,6 +170,41 @@ function transitionRecord(value: unknown): KnowledgeTransitionRecord {
   };
 }
 
+
+function relationEndpoint(
+  kind: unknown, objectId: unknown, packageId: unknown, versionNo: unknown,
+) {
+  const endpointKind = kind as KnowledgeRelationRecord["source"]["kind"];
+  return {
+    kind: endpointKind,
+    id: String(endpointKind === "knowledge_object" ? objectId : packageId),
+    versionNo: versionNo == null ? null : Number(versionNo),
+  };
+}
+
+function relationRecord(value: unknown): KnowledgeRelationRecord {
+  const row = value as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    organizationId: String(row.organization_id),
+    scope: row.scope_type as KnowledgeRelationRecord["scope"],
+    projectId: row.project_id == null ? null : String(row.project_id),
+    relationType: row.relation_type as KnowledgeRelationRecord["relationType"],
+    source: relationEndpoint(row.source_endpoint_kind, row.source_object_id, row.source_package_id, row.source_version_no),
+    target: relationEndpoint(row.target_endpoint_kind, row.target_object_id, row.target_package_id, row.target_version_no),
+    basis: row.basis as KnowledgeRelationRecord["basis"],
+    resolutionStatus: row.resolution_status as KnowledgeRelationRecord["resolutionStatus"],
+    resolutionRationale: typeof row.resolution_rationale === "string" ? row.resolution_rationale : null,
+    approvedBy: row.approved_by == null ? null : String(row.approved_by),
+    approvedAt: row.approved_at == null ? null : String(row.approved_at),
+    note: typeof row.note === "string" ? row.note : null,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    createdBy: String(row.created_by),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  };
+}
+
 function throwRepositoryError(error: { message?: string } | null, fallback: string): never {
   throw new Error(error?.message || fallback);
 }
@@ -171,9 +218,11 @@ export function createSupabaseKnowledgeLayerRepository(
       const { data, error } = await writeClient.rpc("create_project_knowledge_object", {
         p_input: {
           organization_id: context.organizationId,
+          scope_type: input.scope,
           project_id: input.projectId,
           actor_id: context.userId,
           knowledge_type: input.knowledgeType,
+          owner_user_id: input.ownerUserId ?? null,
           idempotency_key: input.idempotencyKey,
           ...toRpcVersion(input),
         },
@@ -242,6 +291,87 @@ export function createSupabaseKnowledgeLayerRepository(
         evidence: (evidence.data ?? []).map(evidenceRecord),
         transitions: (transitions.data ?? []).map(transitionRecord),
       };
+    },
+    async listOrganizationScoped(context, filter = {}) {
+      let query = readClient
+        .from("project_knowledge_object_current")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .eq("scope_type", "organization")
+        .order("updated_at", { ascending: false })
+        .limit(Math.min(Math.max(filter.limit ?? 100, 1), 500));
+      if (filter.status) query = query.eq("current_status", filter.status);
+      if (filter.knowledgeType) query = query.eq("knowledge_type", filter.knowledgeType);
+      const { data, error } = await query;
+      if (error) throwRepositoryError(error, "knowledge_list_failed");
+      return (data ?? []).map(readModel);
+    },
+
+    async createRelation(context, input) {
+      const spec = KNOWLEDGE_RELATION_SPECS[input.relationType];
+      const { data, error } = await writeClient
+        .from("project_knowledge_relations")
+        .insert({
+          organization_id: context.organizationId,
+          scope_type: input.scope,
+          project_id: input.projectId,
+          relation_type: input.relationType,
+          source_endpoint_kind: input.source.kind,
+          source_object_id: input.source.kind === "knowledge_object" ? input.source.id : null,
+          source_package_id: input.source.kind === "knowledge_package" ? input.source.id : null,
+          source_version_no: input.source.versionNo ?? null,
+          target_endpoint_kind: input.target.kind,
+          target_object_id: input.target.kind === "knowledge_object" ? input.target.id : null,
+          target_package_id: input.target.kind === "knowledge_package" ? input.target.id : null,
+          target_version_no: input.target.versionNo ?? null,
+          basis: input.basis ?? "declared",
+          note: input.note ?? null,
+          metadata: input.metadata ?? {},
+          // A relation whose assertion requires human approval records the
+          // approver at the moment it is asserted by one. Nothing else may set
+          // these columns, so an unapproved assertion is visibly unapproved.
+          approved_by: spec.humanApproval ? context.userId : null,
+          approved_at: spec.humanApproval ? new Date().toISOString() : null,
+          created_by: context.userId,
+        })
+        .select("*")
+        .single();
+      if (error || !data) throwRepositoryError(error, "knowledge_relation_create_failed");
+      return relationRecord(data);
+    },
+
+    async resolveRelation(context, input) {
+      const { data, error } = await writeClient
+        .from("project_knowledge_relations")
+        .update({
+          resolution_status: input.resolution,
+          resolution_rationale: input.rationale,
+          approved_by: context.userId,
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", input.relationId)
+        .eq("organization_id", context.organizationId)
+        .select("*")
+        .single();
+      if (error || !data) throwRepositoryError(error, "knowledge_relation_resolve_failed");
+      return relationRecord(data);
+    },
+
+    async listRelations(context, filter = {}) {
+      let query = readClient
+        .from("project_knowledge_relations")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .order("created_at", { ascending: false })
+        .limit(Math.min(Math.max(filter.limit ?? 200, 1), 1000));
+      if (filter.relationType) query = query.eq("relation_type", filter.relationType);
+      if (filter.unresolvedOnly) query = query.eq("resolution_status", "unresolved");
+      if (filter.objectId) {
+        query = query.or(`source_object_id.eq.${filter.objectId},target_object_id.eq.${filter.objectId}`);
+      }
+      const { data, error } = await query;
+      if (error) throwRepositoryError(error, "knowledge_relation_list_failed");
+      return (data ?? []).map(relationRecord);
     },
   };
 }
