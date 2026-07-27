@@ -1893,7 +1893,31 @@
       "milestones": "Hitos",
       "activities": "Actividades",
       "events": "Eventos",
-      "knowledge": "Conocimiento"
+      "knowledge": "Conocimiento",
+      "trust": "Enterprise Trust"
+    },
+    "trustLens": {
+      "viewHint": "Lente de solo lectura sobre el modelo canónico: controles, su evidencia y hallazgos abiertos. Nada de esto se almacena por separado.",
+      "summary": "{count} nodos de confianza",
+      "status": {
+        "disabled": "La lente Enterprise Trust no está habilitada para esta organización.",
+        "empty": "Esta organización todavía no tiene controles.",
+        "error": "No se pudo cargar la lente Enterprise Trust. Las vistas operativas del grafo no cambian."
+      },
+      "kind": {
+        "control": "Control",
+        "evidence_binding": "Vínculo de evidencia",
+        "finding": "Hallazgo",
+        "owner": "Responsable",
+        "obligation": "Obligación"
+      },
+      "freshness": {
+        "fresh": "Vigente",
+        "warning": "Por vencer",
+        "stale": "Vencida",
+        "unreadable": "Ilegible",
+        "never_measured": "Nunca medida"
+      }
     },
     "canonicalKnowledge": {
       "viewHint": "Especificación canónica del grafo v{version}. Los vínculos respaldan hallazgos; no son transiciones del proceso ni prueba de causalidad.",

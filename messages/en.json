@@ -1893,7 +1893,31 @@
       "milestones": "Milestones",
       "activities": "Activities",
       "events": "Events",
-      "knowledge": "Knowledge"
+      "knowledge": "Knowledge",
+      "trust": "Enterprise Trust"
+    },
+    "trustLens": {
+      "viewHint": "Read-only lens over the canonical model: controls, their evidence and open findings. Nothing here is stored separately.",
+      "summary": "{count} trust nodes",
+      "status": {
+        "disabled": "The Enterprise Trust lens is not enabled for this organization.",
+        "empty": "No controls exist for this organization yet.",
+        "error": "The Enterprise Trust lens could not be loaded. Operational graph views remain unchanged."
+      },
+      "kind": {
+        "control": "Control",
+        "evidence_binding": "Evidence binding",
+        "finding": "Finding",
+        "owner": "Owner",
+        "obligation": "Obligation"
+      },
+      "freshness": {
+        "fresh": "Fresh",
+        "warning": "Approaching stale",
+        "stale": "Stale",
+        "unreadable": "Unreadable",
+        "never_measured": "Never measured"
+      }
     },
     "canonicalKnowledge": {
       "viewHint": "Canonical graph spec v{version}. Evidence links support findings; they are not process transitions or proof of causality.",

@@ -79,9 +79,13 @@ export class EkiEvaluator {
       throw error;
     }
 
-    let evaluated = 0;
-    let failed = 0;
+    // Only supersessions are counted here. The evaluated and failed totals come
+    // from `completeRun`, which counts the run ITEMS the database wrote — the
+    // authoritative record. Counting them again in this loop would produce a
+    // second tally that silently disagrees the first time an RPC succeeds but
+    // its item update does not.
     let superseded = 0;
+    let transportFailures = 0;
 
     for (const claim of claims) {
       let result: ClaimedEvaluationResult;
@@ -89,18 +93,26 @@ export class EkiEvaluator {
         result = await this.evaluateClaim(started.runId, claim);
       } catch (error) {
         // The RPC itself failed — a transport or permission problem rather than
-        // an evidence problem. Contained here so the remaining tenants still run.
-        failed += 1;
+        // an evidence problem, so the database has no run item recording it.
+        // Contained here so the remaining tenants still run.
+        transportFailures += 1;
         void error;
         continue;
       }
-      if (result.evaluated) evaluated += 1;
-      else if (result.reason === "claim_superseded") superseded += 1;
-      else failed += 1;
+      if (!result.evaluated && result.reason === "claim_superseded") superseded += 1;
     }
 
     const summary = await this.completeRun(started.runId);
-    return { ...summary, runId: started.runId, duplicate: false, superseded };
+    return {
+      ...summary,
+      runId: started.runId,
+      duplicate: false,
+      superseded,
+      // A transport failure leaves no run item, so it is added to the database's
+      // count rather than hidden by it. A sweep that lost three tenants to a
+      // network fault must not report zero failures.
+      failed: summary.failed + transportFailures,
+    };
   }
 
   async startRun(options: EvaluatorOptions): Promise<{ runId: string; duplicate: boolean }> {

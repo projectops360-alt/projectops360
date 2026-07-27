@@ -363,7 +363,10 @@ export function answerTrustQuestion(input: TrustAnswerInput): TrustAnswer {
  */
 export function classifyTrustQuestion(question: string): TrustQuestion | null {
   const q = question.toLowerCase();
-  if (!/\b(control|controls|trust|confianza|evidence|evidencia|finding|hallazgo|governance|gobernanza|compliance|cumplimiento)\b/.test(q)) {
+  // Plurals and Spanish inflections are matched explicitly. `\bcontrol\b` does
+  // not match "controles" or "controls", so a subject gate written that way
+  // silently declines most real questions and everything falls through to RAG.
+  if (!/\b(control(s|es)?|trust|confianza|evidence(s)?|evidencia(s)?|finding(s)?|hallazgo(s)?|governance|gobernanza|compliance|cumplimiento)\b/.test(q)) {
     return null;
   }
   if (/\bchang(ed|es)\b|\bcambi(ó|o|os|ado)\b|since the previous|desde la (última|anterior)/.test(q)) return "what_changed";
@@ -374,7 +377,9 @@ export function classifyTrustQuestion(question: string): TrustQuestion | null {
   if (/\bfinding|hallazgo/.test(q)) return "open_findings";
   if (/why .*(degrad|fail)|por qu(é|e) .*(degrad|fall)/.test(q)) return "why_degraded";
   if (/why .*operating|qu(é|e) evidencia|what evidence/.test(q)) return "why_operating";
-  if (/provenance|procedencia|which governance action|qu(é|e) acci(ó|o)n/.test(q)) return "evidence_provenance";
+  if (/provenance|procedencia|(which|what) governance action|qu[eé] acci[oó]n( de gobernanza)?/.test(q)) {
+    return "evidence_provenance";
+  }
   if (/degrad/.test(q)) return "degraded_controls";
   if (/operating|operando|en operaci(ó|o)n/.test(q)) return "operating_controls";
   return "overview";

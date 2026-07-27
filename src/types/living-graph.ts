@@ -15,6 +15,7 @@ import type {
 } from "./database";
 
 import type { CapacityInsightKind } from "@/lib/labor/explanation";
+import type { TrustLensNode, TrustLensEdge } from "@/lib/graph/trust-lens-projection";
 
 export type LivingGraphRiskLevel = "low" | "medium" | "high";
 
@@ -289,6 +290,13 @@ export interface LivingGraphData {
   knowledgeGraphEdges?: LivingGraphEdge[];
   knowledgeGraphProjectionStatus?: "empty" | "ready" | "insufficient_evidence" | "invalid" | "error";
   canonicalGraphSpecVersion?: string;
+  // ── Enterprise Trust lens (read-only projection) ─────────────────────────
+  // Same contract as the canonical-event projection: the page ALWAYS sets a
+  // status so the "trust" level can never silently fall back to operational
+  // nodes. With the flag OFF the arrays stay undefined.
+  trustNodes?: TrustLensNode[];
+  trustEdges?: TrustLensEdge[];
+  trustLensStatus?: "disabled" | "empty" | "ready" | "error";
   // ── Projection status contract (CAP-045 §C.2 / Part B) ─────────────────
   // EXPLICIT signal of the canonical-event projection state so the "events"
   // view never silently falls back to operational process_nodes/process_edges.
@@ -337,8 +345,11 @@ export type LivingGraphLayoutMode = "hierarchical" | "timeline" | "force";
  * - milestones: one node per milestone (high-level flowchart, default)
  * - activities: one node per source entity (aggregated process map)
  * - events: every process event as its own node
+ * - trust: Enterprise Trust — controls, evidence bindings, findings, owners and
+ *   obligations. A FILTERED SEMANTIC VIEW of the canonical model, not a separate
+ *   graph: nothing is persisted and the operational levels are untouched.
  */
-export type LivingGraphViewLevel = "milestones" | "activities" | "events" | "knowledge";
+export type LivingGraphViewLevel = "milestones" | "activities" | "events" | "knowledge" | "trust";
 
 export type LivingGraphSimulationScenario =
   | "delay1d"

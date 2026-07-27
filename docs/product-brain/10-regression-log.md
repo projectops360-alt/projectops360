@@ -997,3 +997,65 @@ caller, after the record exists.
 `src/lib/eki-evidence/__tests__/service.test.ts` → "turns a database denial into
 an error without inventing a success" · real-database:
 `supabase/tests/eki_macrophase2_acceptance.sql` step 17.
+
+---
+
+## REG-034 — A refusal by an actor with no role could not be recorded
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-ACTOR-ROLE-NONE`
+
+`eki_resolve_finding`, `eki_assign_owner` and `eki_request_evaluation` all write
+an `access_denied` record with `coalesce(actor_role, 'none')` before returning
+the denial. `platform_governance_audit.actor_role` admitted owner / admin /
+member / viewer / service and nothing else, so the insert violated its check
+constraint, the exception propagated, and **both** the audit record and the
+caller's answer were lost.
+
+**Root cause:** the vocabulary could not express "no role". An actor with no
+standing in the organization is the most important denial there is, and it was
+the one the audit was structurally unable to record.
+
+**Why Macrophase 2 did not catch it:** its acceptance test used a *member without
+authority*. The role was `member`, the constraint was satisfied, and the branch
+that produces `none` was never executed. The test passed for a case adjacent to
+the one that mattered — the third time this programme has hit that shape
+(Macrophase 1 probe 11, Macrophase 2 step 17).
+
+**Protection rule (binding):** `actor_role` admits `none`, and `none` is denied
+**every** operation in `src/lib/platform-governance/security.ts`, reads included.
+Widening the vocabulary grants nothing. A denial path must be exercised by an
+actor with genuinely no standing, not by a low-privilege member.
+
+**Verify:** `src/lib/platform-governance/__tests__/governance-audit.test.ts` →
+"REG-034 — an actor with no role" ·
+`src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts` →
+"REG-034" · real database: `supabase/tests/eki_macrophase3_acceptance.sql`
+steps 10-11.
+
+---
+
+## REG-035 — The trust question classifier declined its own vocabulary
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-TRUST-QUESTION-ROUTING`
+
+The Enterprise Trust subject gate was written `\b(control|finding|evidence|…)\b`.
+`\bcontrol\b` does not match "controls" or "controles"; `\bfinding\b` does not
+match "findings". Nearly every real question — "Which controls are degraded?",
+"¿Qué controles están degradados?", "Which findings are open?" — failed the gate
+and fell through to RAG, which answered a live-state governance question from a
+document corpus.
+
+**Root cause:** word-boundary anchors written against the singular English stem,
+in a product that must answer in English and Spanish.
+
+**Why it looked fine:** the failure produced a *plausible* answer from the
+retrieval corpus rather than an error. Nothing surfaced; the answer was simply
+stale and unattributed.
+
+**Protection rule (binding):** the trust subject gate matches plural and Spanish
+inflections explicitly, and a routing test asserts every question listed in the
+Macrophase 3 scope in both languages. A governance question about current state
+must never be answerable from the corpus.
+
+**Verify:** `src/lib/isabella/enterprise-trust/__tests__/trust-reasoning.test.ts`
+→ "question classification".
