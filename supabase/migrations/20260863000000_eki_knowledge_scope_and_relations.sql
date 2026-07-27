@@ -627,7 +627,13 @@ $$;
 
 -- ── 11. Read model ──────────────────────────────────────────────────────────
 
-create or replace view public.project_knowledge_object_current with (security_invoker = true) as
+-- `create or replace view` cannot rename or reorder columns, and this view gains
+-- scope_type and owner_user_id in positions the old definition did not have.
+-- Postgres rejects the replace outright, so the view is dropped and recreated —
+-- and the grant it carried has to be restored, because dropping takes it away.
+drop view if exists public.project_knowledge_object_current;
+
+create view public.project_knowledge_object_current with (security_invoker = true) as
 select o.id, o.organization_id, o.scope_type, o.project_id, o.knowledge_type, o.owner_user_id,
   o.current_status, o.current_version_no, o.active_version_no,
   v.title, v.summary, v.body, v.structured_content, v.confidence, v.confidence_reason, v.provenance,
@@ -653,6 +659,7 @@ create policy "Service role project_knowledge_relations" on public.project_knowl
 
 revoke insert, update, delete on public.project_knowledge_relations from anon, authenticated;
 grant select on public.project_knowledge_relations to authenticated;
+grant select on public.project_knowledge_object_current to authenticated;
 
 revoke all on function public.project_knowledge_assert_relation(text, text, text, integer, integer) from public, anon, authenticated;
 revoke all on function public.project_knowledge_relations_guard() from public, anon, authenticated;
