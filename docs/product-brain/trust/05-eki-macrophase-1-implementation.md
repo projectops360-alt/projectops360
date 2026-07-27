@@ -1,7 +1,7 @@
 # EKI Macrophase 1 — Implementation Notes
 
 **Phase 2 · Macrophase 1 · Foundational platform**
-**Date:** 2026-07-26 · **Status:** Implemented, migration **not applied**
+**Date:** 2026-07-26 · **Status:** Implemented and **validated in stage**
 **Implements:** [ADR-013](../adrs/ADR-013-governance-knowledge-scope.md) ·
 [ADR-014](../adrs/ADR-014-governance-objects-are-knowledge-objects.md) ·
 [ADR-015](../adrs/ADR-015-normative-layer-in-knowledge-packages.md)
@@ -147,20 +147,72 @@ preferring an explicit scope over a nullable project.
 
 ---
 
-## Known state
+## Stage validation (2026-07-26)
 
-**The migration is authored but NOT applied to any environment.** Applying DDL to
-shared infrastructure was outside what this phase authorised, and the request was
-explicit that nothing be deployed. It must be applied to stage and verified
-against a live engine before the schema is relied upon.
+Applied to **stage only** (`gcxcljfzleasrleyyyda`). Production untouched.
 
-Consequently the following are verified **statically** — by contract tests that
-parse the migration — and not yet against a running database:
+### Defect found and fixed
 
-- Constraint rejection of an incoherent scope/project pair
-- Foreign-key enforcement for organization-scoped children
-- Trigger rejection of an invalid relation endpoint or a cross-tenant package
-- RLS behaviour of the new table
+**`create or replace view` cannot rename or reorder columns.** The view gains
+`scope_type` and `owner_user_id` in positions the previous definition did not
+have, and Postgres rejected the replace outright:
 
-Integration verification against a live engine is the first item of the next
-macrophase, and should precede any dependent work.
+```
+42P16: cannot change name of view column "project_id" to "scope_type"
+```
+
+The migration now drops and recreates the view — and **restores the grant**,
+because dropping a view takes its grants with it. Silently losing
+`grant select … to authenticated` would have removed read access for every
+authenticated user without any statement failing.
+
+Recorded as **REG-027**. It is the class of defect that only a real engine
+finds: the SQL is valid, the tests that parse it pass, and it fails on execution.
+
+### Verified against the engine, not by parsing SQL
+
+Each probe attempted the operation that must fail and recorded whether the engine
+rejected it. All ran inside a transaction terminated by a deliberate exception,
+so nothing persisted.
+
+| # | Property | Result |
+|---|---|---|
+| 1 | Project scope without a project | **rejected** |
+| 2 | Organization scope carrying a project | **rejected** |
+| 3 | Child FK enforced at organization scope (the MATCH SIMPLE hole) | **enforced** |
+| 4 | Child disagreeing with its parent about scope | **rejected** |
+| 5 | Governance kind accepted at organization scope | accepted |
+| 6 | Idempotency at organization scope | **enforced** |
+| 7 | Relation with an endpoint kind the type does not accept | **rejected** |
+| 8 | Version-sensitive relation missing its version | **rejected** |
+| 9 | Self-relation | **rejected** |
+| 10 | Contradiction resolved without a rationale | **rejected** |
+| 11 | Relation to another tenant's package | **rejected** |
+| 12 | Relation to a global package | accepted |
+| 13 | Relation to an object in another organization | **rejected** |
+
+Probe 11 was initially **inconclusive** — stage holds no package belonging to
+another tenant, so the probe silently fell back to a global package and passed
+for the wrong reason. It was re-run after creating a foreign-tenant package
+inside the transaction. An inconclusive probe reported as a pass is worse than a
+failure, because it retires the question.
+
+### Post-migration state
+
+| Measure | Value |
+|---|---|
+| Knowledge objects | 5, **all `scope_type = 'project'`** — the backfill required no interpretation |
+| Versions / evidence rows | 5 / 210 — unchanged |
+| Residual probe rows | **0** |
+| Read model rows | 5 — the view works after drop and recreate |
+| RLS policies on the relation table | 2 |
+| `SECURITY DEFINER` functions without `search_path` | **0** |
+
+Existing project-scoped behaviour is unchanged: every pre-existing row kept its
+data and acquired the correct scope by default.
+
+### Rollback safety
+
+The migration is additive apart from the view recreation. Reversal is possible
+while no organization-scoped row exists; afterwards it requires an explicit
+decision about their disposition, which ADR-013 anticipated.

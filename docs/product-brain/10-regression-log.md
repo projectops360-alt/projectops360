@@ -870,3 +870,130 @@ el camino que un usuario recorre de verdad.
 sus tests, sino cuando existe un camino desde la pantalla hasta ella. Si una
 acción de servidor no tiene consumidor, o un dato guardado no tiene lector, eso
 es un defecto y no una función pendiente.
+
+---
+
+## REG-027 — A replaced view kept its definition and lost its grants
+
+**Date:** 2026-07-26 · **Status:** closed · **Guard:** `EKI-VIEW-REGRANT`
+
+`create or replace view` cannot rename or reorder columns, so the EKI scope
+migration dropped the view and recreated it. Dropping a view discards its grants.
+The recreated view was correct and unreadable: every `authenticated` caller lost
+`select`, and the failure surfaces as an empty screen, not as an error.
+
+**Root cause:** the drop was treated as a syntactic workaround for a Postgres
+restriction rather than as a change of ownership state. Only the definition was
+carried across.
+
+**Protection rule (binding):** a migration that drops a view must restore its
+grants in the same migration. Every `drop view` needs a matching `grant` — the
+test enumerates the drops and requires a regrant for each, so a new drop cannot
+be added without one.
+
+**Verify:** `src/lib/eki-evidence/__tests__/migration-contract.test.ts` →
+"a replaced view must keep its grants".
+
+---
+
+## REG-028 — Array append written as concatenation with a literal
+
+**Date:** 2026-07-26 · **Status:** closed · **Guard:** `EKI-ARRAY-APPEND`
+
+`failures := failures || 'no_fresh_evidence'` parses the right-hand side as an
+array *literal*, not as an element, and raises `22P02: malformed array literal`
+at runtime. It appeared in five places in the control gate — the exact code path
+that runs when a control is failing, so the error only fired when something was
+already wrong.
+
+**Root cause:** `||` is overloaded for arrays and reads as "append" to anyone who
+has written it in another language. The ambiguity is invisible in review.
+
+**Protection rule (binding):** accumulate into a `text[]` with `array_append`.
+No `x := x || 'literal'` in any migration.
+
+**Verify:** `src/lib/eki-evidence/__tests__/migration-contract.test.ts` →
+"array append must not be written as concatenation with a literal".
+
+---
+
+## REG-029 — Transaction time used where statement time was meant
+
+**Date:** 2026-07-26 · **Status:** closed · **Guard:** `EKI-CLOCK-TIMESTAMP`
+
+`now()` is the **transaction** timestamp. It broke the engine twice:
+
+1. Two evaluations written in one transaction received an identical
+   `evaluated_at`. `order by evaluated_at desc limit 1` became non-deterministic,
+   the engine read a stale evaluation as the latest one, and **a control could
+   never reach `operating`** — the single state the whole programme exists to
+   establish.
+2. Freshness measured as `now() - latest_evidence` compared against an
+   increasingly wrong "now" inside a long transaction, so evidence that aged
+   during the transaction was reported as current.
+
+**Root cause:** `now()` is the default reflex and is correct for "when did this
+unit of work happen". It is wrong for "when did this measurement happen" and for
+"how old is this evidence".
+
+**Found by:** running the end-to-end flow against a real database. Invisible in
+review — both spellings look right.
+
+**Protection rule (binding):** evaluation and freshness use `clock_timestamp()`.
+"Latest" is resolved by the `sequence_no` identity column, never by a timestamp
+alone, in SQL and in the repository.
+
+**Verify:** `src/lib/eki-evidence/__tests__/migration-contract.test.ts` →
+"evaluation time is statement time, not transaction time" ·
+`src/lib/eki-evidence/__tests__/repository.test.ts` → "resolves the latest
+evaluation by sequence, not by timestamp".
+
+---
+
+## REG-030 — A shared trigger referenced a column not present on every table it served
+
+**Date:** 2026-07-26 · **Status:** closed · **Guard:** `EKI-TRIGGER-BRANCH-SCOPE`
+
+One audit trigger function serves `project_knowledge_objects`,
+`project_knowledge_object_transitions` and `project_knowledge_relations`.
+Resolving the actor type with a shared expression over `new.knowledge_type`
+raised `42703: record "new" has no field "knowledge_type"` on the two tables that
+lack the column — including the branch that never needed it.
+
+**Root cause:** PL/pgSQL resolves `new.<column>` when the statement executes, not
+when the branch is taken, so an expression outside the per-table branch runs for
+every table.
+
+**Protection rule (binding):** in a trigger shared across tables, read
+table-specific columns only inside the `TG_TABLE_NAME` branch for that table.
+Declarations and shared expressions use variables with safe defaults.
+
+**Verify:** `src/lib/eki-evidence/__tests__/migration-contract.test.ts` →
+"reads table-specific columns only inside their own branch".
+
+---
+
+## REG-031 — A denial rolled back the record that proved it happened
+
+**Date:** 2026-07-26 · **Status:** closed · **Guard:** `EKI-DENIAL-RETURNED`
+
+`eki_resolve_finding` wrote an `access_denied` audit record and then `RAISE`d to
+reject the caller. The exception rolled back the audit insert made in the same
+transaction, so the refusal left no trace. The system logged only its successes
+and could not demonstrate that it refuses anything — which is precisely the claim
+an auditor tests.
+
+**Found by:** the acceptance run reporting `17b_denegacion_auditada = false` while
+every functional step passed. The engine worked; its evidence of working did not
+exist.
+
+**Protection rule (binding):** an authorization denial that must be audited is
+**returned** as `{authorized: false, reason}`, never raised. Nothing is mutated on
+the denied path. The service layer converts the denial into an error for the
+caller, after the record exists.
+
+**Verify:** `src/lib/eki-evidence/__tests__/migration-contract.test.ts` →
+"a denial must be returned, never raised" ·
+`src/lib/eki-evidence/__tests__/service.test.ts` → "turns a database denial into
+an error without inventing a success" · real-database:
+`supabase/tests/eki_macrophase2_acceptance.sql` step 17.
