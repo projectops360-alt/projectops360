@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AssignOwnerInput,
   AuthorizedResult,
+  BindingScheduleInput,
+  ClaimedEvaluationResult,
+  EvaluationRunItemRecord,
+  EvaluationRunRecord,
   ControlGate,
   ControlRuntimeRecord,
   ControlState,
@@ -36,6 +40,13 @@ export interface EkiEvidenceRepository {
   listOpenFindings(context: EvidenceActorContext, targetObjectId?: string): Promise<OpenFindingRecord[]>;
   resolveFinding(context: EvidenceActorContext, input: ResolveFindingInput): Promise<AuthorizedResult<{ controlState: string | null }>>;
   assignOwner(context: EvidenceActorContext, input: AssignOwnerInput): Promise<AuthorizedResult<{ previousOwner: string | null }>>;
+
+  // ── Macrophase 3 — automation surface ─────────────────────────────────────
+  setSchedule(context: EvidenceActorContext, bindingObjectId: string, input: BindingScheduleInput): Promise<EvidenceBindingRecord>;
+  requestEvaluation(context: EvidenceActorContext, bindingObjectId: string): Promise<AuthorizedResult<ClaimedEvaluationResult>>;
+  listRuns(context: EvidenceActorContext, limit?: number): Promise<EvaluationRunRecord[]>;
+  listRunItems(context: EvidenceActorContext, runId: string): Promise<EvaluationRunItemRecord[]>;
+  bindingRunHistory(context: EvidenceActorContext, bindingObjectId: string, limit?: number): Promise<EvaluationRunItemRecord[]>;
 }
 
 function fail(error: { message?: string } | null, fallback: string): never {
@@ -100,6 +111,50 @@ function openFindingRecord(value: unknown): OpenFindingRecord {
     openedAt: String(row.opened_at),
     lastSeenAt: String(row.last_seen_at),
     occurrenceCount: Number(row.occurrence_count ?? 1),
+  };
+}
+
+function runRecord(value: unknown): EvaluationRunRecord {
+  const row = value as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    runKey: String(row.run_key),
+    triggerType: row.trigger_type as EvaluationRunRecord["triggerType"],
+    organizationId: row.organization_id == null ? null : String(row.organization_id),
+    requestedBy: row.requested_by == null ? null : String(row.requested_by),
+    startedAt: String(row.started_at),
+    completedAt: row.completed_at == null ? null : String(row.completed_at),
+    status: row.status as EvaluationRunRecord["status"],
+    bindingsClaimed: Number(row.bindings_claimed ?? 0),
+    bindingsEvaluated: Number(row.bindings_evaluated ?? 0),
+    bindingsFailed: Number(row.bindings_failed ?? 0),
+    failureCategory: row.failure_category == null ? null : String(row.failure_category),
+    safeError: row.safe_error == null ? null : String(row.safe_error),
+  };
+}
+
+function runItemRecord(value: unknown): EvaluationRunItemRecord {
+  const row = value as Record<string, unknown>;
+  return {
+    id: String(row.id),
+    runId: String(row.run_id),
+    bindingObjectId: String(row.binding_object_id),
+    organizationId: String(row.organization_id),
+    startedAt: String(row.started_at),
+    completedAt: row.completed_at == null ? null : String(row.completed_at),
+    outcome: (row.outcome ?? null) as EvaluationRunItemRecord["outcome"],
+    evaluationId: row.evaluation_id == null ? null : String(row.evaluation_id),
+    evaluationSequence: row.evaluation_sequence == null ? null : Number(row.evaluation_sequence),
+    controlObjectId: row.control_object_id == null ? null : String(row.control_object_id),
+    controlStateBefore: (row.control_state_before ?? null) as EvaluationRunItemRecord["controlStateBefore"],
+    controlStateAfter: (row.control_state_after ?? null) as EvaluationRunItemRecord["controlStateAfter"],
+    findingAction: (row.finding_action ?? null) as EvaluationRunItemRecord["findingAction"],
+    findingObjectId: row.finding_object_id == null ? null : String(row.finding_object_id),
+    status: row.status as EvaluationRunItemRecord["status"],
+    failureCategory: row.failure_category == null ? null : String(row.failure_category),
+    safeError: row.safe_error == null ? null : String(row.safe_error),
+    retryCount: Number(row.retry_count ?? 0),
+    missedIntervals: Number(row.missed_intervals ?? 0),
   };
 }
 
@@ -303,6 +358,84 @@ export function createSupabaseEkiEvidenceRepository(
         reason: row.reason == null ? undefined : String(row.reason),
         value: { previousOwner: row.previous_owner == null ? null : String(row.previous_owner) },
       };
+    },
+
+    async setSchedule(context, bindingObjectId, input) {
+      const patch: Record<string, unknown> = {
+        evaluation_interval: input.evaluationInterval,
+        updated_at: new Date().toISOString(),
+      };
+      if (input.enabled !== undefined) patch.evaluation_enabled = input.enabled;
+      const { data, error } = await writeClient
+        .from("eki_evidence_binding_runtime")
+        .update(patch)
+        .eq("binding_object_id", bindingObjectId)
+        .eq("organization_id", context.organizationId)
+        .select("*")
+        .single();
+      if (error || !data) fail(error, "eki_schedule_update_failed");
+      return bindingRecord(data);
+    },
+
+    async requestEvaluation(context, bindingObjectId) {
+      const { data, error } = await writeClient.rpc("eki_request_evaluation", {
+        p_binding_object_id: bindingObjectId,
+        // The actor comes from the trusted session. A caller able to name its own
+        // actor could evaluate as somebody else, and the audit record would
+        // preserve the forged identity as fact.
+        p_actor_id: context.userId,
+        p_trigger_type: "manual",
+      });
+      if (error || !data) fail(error, "eki_manual_evaluation_failed");
+      const row = data as Record<string, unknown>;
+      const control = row.control as Record<string, unknown> | null;
+      return {
+        authorized: Boolean(row.authorized),
+        reason: row.reason == null ? undefined : String(row.reason),
+        value: {
+          evaluated: Boolean(row.evaluated),
+          reason: row.reason == null ? undefined : String(row.reason),
+          outcome: row.outcome as ClaimedEvaluationResult["outcome"],
+          controlObjectId: row.control_object_id == null ? null : String(row.control_object_id),
+          controlState: control ? (control.control_state as ClaimedEvaluationResult["controlState"]) : null,
+          condition: (row.condition ?? null) as ClaimedEvaluationResult["condition"],
+        },
+      };
+    },
+
+    async listRuns(context, limit = 50) {
+      const { data, error } = await readClient
+        .from("eki_evaluation_runs")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .order("started_at", { ascending: false })
+        .limit(Math.min(Math.max(limit, 1), 200));
+      if (error) fail(error, "eki_run_list_failed");
+      return (data ?? []).map(runRecord);
+    },
+
+    async listRunItems(context, runId) {
+      const { data, error } = await readClient
+        .from("eki_evaluation_run_items")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .eq("run_id", runId)
+        .order("started_at", { ascending: false })
+        .limit(500);
+      if (error) fail(error, "eki_run_item_list_failed");
+      return (data ?? []).map(runItemRecord);
+    },
+
+    async bindingRunHistory(context, bindingObjectId, limit = 50) {
+      const { data, error } = await readClient
+        .from("eki_evaluation_run_items")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .eq("binding_object_id", bindingObjectId)
+        .order("started_at", { ascending: false })
+        .limit(Math.min(Math.max(limit, 1), 200));
+      if (error) fail(error, "eki_binding_run_history_failed");
+      return (data ?? []).map(runItemRecord);
     },
   };
 }

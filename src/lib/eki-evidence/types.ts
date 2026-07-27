@@ -173,3 +173,97 @@ export interface AssignOwnerInput {
   ownerUserId: string;
   rationale: string;
 }
+
+// ============================================================================
+// Macrophase 3 — automated evaluation
+// ============================================================================
+
+/** How an evaluation run was triggered. Never accepted from a client. */
+export const RUN_TRIGGERS = ["scheduled", "manual", "mutation"] as const;
+export const RUN_STATUSES = ["running", "succeeded", "partial", "failed", "duplicate"] as const;
+export const RUN_ITEM_STATUSES = ["claimed", "succeeded", "failed", "superseded", "skipped"] as const;
+export const FINDING_ACTIONS = ["created", "recurred", "none"] as const;
+
+export type RunTrigger = (typeof RUN_TRIGGERS)[number];
+export type RunStatus = (typeof RUN_STATUSES)[number];
+export type RunItemStatus = (typeof RUN_ITEM_STATUSES)[number];
+export type FindingAction = (typeof FINDING_ACTIONS)[number];
+
+/**
+ * A claim on a binding.
+ *
+ * The token identifies WHICH claim, not merely that one exists. A worker that
+ * hung, lost its claim and came back must be distinguishable from the worker
+ * holding it now, and a timestamp cannot tell those two apart.
+ */
+export interface BindingClaim {
+  bindingObjectId: string;
+  organizationId: string;
+  claimToken: string;
+}
+
+export interface EvaluationRunRecord {
+  id: string;
+  runKey: string;
+  triggerType: RunTrigger;
+  organizationId: string | null;
+  requestedBy: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  status: RunStatus;
+  bindingsClaimed: number;
+  bindingsEvaluated: number;
+  bindingsFailed: number;
+  failureCategory: string | null;
+  safeError: string | null;
+}
+
+export interface EvaluationRunItemRecord {
+  id: string;
+  runId: string;
+  bindingObjectId: string;
+  organizationId: string;
+  startedAt: string;
+  completedAt: string | null;
+  outcome: EvidenceOutcome | null;
+  evaluationId: string | null;
+  evaluationSequence: number | null;
+  controlObjectId: string | null;
+  controlStateBefore: ControlState | null;
+  controlStateAfter: ControlState | null;
+  findingAction: FindingAction | null;
+  findingObjectId: string | null;
+  status: RunItemStatus;
+  failureCategory: string | null;
+  safeError: string | null;
+  retryCount: number;
+  missedIntervals: number;
+}
+
+/** The result of evaluating one claimed binding. */
+export interface ClaimedEvaluationResult {
+  evaluated: boolean;
+  reason?: string;
+  outcome?: EvidenceOutcome;
+  controlObjectId?: string | null;
+  controlState?: ControlState | null;
+  findingObjectId?: string | null;
+  condition?: FindingCondition | null;
+  error?: string;
+}
+
+export interface SweepSummary {
+  runId: string;
+  duplicate: boolean;
+  claimed: number;
+  evaluated: number;
+  failed: number;
+  superseded: number;
+  status: RunStatus;
+}
+
+export interface BindingScheduleInput {
+  /** Postgres interval literal, e.g. "1 day". Per binding, never global. */
+  evaluationInterval: string;
+  enabled?: boolean;
+}

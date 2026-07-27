@@ -1,5 +1,14 @@
 export type PlatformActorType = "human" | "ai" | "system";
-export type PlatformActorRole = "owner" | "admin" | "member" | "viewer" | "service";
+/**
+ * `none` is a real value, not a placeholder.
+ *
+ * An actor with no standing in the organization is exactly the actor whose
+ * refusal most needs recording, and until this existed the vocabulary could not
+ * express it: the governance audit rejected the row, the insert raised, and the
+ * refusal was lost together with the error. `none` is denied every operation in
+ * `security.ts` — widening the vocabulary grants nothing. See REG-034.
+ */
+export type PlatformActorRole = "owner" | "admin" | "member" | "viewer" | "service" | "none";
 export type PlatformOperation = "read" | "analyze" | "propose" | "mutate" | "approve" | "export";
 export type PlatformResourceKind =
   | "project_data"
@@ -45,6 +54,7 @@ export type PlatformAccessDenialReason =
   | "ai_mutation_forbidden"
   | "human_approval_required"
   | "viewer_write_forbidden"
+  | "actor_without_role"
   | "restricted_export_forbidden";
 
 export interface PlatformAccessDecision {

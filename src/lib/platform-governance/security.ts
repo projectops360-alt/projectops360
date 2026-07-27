@@ -35,6 +35,12 @@ export function authorizePlatformAccess(
   if (session.actorRole === "viewer" && ["propose", "mutate", "approve", "export"].includes(request.operation)) {
     denialReasons.push("viewer_write_forbidden");
   }
+  // An actor with no standing in the organization is denied EVERY operation,
+  // reads included. `none` exists so a refusal can be recorded honestly, not so
+  // that "no role" becomes a weak role.
+  if (session.actorRole === "none") {
+    denialReasons.push("actor_without_role");
+  }
   if (request.operation === "approve" && !["owner", "admin"].includes(session.actorRole)) {
     denialReasons.push("human_approval_required");
   }
