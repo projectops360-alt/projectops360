@@ -207,10 +207,42 @@ export const UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE: ProductUxContract = {
   ],
 };
 
+export const UX_016_SIMULATION_IS_A_QUESTION: ProductUxContract = {
+  id: "UX-016",
+  title: "A Simulation Is a Question, Never an Instruction",
+  status: "APPROVED",
+  rules: [
+    "Running or saving a scenario must never modify a project, task, milestone, risk, resource or budget line; there is no apply-to-project path in V1.",
+    "Money, days and counts never share a metric; risk exposure is reported per unit and the two capacity engines (hours vs headcount) are never summed.",
+    "Every figure states its provenance (OBSERVED, ASSUMED, DERIVED_PROXY, UNAVAILABLE); an unknowable value reads 'Data unavailable' and is never rendered or exported as zero.",
+    "An intervention that cannot be computed is kept and explained, never dropped — a vanished intervention reads as one that had no effect.",
+    "The run is blocked while an enabled intervention has no target, and the incomplete one is named in place.",
+    "Qualitative risk severity is never mapped to currency or days; assumed figures live on the intervention and are never written back to risks.",
+    "A stored result is read when a scenario is reopened, never silently recomputed against a newer baseline.",
+  ],
+};
+
+export const UX_017_ACRONYMS_ARE_REACHABLE: ProductUxContract = {
+  id: "UX-017",
+  title: "Acronyms Are Defined Once and Reachable Without Data",
+  status: "APPROVED",
+  rules: [
+    "The acronym reference opens from the toolbar with no scenario run and nothing selected; an inline annotated term is never the only way to reach a definition.",
+    "Definitions come from one versioned registry; no component defines an acronym locally and no DOM scanner auto-annotates text.",
+    "Every annotated term is reachable by pointer, keyboard and touch — the first tap opens the tooltip, and nothing depends on hover alone.",
+    "Caveats are rendered above the example, not filed as a footnote, because they are what prevents the misreading.",
+    "When a metric has several accepted formulas, the panel states which one the engine actually used rather than showing a default it cannot vouch for.",
+    "Search covers code, full name and definition, so a user who knows the concept but not the abbreviation can still find the term.",
+    "An unknown code renders as plain text with no affordance; the surface never breaks because the corpus has a gap.",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
   UX_012_LANGUAGE_CONSISTENCY,
   UX_013_WORKBOARD_RESPONSIVE,
   UX_014_TASK_EDITOR_AI_PROMPT,
   UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE,
+  UX_016_SIMULATION_IS_A_QUESTION,
+  UX_017_ACRONYMS_ARE_REACHABLE,
 ];

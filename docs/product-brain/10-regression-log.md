@@ -812,3 +812,61 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*
+
+---
+
+## REG-032 — Los motores genéricos quedaron ciegos a datos que sí existían
+
+**Fecha:** 2026-07-26 · **Estado:** cerrada · **Guards:** `PMO-SIM-EVM-SOURCE`,
+`IMPORT-TASK-HOURS-BOTH-FIELDS`, `IMPORT-PROJECT-TYPE-WORD-BOUNDARY`
+
+Tres defectos con la misma forma: el dato estaba en la base y el consumidor no lo
+leía. Ninguno producía un error — producían una respuesta plausible y menos
+informada, que es el modo de fallo más difícil de notar.
+
+| # | Defecto | Efecto |
+|---|---|---|
+| 1 | `financial_measurement_snapshots` guarda BAC/PV/EV/AC; el read model de simulación forzaba `ev: null` con un comentario que decía "EV no tiene fuente en este esquema" | Todo pronóstico EVM reportaba "unavailable" para proyectos con medición válida |
+| 2 | La importación escribía las horas solo en `estimated_labor_hours` | La estimación quedaba invisible para CPM, capacidad genérica, process mining e Isabella; en un proyecto de software se perdía del todo |
+| 3 | El clasificador de tipo de proyecto comparaba palabras clave como subcadena, y `"ia"` (dos letras) vive dentro de *ingeniería*, *licencia*, *garantía* | Planes de infraestructura en español se clasificaban como `ai_native_execution`, lo que decide qué módulos recibe el proyecto |
+
+**Causa raíz común:** el comentario de (1) fue cierto cuando se escribió y dejó de
+serlo cuando el módulo financiero añadió la tabla. Nadie volvió. (2) y (3) nunca
+se ejercitaron contra datos reales en español.
+
+**Cómo se encontraron:** recorriendo el flujo completo contra un proyecto real
+—importar, simular, leer las filas de vuelta— no inspeccionando el código. La
+lectura del código no los habría encontrado porque todos parecen correctos.
+
+**Regla de protección:** al leer un dominio, verificar contra el esquema vigente
+que la fuente sigue ausente antes de codificar `null`. Un comentario que afirma
+que un dato no existe es una aserción con fecha de caducidad, no un hecho.
+
+---
+
+## REG-033 — Trabajo guardado que no se podía recuperar
+
+**Fecha:** 2026-07-26 · **Estado:** cerrada · **Guards:**
+`PMO-SIM-MULTIPLE-SCENARIOS`, `PMO-SIM-NO-SILENT-DROP`, `PMO-SIM-NO-RAW-ERROR-CODES`,
+`ACRONYM-GLOSSARY-REACHABLE`
+
+Cuatro defectos de alcanzabilidad en la misma superficie:
+
+1. **Escenarios guardados inaccesibles.** `listScenarios` y `getLastResult`
+   existían en el servidor, las tablas guardaban las filas, y la interfaz nunca
+   los pedía. "Guardar" escribía un escenario que no se podía reabrir jamás.
+2. **Una sola simulación.** Editar, Re-ejecutar, Duplicar y Borrar volvían todos
+   al mismo escenario. Comparar opciones es la actividad completa de un what-if.
+3. **Intervención descartada en silencio.** Una intervención sin objetivo la
+   elimina el parser; la corrida seguía y reportaba un resultado calculado sobre
+   cero intervenciones mientras el formulario mostraba una.
+4. **Acrónimos inalcanzables.** Solo se llegaba a una definición teniendo ya el
+   número en pantalla, lo que exigía construir y ejecutar un escenario.
+
+**Causa raíz común:** cada pieza funcionaba aislada y ninguna era alcanzable por
+el camino que un usuario recorre de verdad.
+
+**Regla de protección:** una capacidad no está terminada cuando su lógica pasa
+sus tests, sino cuando existe un camino desde la pantalla hasta ella. Si una
+acción de servidor no tiene consumidor, o un dato guardado no tiene lector, eso
+es un defecto y no una función pendiente.
