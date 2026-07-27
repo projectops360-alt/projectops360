@@ -40,11 +40,12 @@ Everything below follows from that.
 | 8 | Living Graph lens | `trust-lens-projection.ts` — read-only, no second graph |
 | 9 | Internal APIs | 5 new entry points on the existing evidence server module |
 | 10 | Tests | 100 new vitest assertions + a 31-check real-database acceptance script |
-| 11 | Regressions | REG-034, REG-035 |
+| 11 | Regressions | REG-034, REG-035, REG-036 |
 | 12 | Documentation | This file |
 
 Migrations: `20260866000000_eki_automated_evaluation.sql`,
-`20260867000000_governance_audit_actor_role_none.sql`. **Stage only.**
+`20260867000000_governance_audit_actor_role_none.sql`,
+`20260868000000_eki_revoke_public_execute.sql`. **Stage only.**
 
 Not built, deliberately: dashboard, trust score, readiness percentage, framework
 package, policy authoring, audit management, a third resolver.
@@ -454,8 +455,60 @@ what the product forbids.
   the run record shows it via `missed_intervals` rather than hiding it. Per-tenant
   sweep scheduling is not built.
 - **`auth.role()` is NULL on a direct database connection**, so the service-role
-  guard does not fire there. That path needs database credentials, which already
-  confer more than the guard protects, and it is what lets the acceptance script
-  run. Recorded here rather than left to be rediscovered.
+  guard does not fire there. Classified during final review as **DEFECT FIXED** —
+  see below. After REG-036 the only callers left are `service_role` and the
+  function owner, so a NULL role now requires owner-level credentials, which
+  already confer more than the guard protects. It is what lets the acceptance
+  script and any future scheduled job run.
 - **Both flags default OFF.** Nothing evaluates automatically and no lens appears
   until they are set. Production is untouched and nothing is deployed.
+
+---
+
+## Final review — the `auth.role() IS NULL` path
+
+**Classification: DEFECT FIXED.**
+
+The question was which caller reaches a state where `auth.role()` is NULL, given
+that every privileged function guards with `auth.role() <> 'service_role'` and
+`NULL <> 'service_role'` evaluates to NULL, so the guard does not fire.
+
+Answering it required enumerating who can execute these functions at all, and
+that surfaced a defect with nothing to do with NULL roles.
+
+### What the path actually is
+
+| Question | Answer |
+|---|---|
+| Which callers reach NULL? | Only a **direct database connection** — psql, the pooler, a migration runner. Through PostgREST `auth.role()` is always populated: `anon`, `authenticated` or `service_role`. |
+| Does it use service-role credentials? | No — it uses **database** credentials, which are strictly broader. |
+| Can a browser user reach it? | No. A client cannot execute arbitrary SQL and cannot set `request.jwt.claims`. |
+| Is tenant context still enforced? | The functions take an explicit `organization_id`; RLS is bypassed by `SECURITY DEFINER` **by design**, because a resolver must read across it. |
+| Can actor identity be spoofed? | Not through the API. `p_actor_id` is stamped server-side from `getOrgContext()`. |
+| Do RLS policies behave differently at NULL? | `is_org_member(NULL)` is not true, so a NULL-role session sees no rows through RLS. The exposure was never RLS — it was `SECURITY DEFINER` reachability. |
+
+### What the review found instead — REG-036
+
+Macrophase 3 never revoked the default `PUBLIC` grant. All eight functions were
+callable through PostgREST. The write paths were contained by the service-role
+guard; **the resolver was not**, because a resolver called from inside the engine
+had no guard.
+
+Verified in stage against a real tenant, as `authenticated` and again as `anon`:
+RLS showed **0 rows** of another organization's `audit_logs`, and
+`eki_resolve_privileged_access_activity` returned **31** with an exact timestamp
+for the same organization. A publishable key and no session were enough.
+
+Fixed in `20260868000000_eki_revoke_public_execute.sql`: revoke from
+`public, anon, authenticated`, plus a service-role guard on the resolver so a
+grant restored by a later migration cannot silently reopen it. Re-verified in
+stage — all three paths now refused, the engine itself unaffected. Guarded by an
+automated test that discovers EKI migrations from disk and was negative-controlled.
+
+### Why the NULL question was worth asking
+
+It was the right question for the wrong reason. NULL turned out to be a narrow
+operator path; the enumeration it forced found a cross-tenant disclosure reachable
+by an unauthenticated key. "It did not fail during testing" would have missed
+both, because nothing failed — the resolver answered, correctly, to the wrong
+person.

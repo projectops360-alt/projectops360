@@ -1059,3 +1059,52 @@ must never be answerable from the corpus.
 
 **Verify:** `src/lib/isabella/enterprise-trust/__tests__/trust-reasoning.test.ts`
 → "question classification".
+
+---
+
+## REG-036 — Macrophase 3 functions were executable by `anon` and `authenticated`
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-FUNCTION-EXECUTE-REVOKED`
+
+PostgreSQL grants `EXECUTE` to `PUBLIC` by default on `CREATE FUNCTION`, and
+`anon` and `authenticated` inherit it. Macrophases 1 and 2 revoked explicitly.
+Macrophase 3 did not, so all eight functions it added were callable through
+PostgREST.
+
+For the write paths this was contained: `auth.role() <> 'service_role'` fires for
+both roles and the call raises. **For the read path it was not.**
+
+`eki_resolve_privileged_access_activity` is `SECURITY DEFINER` and had no
+service-role guard, because it is a resolver invoked from inside the engine. With
+`PUBLIC` execute, any caller could name an **arbitrary organization id** and read
+that tenant's privileged-access profile: record count, timestamp of the most
+recent privileged change, and contradiction count.
+
+**Confirmed in stage, not inferred.** As `authenticated` with a JWT belonging to
+no member of the target organization:
+
+| Path | Result |
+|---|---|
+| `select count(*) from audit_logs where organization_id = <other tenant>` | **0** (RLS) |
+| `eki_resolve_privileged_access_activity(<other tenant>, …)` | **31**, plus the exact `latest_evidence_at` |
+
+Reachable as `anon` as well, so a publishable key and no session were enough.
+
+**Root cause:** the default grant. Not a missing check — a missing *revoke*, which
+is invisible in a diff because the dangerous state is the one nobody wrote down.
+
+**Why it was found:** the final review asked precisely which caller reaches
+`auth.role() IS NULL`. Answering that required enumerating who can execute these
+functions at all, which surfaced a disclosure that has nothing to do with NULL
+roles. The NULL question was the right question for the wrong reason.
+
+**Protection rule (binding):** every `SECURITY DEFINER` function in the EKI
+namespace must be revoked from `public, anon, authenticated` in the same
+migration that creates it. A resolver that reads across RLS must additionally
+carry a service-role guard, so a grant restored later cannot silently reopen the
+disclosure. The revoke is the control; the guard is defence in depth.
+
+**Verify:** `src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts`
+→ "REG-036". The guard discovers EKI migrations from disk rather than from a
+hard-coded list, and was negative-controlled: with the fix migration removed it
+names all seven unprotected functions.

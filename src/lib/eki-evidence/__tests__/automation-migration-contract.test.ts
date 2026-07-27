@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EVIDENCE_RESOLVERS, RUN_ITEM_STATUSES, RUN_STATUSES, RUN_TRIGGERS } from "../types";
@@ -270,6 +270,76 @@ describe("REG-034 — a refusal by an actor with no role", () => {
   it("widens and never narrows the existing vocabulary", () => {
     for (const role of ["owner", "admin", "member", "viewer", "service"]) {
       expect(actorRole).toContain(`'${role}'`);
+    }
+  });
+});
+
+describe("REG-036 — every EKI function must be revoked from the API roles", () => {
+  /**
+   * PostgreSQL grants EXECUTE to PUBLIC by default on CREATE FUNCTION, and
+   * `anon` and `authenticated` inherit it. Macrophases 1 and 2 revoked
+   * explicitly; Macrophase 3 did not, and
+   * `eki_resolve_privileged_access_activity` — SECURITY DEFINER, no service-role
+   * guard, because it is called from inside the engine — became readable by any
+   * caller naming an arbitrary organization id. Verified in stage: RLS showed an
+   * authenticated user 0 rows of another tenant's `audit_logs`; the resolver
+   * returned 31 with an exact timestamp. `anon` reached it too, so a publishable
+   * key and no session were enough.
+   *
+   * The guard is written over ALL EKI migrations rather than the new one, so a
+   * function added by a later macrophase without a revoke fails here.
+   */
+  // Discovered from disk, not listed. A hard-coded list is a guard that stops
+  // guarding the moment somebody adds a migration and forgets to register it
+  // here — which is the same class of omission the guard exists to catch.
+  const combined = readdirSync(resolve(process.cwd(), "supabase/migrations"))
+    .filter((name) => name.endsWith(".sql") && name.includes("eki"))
+    .map((name) => read(`supabase/migrations/${name}`))
+    .join("\n");
+
+  function namesMatching(pattern: RegExp): Set<string> {
+    return new Set([...combined.matchAll(pattern)].map((m) => m[1]));
+  }
+
+  it("revokes execute from public, anon and authenticated for every function it creates", () => {
+    const created = namesMatching(/create or replace function public\.(eki_\w+)\s*\(/g);
+    const revoked = namesMatching(/revoke all on function public\.(eki_\w+)\s*\(/g);
+    expect(created.size).toBeGreaterThan(10);
+
+    const unprotected = [...created].filter((name) => !revoked.has(name));
+    expect(unprotected, `EKI functions with no revoke: ${unprotected.join(", ")}`).toEqual([]);
+  });
+
+  it("revokes from all three API roles, never only from public", () => {
+    for (const match of combined.matchAll(/revoke all on function public\.eki_\w+[^;]*;/g)) {
+      expect(match[0]).toContain("from public, anon, authenticated");
+    }
+  });
+
+  it("guards the resolver itself, so a restored grant cannot reopen the disclosure", () => {
+    const resolver = code(extract("eki_resolve_privileged_access_activity", read(
+      "supabase/migrations/20260868000000_eki_revoke_public_execute.sql",
+    )));
+    expect(resolver).toContain("eki_service_role_required");
+    // NOT coalesce(): a NULL role means a direct database connection, which is
+    // how the acceptance script and any scheduled job run and which already needs
+    // credentials conferring more than this guard protects. The revoke is the
+    // control; this is defence in depth.
+    expect(resolver).toMatch(/auth\.role\(\) is not null and auth\.role\(\) <> 'service_role'/);
+  });
+
+  it("keeps service_role able to execute what it must", () => {
+    const fix = read("supabase/migrations/20260868000000_eki_revoke_public_execute.sql");
+    for (const fn of [
+      "eki_resolve_privileged_access_activity",
+      "eki_claim_due_bindings",
+      "eki_evaluate_claimed_binding",
+      "eki_request_evaluation",
+      "eki_start_evaluation_run",
+      "eki_complete_evaluation_run",
+      "eki_recalculate_control_state",
+    ]) {
+      expect(fix, fn).toMatch(new RegExp(`grant execute on function public\\.${fn}\\(`));
     }
   });
 });
