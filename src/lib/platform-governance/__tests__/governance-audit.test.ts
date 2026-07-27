@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createGovernanceAuditRecord, validateGovernanceAuditChain } from "../audit";
+import { authorizePlatformAccess } from "../security";
+import type { TrustedPlatformSession } from "../types";
 import { denverDataCenter, projectManagerSession } from "./fixtures";
 
 describe("P8-T3B governance auditability", () => {
@@ -83,5 +85,52 @@ describe("P8-T3B governance auditability", () => {
       "record_hash_mismatch:event-1",
       "cross_organization_chain:event-2",
     ]));
+  });
+});
+
+// ── REG-034 ─────────────────────────────────────────────────────────────────
+describe("REG-034 — an actor with no role", () => {
+  /**
+   * `none` exists so a refusal by somebody with no standing in the organization
+   * can be RECORDED. Before it existed the governance audit rejected the row,
+   * the insert raised, and the exception discarded both the audit record and the
+   * caller's answer — losing exactly the denial that matters most.
+   */
+  it("is denied every operation, reads included", () => {
+    const stranger: TrustedPlatformSession = {
+      ...projectManagerSession,
+      actorRole: "none",
+      capabilities: [...projectManagerSession.capabilities],
+    };
+    for (const operation of ["read", "analyze", "propose", "mutate", "approve", "export"] as const) {
+      const decision = authorizePlatformAccess(stranger, {
+        operation,
+        purpose: "checking that no role grants nothing",
+        resource: {
+          organizationId: stranger.organizationId,
+          projectId: null,
+          resourceKind: "governance_audit",
+          sensitivity: "internal",
+          containsRawPayload: false,
+        },
+      });
+      expect(decision.allowed, operation).toBe(false);
+      expect(decision.denialReasons).toContain("actor_without_role");
+    }
+  });
+
+  it("does not weaken any existing role", () => {
+    const decision = authorizePlatformAccess(projectManagerSession, {
+      operation: "read",
+      purpose: "regression guard: widening the vocabulary must grant nothing new",
+      resource: {
+        organizationId: projectManagerSession.organizationId,
+        projectId: null,
+        resourceKind: "governance_audit",
+        sensitivity: "internal",
+        containsRawPayload: false,
+      },
+    });
+    expect(decision.denialReasons).not.toContain("actor_without_role");
   });
 });

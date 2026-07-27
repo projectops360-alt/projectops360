@@ -3,7 +3,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { createSupabaseEkiEvidenceRepository } from "./repository";
 import { EkiEvidenceService } from "./service";
-import type { AssignOwnerInput, CreateEvidenceBindingInput, ResolveFindingInput } from "./types";
+import type {
+  AssignOwnerInput,
+  BindingScheduleInput,
+  CreateEvidenceBindingInput,
+  ResolveFindingInput,
+} from "./types";
 
 /**
  * Internal entry points for the evidence engine.
@@ -89,4 +94,31 @@ export async function resolveGovernanceFinding(input: ResolveFindingInput) {
 export async function assignGovernanceOwner(input: AssignOwnerInput) {
   const { context, service } = await runtime();
   return service.assignOwner(context, input);
+}
+
+// ── Macrophase 3 — automation surface ───────────────────────────────────────
+
+export async function setEvidenceBindingSchedule(bindingObjectId: string, input: BindingScheduleInput) {
+  const { context, service } = await runtime();
+  return service.setSchedule(context, bindingObjectId, input);
+}
+
+export async function requestEvidenceEvaluation(bindingObjectId: string) {
+  const { context, service } = await runtime();
+  return service.requestEvaluation(context, bindingObjectId);
+}
+
+export async function listEvidenceEvaluationRuns(limit?: number) {
+  const { context, service } = await runtime();
+  return service.listRuns(context, limit);
+}
+
+export async function getEvidenceEvaluationRunDetail(runId: string) {
+  const { context, service } = await runtime();
+  return service.runDetail(context, runId);
+}
+
+export async function getBindingEvaluationHistory(bindingObjectId: string, limit?: number) {
+  const { context, service } = await runtime();
+  return service.bindingRunHistory(context, bindingObjectId, limit);
 }

@@ -101,6 +101,21 @@ export async function runIsabellaProcessIntelligence(
     };
   }
 
+  // Enterprise Trust is organization-scoped and reads a different canonical
+  // context (controls, bindings, evaluations, findings), so it is resolved by
+  // the server wrapper `answerEnterpriseTrustQuestion`, which holds the caller's
+  // Supabase client. The runtime only routes to it; assembling the project
+  // context first would scope a governance answer to a project it does not
+  // belong to.
+  if (decision.route === "enterprise_trust") {
+    return {
+      status: "fallback",
+      route: "enterprise_trust",
+      answer: "",
+      audit: audit({ route: "enterprise_trust", resultStatus: "fallback" }),
+    };
+  }
+
   // RAG / factual-data are handled by the existing pipeline — fall back cleanly.
   if (decision.route === "product_help" || decision.route === "factual_project_data") {
     return { status: "fallback", route: decision.route, answer: "", audit: audit({ resultStatus: "fallback" }) };

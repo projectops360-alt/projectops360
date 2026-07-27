@@ -997,3 +997,114 @@ caller, after the record exists.
 `src/lib/eki-evidence/__tests__/service.test.ts` → "turns a database denial into
 an error without inventing a success" · real-database:
 `supabase/tests/eki_macrophase2_acceptance.sql` step 17.
+
+---
+
+## REG-034 — A refusal by an actor with no role could not be recorded
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-ACTOR-ROLE-NONE`
+
+`eki_resolve_finding`, `eki_assign_owner` and `eki_request_evaluation` all write
+an `access_denied` record with `coalesce(actor_role, 'none')` before returning
+the denial. `platform_governance_audit.actor_role` admitted owner / admin /
+member / viewer / service and nothing else, so the insert violated its check
+constraint, the exception propagated, and **both** the audit record and the
+caller's answer were lost.
+
+**Root cause:** the vocabulary could not express "no role". An actor with no
+standing in the organization is the most important denial there is, and it was
+the one the audit was structurally unable to record.
+
+**Why Macrophase 2 did not catch it:** its acceptance test used a *member without
+authority*. The role was `member`, the constraint was satisfied, and the branch
+that produces `none` was never executed. The test passed for a case adjacent to
+the one that mattered — the third time this programme has hit that shape
+(Macrophase 1 probe 11, Macrophase 2 step 17).
+
+**Protection rule (binding):** `actor_role` admits `none`, and `none` is denied
+**every** operation in `src/lib/platform-governance/security.ts`, reads included.
+Widening the vocabulary grants nothing. A denial path must be exercised by an
+actor with genuinely no standing, not by a low-privilege member.
+
+**Verify:** `src/lib/platform-governance/__tests__/governance-audit.test.ts` →
+"REG-034 — an actor with no role" ·
+`src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts` →
+"REG-034" · real database: `supabase/tests/eki_macrophase3_acceptance.sql`
+steps 10-11.
+
+---
+
+## REG-035 — The trust question classifier declined its own vocabulary
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-TRUST-QUESTION-ROUTING`
+
+The Enterprise Trust subject gate was written `\b(control|finding|evidence|…)\b`.
+`\bcontrol\b` does not match "controls" or "controles"; `\bfinding\b` does not
+match "findings". Nearly every real question — "Which controls are degraded?",
+"¿Qué controles están degradados?", "Which findings are open?" — failed the gate
+and fell through to RAG, which answered a live-state governance question from a
+document corpus.
+
+**Root cause:** word-boundary anchors written against the singular English stem,
+in a product that must answer in English and Spanish.
+
+**Why it looked fine:** the failure produced a *plausible* answer from the
+retrieval corpus rather than an error. Nothing surfaced; the answer was simply
+stale and unattributed.
+
+**Protection rule (binding):** the trust subject gate matches plural and Spanish
+inflections explicitly, and a routing test asserts every question listed in the
+Macrophase 3 scope in both languages. A governance question about current state
+must never be answerable from the corpus.
+
+**Verify:** `src/lib/isabella/enterprise-trust/__tests__/trust-reasoning.test.ts`
+→ "question classification".
+
+---
+
+## REG-036 — Macrophase 3 functions were executable by `anon` and `authenticated`
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-FUNCTION-EXECUTE-REVOKED`
+
+PostgreSQL grants `EXECUTE` to `PUBLIC` by default on `CREATE FUNCTION`, and
+`anon` and `authenticated` inherit it. Macrophases 1 and 2 revoked explicitly.
+Macrophase 3 did not, so all eight functions it added were callable through
+PostgREST.
+
+For the write paths this was contained: `auth.role() <> 'service_role'` fires for
+both roles and the call raises. **For the read path it was not.**
+
+`eki_resolve_privileged_access_activity` is `SECURITY DEFINER` and had no
+service-role guard, because it is a resolver invoked from inside the engine. With
+`PUBLIC` execute, any caller could name an **arbitrary organization id** and read
+that tenant's privileged-access profile: record count, timestamp of the most
+recent privileged change, and contradiction count.
+
+**Confirmed in stage, not inferred.** As `authenticated` with a JWT belonging to
+no member of the target organization:
+
+| Path | Result |
+|---|---|
+| `select count(*) from audit_logs where organization_id = <other tenant>` | **0** (RLS) |
+| `eki_resolve_privileged_access_activity(<other tenant>, …)` | **31**, plus the exact `latest_evidence_at` |
+
+Reachable as `anon` as well, so a publishable key and no session were enough.
+
+**Root cause:** the default grant. Not a missing check — a missing *revoke*, which
+is invisible in a diff because the dangerous state is the one nobody wrote down.
+
+**Why it was found:** the final review asked precisely which caller reaches
+`auth.role() IS NULL`. Answering that required enumerating who can execute these
+functions at all, which surfaced a disclosure that has nothing to do with NULL
+roles. The NULL question was the right question for the wrong reason.
+
+**Protection rule (binding):** every `SECURITY DEFINER` function in the EKI
+namespace must be revoked from `public, anon, authenticated` in the same
+migration that creates it. A resolver that reads across RLS must additionally
+carry a service-role guard, so a grant restored later cannot silently reopen the
+disclosure. The revoke is the control; the guard is defence in depth.
+
+**Verify:** `src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts`
+→ "REG-036". The guard discovers EKI migrations from disk rather than from a
+hard-coded list, and was negative-controlled: with the fix migration removed it
+names all seven unprotected functions.

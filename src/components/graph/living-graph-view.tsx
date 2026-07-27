@@ -167,6 +167,7 @@ import {
 } from "@/lib/graph/between-analysis";
 import { scopeLivingGraphDataToProject } from "@/lib/graph/project-scoped-data";
 import { buildProgressiveKnowledgeGraph } from "@/lib/graph/knowledge-progressive-view";
+import { adaptTrustLens } from "@/lib/graph/trust-lens-living-adapter";
 import { BetweenAnalysisPanel } from "./between-analysis-panel";
 import type {
   LivingFlowNode,
@@ -602,6 +603,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       ),
     [taskProcessModel, selectedProcessVariant],
   );
+  // ── Enterprise Trust lens ────────────────────────────────────────────────
+  // Same contract as the canonical-event view: active ONLY when the page
+  // reported "ready". Any other status renders an empty graph + a banner, so
+  // the operational nodes can never appear under the Enterprise Trust label.
+  const trustLensStatus = data.trustLensStatus;
+  const trustLensActive = viewLevel === "trust" && trustLensStatus === "ready";
+  const trustGraph = useMemo(
+    () => adaptTrustLens(data.trustNodes ?? [], data.trustEdges ?? []),
+    [data.trustNodes, data.trustEdges],
+  );
+
   const caseExplorerActive = canonicalEventsActive && eventExperience === "cases";
   const processExplorerActive = canonicalEventsActive && eventExperience === "process";
   const canonicalAuditActive = canonicalEventsActive && eventExperience === "audit";
@@ -684,6 +696,12 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return () => window.clearTimeout(timeoutId);
   }, [viewLevel, knowledgeFocusId, progressiveKnowledgeGraph.nodes.length, fitView]);
 
+  useEffect(() => {
+    if (viewLevel !== "trust") return;
+    const timeoutId = window.setTimeout(() => void fitView({ padding: 0.2, duration: 300 }), 100);
+    return () => window.clearTimeout(timeoutId);
+  }, [viewLevel, trustGraph.nodes.length, fitView]);
+
   const displayGraph = useMemo(() => {
     if (viewLevel === "milestones") {
       return aggregateByMilestone(laborEnrichedData.nodes, laborEnrichedData.edges, milestoneCensus);
@@ -697,6 +715,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       }
       return progressiveKnowledgeGraph;
     }
+    if (viewLevel === "trust") {
+      return trustLensActive ? { nodes: trustGraph.nodes, edges: trustGraph.edges } : { nodes: [], edges: [] };
+    }
     const graph =
       viewLevel === "activities"
         ? clusterByEntity(laborEnrichedData.nodes, laborEnrichedData.edges)
@@ -704,7 +725,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     return simplifyEdges
       ? { nodes: graph.nodes, edges: pruneEdgesForClarity(graph.edges) }
       : graph;
-  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive, knowledgeProjectionStatus, progressiveKnowledgeGraph]);
+  }, [viewLevel, laborEnrichedData, simplifyEdges, milestoneCensus, canonicalEventsActive, knowledgeProjectionStatus, progressiveKnowledgeGraph, trustLensActive, trustGraph]);
 
   const canonicalFlow = useMemo(
     () =>
@@ -803,7 +824,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   );
 
   const filtered = useMemo(() => {
-    if (viewLevel === "knowledge") return { nodes: baseNodes, edges: baseEdges };
+    // The trust lens has no event time and no milestone, so the operational
+    // date/milestone filters would silently drop every node. It manages its own
+    // (unfiltered) node set, exactly like the knowledge level.
+    if (viewLevel === "knowledge" || viewLevel === "trust") return { nodes: baseNodes, edges: baseEdges };
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : null;
     const toTime = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null;
     const nodes = baseNodes.filter((n) => {
@@ -935,6 +959,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
   const layoutPositions = useMemo(() => {
     if (viewLevel === "knowledge") return progressiveKnowledgeGraph.positions;
+    if (viewLevel === "trust") return trustGraph.positions;
     if (viewLevel === "milestones") {
       return milestoneFlowLayout(withSubtasks.nodes); // serpentine roadmap, layoutMode ignored
     }
@@ -948,7 +973,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       });
     }
     return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
-  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode, progressiveKnowledgeGraph.positions]);
+  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode, progressiveKnowledgeGraph.positions, trustGraph.positions]);
 
   // User drags win over the computed layout. In milestone focus mode the manual
   // positions come from a PER-MILESTONE saved layout (scoped by the focus layout
@@ -1598,6 +1623,15 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (!eventId) return null;
     return canonicalEvents.find((e) => e.eventId === eventId) ?? null;
   }, [canonicalEventsActive, selectedNodeId, canonicalEvents]);
+  // Selected trust node. Flow ids are prefixed (`ctl:` / `bnd:` / `fnd:` /
+  // `own:` / `obl:`); strip the prefix to get the canonical object id the
+  // detail panel navigates by, so a click resolves to the same object the
+  // projection read.
+  const selectedTrustNode = useMemo(() => {
+    if (!trustLensActive || !selectedNodeId) return null;
+    const canonicalObjectId = selectedNodeId.slice(selectedNodeId.indexOf(":") + 1);
+    return (data.trustNodes ?? []).find((n) => n.canonicalObjectId === canonicalObjectId) ?? null;
+  }, [trustLensActive, selectedNodeId, data.trustNodes]);
   const selectedProcessActivity = processExplorerActive
     ? taskProcessAggregate.activities.find((activity) => activity.id === selectedNodeId) ?? null
     : null;
@@ -1667,6 +1701,14 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     (_event, node) => {
       if (viewLevel === "knowledge") {
         if (node.data.node.nodeType === "knowledge_object") setKnowledgeFocusId(node.id);
+        setSelectedNodeId(node.id);
+        setSelectedEdgeId(null);
+        return;
+      }
+      // The trust lens is read-only: selection opens the detail panel, but no
+      // milestone pick, path mode or in-graph editing — there is no operational
+      // entity behind these nodes to edit.
+      if (viewLevel === "trust") {
         setSelectedNodeId(node.id);
         setSelectedEdgeId(null);
         return;
@@ -1981,7 +2023,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   ]);
 
   const showPanel =
-    selectedNode != null || selectedEdge != null || selectedCanonicalEvent != null;
+    selectedNode != null ||
+    selectedEdge != null ||
+    selectedCanonicalEvent != null ||
+    selectedTrustNode != null;
 
   // Progressive disclosure: never dump the full flat activity/event graph. When
   // there are many nodes and no phase is focused, guide the user to drill into
@@ -2534,7 +2579,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
 
         {/* Floating Insights (executive KPIs + summary) — hidden while a node
             detail panel occupies the right side. Graph keeps full height. */}
-        {viewLevel !== "events" && viewLevel !== "knowledge" && !showPanel && !insightsOpen && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && viewLevel !== "trust" && !showPanel &&!insightsOpen && (
           <button
             type="button"
             onClick={() => setInsightsOpen(true)}
@@ -2553,7 +2598,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             </span>
           </button>
         )}
-        {viewLevel !== "events" && viewLevel !== "knowledge" && !showPanel && insightsOpen && (
+        {viewLevel !== "events" && viewLevel !== "knowledge" && viewLevel !== "trust" && !showPanel &&insightsOpen && (
           <div className="absolute right-3 top-3 z-20 flex max-h-[calc(100%-1.5rem)] w-[380px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur">
             <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
               <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2705,6 +2750,23 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         {canonicalAuditActive && canonicalEvents.length > 0 && (
           <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
             {t("canonicalEvents.viewTitle")} — {t("canonicalEvents.viewHint")}
+          </p>
+        )}
+        {/* Enterprise Trust lens — same explicit-status contract as the events
+            view. A non-ready lens shows why it is empty; it NEVER falls back to
+            operational nodes under the trust label. */}
+        {viewLevel === "trust" && !trustLensActive && (
+          <div
+            role="status"
+            className="absolute left-3 right-3 top-3 z-30 flex items-center gap-2 rounded-md border border-amber-500/40 bg-card/95 px-3 py-1.5 text-[11px] font-medium text-amber-700 shadow-sm backdrop-blur dark:text-amber-300"
+          >
+            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {t(`trustLens.status.${trustLensStatus ?? "disabled"}`)}
+          </div>
+        )}
+        {trustLensActive && (
+          <p className="absolute bottom-3 left-14 z-20 rounded bg-card/90 px-2 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+            {t("trustLens.summary", { count: trustGraph.nodes.length })} — {t("trustLens.viewHint")}
           </p>
         )}
         {viewLevel === "knowledge" && knowledgeProjectionStatus !== "ready" && (

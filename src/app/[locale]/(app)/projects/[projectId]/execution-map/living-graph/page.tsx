@@ -53,6 +53,7 @@ import { loadCanonicalEventProjection } from "@/lib/graph/event-relationship-loa
 import type { TaskAttachmentRef } from "@/lib/graph/task-case-analysis";
 import { loadKnowledgeGraphProjection } from "@/lib/graph/knowledge-graph-loader";
 import { adaptCanonicalKnowledgeGraph } from "@/lib/graph/canonical-graph-living-adapter";
+import { isTrustLensEnabled, loadTrustLens } from "@/lib/graph/trust-lens-loader";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -509,6 +510,23 @@ export default async function LivingGraphPage({
   } catch (error) {
     console.error("Living Graph knowledge projection failed:", error);
     data.knowledgeGraphProjectionStatus = "error";
+  }
+
+  // ── Enterprise Trust lens ────────────────────────────────────────────────────
+  // Read-only, org-scoped projection over the canonical model. Default OFF: with
+  // the flag unset the arrays stay UNDEFINED so the existing views are byte-
+  // identical, exactly like the canonical-event rollback contract. The read uses
+  // the AUTHENTICATED client (RLS) and the organization from the resolved server
+  // context — never a route param, which the caller controls.
+  if (!isTrustLensEnabled()) {
+    data.trustLensStatus = "disabled";
+  } else {
+    const trustLens = await loadTrustLens(supabase, org.organizationId);
+    data.trustLensStatus = trustLens.status;
+    if (trustLens.projection) {
+      data.trustNodes = trustLens.projection.nodes;
+      data.trustEdges = trustLens.projection.edges;
+    }
   }
 
   // Compute labor capacity (non-fatal — errors just mean no labor overlay)

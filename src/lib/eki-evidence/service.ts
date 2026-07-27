@@ -1,6 +1,7 @@
 import {
   assignOwnerSchema,
   authorizeEvidenceAction,
+  bindingScheduleSchema,
   createEvidenceBindingSchema,
   resolveFindingSchema,
   type EvidenceAction,
@@ -8,6 +9,7 @@ import {
 import type { EkiEvidenceRepository } from "./repository";
 import type {
   AssignOwnerInput,
+  BindingScheduleInput,
   CreateEvidenceBindingInput,
   EvidenceActorContext,
   ResolveFindingInput,
@@ -157,6 +159,55 @@ export class EkiEvidenceService {
     const result = await this.repository.resolveFinding(context, parsed.data);
     if (!result.authorized) throw new EkiEvidenceError(result.reason || "eki_finding_resolution_forbidden");
     return result.value ?? { controlState: null };
+  }
+
+  // ── Macrophase 3 — automation surface ─────────────────────────────────────
+
+  /**
+   * Set how often this binding is measured.
+   *
+   * The cadence is policy, so changing it needs define_binding authority, not
+   * evaluate: lengthening an interval to a year hides a lapse, and nobody with
+   * only the right to run a measurement should be able to decide that.
+   */
+  async setSchedule(context: EvidenceActorContext, bindingObjectId: string, input: BindingScheduleInput) {
+    assertAuthorized(context, "define_binding");
+    assertUuid(bindingObjectId, "invalid_binding_object_id");
+    const parsed = bindingScheduleSchema.safeParse(input);
+    if (!parsed.success) throw new EkiEvidenceError("invalid_binding_schedule", parsed.error.issues[0]?.message);
+    return this.repository.setSchedule(context, bindingObjectId, parsed.data);
+  }
+
+  /**
+   * Evaluate now, on a named human's request, whether or not the binding is due.
+   *
+   * An explicit request may bypass the cadence; the scheduler may not. The
+   * cadence IS the policy, and a sweep that ignores it is not measuring on a
+   * cadence at all.
+   */
+  async requestEvaluation(context: EvidenceActorContext, bindingObjectId: string) {
+    assertAuthorized(context, "evaluate");
+    assertUuid(bindingObjectId, "invalid_binding_object_id");
+    const result = await this.repository.requestEvaluation(context, bindingObjectId);
+    if (!result.authorized) throw new EkiEvidenceError(result.reason || "eki_evaluation_forbidden");
+    return result.value ?? { evaluated: false };
+  }
+
+  async listRuns(context: EvidenceActorContext, limit?: number) {
+    assertAuthorized(context, "read");
+    return this.repository.listRuns(context, limit);
+  }
+
+  async runDetail(context: EvidenceActorContext, runId: string) {
+    assertAuthorized(context, "read");
+    assertUuid(runId, "invalid_run_id");
+    return this.repository.listRunItems(context, runId);
+  }
+
+  async bindingRunHistory(context: EvidenceActorContext, bindingObjectId: string, limit?: number) {
+    assertAuthorized(context, "read");
+    assertUuid(bindingObjectId, "invalid_binding_object_id");
+    return this.repository.bindingRunHistory(context, bindingObjectId, limit);
   }
 
   async assignOwner(context: EvidenceActorContext, input: AssignOwnerInput) {

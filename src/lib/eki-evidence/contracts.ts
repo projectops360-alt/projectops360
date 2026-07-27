@@ -25,6 +25,23 @@ export const createEvidenceBindingSchema = z
   })
   .strict();
 
+/**
+ * Evaluation cadence.
+ *
+ * Bounded vocabulary, like the freshness interval. A cadence in seconds turns
+ * the scheduler into a spin loop measuring the same instant repeatedly, and free
+ * text here would reach SQL.
+ */
+export const bindingScheduleSchema = z
+  .object({
+    evaluationInterval: z
+      .string()
+      .trim()
+      .regex(/^\d+ (minutes?|hours?|days?|weeks?)$/, "invalid_evaluation_interval"),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 export const resolveFindingSchema = z
   .object({
     findingObjectId: z.string().uuid(),
