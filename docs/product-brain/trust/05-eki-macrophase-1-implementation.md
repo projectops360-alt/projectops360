@@ -166,7 +166,7 @@ because dropping a view takes its grants with it. Silently losing
 `grant select … to authenticated` would have removed read access for every
 authenticated user without any statement failing.
 
-Recorded as **REG-026**. It is the class of defect that only a real engine
+Recorded as **REG-027**. It is the class of defect that only a real engine
 finds: the SQL is valid, the tests that parse it pass, and it fails on execution.
 
 ### Verified against the engine, not by parsing SQL

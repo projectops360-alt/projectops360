@@ -35,10 +35,14 @@ import {
   isGovernanceKnowledgeType,
 } from "../types";
 
+// Line endings are normalised on read. The migration is checked out with CRLF on
+// Windows and LF on CI, so a pattern containing "\n" silently matches nothing on
+// one of the two — `indexOf` returns -1, `slice(-1)` yields a single character,
+// and the assertion fails for a reason that has nothing to do with the migration.
 const migration = readFileSync(
   resolve(process.cwd(), "supabase/migrations/20260863000000_eki_knowledge_scope_and_relations.sql"),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 
 const uuid = (n: string) => `${n.repeat(8)}-${n.repeat(4)}-4${n.repeat(3)}-8${n.repeat(3)}-${n.repeat(12)}`;
 const OBJECT_A = uuid("1");
