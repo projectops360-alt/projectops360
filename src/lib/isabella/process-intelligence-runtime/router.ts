@@ -10,6 +10,7 @@
 // ============================================================================
 
 import { classifyTrustQuestion } from "@/lib/isabella/enterprise-trust/engine";
+import { isEnterpriseTrustReasoningEnabled } from "@/lib/isabella/enterprise-trust/flag";
 import { classifyIsabellaIntent } from "@/lib/isabella/process-intelligence/intent-contract";
 import { isScreenExplanationIntent, resolveScreenArea } from "@/lib/isabella/screen-help";
 import type { IsabellaRoute, IsabellaScreenContext, IsabellaSelectedNode } from "./types";
@@ -76,7 +77,12 @@ export function routeIsabellaQuestion(
   // engines because they must not require a project: a governance control
   // belongs to the tenant, and sending "which controls are degraded?" to Daily
   // Diagnosis would answer a governance question with delivery data.
-  if (classifyTrustQuestion(q) !== null) {
+  // Gated, and default OFF. The subject gate is broad by necessity — "how do I
+  // add quality controls?" matches it — so with the route always on those
+  // questions would be pulled away from retrieval and answered from a context
+  // that is empty wherever the EKI migrations have not been applied. That is a
+  // silent degradation, not an error, and therefore one nobody reports.
+  if (isEnterpriseTrustReasoningEnabled() && classifyTrustQuestion(q) !== null) {
     // Deliberately not `decide(...)`: this route is exempt from the project-scope
     // requirement every other engine route enforces.
     return { route: "enterprise_trust", scope, needsClarification: false };

@@ -10,7 +10,9 @@ import {
   isabellaMay,
 } from "../authorization";
 import { answerTrustQuestion, classifyTrustQuestion } from "../engine";
+import { isEnterpriseTrustReasoningEnabled } from "../flag";
 import { formatTrustAnswer } from "../formatter";
+import { routeIsabellaQuestion } from "@/lib/isabella/process-intelligence-runtime/router";
 
 const CONTROL = "11111111-1111-4111-8111-111111111111";
 const OWNER = "22222222-2222-4222-8222-222222222222";
@@ -265,5 +267,63 @@ describe("rendering", () => {
     const empty = answerTrustQuestion({ question: "what_changed", views: [], summary: summarize([]), remediation: [] });
     expect(formatTrustAnswer(empty, "en")).toContain("Nothing changed");
     expect(formatTrustAnswer(empty, "es")).toContain("No cambió nada");
+  });
+});
+
+describe("routing is gated, and default OFF", () => {
+  const original = process.env.EKI_TRUST_REASONING_ENABLED;
+  const restore = () => {
+    if (original === undefined) delete process.env.EKI_TRUST_REASONING_ENABLED;
+    else process.env.EKI_TRUST_REASONING_ENABLED = original;
+  };
+
+  it("is off unless explicitly enabled", () => {
+    delete process.env.EKI_TRUST_REASONING_ENABLED;
+    expect(isEnterpriseTrustReasoningEnabled()).toBe(false);
+    process.env.EKI_TRUST_REASONING_ENABLED = "1";
+    expect(isEnterpriseTrustReasoningEnabled()).toBe(false);
+    process.env.EKI_TRUST_REASONING_ENABLED = "true";
+    expect(isEnterpriseTrustReasoningEnabled()).toBe(true);
+    restore();
+  });
+
+  /**
+   * The reason the gate exists. The subject regex matches "controls" wherever it
+   * appears, including product questions that have nothing to do with governance.
+   * Ungated, those would be pulled away from retrieval and answered from a
+   * context that is empty wherever the EKI migrations have not been applied —
+   * a silent degradation, not an error.
+   */
+  it("leaves ordinary product questions with retrieval when off", () => {
+    delete process.env.EKI_TRUST_REASONING_ENABLED;
+    for (const question of [
+      "How do I add quality controls to my project?",
+      "¿Dónde configuro los controles de calidad?",
+      "Where can I see the findings from my last import?",
+    ]) {
+      const decision = routeIsabellaQuestion(question, { hasProject: true });
+      expect(decision.route, question).not.toBe("enterprise_trust");
+    }
+    restore();
+  });
+
+  it("routes trust questions only when on", () => {
+    delete process.env.EKI_TRUST_REASONING_ENABLED;
+    expect(routeIsabellaQuestion("Which controls are degraded?", { hasProject: true }).route)
+      .not.toBe("enterprise_trust");
+
+    process.env.EKI_TRUST_REASONING_ENABLED = "true";
+    expect(routeIsabellaQuestion("Which controls are degraded?", { hasProject: true }).route)
+      .toBe("enterprise_trust");
+    restore();
+  });
+
+  /** A governance question must never require a project to be answerable. */
+  it("does not demand a project scope for a trust question", () => {
+    process.env.EKI_TRUST_REASONING_ENABLED = "true";
+    const decision = routeIsabellaQuestion("Which controls are operating?", { hasProject: false });
+    expect(decision.route).toBe("enterprise_trust");
+    expect(decision.needsClarification).toBe(false);
+    restore();
   });
 });

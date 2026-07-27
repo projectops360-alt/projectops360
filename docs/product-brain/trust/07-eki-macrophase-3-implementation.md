@@ -460,8 +460,17 @@ what the product forbids.
   function owner, so a NULL role now requires owner-level credentials, which
   already confer more than the guard protects. It is what lets the acceptance
   script and any future scheduled job run.
-- **Both flags default OFF.** Nothing evaluates automatically and no lens appears
-  until they are set. Production is untouched and nothing is deployed.
+- **All three flags default OFF** — `EKI_AUTOMATED_EVALUATION_ENABLED`,
+  `LIVING_GRAPH_TRUST_LENS_ENABLED`, `EKI_TRUST_REASONING_ENABLED`. Nothing
+  evaluates automatically, no lens appears, and Isabella routes exactly as before
+  until they are set. Production is untouched.
+
+  The reasoning flag was added during final review. The route had none, and the
+  subject gate is broad by necessity: "how do I add quality controls?" matches it.
+  Merged ungated into an environment without the EKI migrations, every such
+  question would have been pulled away from retrieval and answered "there is no
+  Enterprise Trust context" — a silent degradation, not an error, and therefore
+  one nobody would report.
 
 ---
 
