@@ -24,6 +24,12 @@ export type IsabellaRoute =
   | "daily_diagnosis"
   | "root_cause"
   | "recommendation"
+  // Enterprise Trust: control state, evidence freshness, findings and their
+  // provenance. Organization-scoped, so unlike every other engine route it does
+  // NOT require a project — governance controls belong to the tenant, and
+  // demanding a project scope would make the domain unreachable from anywhere
+  // except inside a project.
+  | "enterprise_trust"
   | "mixed";
 
 export type IsabellaRuntimeStatus =

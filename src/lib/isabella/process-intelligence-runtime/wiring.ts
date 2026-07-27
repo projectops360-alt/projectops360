@@ -14,6 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
 import type { AskGuideInput, GuideAnswer } from "@/lib/knowledge-os/types";
 import type { Locale } from "@/types/database";
+import { answerEnterpriseTrustQuestion } from "@/lib/isabella/enterprise-trust/server";
 import { isIsabellaProcessIntelligenceEnabled } from "./flag";
 import { runIsabellaProcessIntelligence } from "./runtime";
 import type { IsabellaProcessIntelligenceAudit, IsabellaSelectedNode } from "./types";
@@ -76,6 +77,38 @@ export async function maybeAnswerWithProcessIntelligence(
     });
   } catch {
     return null; // never break the flow — fall through to the existing pipeline
+  }
+
+  // Enterprise Trust falls OUT of the runtime by design — it needs the caller's
+  // client, not the admin one — and is answered here from live canonical data.
+  // Returning null instead would hand a governance question to RAG, which would
+  // answer it from a corpus: a confidently stale compliance answer, the exact
+  // failure this programme exists to prevent.
+  if (result.status === "fallback" && result.route === "enterprise_trust") {
+    let trust;
+    try {
+      trust = await answerEnterpriseTrustQuestion(input.query ?? "", language);
+    } catch {
+      return null;
+    }
+    if (trust.status === "not_a_trust_question") return null;
+    await persistAudit(org, input.query ?? "", result.audit);
+    const grounded = trust.status === "answered";
+    return {
+      answerId: null,
+      grounded,
+      answer: trust.answer,
+      steps: [],
+      followups: [],
+      // `verified` only when the answer came from live canonical rows. A refusal
+      // or an unreadable context is not a verified answer.
+      tier: grounded ? "verified" : "best_practice",
+      confidenceScore: grounded ? 1 : 0.5,
+      language: language as Locale,
+      sources: [],
+      expert,
+      degraded: trust.status === "unavailable",
+    };
   }
 
   // RAG / factual-data → let the existing pipeline handle it (unchanged).

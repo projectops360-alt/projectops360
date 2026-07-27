@@ -9,6 +9,7 @@
 // never decides data truth; this router does the routing. Pure.
 // ============================================================================
 
+import { classifyTrustQuestion } from "@/lib/isabella/enterprise-trust/engine";
 import { classifyIsabellaIntent } from "@/lib/isabella/process-intelligence/intent-contract";
 import { isScreenExplanationIntent, resolveScreenArea } from "@/lib/isabella/screen-help";
 import type { IsabellaRoute, IsabellaScreenContext, IsabellaSelectedNode } from "./types";
@@ -68,6 +69,17 @@ export function routeIsabellaQuestion(
     }
     // A known-but-uncovered screen → RAG (product knowledge), never an engine.
     return { route: "product_help", scope, needsClarification: false };
+  }
+
+  // Enterprise Trust questions are organization-scoped and answered from the
+  // canonical control / evidence / finding model. Routed BEFORE the project
+  // engines because they must not require a project: a governance control
+  // belongs to the tenant, and sending "which controls are degraded?" to Daily
+  // Diagnosis would answer a governance question with delivery data.
+  if (classifyTrustQuestion(q) !== null) {
+    // Deliberately not `decide(...)`: this route is exempt from the project-scope
+    // requirement every other engine route enforces.
+    return { route: "enterprise_trust", scope, needsClarification: false };
   }
 
   // The PMO financial setup is a deterministic project-data answer, not a
