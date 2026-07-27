@@ -8,7 +8,8 @@
 | Architecture Specification | **FROZEN** — baseline v1.0 |
 | Strategy | **FROZEN** — baseline v1.0 |
 | Charter | **FROZEN** — baseline v1.0 |
-| Enterprise Knowledge Intelligence | Draft for architecture review — **not part of the frozen baseline** |
+| Enterprise Knowledge Intelligence | Reviewed — decisions resolved · **not part of the frozen baseline** |
+| EKI Architecture Decision Gate | **READY FOR IMPLEMENTATION DESIGN** · not part of the frozen baseline |
 
 > Future modifications require an ADR or a formal version update.
 > See [Governance Rules](#governance-rules).
@@ -59,11 +60,17 @@ before it.
 | **01** | [Strategy](01-enterprise-trust-strategy.md) | *Why invest, what is it worth, and in what order?* | Board, executives, investors, enterprise customers |
 | **02** | [Charter](02-enterprise-trust-charter.md) | *What rules constrain every future decision?* | Everyone. Permanent |
 | **03** | [Enterprise Knowledge Intelligence](03-enterprise-knowledge-intelligence.md) | *How does the platform represent and reason over trust as knowledge?* | Architects, knowledge engineers |
+| **04** | [EKI Architecture Decision Gate](04-eki-architecture-decision-gate.md) | *Are the architectural decisions settled enough to start building?* | Architects, executive sponsor |
 | — | [CHANGELOG](CHANGELOG.md) | *What changed, when, and under what authority?* | Everyone |
 
-**00–02 are the frozen baseline. 03 begins Phase 2** and is a design document
-under review, not an approved position. It is governed by the Charter and may not
-contradict it.
+**00–02 are the frozen baseline. 03 and 04 are Phase 2** and are not part of it.
+Both are governed by the Charter and may not contradict it. Where 03 and 04
+differ, **04 is authoritative** — it records the decisions taken after 03 was
+written, one of which superseded a recommendation in 03.
+
+The seven architectural decisions are ADRs **013–019** in the repository's single
+[ADR index](../07-adr-index.md), not in a trust-specific register: a second ADR
+registry would itself be a second source of truth.
 
 The Charter is numbered last and **ranks first**. Where any document, policy,
 standard or decision conflicts with it, the Charter prevails.
@@ -72,8 +79,8 @@ standard or decision conflicts with it, the Charter prevails.
 
 ## Reading order
 
-Different readers need different paths. All three documents are self-contained;
-none requires the others to be understood.
+Different readers need different paths. Each document is self-contained; none
+requires the others to be understood.
 
 **Board member or investor** — 01 (Executive Summary, Business Value, Risk
 Analysis, Executive Recommendations), then 02 (Purpose, Long-Term Commitments,
@@ -91,8 +98,9 @@ corrected. Then 02 §Governance Model and §Ownership.
 The principles decide design arguments; the specification only describes the
 current state. Then 00 §7–8 (compliance engine, evidence framework).
 
-**Executive sponsor** — all three, in order. 00 §12 and 01 §Executive
-Recommendations converge; where they differ in emphasis, 02 resolves it.
+**Executive sponsor** — 00 through 02, in order, then 04 §7–8 for the
+implementation prerequisites. 00 §12 and 01 §Executive Recommendations converge;
+where they differ in emphasis, 02 resolves it.
 
 ---
 

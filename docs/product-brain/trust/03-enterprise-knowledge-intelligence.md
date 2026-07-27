@@ -1,7 +1,9 @@
 # Enterprise Knowledge Intelligence (EKI)
 
 **Knowledge Architecture Specification · v1.0 · Phase 2**
-**Status:** Draft for architecture review · **Date:** 2026-07-26
+**Status:** Reviewed — all seven open decisions resolved by ADR-013…019.
+See the [Architecture Decision Gate](04-eki-architecture-decision-gate.md), which
+is authoritative where the two differ · **Date:** 2026-07-26
 **Scope:** Ontology and knowledge design only. No code, no schema, no API, no UI.
 **Governed by:** [Enterprise Trust Charter](02-enterprise-trust-charter.md) — where this
 document conflicts with the Charter, the Charter prevails.
@@ -131,6 +133,16 @@ attach to a scope entity rather than to a project directly.
 **Recommendation: (a), with an ADR.** It is the only option that keeps one
 knowledge-object model, and the cost is a nullable column rather than a second
 system of record.
+
+> **⚠ Superseded — [ADR-013](../adrs/ADR-013-governance-knowledge-scope.md).**
+> The recommendation above was **not** accepted. Resolution introduced an
+> explicit `scope_type` vocabulary rather than a nullable project, on the
+> grounds that a NULL is the absence of a value rather than the presence of a
+> scope: it makes "organization-scoped" indistinguishable from a defective
+> write, and puts a branch in the tenant-isolation predicate. A fourth option —
+> a system-managed "governance project" — was also evaluated and rejected. The
+> paragraph above is retained so the reasoning that preceded the decision stays
+> visible.
 
 ---
 
@@ -1147,18 +1159,25 @@ by which it is real rather than asserted.
 
 # 11. Open Architecture Decisions
 
-Phase 2 implementation must not begin until these are decided. Each requires an
-ADR.
+**RESOLVED.** All seven were decided by ADR on 2026-07-26. See the
+[EKI Architecture Decision Gate](04-eki-architecture-decision-gate.md), which is
+authoritative where it differs from the recommendations below.
 
-| # | Decision | Recommendation |
-|---|---|---|
-| **1** | Scope of governance knowledge objects (§1.4) | **(a)** Extend knowledge objects to organization scope. Only option preserving one model |
-| **2** | Are EKI objects knowledge objects, or a distinct family sharing the pattern? | **Knowledge objects**, namespaced. Principle 12 |
-| **3** | Does the normative layer live in `knowledge_packages` or as objects? | **Packages** — already versioned, tiered, bilingual and indexed |
-| **4** | Are the eight lenses Living Graph lenses or a separate surface? | **Living Graph lenses.** R2 |
-| **5** | Does trust knowledge enter the retrieval corpus, given it enumerates weaknesses? | **Yes, with purpose-bound authorization** — a separate corpus is a second source of truth |
-| **6** | Does Isabella traverse the graph live, or read a projection? | **Live for status, projection for definitions.** A cached status answer is the failure mode of §6.1 |
-| **7** | Where do automatic Findings originate? | The evidence layer, as derived observations. **Never the AI** — an automatic finding must be reproducible |
+The recommendations are retained as written so the reasoning that preceded each
+decision remains visible. **Decision 1 changed during resolution**: the
+recommendation here was to extend knowledge objects to organization scope; the
+accepted decision introduces an explicit scope vocabulary instead, because a
+nullable project is the absence of a value rather than the presence of a scope.
+
+| # | Decision | Recommendation at time of writing | Resolved by |
+|---|---|---|---|
+| **1** | Scope of governance knowledge objects (§1.4) | **(a)** Extend knowledge objects to organization scope. Only option preserving one model | [ADR-013](../adrs/ADR-013-governance-knowledge-scope.md) — **superseded the recommendation** |
+| **2** | Are EKI objects knowledge objects, or a distinct family sharing the pattern? | **Knowledge objects**, namespaced. Principle 12 | [ADR-014](../adrs/ADR-014-governance-objects-are-knowledge-objects.md) |
+| **3** | Does the normative layer live in `knowledge_packages` or as objects? | **Packages** — already versioned, tiered, bilingual and indexed | [ADR-015](../adrs/ADR-015-normative-layer-in-knowledge-packages.md) |
+| **4** | Are the eight lenses Living Graph lenses or a separate surface? | **Living Graph lenses.** R2 | [ADR-016](../adrs/ADR-016-trust-views-are-living-graph-lenses.md) |
+| **5** | Does trust knowledge enter the retrieval corpus, given it enumerates weaknesses? | **Yes, with purpose-bound authorization** — a separate corpus is a second source of truth | [ADR-017](../adrs/ADR-017-trust-knowledge-in-retrieval-corpus.md) |
+| **6** | Does Isabella traverse the graph live, or read a projection? | **Live for status, projection for definitions.** A cached status answer is the failure mode of §6.1 | [ADR-018](../adrs/ADR-018-isabella-reasons-live-over-the-graph.md) |
+| **7** | Where do automatic Findings originate? | The evidence layer, as derived observations. **Never the AI** — an automatic finding must be reproducible | [ADR-019](../adrs/ADR-019-automatic-findings-originate-in-the-evidence-layer.md) |
 
 ---
 

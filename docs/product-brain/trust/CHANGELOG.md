@@ -150,7 +150,62 @@ Recorded explicitly, because absence is a decision:
 
 ## Unreleased
 
-### Added — Phase 2 design
+_Phase 2. Not part of the frozen baseline. Listed newest first._
+
+### Phase 2 · Architecture Decision Gate — 2026-07-26
+
+**Added — decision gate**
+
+**[04-eki-architecture-decision-gate.md](04-eki-architecture-decision-gate.md)** and
+**ADR-013 … ADR-019** in the repository's single ADR directory.
+
+All seven architectural decisions left open by the EKI specification are resolved.
+Gate status: **READY FOR IMPLEMENTATION DESIGN**.
+
+The organization-scope decision (ADR-013) evaluated four options and **did not
+accept the EKI specification's recommendation**. A nullable `project_id` was
+rejected because NULL is the absence of a value rather than the presence of a
+scope: it makes "organization-scoped" indistinguishable from a defective write,
+and puts a branch in the tenant-isolation predicate. A system-managed "governance
+project" was rejected as a semantic fiction that inherits project RLS and project
+lifecycle — an ordinary user could archive the control inventory, and it would
+look like a normal action.
+
+The accepted model introduces an explicit `scope_type` vocabulary with
+`organization_id` remaining NOT NULL at every scope, so **no RLS policy changes
+and tenant isolation is untouched**. It avoids polymorphic keys entirely: both
+scope levels already have real, constrained foreign keys.
+
+Also defines the canonical object vocabulary (fifteen kinds, seven candidates
+rejected with reasons), the relationship vocabulary with a rule that **no
+inferred relationship may change a compliance status**, the Control completion
+state machine formalising the Charter rule, and four-layer enforcement of the AI
+authorization boundary — identity, authorization, domain rules and evidence —
+because a boundary held only in a prompt is a suggestion.
+
+**Changed**
+
+
+- EKI specification §11 marked resolved and linked to each ADR; §1.4 annotated as
+  superseded, with the original recommendation retained so the reasoning that
+  preceded the decision stays visible
+- EKI status header updated; 04 declared authoritative where the two differ
+- ADR index gained ADR-012 through ADR-019
+- README document order and status table updated
+
+**Not changed**
+
+
+**The frozen baseline documents (00, 01, 02) were not modified.** Two structural
+listings in 00 §11 are superseded by decisions taken here — the proposed
+`trust/adr/` directory and a folder listing predating 03 and 04. Both are recorded
+in the gate document §6 as candidate corrections for a future baseline revision
+rather than silently edited. Neither affects a decision.
+
+
+### Phase 2 · EKI Specification — 2026-07-26
+
+**Added — specification**
 
 **[03-enterprise-knowledge-intelligence.md](03-enterprise-knowledge-intelligence.md) — Enterprise Knowledge Intelligence (EKI)**
 
@@ -198,14 +253,18 @@ Makes the Charter's completion rule computable: a Control cannot reach
 records stop arriving becomes stale by the passage of time, and a stale binding
 becomes a Finding without anyone noticing it should.
 
-### Changed
+**Changed**
+
 
 - README document order and status table updated to list 03 and to state
   explicitly that it is not part of the frozen baseline
 
-### Not changed
+**Not changed**
+
 
 **The frozen baseline documents (00, 01, 02) were not modified.**
+
+---
 
 ---
 
