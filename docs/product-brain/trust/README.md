@@ -1,13 +1,14 @@
 # Enterprise Trust Program
 
 **Enterprise Trust Baseline v1.0** · **Status: APPROVED**
-**Phase 1: CLOSED** (2026-07-26) · **Phase 2: not started**
+**Phase 1: CLOSED** (2026-07-26) · **Phase 2: in design**
 
 | Document | Status |
 |---|---|
-| Architecture Specification | **FROZEN** |
-| Strategy | **FROZEN** |
-| Charter | **FROZEN** |
+| Architecture Specification | **FROZEN** — baseline v1.0 |
+| Strategy | **FROZEN** — baseline v1.0 |
+| Charter | **FROZEN** — baseline v1.0 |
+| Enterprise Knowledge Intelligence | Draft for architecture review — **not part of the frozen baseline** |
 
 > Future modifications require an ADR or a formal version update.
 > See [Governance Rules](#governance-rules).
@@ -57,7 +58,12 @@ before it.
 | **00** | [Architecture Specification](00-etcf-architecture-specification.md) | *Where do we actually stand, and what must be built?* | Architects, security engineers, auditors |
 | **01** | [Strategy](01-enterprise-trust-strategy.md) | *Why invest, what is it worth, and in what order?* | Board, executives, investors, enterprise customers |
 | **02** | [Charter](02-enterprise-trust-charter.md) | *What rules constrain every future decision?* | Everyone. Permanent |
+| **03** | [Enterprise Knowledge Intelligence](03-enterprise-knowledge-intelligence.md) | *How does the platform represent and reason over trust as knowledge?* | Architects, knowledge engineers |
 | — | [CHANGELOG](CHANGELOG.md) | *What changed, when, and under what authority?* | Everyone |
+
+**00–02 are the frozen baseline. 03 begins Phase 2** and is a design document
+under review, not an approved position. It is governed by the Charter and may not
+contradict it.
 
 The Charter is numbered last and **ranks first**. Where any document, policy,
 standard or decision conflicts with it, the Charter prevails.

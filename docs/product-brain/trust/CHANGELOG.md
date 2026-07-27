@@ -150,7 +150,62 @@ Recorded explicitly, because absence is a decision:
 
 ## Unreleased
 
-_Phase 2 has not started. It begins when an executive owner is named._
+### Added — Phase 2 design
+
+**[03-enterprise-knowledge-intelligence.md](03-enterprise-knowledge-intelligence.md) — Enterprise Knowledge Intelligence (EKI)**
+
+Ontology and knowledge design. **Not part of the frozen baseline**; a design
+document under architecture review. No code, no schema, no API, no UI.
+
+Written after auditing the platform's existing knowledge substrate, because the
+obvious design — a governance ontology with its own objects, graph and storage —
+is forbidden by Charter Principle 12. The audit found the platform already has a
+complete knowledge-object model in production: typed objects with lifecycle,
+immutable versions carrying a **mandatory** confidence reason, typed evidence with
+supports/contradicts/context roles, and status transitions that require a
+non-empty rationale. Seven of the eight attributes this phase requires of every
+object were already structural properties of that model.
+
+EKI therefore introduces no new knowledge machinery — only a governance
+vocabulary that the existing machinery carries.
+
+Principal design positions:
+
+- **One graph, eight lenses.** The phase requested eight graphs. Eight graphs
+  means eight sources of truth and eight answers to the same question. The eight
+  are lens definitions over one typed graph — the pattern the Living Graph
+  already uses
+- **Three knowledge layers** separated by what makes a statement true: normative
+  (an authority defined it), instance (we decided it), observed (the system
+  recorded it). Every audit question crosses all three
+- **Frameworks are metadata, never structure.** No object kind is named after a
+  framework, which is what allows ISO 27001, NIST, CIS, GDPR and HIPAA to be
+  added as Obligation and ControlMapping objects with no architectural change
+- **Fifteen object kinds**, with five deliberately excluded and the exclusions
+  justified — an ontology's failure mode is proliferation
+- **Contradiction is a first-class relationship.** Most compliance systems cannot
+  represent an inconsistency, so they resolve it by deleting one side
+- **The AI may traverse and report; it may not assert compliance, change status,
+  approve, or close a finding.** Enforced at the authorization layer, not by
+  prompt instruction
+
+Records seven open architecture decisions that must be settled by ADR before
+implementation, including one honest structural gap: knowledge objects are
+project-scoped, and governance knowledge is organization-scoped.
+
+Makes the Charter's completion rule computable: a Control cannot reach
+`operating` without an evidence binding producing records, a binding whose
+records stop arriving becomes stale by the passage of time, and a stale binding
+becomes a Finding without anyone noticing it should.
+
+### Changed
+
+- README document order and status table updated to list 03 and to state
+  explicitly that it is not part of the frozen baseline
+
+### Not changed
+
+**The frozen baseline documents (00, 01, 02) were not modified.**
 
 ---
 
