@@ -53,15 +53,39 @@ package, policy authoring, audit management, a third resolver.
 
 ## Scheduling
 
-**Vercel Cron**, hourly, declared in `vercel.json`. It is the smallest reliable
-recurring mechanism the deployment already has — the app runs on Vercel and the
-repo has no other scheduler. Nothing generic was built: there is one path, one
-endpoint, one job.
+**Vercel Cron**, declared in `vercel.json`. It is the smallest reliable recurring
+mechanism the deployment already has — the app runs on Vercel and the repo has no
+other scheduler. Nothing generic was built: one path, one endpoint, one job.
 
-The **hour is the sweep interval, not the evaluation cadence**. Each binding
-carries its own `evaluation_interval` and is only claimed once `next_due_at` has
-passed, so a weekly control is measured weekly no matter how often the sweep
-runs. The sweep only needs to run at least as often as the shortest cadence.
+The **sweep interval is not the evaluation cadence**. Each binding carries its own
+`evaluation_interval` and is claimed only once `next_due_at` has passed, so a
+weekly control is measured weekly however often the sweep runs. The sweep needs to
+run at least as often as the shortest cadence.
+
+### The schedule is daily, and that is a plan constraint
+
+The first attempt used `0 * * * *`. **Vercel rejected the deployment**: the
+account's plan allows cron jobs at daily granularity only, and the failure
+redirects to the cron pricing page rather than producing a build error, so it is
+easy to misread as an unrelated deployment problem.
+
+The schedule is therefore `0 3 * * *`. The consequence is real and worth stating
+rather than hiding: **with a daily sweep, the effective minimum cadence is one
+day**, whatever a binding's `evaluation_interval` says. A binding configured for
+an hourly cadence will still only be evaluated once a day, because nothing asks it
+in between — which is the exact failure mode this macrophase exists to remove,
+merely at a coarser resolution.
+
+Two things mitigate it and neither replaces it:
+
+- The manual and post-mutation paths (`eki_request_evaluation`) are unaffected and
+  may evaluate a binding that is not due, so anything needing a faster answer can
+  ask for one.
+- `missed_intervals` records how many cadences elapsed before a binding was picked
+  up, so under-measurement is visible in the run record instead of silent.
+
+The fix is a plan that permits a finer cron, or an external trigger calling the
+same endpoint with the same secret. Both are outside this macrophase.
 
 Two gates guard the endpoint:
 
@@ -425,8 +449,10 @@ what the product forbids.
 - **The normative layer is thin.** It reads `obligation` objects and their
   `satisfies` relations; with none present the layer is reported as unavailable
   rather than empty, which is honest but not yet useful.
-- **The sweep is hourly and platform-wide.** A tenant with a sub-hourly cadence
-  would be measured late. Per-tenant sweep scheduling is not built.
+- **The sweep is daily and platform-wide**, because the Vercel plan permits no
+  finer cron. Any binding with a cadence shorter than a day is measured late, and
+  the run record shows it via `missed_intervals` rather than hiding it. Per-tenant
+  sweep scheduling is not built.
 - **`auth.role()` is NULL on a direct database connection**, so the service-role
   guard does not fire there. That path needs database credentials, which already
   confer more than the guard protects, and it is what lets the acceptance script
