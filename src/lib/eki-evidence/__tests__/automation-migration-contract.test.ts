@@ -370,3 +370,58 @@ describe("real-database acceptance script", () => {
     expect(acceptance).toMatch(/raise exception 'acceptance_requires_/);
   });
 });
+
+describe("REG-037 — no API role may hold a write privilege on an EKI table", () => {
+  /**
+   * Supabase grants ALL on new `public` tables to `anon` and `authenticated`.
+   * 20260864 and 20260866 revoked only `insert, update, delete`, and only `from
+   * authenticated`. TRUNCATE survived for both roles on all seven EKI tables.
+   *
+   * TRUNCATE does not go through RLS and does not fire row-level triggers, so
+   * the BEFORE DELETE append-only guards on `eki_evidence_evaluations` and
+   * `eki_control_state_transitions` would never run. A holder of the publishable
+   * key could erase the immutable evidence history, and the guards built to
+   * prevent exactly that are structurally unable to see it.
+   *
+   * Found by a production probe, not by review.
+   */
+  const fix = read("supabase/migrations/20260869000000_eki_revoke_api_write_grants.sql");
+
+  it("revokes ALL rather than enumerating privileges to remove", () => {
+    // Enumerating is what produced the gap: TRUNCATE was simply not on the list.
+    // `revoke all` is immune to the class, including privileges a future
+    // PostgreSQL adds.
+    expect(fix).toMatch(/revoke all on public\.%I from anon, authenticated/);
+    expect(fix).not.toMatch(/revoke\s+(insert|update|delete)[^;]*from anon/i);
+  });
+
+  it("covers every EKI table and the relations table", () => {
+    for (const table of [
+      "eki_evidence_binding_runtime",
+      "eki_evidence_evaluations",
+      "eki_control_runtime",
+      "eki_control_state_transitions",
+      "eki_open_findings",
+      "eki_evaluation_runs",
+      "eki_evaluation_run_items",
+      "project_knowledge_relations",
+    ]) {
+      expect(fix, table).toContain(`'${table}'`);
+    }
+  });
+
+  it("grants back only SELECT to authenticated, and all to the service role", () => {
+    expect(fix).toMatch(/grant select on public\.%I to authenticated/);
+    expect(fix).toMatch(/grant all on public\.%I to service_role/);
+    // Comments are stripped: the header explains that Supabase grants ALL "to anon
+    // and authenticated" by default, and matching prose rather than code would
+    // fail for the wrong reason.
+    expect(code(fix)).not.toMatch(/grant[^;]*to anon/);
+  });
+
+  /** The earlier revokes stay in place; this one is additive hardening. */
+  it("does not weaken the existing revokes", () => {
+    const automationSql = read("supabase/migrations/20260866000000_eki_automated_evaluation.sql");
+    expect(automationSql).toContain("revoke insert, update, delete");
+  });
+});

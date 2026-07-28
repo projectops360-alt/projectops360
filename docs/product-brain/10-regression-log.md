@@ -1108,3 +1108,46 @@ disclosure. The revoke is the control; the guard is defence in depth.
 → "REG-036". The guard discovers EKI migrations from disk rather than from a
 hard-coded list, and was negative-controlled: with the fix migration removed it
 names all seven unprotected functions.
+
+---
+
+## REG-037 — TRUNCATE left granted to `anon` and `authenticated` on the EKI tables
+
+**Date:** 2026-07-27 · **Status:** closed · **Guard:** `EKI-NO-API-WRITE-GRANTS`
+
+Supabase grants ALL on new `public` tables to `anon` and `authenticated`.
+Migrations `20260864000000` and `20260866000000` revoked only
+`insert, update, delete`, and only `from authenticated`. Measured in production
+immediately after the Macrophase 4 push:
+
+| | `anon` | `authenticated` |
+|---|---|---|
+| All seven EKI tables | TRUNCATE | TRUNCATE |
+| `eki_evaluation_runs`, `eki_evaluation_run_items` | + DELETE, INSERT, UPDATE | TRUNCATE |
+
+The row-level grants are contained by RLS — no policy grants `anon` anything, so
+a row write is refused.
+
+**TRUNCATE is not.** It does not go through RLS and it does not fire row-level
+triggers. The append-only guards on `eki_evidence_evaluations` and
+`eki_control_state_transitions` are `BEFORE DELETE` triggers, so they would never
+run. A holder of the publishable key could erase the immutable evidence and
+transition history — the record the programme exists to make tamper-evident —
+and the guards built to prevent exactly that are structurally unable to see it.
+
+**Root cause:** the revoke enumerated the privileges that seemed relevant, and
+TRUNCATE was not one of them. Enumerating what to remove is what produced the gap.
+
+**Why it was found:** a production security probe after the migration, not
+review. Every earlier check asked "can this role read another tenant's data?"
+and the answer was correctly no. Nobody asked "can this role destroy the
+evidence?" — RLS does not answer that question, and neither did the triggers.
+
+**Protection rule (binding):** an EKI table grants `select` to `authenticated`
+and nothing else. Revocation is written `revoke all … from anon, authenticated`
+followed by an explicit re-grant — never as a list of privileges to remove, which
+cannot cover a privilege nobody thought of, including any PostgreSQL adds later.
+
+**Verify:** `src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts`
+→ "REG-037". Production re-probed after `20260869000000`: 8 of 8 probes pass, 0
+write privileges held by any API role.

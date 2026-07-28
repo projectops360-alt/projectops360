@@ -1,0 +1,23 @@
+-- ============================================================================
+-- 20260705151216 — applied outside this repository
+-- ============================================================================
+-- PLACEHOLDER. Intentionally contains no SQL.
+--
+-- Production's migration history records this version, but no migration file
+-- for it exists in this repository: the change was applied directly through the
+-- Supabase Studio, so it has no reproducible source here.
+--
+-- Without this file the Supabase CLI refuses every 'db push' against production
+-- with 'Remote migration versions not found in local migrations directory',
+-- because it reconciles local and remote history before it will apply anything.
+--
+-- The alternative the CLI suggests — 'migration repair --status reverted' —
+-- would mark a change that IS applied in production as reverted. That writes a
+-- false statement into the history to make a tool proceed. This file states the
+-- truth instead: the version exists, it was applied elsewhere, and its content
+-- is not recoverable from this repository.
+--
+-- Do not add SQL here. If this migration's effect ever needs to be reproduced,
+-- write a NEW forward migration; editing this one would silently change the
+-- meaning of a version production already considers applied.
+-- ============================================================================
