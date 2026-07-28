@@ -773,12 +773,18 @@ Impact · Severity · Investigation status · Owner · Next action.
   2. **Wildcards compared literally.** `Paul*` was matched with `===`, so even a
      correctly resolved "Paul Reyes" would not have matched. There is no SQL here
      (filters run in memory over curated rows), so `ILIKE` had no equivalent.
+  3. **Accent-sensitive matching** — surfaced during acceptance once 1 and 2 were
+     fixed. `Proyecto = mobil*` returned 29 rows, but adding `Responsable =
+     Sofia*` returned 0: the stored name is `Sofía Gómez (Dev)`. Nobody types
+     diacritics into a filter box, and in a Spanish-language product a report
+     that silently empties over one accent reads as the same defect.
 - **Status: RESOLVED / PROTECTED (2026-07-27).** Owner names are now resolved from
   the assignee ids actually referenced by the already-org-scoped tasks
   (`.in("id", ownerIds)`), which also shrinks the query. Text filters compile `*`
-  and `?` into an anchored, case-insensitive pattern — the in-memory equivalent of
-  `ILIKE` — with regex metacharacters escaped. Filters are compiled once per
-  report instead of per row, so combining filters stays linear.
+  and `?` into an anchored pattern — the in-memory equivalent of `ILIKE` — with
+  regex metacharacters escaped, and both sides are compared case- **and
+  accent-insensitively** (NFD fold), so `Sofia*` finds `Sofía Gómez`. Filters are
+  compiled once per report instead of per row, so combining filters stays linear.
 - **Protection rule (binding):** **A display name shown in a report must be
   resolved from the ids the scoped rows reference, never by re-filtering the
   lookup table on `organization_id`.** Org isolation comes from the rows being

@@ -127,6 +127,48 @@ describe("Task Report Builder — wildcards (ILIKE equivalent)", () => {
   });
 });
 
+describe("Task Report Builder — accents (people rarely type them)", () => {
+  // Real DEV data: owners are stored as "Sofía Gómez (Dev)", "Marta Solís".
+  const ACCENTED: ReportRow[] = [
+    { project_name: "Mobile App Design", task_name: "Landing page", owner: "Sofía Gómez (Dev)", status: "done", progress_pct: 100 },
+    { project_name: "Mobile App Design", task_name: "Design changes", owner: "Camila Ortiz (Diseño)", status: "done", progress_pct: 100 },
+    { project_name: "Mobile App Design", task_name: "Integrations", owner: "Carlos Méndez (PM)", status: "done", progress_pct: 100 },
+  ];
+  const find = (...filters: ReportFilter[]) => applyFilters(ACCENTED, filters, COLUMNS).map((r) => r.task_name);
+
+  it('"Sofia*" (no accent) finds "Sofía Gómez (Dev)"', () => {
+    expect(find({ column: "owner", operator: "equals", value: "Sofia*" })).toEqual(["Landing page"]);
+  });
+
+  it('"Sofía*" (with accent) finds it too', () => {
+    expect(find({ column: "owner", operator: "equals", value: "Sofía*" })).toEqual(["Landing page"]);
+  });
+
+  it("works with contains, starts_with and is-one-of", () => {
+    expect(find({ column: "owner", operator: "contains", value: "gomez" })).toEqual(["Landing page"]);
+    expect(find({ column: "owner", operator: "starts_with", value: "Carlos Mendez" })).toEqual(["Integrations"]);
+    expect(find({ column: "owner", operator: "in", value: ["Camila Ortiz (Diseno)"] })).toEqual(["Design changes"]);
+  });
+
+  it("the reported combination: Proyecto = mobil* AND Responsable = Sofia*", () => {
+    expect(find(
+      { column: "project_name", operator: "equals", value: "mobil*" },
+      { column: "owner", operator: "equals", value: "Sofia*" },
+    )).toEqual(["Landing page"]);
+  });
+
+  it("negation is accent-insensitive as well", () => {
+    expect(find({ column: "owner", operator: "not_equals", value: "Sofia*" }))
+      .toEqual(["Design changes", "Integrations"]);
+  });
+
+  it("ñ and ü fold to n and u", () => {
+    const rows: ReportRow[] = [{ owner: "Iñaki Muñoz", task_name: "A" }, { owner: "Jürgen Weiß", task_name: "B" }];
+    expect(applyFilters(rows, [{ column: "owner", operator: "contains", value: "munoz" }], COLUMNS)).toHaveLength(1);
+    expect(applyFilters(rows, [{ column: "owner", operator: "starts_with", value: "jurgen" }], COLUMNS)).toHaveLength(1);
+  });
+});
+
 describe("Task Report Builder — two filters (the reported defect)", () => {
   it("Project = Agro* AND Responsable = Paul* returns rows, not zero", () => {
     const filters: ReportFilter[] = [

@@ -83,14 +83,24 @@ export function hasWildcard(value: unknown): boolean {
 }
 
 const REGEX_SPECIALS = /[.+^${}()|[\]\\]/g;
+const DIACRITICS = /\p{Diacritic}/gu;
 
 /**
- * Compile a user pattern into a case-insensitive RegExp.
+ * Case- and accent-insensitive form of a value. Typing "Sofia" must find
+ * "Sofía Gómez" — people rarely type accents into a filter box, and a report
+ * that silently returns nothing because of one diacritic reads as a bug.
+ */
+function fold(s: string): string {
+  return s.normalize("NFD").replace(DIACRITICS, "").toLowerCase();
+}
+
+/**
+ * Compile a user pattern into a RegExp matched against folded text.
  * `anchor: "full"` behaves like `ILIKE 'x'`, `"start"` like `ILIKE 'x%'`,
  * `"end"` like `ILIKE '%x'`, `"loose"` like `ILIKE '%x%'`.
  */
 function globToRegExp(pattern: string, anchor: "full" | "start" | "end" | "loose"): RegExp {
-  const body = pattern
+  const body = fold(pattern)
     .replace(REGEX_SPECIALS, "\\$&")   // escape regex metachars, leaving * and ?
     .replace(/\*/g, "[\\s\\S]*")
     .replace(/\?/g, "[\\s\\S]");
@@ -108,10 +118,10 @@ function makeEqualityTest(value: unknown): (str: string) => boolean {
   const needle = textValue(value);
   if (hasWildcard(needle)) {
     const re = globToRegExp(needle, "full");
-    return (str) => re.test(str);
+    return (str) => re.test(fold(str));
   }
-  const lower = needle.toLowerCase();
-  return (str) => str.toLowerCase() === lower;
+  const folded = fold(needle);
+  return (str) => fold(str) === folded;
 }
 
 /** Substring/prefix/suffix test that honours wildcards. */
@@ -119,12 +129,12 @@ function makeTextTest(value: unknown, anchor: "start" | "end" | "loose"): (str: 
   const needle = textValue(value);
   if (hasWildcard(needle)) {
     const re = globToRegExp(needle, anchor);
-    return (str) => re.test(str);
+    return (str) => re.test(fold(str));
   }
-  const lower = needle.toLowerCase();
-  if (anchor === "start") return (str) => str.toLowerCase().startsWith(lower);
-  if (anchor === "end") return (str) => str.toLowerCase().endsWith(lower);
-  return (str) => str.toLowerCase().includes(lower);
+  const folded = fold(needle);
+  if (anchor === "start") return (str) => fold(str).startsWith(folded);
+  if (anchor === "end") return (str) => fold(str).endsWith(folded);
+  return (str) => fold(str).includes(folded);
 }
 
 // ── Filter compilation ───────────────────────────────────────────────────────

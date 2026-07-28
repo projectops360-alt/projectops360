@@ -29,8 +29,10 @@ function loadEnvLocal(): void {
 
 const RUN = process.env.REPORT_FILTERS_VERIFY === "1";
 
-/** Organization that owns the Agro* projects used in the bug report. */
+/** Organization that owns the Agro* projects from the first bug report. */
 const ORG = process.env.REPORT_FILTERS_VERIFY_ORG ?? "5124cdfd-061f-4c6e-96ca-08989c6bd03c";
+/** Ascendia — owns Mobile App Design, whose owners are stored with accents. */
+const ORG_ACCENTS = process.env.REPORT_FILTERS_VERIFY_ORG_ACCENTS ?? "dc8205c1-c4a2-4f3c-83b9-0e1589590c13";
 
 describe.runIf(RUN)("REG-038 live — Project = Agro* AND Owner = Paul* (DEV data)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -53,8 +55,8 @@ describe.runIf(RUN)("REG-038 live — Project = Agro* AND Owner = Paul* (DEV dat
     visualization: "table" as const,
   };
 
-  const report = async (filters: unknown[]) => {
-    const r = await runReport({ ...base, filters }, { organizationId: ORG, projectId: null }, { page: 1, pageSize: 500 });
+  const report = async (filters: unknown[], organizationId = ORG) => {
+    const r = await runReport({ ...base, filters }, { organizationId, projectId: null }, { page: 1, pageSize: 500 });
     if ("error" in r) throw new Error(`report failed: ${r.error} ${r.details?.join("; ") ?? ""}`);
     return r;
   };
@@ -94,6 +96,19 @@ describe.runIf(RUN)("REG-038 live — Project = Agro* AND Owner = Paul* (DEV dat
     ]);
     expect(three.totalRows).toBe(two.totalRows);
     console.log(`[REG-038] with Progress >= 0 → ${three.totalRows} rows`);
+  });
+
+  it("Proyecto = mobil* AND Responsable = Sofia* (unaccented input) returns rows", async () => {
+    const only = await report([{ column: "project_name", operator: "equals", value: "mobil*" }], ORG_ACCENTS);
+    const both = await report([
+      { column: "project_name", operator: "equals", value: "mobil*" },
+      { column: "owner", operator: "equals", value: "Sofia*" },
+    ], ORG_ACCENTS);
+    expect(only.totalRows).toBeGreaterThan(0);
+    expect(both.totalRows).toBeGreaterThan(0);
+    expect(both.totalRows).toBeLessThanOrEqual(only.totalRows);
+    console.log(`[REG-038] mobil* → ${only.totalRows} rows; + Sofia* → ${both.totalRows} rows`);
+    console.log(`[REG-038] owners matched: ${[...new Set(both.rows.map((r: Record<string, unknown>) => r.owner))].join(", ")}`);
   });
 
   it("owners are resolved to names, not left blank", async () => {
