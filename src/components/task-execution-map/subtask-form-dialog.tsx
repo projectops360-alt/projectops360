@@ -7,11 +7,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { X } from "lucide-react";
+import { X, Clock } from "lucide-react";
 import type { Subtask, SubtaskStatus, SubtaskPriority } from "@/lib/subtasks/types";
 import { SUBTASK_STATUSES, SUBTASK_PRIORITIES } from "@/lib/subtasks/types";
 import { createSubtaskAction, updateSubtaskAction } from "@/lib/subtasks/actions";
 import { EntityAttachmentsSection } from "@/components/attachments/entity-attachments-section";
+import { SubtaskTimeLog } from "./subtask-time-log";
 
 export interface SubtaskFormDialogProps {
   projectId: string;
@@ -35,9 +36,12 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
   const [ownerId, setOwnerId] = useState<string>(subtask?.owner_id ?? "");
   const [dueDate, setDueDate] = useState(subtask?.due_date ?? "");
   const [estimatedHours, setEstimatedHours] = useState(subtask?.estimated_hours?.toString() ?? "");
-  const [actualHours, setActualHours] = useState(subtask?.actual_hours?.toString() ?? "");
   const [weight, setWeight] = useState(subtask?.weight?.toString() ?? "");
   const [isCritical, setIsCritical] = useState(subtask?.is_critical ?? false);
+  const [tab, setTab] = useState<"details" | "time">("details");
+  // Actual hours are derived from the time log, never typed. Kept in state only
+  // so the summary reflects a new entry without a full refresh.
+  const [actualHours, setActualHours] = useState(subtask?.actual_hours ?? 0);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,12 +59,10 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
         weight: weight === "" ? null : Number(weight),
         is_critical: isCritical,
       };
+      // actual_hours is intentionally NOT sent: it is derived from the time log
+      // (SUBTASK-ACTUAL-HOURS-DERIVED) and preserve-on-absent keeps it intact.
       const res = subtask
-        ? await updateSubtaskAction({
-            ...base,
-            subtaskId: subtask.id,
-            actual_hours: actualHours === "" ? null : Number(actualHours),
-          })
+        ? await updateSubtaskAction({ ...base, subtaskId: subtask.id })
         : await createSubtaskAction({ ...base, taskId });
       if (res.error) {
         setError(res.error);
@@ -87,6 +89,40 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
           </button>
         </div>
 
+        {/* Time log lives behind a tab — only once the subtask exists, since an
+            entry needs something to attach to. */}
+        {subtask && (
+          <div className="flex gap-1 border-b border-border" role="tablist">
+            {(["details", "time"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                onClick={() => setTab(key)}
+                className={`-mb-px border-b-2 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  tab === key
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {key === "details" ? t("timeTracking.tabDetails") : t("timeTracking.tabTimeLog")}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {subtask && tab === "time" && (
+          <SubtaskTimeLog
+            projectId={projectId}
+            subtaskId={subtask.id}
+            estimatedHours={estimatedHours === "" ? null : Number(estimatedHours)}
+            onTotalChange={setActualHours}
+          />
+        )}
+
+        {tab === "details" && (
+        <>
         {error && (
           <p role="alert" className="rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
             {error}
@@ -199,18 +235,11 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
           </div>
           {subtask && (
             <div>
-              <label htmlFor="tem-f-act" className="text-xs font-medium text-foreground">
-                {t("form.actualHours")}
-              </label>
-              <input
-                id="tem-f-act"
-                type="number"
-                min={0}
-                step={0.5}
-                value={actualHours}
-                onChange={(e) => setActualHours(e.target.value)}
-                className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
-              />
+              {/* Read-only: actual hours are the sum of the time log. */}
+              <span className="text-xs font-medium text-foreground">{t("form.actualHours")}</span>
+              <p className="mt-1 rounded border border-dashed border-border bg-muted/40 p-1.5 text-sm tabular-nums text-foreground">
+                {actualHours} {t("timeTracking.hoursShort")}
+              </p>
             </div>
           )}
           <div>
@@ -228,6 +257,18 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
             />
           </div>
         </div>
+        {/* Jump straight to logging time without hunting for the tab. */}
+        {subtask && (
+          <button
+            type="button"
+            onClick={() => setTab("time")}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            {t("timeTracking.logButton")}
+          </button>
+        )}
+
         <label className="flex items-center gap-2 text-xs text-foreground">
           <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} />
           {t("form.isCritical")}
@@ -241,6 +282,8 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
             <EntityAttachmentsSection projectId={projectId} subtaskId={subtask.id} />
           </div>
         )}
+        </>
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button
@@ -248,15 +291,17 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
             onClick={onClose}
             className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
           >
-            {t("form.cancel")}
+            {tab === "time" ? t("panel.close") : t("form.cancel")}
           </button>
-          <button
-            type="submit"
-            disabled={pending || title.trim().length === 0}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {pending ? t("form.saving") : t("form.save")}
-          </button>
+          {tab === "details" && (
+            <button
+              type="submit"
+              disabled={pending || title.trim().length === 0}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? t("form.saving") : t("form.save")}
+            </button>
+          )}
         </div>
       </form>
     </div>

@@ -123,6 +123,15 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   ParentTaskProgressRecalculated: sem("ParentTaskProgressRecalculated", "work", { ...DERIVED, notes: "Derived parent progress recalculated from subtasks (audit trail of why progress moved)." }),
   ParentTaskProgressOverride: sem("ParentTaskProgressOverride", "work", { notes: "Authorized manual parent-progress override with reason (audited)." }),
 
+  // ── Effort / Time tracking ────────────────────────────────────────────────
+  // Logged time is evidence that work HAPPENED, not that it ADVANCED: hours can
+  // pile up on a subtask going nowhere. So it carries no transition signal —
+  // only the budget overrun speaks to health.
+  TimeLogged: sem("TimeLogged", "work", { flowSegmentType: "active_work", notes: "Effort recorded against a subtask; Actual Cost evidence, not progress." }),
+  TimeEntryUpdated: sem("TimeEntryUpdated", "work", { notes: "A time entry was corrected (audited); Actual Cost restated." }),
+  TimeEntryDeleted: sem("TimeEntryDeleted", "work", { notes: "A time entry was removed (audited); Actual Cost restated." }),
+  EffortBudgetExceeded: sem("EffortBudgetExceeded", "work", { ...DERIVED, healthSignal: "degrades_health", notes: "Logged effort passed the estimate; derived from the time log crossing the budget." }),
+
   // ── Risk / Issue ──────────────────────────────────────────────────────────
   RiskIdentified: sem("RiskIdentified", "risk", { healthSignal: "increases_risk", constraintPropagationSignal: "creates_constraint", notes: "Risk identified." }),
   RiskEscalated: sem("RiskEscalated", "risk", { healthSignal: "increases_risk", constraintPropagationSignal: "intensifies_constraint", notes: "Risk escalated (critical)." }),

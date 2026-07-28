@@ -134,6 +134,11 @@ const REPORT_ES: Record<string, string> = {
   "Has Dependencies": "Tiene dependencias",
   "Estimated Hours": "Horas estimadas",
   "Actual Hours": "Horas reales",
+  "Logged Hours": "Horas registradas",
+  "Hours from the time log. Only work with no logged time falls back to the value captured by hand.":
+    "Horas del registro de tiempo. Solo el trabajo sin tiempo registrado recurre al valor capturado a mano.",
+  "The time log alone. 0 when nobody has recorded time against this work yet.":
+    "Solo el registro de tiempo. 0 cuando nadie ha registrado tiempo en este trabajo.",
   "Hours Variance": "Variación de horas",
   "Hours Variance %": "Variación de horas %",
   "Budget Item": "Partida presupuestal",

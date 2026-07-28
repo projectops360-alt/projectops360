@@ -28,8 +28,23 @@ import {
   XCircle,
 } from "lucide-react";
 import type { SubtaskStatus } from "@/lib/subtasks/types";
+import { computeEffort, SUBTASK_THRESHOLDS } from "@/lib/time-tracking/effort";
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
+
+/** Colour for logged hours against the estimate (amber at 90%, red past 100%). */
+function effortToneClass(estimated: number | null, actual: number): string {
+  switch (computeEffort(estimated, actual, SUBTASK_THRESHOLDS).severity) {
+    case "critical":
+      return "text-red-600 dark:text-red-400";
+    case "over":
+      return "text-orange-600 dark:text-orange-400";
+    case "warning":
+      return "text-amber-600 dark:text-amber-400";
+    default:
+      return "text-foreground";
+  }
+}
 
 export const STATUS_ICONS: Record<SubtaskStatus, React.ComponentType<{ className?: string }>> = {
   not_started: CircleDashed,
@@ -232,6 +247,8 @@ export function SubtaskMapNode({ data }: NodeProps<SubtaskNodeType>) {
     dueDate: string | null;
     weight: number | null;
     estimatedHours: number | null;
+    /** Sum of the time log (derived cache) — never a typed-in number. */
+    actualHours: number | null;
     isCritical: boolean;
     isOverdue: boolean;
     isBlocked: boolean;
@@ -282,6 +299,20 @@ export function SubtaskMapNode({ data }: NodeProps<SubtaskNodeType>) {
         <ProgressBar value={d.progress} muted={d.muted} />
         <span className="text-[10px] font-semibold tabular-nums text-foreground">{d.progress}%</span>
       </div>
+      {/* Effort under the progress: estimated vs what the time log actually
+          holds, coloured once the estimate is at risk. */}
+      {(d.estimatedHours != null || (d.actualHours ?? 0) > 0) && (
+        <div className="mt-1 flex items-center justify-between text-[10px]">
+          <span className="text-muted-foreground">{t("timeTracking.estimated")}</span>
+          <span className="tabular-nums text-foreground">
+            {d.estimatedHours != null ? `${d.estimatedHours} ${t("timeTracking.hoursShort")}` : "—"}
+          </span>
+          <span className="text-muted-foreground">{t("timeTracking.actual")}</span>
+          <span className={`tabular-nums font-medium ${effortToneClass(d.estimatedHours, d.actualHours ?? 0)}`}>
+            {(d.actualHours ?? 0)} {t("timeTracking.hoursShort")}
+          </span>
+        </div>
+      )}
       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1">
         <StatusBadge status={d.status} />
         <OwnerChip name={d.ownerName} />

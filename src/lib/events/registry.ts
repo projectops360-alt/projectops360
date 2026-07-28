@@ -98,6 +98,14 @@ export const EVENT_REGISTRY: Record<string, EventDef> = {
   ParentTaskProgressRecalculated: { category: "task", subjectType: "task", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: DER, requiredPayload: ["new_value"] },
   ParentTaskProgressOverride: { category: "task", subjectType: "task", importance: "HIGH", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["reason", "new_value"] },
 
+  // ── Effort / Time tracking (Actual Cost spine for EVM) ──
+  // AUDIT retention: these rows ARE the Actual Cost record. Once utilisation,
+  // CPI/SPI or an invoice has been derived from them, the trail must survive.
+  TimeLogged: { category: "effort", subjectType: "subtask", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["task_id", "duration_hours", "work_date"] },
+  TimeEntryUpdated: { category: "effort", subjectType: "subtask", importance: "LOW", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["task_id", "duration_hours"] },
+  TimeEntryDeleted: { category: "effort", subjectType: "subtask", importance: "NORMAL", retention: "AUDIT", lifecycleClass: B, requiredPayload: ["task_id", "duration_hours"] },
+  EffortBudgetExceeded: { category: "effort", subjectType: "subtask", importance: "HIGH", retention: "OPERATIONAL", lifecycleClass: DER, requiredPayload: ["task_id", "estimated_hours", "actual_hours"] },
+
   // ── Milestone / Phase ──
   MilestoneCreated: { category: "milestone", subjectType: "milestone", importance: "NORMAL", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: [] },
   MilestoneUpdated: { category: "milestone", subjectType: "milestone", importance: "LOW", retention: "OPERATIONAL", lifecycleClass: B, requiredPayload: [] },
