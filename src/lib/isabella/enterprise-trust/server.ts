@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getOrgContext } from "@/lib/auth";
+import { isEkiRolloutOrganization } from "@/lib/eki-evidence/rollout";
 import { getEnterpriseTrustOverview } from "@/lib/eki-trust-context/server";
 import { IsabellaTrustAuthorityError } from "./authorization";
 import { answerTrustQuestion, classifyTrustQuestion, type TrustAnswer } from "./engine";
@@ -33,6 +35,20 @@ export async function answerEnterpriseTrustQuestion(
   if (!kind) return { status: "not_a_trust_question", answer: "" };
 
   const language: TrustLanguage = locale === "es" ? "es" : "en";
+
+  // Controlled rollout. An organization outside the approved scope is reported
+  // as "not a trust question" rather than "no context available", so the caller
+  // falls through to retrieval and Isabella behaves exactly as before. Answering
+  // "there is no Enterprise Trust context" would be a visible degradation for a
+  // tenant that was never meant to see this capability at all.
+  try {
+    const org = await getOrgContext();
+    if (!isEkiRolloutOrganization(org.organizationId)) {
+      return { status: "not_a_trust_question", answer: "" };
+    }
+  } catch {
+    return { status: "not_a_trust_question", answer: "" };
+  }
 
   let overview;
   try {

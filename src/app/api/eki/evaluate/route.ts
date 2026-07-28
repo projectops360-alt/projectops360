@@ -22,6 +22,7 @@ import {
   secretMatches,
 } from "@/lib/eki-evidence/automation-flag";
 import { EkiEvaluator, scheduledRunKey } from "@/lib/eki-evidence/evaluator";
+import { ekiRolloutOrganizations } from "@/lib/eki-evidence/rollout";
 
 // A sweep reads and writes per binding; it must never be served from a cache.
 export const dynamic = "force-dynamic";
@@ -48,22 +49,33 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // Controlled rollout. The sweep covers ONLY the organizations on the allowlist,
+  // one scoped run each, and the list comes from the environment — never from the
+  // request. An empty allowlist evaluates nothing: deny by default, so a missing
+  // variable cannot silently sweep every tenant on the platform.
+  const organizations = [...ekiRolloutOrganizations()];
+  if (organizations.length === 0) {
+    return NextResponse.json({ status: "no_rollout_scope", swept: 0 }, { status: 200 });
+  }
+
   const evaluator = new EkiEvaluator(createAdminClient());
+  const at = new Date();
 
   try {
-    const summary = await evaluator.sweep({
-      // Truncated to the minute, so an at-least-once scheduler delivering the
-      // same tick twice resolves to one run instead of two competing sweeps.
-      runKey: scheduledRunKey(new Date()),
-      trigger: "scheduled",
-      // Platform-wide. Never narrowed by request input.
-      organizationId: null,
-      // The scheduler has no human actor and does not borrow one.
-      requestedBy: null,
-    });
-
-    return NextResponse.json(
-      {
+    const results = [];
+    for (const organizationId of organizations) {
+      // One run per organization, each with its own idempotency key, so a
+      // failure in one tenant cannot consume another tenant's run identity.
+      const summary = await evaluator.sweep({
+        // Truncated to the minute, so an at-least-once scheduler delivering the
+        // same tick twice resolves to one run instead of two competing sweeps.
+        runKey: scheduledRunKey(at, organizationId),
+        trigger: "scheduled",
+        organizationId,
+        // The scheduler has no human actor and does not borrow one.
+        requestedBy: null,
+      });
+      results.push({
         runId: summary.runId,
         duplicate: summary.duplicate,
         status: summary.status,
@@ -71,9 +83,10 @@ export async function GET(request: Request): Promise<NextResponse> {
         evaluated: summary.evaluated,
         failed: summary.failed,
         superseded: summary.superseded,
-      },
-      { status: 200 },
-    );
+      });
+    }
+
+    return NextResponse.json({ swept: results.length, runs: results }, { status: 200 });
   } catch (error) {
     // The message is not echoed. A sweep failure can carry database detail, and
     // this endpoint is reachable by anyone holding the token.
