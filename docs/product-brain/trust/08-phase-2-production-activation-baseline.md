@@ -217,3 +217,92 @@ No additional controls, resolvers, dashboards, trust scores or framework package
 were added. No frozen architecture, strategy or Charter document was modified. No
 production data was read outside aggregate counts, and no secrets, tokens or
 customer payloads were captured.
+
+---
+
+## 6 — Deployment attempt via Supabase CLI (2026-07-27)
+
+Authorized method: Supabase CLI from this repository, linked to production.
+**No DDL was executed. `supabase db push` refused to run.**
+
+### Steps completed
+
+| Step | Result |
+|---|---|
+| Repository / branch | `C:\p360-pmo-process-intelligence-redesign`, `feat/eki-macrophase-4` @ `35f626e`, working tree clean |
+| CLI version | `2.109.1` |
+| `supabase link --project-ref ocopmlnkvidvmxgiwvxw` | success |
+| `supabase/.temp/project-ref` | `ocopmlnkvidvmxgiwvxw` — **verified, correct target** |
+| `supabase migration list --linked` | captured |
+| `supabase db push --linked --include-all --dry-run` | **exit 1 — refused** |
+| `supabase db push --linked --dry-run` | **exit 1 — refused, identically** |
+
+### Why the push is refused
+
+```
+Remote migration versions not found in local migrations directory.
+```
+
+Production's migration history contains **64 entries with no corresponding file
+in this repository**. They are the Studio-applied migrations visible by their
+timestamp format (`20260614012842`, `20260625020613`, …) plus `20260851000000`
+and `20260851010000`.
+
+The CLI reconciles local and remote history before pushing anything, and refuses
+while they disagree. It never reaches the question of which migrations to apply,
+so the dry run produced **no migration list at all** — with or without
+`--include-all`.
+
+This is a pre-existing condition of the production project. Macrophase 4 did not
+create it, and no EKI migration is involved.
+
+### The two remedies the CLI offers are both out of bounds
+
+1. **`supabase migration repair --status reverted <64 versions>`**
+   This marks 64 migrations that **are applied in production** as reverted. It
+   writes a false statement into the production history to make a tool proceed.
+   The brief forbids `migration repair` except where a migration was
+   demonstrably applied but its entry was not recorded — this is the inverse
+   case, and the inverse remedy.
+
+2. **`supabase db pull`**
+   This regenerates local migration files from production's current schema. It
+   would rewrite a large part of `supabase/migrations/` with content unrelated to
+   EKI, which the brief excludes as unrelated scope.
+
+### Correction to an earlier assessment
+
+In §4 I said `--include-all` mattered and later warned it might re-run ~40
+already-applied migrations. Both points are now moot and one was wrong:
+
+- The CLI never evaluates the migration set, so the flag makes no difference here.
+- `20260860`, `20260861` and `20260862` are genuinely idempotent
+  (`drop constraint if exists`, `create table if not exists`), so they would not
+  have blocked a push. That earlier concern was unfounded.
+
+The real obstacle is history reconciliation, which neither dry run could get past.
+
+### What would unblock it, in preference order
+
+1. **Add placeholder migration files for the 64 orphan versions** — one inert
+   file per version, named for it, recording that the change was applied through
+   the Studio and has no reproducible source. Local and remote history then agree,
+   `db push` applies exactly `20260860` … `20260868`, and the repository stops
+   claiming a history it does not have. Honest, reversible, and it fixes the
+   underlying condition rather than working around it.
+2. **`supabase db pull` on a dedicated branch**, reviewed as its own change,
+   before Macrophase 4 resumes. Larger, but it makes the repository the true
+   record of production for the first time.
+3. **Direct connection (`psql -f`)** applying the nine files byte-for-byte, then
+   recording history entries. Needs a deliberate decision about production
+   database credentials in an agent session.
+
+Option 1 is the smallest honest change and the only one that stays inside
+Macrophase 4's scope. It is still a decision about production history and is not
+taken here.
+
+### Production state
+
+Unchanged and re-verified after the attempt: 111 migrations recorded, latest
+`20260859000000`, 0 EKI tables, 0 EKI functions, 5 knowledge objects, 210
+evidence rows, 76 organizations. No DDL ran.
