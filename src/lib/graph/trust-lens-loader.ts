@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toControlViews } from "@/lib/eki-trust-context/assembler";
 import { loadTrustContext } from "@/lib/eki-trust-context/loader";
+import { isEkiRolloutOrganization } from "@/lib/eki-evidence/rollout";
 import { assertSingleTenant, projectTrustLens, type TrustLensProjection } from "./trust-lens-projection";
 
 /**
@@ -24,6 +25,9 @@ export async function loadTrustLens(
   client: SupabaseClient,
   organizationId: string,
 ): Promise<TrustLensLoadResult> {
+  // Controlled rollout: an organization outside the approved scope sees the lens
+  // as disabled, identical to the flag being off. No query runs.
+  if (!isEkiRolloutOrganization(organizationId)) return { status: "disabled" };
   try {
     const { context } = await loadTrustContext(client, organizationId, new Date().toISOString());
     const views = toControlViews(context);
