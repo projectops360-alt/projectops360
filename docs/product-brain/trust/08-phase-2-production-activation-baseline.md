@@ -404,3 +404,96 @@ The second command then applies exactly `20260860000000` … `20260868000000`.
 Production remains unchanged: 111 migrations recorded, latest `20260859000000`,
 0 EKI tables, 0 EKI functions, 5 knowledge objects, 210 evidence rows, 76
 organizations. No DDL has run.
+
+---
+
+## 8 — Production migration applied (2026-07-27)
+
+`supabase db push --linked` — no `--include-all`. Dry run listed exactly nine
+files; nine were applied; exit 0.
+
+```
+20260860000000 … 20260868000000   applied
+```
+
+`20260861` and `20260862` emitted `NOTICE ... already exists, skipping` as
+expected — they are idempotent and their objects were already present.
+
+### Integrity against the baseline
+
+| Measure | Baseline | After | Verdict |
+|---|---|---|---|
+| Knowledge objects | 5 | 5 | preserved |
+| Knowledge versions | 5 | 5 | preserved |
+| Evidence rows | 210 | 210 | preserved |
+| Transitions | 5 | 5 | preserved |
+| Organizations | 76 | 76 | preserved |
+| Active projects | 132 | 132 | preserved |
+| Read-model view rows | 5 | 5 | preserved |
+| Orphan versions / evidence | — | 0 / 0 | clean |
+| `scope_type = 'project'` | — | **5** | backfill required no interpretation |
+| `scope_type = 'organization'` | — | 0 | none created accidentally |
+| `project_id is null` | — | 0 | no invalid scope combination |
+| EKI tables / functions | 0 / 0 | **7 / 20** | created |
+| Runs · evaluations · findings · controls · bindings · audit | 0 | **0 each** | nothing started on its own |
+| RLS enabled / disabled | 161 / 0 | **169 / 0** | +8 new tables, all protected |
+| RLS policies | 584 | 600 | +16 |
+| `SECURITY DEFINER` without `search_path` | 0 | **0** | held |
+
+### Security probes
+
+| Probe | Result |
+|---|---|
+| No API role can execute any EKI function | **pass** |
+| `service_role` retains execute on every EKI function | **pass** |
+| Every EKI `SECURITY DEFINER` function fixes `search_path` | **pass** |
+| Every EKI table has RLS enabled | **pass** |
+| Every EKI table has member-read and service-role policies | **pass** (7/7) |
+| Read-model view does not bypass RLS | **pass** — `security_invoker = true` |
+| No API role can write to any EKI table | **FAIL — REG-037** |
+
+The view finding from §2 resolved differently than predicted: grants were **not**
+narrowed, but the view carries `security_invoker = true`, so it enforces the
+caller's RLS and there is no cross-tenant exposure. The prediction was wrong
+about the mechanism and right about the outcome being safe.
+
+---
+
+## 9 — REG-037: TRUNCATE left granted to `anon` and `authenticated`
+
+Supabase grants ALL on new `public` tables to `anon` and `authenticated`.
+Migrations `20260864` and `20260866` revoked only `insert, update, delete`, and
+only `from authenticated`. Measured in production after the push:
+
+| Table | anon | authenticated |
+|---|---|---|
+| `eki_evidence_evaluations` | TRUNCATE | TRUNCATE |
+| `eki_control_state_transitions` | TRUNCATE | TRUNCATE |
+| `eki_control_runtime` | TRUNCATE | TRUNCATE |
+| `eki_evidence_binding_runtime` | TRUNCATE | TRUNCATE |
+| `eki_open_findings` | TRUNCATE | TRUNCATE |
+| `eki_evaluation_runs` | **DELETE, INSERT, TRUNCATE, UPDATE** | TRUNCATE |
+| `eki_evaluation_run_items` | **DELETE, INSERT, TRUNCATE, UPDATE** | TRUNCATE |
+
+The row-level grants on the two run tables are contained by RLS: no policy grants
+`anon` anything, so a row write is refused.
+
+**TRUNCATE is not.** It does not go through RLS, and it does not fire row-level
+triggers. The append-only guards on `eki_evidence_evaluations` and
+`eki_control_state_transitions` are `BEFORE DELETE` triggers, so they would never
+run. A holder of the publishable key could erase the immutable evidence and
+transition history — the record the programme exists to make tamper-evident —
+and the guards designed to prevent exactly that are structurally unable to see it.
+
+**Root cause:** the revoke enumerated the privileges that seemed relevant.
+TRUNCATE was not one of them. Enumerating what to remove is what produced the
+gap.
+
+**Fix** (`20260869000000_eki_revoke_api_write_grants.sql`, written, dry-run
+clean, **not yet applied**): `revoke all` then grant back only `select`, for the
+seven EKI tables plus `project_knowledge_relations`. Revoking everything and
+re-granting is immune to this class of omission, including privileges added by
+future PostgreSQL versions.
+
+Applying it needs authorization: it is a tenth migration, outside the nine that
+were reviewed and approved.
