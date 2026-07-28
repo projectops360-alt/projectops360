@@ -24,7 +24,7 @@ import { listKpis } from "@/lib/reports/kpi-dictionary";
 import type {
   ReportConfig, ReportFilter, ReportResult, DatasetColumn, FilterOperator, VisualizationType, ColumnType,
 } from "@/lib/reports/types";
-import { OPERATORS_BY_TYPE } from "@/lib/reports/filter-engine";
+import { OPERATORS_BY_TYPE, defaultFilterValue, validateFilters } from "@/lib/reports/filter-engine";
 import {
   runReportAction, exportReportCsvAction, saveReportAction, deleteSavedReportAction,
   duplicateSavedReportAction, suggestCalculatedFieldAction, type SavedReportRow, type ReportProject,
@@ -45,7 +45,14 @@ const T = {
     includeSubtasks: "Include subtasks", includeSubtasksHint: "Shows each subtask beneath its parent task in the report, CSV, and printout.", preparingPrint: "Preparing print…",
     addFilter: "Add filter", none: "None", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
     filterHint: "Use * for any text and ? for one character — e.g. Sofia* matches Sofía Gómez. Accents are optional. Repeat = on the same field to match any of several values.",
-    and: "and",
+    and: "and", yes: "Yes", no: "No",
+    filterErrors: {
+      unknown_column: "This column is no longer part of the dataset.",
+      not_filterable: "{column} can't be filtered.",
+      invalid_operator: "That operator doesn't apply to {column}.",
+      missing_value: "Enter a value for {column}.",
+      missing_range: "Enter both values for {column}.",
+    } as Record<string, string>,
     ops: {
       equals: "=", not_equals: "≠", contains: "contains", not_contains: "does not contain", starts_with: "starts with",
       ends_with: "ends with", greater_than: ">", greater_than_or_equal: "≥", less_than: "<", less_than_or_equal: "≤",
@@ -85,7 +92,14 @@ const T = {
     includeSubtasks: "Incluir subtareas", includeSubtasksHint: "Muestra cada subtarea debajo de su tarea principal en el reporte, CSV y la impresión.", preparingPrint: "Preparando impresión…",
     addFilter: "Agregar filtro", none: "Ninguno", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
     filterHint: "Usa * para cualquier texto y ? para un carácter — por ejemplo, Sofia* encuentra a Sofía Gómez. No hace falta escribir acentos. Repite = en el mismo campo para incluir cualquiera de varios valores.",
-    and: "y",
+    and: "y", yes: "Sí", no: "No",
+    filterErrors: {
+      unknown_column: "Esta columna ya no forma parte del dataset.",
+      not_filterable: "{column} no se puede filtrar.",
+      invalid_operator: "Ese operador no aplica a {column}.",
+      missing_value: "Escribe un valor para {column}.",
+      missing_range: "Escribe los dos valores de {column}.",
+    } as Record<string, string>,
     ops: {
       equals: "=", not_equals: "≠", contains: "contiene", not_contains: "no contiene", starts_with: "empieza con",
       ends_with: "termina con", greater_than: ">", greater_than_or_equal: "≥", less_than: "<", less_than_or_equal: "≤",
@@ -730,10 +744,14 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
   const addFilter = () => {
     const first = columns[0];
     if (!first) return;
-    onChange([...filters, { column: first.key, operator: opsFor(first.type)[0], value: "" }]);
+    const operator = opsFor(first.type)[0];
+    onChange([...filters, { column: first.key, operator, value: defaultFilterValue(first.type, operator) }]);
   };
   const update = (i: number, patch: Partial<ReportFilter>) => onChange(filters.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
   const remove = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
+
+  // Live validation: name the filter that is incomplete instead of failing on Run.
+  const errorByIndex = new Map(validateFilters(filters, columns).map((e) => [e.index, e]));
 
   return (
     <div className="rounded-xl border border-border p-3">
@@ -760,9 +778,17 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
             };
             // Text filters accept wildcards; the hint only makes sense there.
             const showWildcardHint = (type === "text" || type === "enum") && needsValue && !range;
+            const err = errorByIndex.get(i);
             return (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <select value={f.column} onChange={(e) => { const nc = colByKey.get(e.target.value); update(i, { column: e.target.value, operator: opsFor(nc?.type ?? "text")[0], value: "" }); }}
+              <div key={i} className="flex flex-wrap items-center gap-2" data-invalid={err ? "true" : undefined}>
+                <select
+                  value={f.column}
+                  onChange={(e) => {
+                    const nc = colByKey.get(e.target.value);
+                    const nextType = nc?.type ?? "text";
+                    const operator = opsFor(nextType)[0];
+                    update(i, { column: e.target.value, operator, value: defaultFilterValue(nextType, operator) });
+                  }}
                   className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
                   {columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
@@ -770,8 +796,9 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
                   value={f.operator}
                   onChange={(e) => {
                     const next = e.target.value as FilterOperator;
-                    // Range operators carry [min,max]; scalar ones a single value.
-                    const value = isRangeOp(next) ? ["", ""] : isRangeOp(f.operator) ? "" : f.value ?? "";
+                    // Keep a typed value the control can actually display.
+                    const keep = !isRangeOp(next) && !isRangeOp(f.operator) && type !== "boolean";
+                    const value = keep ? f.value ?? "" : defaultFilterValue(type, next);
                     update(i, { operator: next, value });
                   }}
                   className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
@@ -788,8 +815,12 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
                         className="w-28 rounded-lg border border-border bg-background px-2 py-1 text-xs" placeholder="…" />
                     </>
                   ) : type === "boolean" ? (
-                    <select value={String(f.value ?? "true")} onChange={(e) => update(i, { value: e.target.value === "true" })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-                      <option value="true">true</option><option value="false">false</option>
+                    // Mirror the stored value exactly — the select has no empty
+                    // option, so it must never display a state the config lacks.
+                    <select value={f.value === false || f.value === "false" ? "false" : "true"}
+                      onChange={(e) => update(i, { value: e.target.value === "true" })}
+                      className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
+                      <option value="true">{t.yes}</option><option value="false">{t.no}</option>
                     </select>
                   ) : type === "enum" && col?.enumValues && !["contains"].includes(f.operator) ? (
                     <select value={Array.isArray(f.value) ? String(f.value[0] ?? "") : String(f.value ?? "")} onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? [e.target.value] : e.target.value })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
@@ -807,6 +838,11 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
                   )
                 )}
                 <button type="button" onClick={() => remove(i)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                {err && (
+                  <span className="w-full text-[11px] text-red-600 dark:text-red-400">
+                    {(t.filterErrors[err.code] ?? err.message).replace("{column}", `“${err.columnLabel}”`)}
+                  </span>
+                )}
               </div>
             );
           })}

@@ -857,6 +857,41 @@ Impact · Severity · Investigation status · Owner · Next action.
 
 ---
 
+## REG-039 — Boolean report filter rejected as invalid without being touched
+
+- **Reported:** 2026-07-28. In the Task Report Builder, adding `En ruta crítica =
+  true` produced "Uno o más filtros no son válidos" and refused to run, although
+  the user had picked the column and the value shown was `true`.
+- **Root cause:** the builder seeded every new filter with `value: ""`,
+  regardless of column type, and the boolean editor is a `<select>` with only
+  `true`/`false` options. With `""` in state, no option matched, so the browser
+  fell back to rendering the first one — `true` — while the report config still
+  carried `""`. Server-side validation then correctly rejected it for having no
+  value. The control displayed a state the configuration did not hold.
+- **Status: RESOLVED / PROTECTED (2026-07-28).** New filters start from
+  `defaultFilterValue(type, operator)`: `true` for booleans, `["", ""]` for range
+  operators, `""` where the user genuinely must type something. The boolean
+  select now derives its rendered option from the stored value instead of
+  falling back. Switching column or operator re-seeds the value the same way, so
+  a boolean can never be left holding `""` nor a range holding a scalar.
+  Validation errors also carry a `code` + `columnLabel`, and the builder
+  validates live: it names the filter that is incomplete ("Escribe un valor para
+  «Nombre de la tarea»") next to that row instead of failing with a generic
+  message after Run. Half-filled ranges are now caught too.
+- **Protection rule (binding):** **a form control must never display a value the
+  configuration does not hold.** Any editor without an empty state (select,
+  toggle, radio) must be seeded with a valid value when the field is created or
+  its type changes — otherwise the UI shows a complete filter that the server
+  rightly rejects. Validation must name the offending field in the user's
+  language, never a generic "one or more filters are invalid". Guard id
+  **REPORT-FILTER-DEFAULT-VALUE**.
+- **Owner:** Product/Engineering. **Verify:**
+  `src/lib/reports/__tests__/task-report-filter-defaults.test.ts` — a freshly
+  added boolean filter must validate untouched; removing the boolean default
+  fails six tests.
+
+---
+
 ### Resolved
 *(none fully closed yet — REG-004/005 partially resolved; keep open until depth/vision shipped.)*
 

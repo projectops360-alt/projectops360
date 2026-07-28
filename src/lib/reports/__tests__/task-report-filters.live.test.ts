@@ -111,6 +111,17 @@ describe.runIf(RUN)("REG-038 live — Project = Agro* AND Owner = Paul* (DEV dat
     console.log(`[REG-038] owners matched: ${[...new Set(both.rows.map((r: Record<string, unknown>) => r.owner))].join(", ")}`);
   });
 
+  it("REG-039: Proyecto = mobil* AND En ruta crítica = true runs and filters", async () => {
+    const all = await report([{ column: "project_name", operator: "equals", value: "mobil*" }], ORG_ACCENTS);
+    const critical = await report([
+      { column: "project_name", operator: "equals", value: "mobil*" },
+      { column: "critical_path", operator: "equals", value: true },
+    ], ORG_ACCENTS);
+    expect(critical.totalRows).toBeLessThan(all.totalRows);
+    for (const r of critical.rows) expect(r.critical_path).toBe(true);
+    console.log(`[REG-039] mobil* → ${all.totalRows} rows; + En ruta crítica = true → ${critical.totalRows} rows`);
+  });
+
   it("owners are resolved to names, not left blank", async () => {
     const { rows } = await report([{ column: "project_name", operator: "equals", value: "Agro*" }]);
     const assigned = rows.filter((r: Record<string, unknown>) => r.owner !== "");

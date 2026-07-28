@@ -27,9 +27,38 @@ export const OPERATORS_BY_TYPE: Record<ColumnType, FilterOperator[]> = {
   enum: ["equals", "not_equals", "contains", "in", "not_in", "is_empty", "is_not_empty"],
 };
 
+/** Why a filter is invalid — `code` lets the UI phrase it in the user's language. */
+export type FilterErrorCode =
+  | "unknown_column"
+  | "not_filterable"
+  | "invalid_operator"
+  | "missing_value"
+  | "missing_range";
+
 export interface FilterValidationError {
   index: number;
   message: string;
+  code: FilterErrorCode;
+  /** Human label of the offending column, so the UI can name it. */
+  columnLabel: string;
+}
+
+/** Operators that need no value at all. */
+const VALUELESS_OPS = new Set<FilterOperator>(["is_empty", "is_not_empty"]);
+/** Operators that need exactly two values. */
+const RANGE_OPS = new Set<FilterOperator>(["between", "date_between"]);
+
+/**
+ * The value a brand-new filter should start with, so what the control DISPLAYS
+ * is what the config actually HOLDS. A boolean select has no empty option — it
+ * renders "true" — so starting it at "" produced a filter that looked complete
+ * and was rejected on run (REG-039).
+ */
+export function defaultFilterValue(type: ColumnType, operator: FilterOperator): ReportFilter["value"] {
+  if (VALUELESS_OPS.has(operator)) return "";
+  if (RANGE_OPS.has(operator)) return ["", ""];
+  if (type === "boolean") return true;
+  return "";
 }
 
 /** Validate filters against the dataset columns. Returns [] when all valid. */
@@ -39,23 +68,25 @@ export function validateFilters(filters: ReportFilter[], columns: DatasetColumn[
   filters.forEach((f, i) => {
     const col = byKey.get(f.column);
     if (!col) {
-      errors.push({ index: i, message: `Unknown column "${f.column}".` });
+      errors.push({ index: i, code: "unknown_column", columnLabel: f.column, message: `Unknown column "${f.column}".` });
       return;
     }
     if (col.filterable === false) {
-      errors.push({ index: i, message: `Column "${col.label}" is not filterable.` });
+      errors.push({ index: i, code: "not_filterable", columnLabel: col.label, message: `Column "${col.label}" is not filterable.` });
       return;
     }
     if (!OPERATORS_BY_TYPE[col.type].includes(f.operator)) {
-      errors.push({ index: i, message: `Operator "${f.operator}" is not valid for ${col.type} column "${col.label}".` });
+      errors.push({ index: i, code: "invalid_operator", columnLabel: col.label, message: `Operator "${f.operator}" is not valid for ${col.type} column "${col.label}".` });
       return;
     }
-    const needsValue = !["is_empty", "is_not_empty"].includes(f.operator);
-    if (needsValue && (f.value === undefined || f.value === null || f.value === "")) {
-      errors.push({ index: i, message: `Filter on "${col.label}" needs a value.` });
+    if (RANGE_OPS.has(f.operator)) {
+      const pair = Array.isArray(f.value) ? f.value : [];
+      const complete = pair.length === 2 && pair.every((v) => v !== "" && v !== null && v !== undefined);
+      if (!complete) errors.push({ index: i, code: "missing_range", columnLabel: col.label, message: `"${col.label}" range filter needs two values.` });
+      return;
     }
-    if ((f.operator === "between" || f.operator === "date_between") && (!Array.isArray(f.value) || f.value.length !== 2)) {
-      errors.push({ index: i, message: `"${col.label}" range filter needs two values.` });
+    if (!VALUELESS_OPS.has(f.operator) && (f.value === undefined || f.value === null || f.value === "")) {
+      errors.push({ index: i, code: "missing_value", columnLabel: col.label, message: `Filter on "${col.label}" needs a value.` });
     }
   });
   return errors;
