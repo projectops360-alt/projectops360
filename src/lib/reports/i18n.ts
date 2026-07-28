@@ -106,7 +106,36 @@ const REPORT_ES: Record<string, string> = {
   "Blocker Reason": "Motivo del bloqueo",
   "On Critical Path": "En ruta crítica",
   "Total Float (days)": "Holgura total (días)",
+  "Owner ID": "ID del responsable",
+
+  // ── Column descriptions (Task Execution) ──
+  "Assignee display name — a team member or a named resource. Supports wildcards, e.g. Paul*":
+    "Nombre del responsable — un miembro del equipo o un recurso con nombre. Admite comodines, por ejemplo Paul*",
+  "Internal id of the assignee. Use when two people share a display name.":
+    "Identificador interno del responsable. Úsalo cuando dos personas comparten el mismo nombre.",
+  "Type of work — the task's discipline.": "Tipo de trabajo — la disciplina de la tarea.",
+  "Type of work — the task's trade.": "Tipo de trabajo — la especialidad de la tarea.",
+  "Days past the planned finish: for completed tasks, actual vs planned finish; for open tasks, today vs planned finish. 0 when on time, empty when there is no planned finish.":
+    "Días después del fin planificado: en tareas completadas, fin real contra fin planificado; en tareas abiertas, hoy contra fin planificado. 0 si va a tiempo, vacío si no hay fin planificado.",
+  "Reported completion, 0–100.": "Avance reportado, de 0 a 100.",
+  "Count of open or mitigating risks linked to this task.":
+    "Cantidad de riesgos abiertos o en mitigación vinculados a esta tarea.",
+  "Highest severity among the task's open risks. Empty when it has none.":
+    "Severidad más alta entre los riesgos abiertos de la tarea. Vacío si no tiene ninguno.",
+  "Number of predecessor tasks this task waits on.":
+    "Cantidad de tareas predecesoras que esta tarea está esperando.",
+  "Actual minus estimated hours. Positive means over the estimate.":
+    "Horas reales menos horas estimadas. Positivo significa por encima de lo estimado.",
+  "Hours variance as a percentage of the estimate.":
+    "Variación de horas como porcentaje de lo estimado.",
+  "Days Late": "Días de atraso",
+  "Top Risk Severity": "Severidad máxima del riesgo",
+  Dependencies: "Dependencias",
+  "Has Dependencies": "Tiene dependencias",
   "Estimated Hours": "Horas estimadas",
+  "Actual Hours": "Horas reales",
+  "Hours Variance": "Variación de horas",
+  "Hours Variance %": "Variación de horas %",
   "Budget Item": "Partida presupuestal",
   Category: "Categoría",
   "Cost Code": "Código de costo",
@@ -268,6 +297,7 @@ export function localizeColumn(col: DatasetColumn, locale: Locale): DatasetColum
     ...col,
     label: trReport(col.label, locale),
     group: trReport(col.group, locale),
+    description: col.description ? trReport(col.description, locale) : col.description,
     enumValues: col.enumValues?.map((e) => ({ ...e, label: trReport(e.label, locale) })),
   };
 }

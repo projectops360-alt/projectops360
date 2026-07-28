@@ -27,6 +27,7 @@ const h = vi.hoisted(() => {
       select: () => b,
       eq: (col: string, val: unknown) => { eqCalls[table].push([col, val]); return b; },
       is: () => b,
+      not: () => b,
       ilike: () => b,
       in: () => b,
       order: () => b,

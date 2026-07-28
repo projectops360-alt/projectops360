@@ -22,8 +22,9 @@ import { localizeDataset, trReport } from "@/lib/reports/i18n";
 import { listPrebuiltReports } from "@/lib/reports/report-library";
 import { listKpis } from "@/lib/reports/kpi-dictionary";
 import type {
-  ReportConfig, ReportFilter, ReportResult, DatasetColumn, FilterOperator, VisualizationType,
+  ReportConfig, ReportFilter, ReportResult, DatasetColumn, FilterOperator, VisualizationType, ColumnType,
 } from "@/lib/reports/types";
+import { OPERATORS_BY_TYPE } from "@/lib/reports/filter-engine";
 import {
   runReportAction, exportReportCsvAction, saveReportAction, deleteSavedReportAction,
   duplicateSavedReportAction, suggestCalculatedFieldAction, type SavedReportRow, type ReportProject,
@@ -42,7 +43,16 @@ const T = {
     run: "Run", open: "Open", dataset: "Dataset", columns: "Columns", filters: "Filters", grouping: "Group by",
     sort: "Sort", visualization: "Visualization", preview: "Preview", save: "Save", exportCsv: "Export CSV", print: "Print",
     includeSubtasks: "Include subtasks", includeSubtasksHint: "Shows each subtask beneath its parent task in the report, CSV, and printout.", preparingPrint: "Preparing print…",
-    addFilter: "Add filter", none: "None", filterHint: "Repeat = on the same field to match any value. Wildcards: * any text, ? one character.", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
+    addFilter: "Add filter", none: "None", rows: "rows", in: "in", ran: "ran in", truncated: "Showing the first 5,000 rows.",
+    filterHint: "Use * for any text and ? for one character — e.g. Sofia* matches Sofía Gómez. Accents are optional. Repeat = on the same field to match any of several values.",
+    and: "and",
+    ops: {
+      equals: "=", not_equals: "≠", contains: "contains", not_contains: "does not contain", starts_with: "starts with",
+      ends_with: "ends with", greater_than: ">", greater_than_or_equal: "≥", less_than: "<", less_than_or_equal: "≤",
+      between: "between", in: "is one of", not_in: "is not one of", is_empty: "is empty", is_not_empty: "is not empty",
+      date_before: "before", date_after: "after", date_on_or_before: "on or before", date_on_or_after: "on or after",
+      date_between: "between",
+    } as Record<FilterOperator, string>,
     selectDataset: "Select a dataset to start building.", noColumns: "Pick at least one column, then Run.",
     runFirst: "Run the report to preview results.", noData: "No rows match this report.",
     scope: { label: "Scope", all: "All Projects", allHint: "Portfolio-wide", choose: "Choose a project", runningFor: "Running report for", noProjects: "No projects available yet.", search: "Search projects…" },
@@ -73,7 +83,16 @@ const T = {
     run: "Ejecutar", open: "Abrir", dataset: "Dataset", columns: "Columnas", filters: "Filtros", grouping: "Agrupar por",
     sort: "Ordenar", visualization: "Visualización", preview: "Vista previa", save: "Guardar", exportCsv: "Exportar CSV", print: "Imprimir",
     includeSubtasks: "Incluir subtareas", includeSubtasksHint: "Muestra cada subtarea debajo de su tarea principal en el reporte, CSV y la impresión.", preparingPrint: "Preparando impresión…",
-    addFilter: "Agregar filtro", none: "Ninguno", filterHint: "Repite = en el mismo campo para incluir cualquier valor. Wildcards: * cualquier texto, ? un carácter.", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
+    addFilter: "Agregar filtro", none: "Ninguno", rows: "filas", in: "en", ran: "ejecutado en", truncated: "Mostrando las primeras 5.000 filas.",
+    filterHint: "Usa * para cualquier texto y ? para un carácter — por ejemplo, Sofia* encuentra a Sofía Gómez. No hace falta escribir acentos. Repite = en el mismo campo para incluir cualquiera de varios valores.",
+    and: "y",
+    ops: {
+      equals: "=", not_equals: "≠", contains: "contiene", not_contains: "no contiene", starts_with: "empieza con",
+      ends_with: "termina con", greater_than: ">", greater_than_or_equal: "≥", less_than: "<", less_than_or_equal: "≤",
+      between: "entre", in: "es alguno de", not_in: "no es ninguno de", is_empty: "está vacío", is_not_empty: "no está vacío",
+      date_before: "antes de", date_after: "después de", date_on_or_before: "en o antes de", date_on_or_after: "en o después de",
+      date_between: "entre",
+    } as Record<FilterOperator, string>,
     selectDataset: "Elige un dataset para empezar.", noColumns: "Elige al menos una columna y ejecuta.",
     runFirst: "Ejecuta el reporte para ver resultados.", noData: "Ninguna fila coincide con este reporte.",
     scope: { label: "Alcance", all: "Todos los Proyectos", allHint: "Todo el portafolio", choose: "Elige un proyecto", runningFor: "Ejecutando reporte para", noProjects: "Aún no hay proyectos disponibles.", search: "Buscar proyectos…" },
@@ -96,19 +115,11 @@ const T = {
   },
 };
 
-const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
-  text: ["equals", "not_equals", "contains", "starts_with", "in", "is_empty", "is_not_empty"],
-  number: ["equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between"],
-  date: ["date_before", "date_after", "date_between", "is_empty", "is_not_empty"],
-  boolean: ["equals"],
-  enum: ["equals", "not_equals", "in", "not_in"],
-};
-const OP_LABELS: Record<FilterOperator, string> = {
-  equals: "=", not_equals: "≠", contains: "contains", not_contains: "not contains", starts_with: "starts with",
-  ends_with: "ends with", greater_than: ">", greater_than_or_equal: "≥", less_than: "<", less_than_or_equal: "≤",
-  between: "between", in: "in", not_in: "not in", is_empty: "is empty", is_not_empty: "is not empty",
-  date_before: "before", date_after: "after", date_between: "between",
-};
+/** Operators offered per column type — the same table the server validates against. */
+const opsFor = (type: string): FilterOperator[] => OPERATORS_BY_TYPE[type as ColumnType] ?? OPERATORS_BY_TYPE.text;
+
+/** Operators that take two values (a range). */
+const isRangeOp = (op: FilterOperator) => op === "between" || op === "date_between";
 
 const VIS_OPTIONS: { value: VisualizationType; label: string }[] = [
   { value: "table", label: "Table" }, { value: "kpi_cards", label: "KPI Cards" },
@@ -719,7 +730,7 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
   const addFilter = () => {
     const first = columns[0];
     if (!first) return;
-    onChange([...filters, { column: first.key, operator: OPERATORS_BY_TYPE[first.type][0], value: "" }]);
+    onChange([...filters, { column: first.key, operator: opsFor(first.type)[0], value: "" }]);
   };
   const update = (i: number, patch: Partial<ReportFilter>) => onChange(filters.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
   const remove = (i: number) => onChange(filters.filter((_, idx) => idx !== i));
@@ -739,31 +750,60 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
             const col = colByKey.get(f.column);
             const type = col?.type ?? "text";
             const needsValue = !["is_empty", "is_not_empty"].includes(f.operator);
+            const range = isRangeOp(f.operator);
+            const inputType = type === "number" ? "number" : type === "date" ? "date" : "text";
+            const bound = (idx: 0 | 1) => (Array.isArray(f.value) ? String(f.value[idx] ?? "") : "");
+            const setBound = (idx: 0 | 1, v: string) => {
+              const pair: [string, string] = [bound(0), bound(1)];
+              pair[idx] = v;
+              update(i, { value: pair });
+            };
+            // Text filters accept wildcards; the hint only makes sense there.
+            const showWildcardHint = (type === "text" || type === "enum") && needsValue && !range;
             return (
               <div key={i} className="flex flex-wrap items-center gap-2">
-                <select value={f.column} onChange={(e) => { const nc = colByKey.get(e.target.value); update(i, { column: e.target.value, operator: OPERATORS_BY_TYPE[nc?.type ?? "text"][0], value: "" }); }}
+                <select value={f.column} onChange={(e) => { const nc = colByKey.get(e.target.value); update(i, { column: e.target.value, operator: opsFor(nc?.type ?? "text")[0], value: "" }); }}
                   className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
                   {columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
                 </select>
-                <select value={f.operator} onChange={(e) => update(i, { operator: e.target.value as FilterOperator })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
-                  {OPERATORS_BY_TYPE[type].map((op) => <option key={op} value={op}>{OP_LABELS[op]}</option>)}
+                <select
+                  value={f.operator}
+                  onChange={(e) => {
+                    const next = e.target.value as FilterOperator;
+                    // Range operators carry [min,max]; scalar ones a single value.
+                    const value = isRangeOp(next) ? ["", ""] : isRangeOp(f.operator) ? "" : f.value ?? "";
+                    update(i, { operator: next, value });
+                  }}
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                >
+                  {opsFor(type).map((op) => <option key={op} value={op}>{t.ops[op]}</option>)}
                 </select>
                 {needsValue && (
-                  type === "boolean" ? (
+                  range ? (
+                    <>
+                      <input type={inputType} value={bound(0)} onChange={(e) => setBound(0, e.target.value)}
+                        className="w-28 rounded-lg border border-border bg-background px-2 py-1 text-xs" placeholder="…" />
+                      <span className="text-xs text-muted-foreground">{t.and}</span>
+                      <input type={inputType} value={bound(1)} onChange={(e) => setBound(1, e.target.value)}
+                        className="w-28 rounded-lg border border-border bg-background px-2 py-1 text-xs" placeholder="…" />
+                    </>
+                  ) : type === "boolean" ? (
                     <select value={String(f.value ?? "true")} onChange={(e) => update(i, { value: e.target.value === "true" })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
                       <option value="true">true</option><option value="false">false</option>
                     </select>
-                  ) : type === "enum" && col?.enumValues ? (
-                    <select value={String(f.value ?? "")} onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? [e.target.value] : e.target.value })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
+                  ) : type === "enum" && col?.enumValues && !["contains"].includes(f.operator) ? (
+                    <select value={Array.isArray(f.value) ? String(f.value[0] ?? "") : String(f.value ?? "")} onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? [e.target.value] : e.target.value })} className="rounded-lg border border-border bg-background px-2 py-1 text-xs">
                       <option value="">—</option>
                       {col.enumValues.map((ev) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
                     </select>
                   ) : (
-                    <input type={type === "number" ? "number" : type === "date" ? "date" : "text"}
+                    <input type={inputType}
                       value={Array.isArray(f.value) ? f.value.join(",") : String(f.value ?? "")}
                       onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? e.target.value.split(",").map((s) => s.trim()) : e.target.value })}
                       maxLength={500}
-                      className="w-40 rounded-lg border border-border bg-background px-2 py-1 text-xs" placeholder="…" />
+                      className="w-40 rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                      placeholder={["in", "not_in"].includes(f.operator) ? "a, b, c" : type === "text" ? "Sofia*" : "…"}
+                      title={showWildcardHint ? t.filterHint : undefined} />
                   )
                 )}
                 <button type="button" onClick={() => remove(i)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>

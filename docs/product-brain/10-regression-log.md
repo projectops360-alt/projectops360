@@ -757,6 +757,53 @@ Impact · Severity · Investigation status · Owner · Next action.
 - **Owner:** Product/Engineering. **Verify:** as a platform admin, expand XXX
   (`dc8205c1-…`) in Companies → 10 users listed, each with email.
 
+## REG-038 — Task Report Builder returned 0 rows when a second filter was added
+
+- **Reported:** 2026-07-27. In the Task Execution report, `Project = Agro*` returned
+  rows, but adding `Responsable = Paul*` returned an empty report — even though 12
+  tasks in the Agro* projects are assigned to Paul.
+- **Root cause (two independent defects, both required to see rows):**
+  1. **Owner never resolved.** `fetchTaskExecution` built its assignee lookup with
+     `profiles.select().eq("organization_id", ctx.organizationId)`. A profile's
+     `organization_id` is the person's **home** org, not every org they work in.
+     Paul's home org differs from the Agro* projects' org, so he fell out of the
+     map and every one of his tasks carried `owner: ""`. Any Owner filter then
+     matched nothing — the Project filter looked fine only because project names
+     are resolved from a different (correct) lookup.
+  2. **Wildcards compared literally.** `Paul*` was matched with `===`, so even a
+     correctly resolved "Paul Reyes" would not have matched. There is no SQL here
+     (filters run in memory over curated rows), so `ILIKE` had no equivalent.
+  3. **Accent-sensitive matching** — surfaced during acceptance once 1 and 2 were
+     fixed. `Proyecto = mobil*` returned 29 rows, but adding `Responsable =
+     Sofia*` returned 0: the stored name is `Sofía Gómez (Dev)`. Nobody types
+     diacritics into a filter box, and in a Spanish-language product a report
+     that silently empties over one accent reads as the same defect.
+- **Status: RESOLVED / PROTECTED (2026-07-27).** Owner names are now resolved from
+  the assignee ids actually referenced by the already-org-scoped tasks
+  (`.in("id", ownerIds)`), which also shrinks the query. Text filters compile `*`
+  and `?` into an anchored pattern — the in-memory equivalent of `ILIKE` — with
+  regex metacharacters escaped, and both sides are compared case- **and
+  accent-insensitively** (NFD fold), so `Sofia*` finds `Sofía Gómez`. Filters are
+  compiled once per report instead of per row, so combining filters stays linear.
+- **Protection rule (binding):** **A display name shown in a report must be
+  resolved from the ids the scoped rows reference, never by re-filtering the
+  lookup table on `organization_id`.** Org isolation comes from the rows being
+  scoped, not from the name lookup; re-scoping the lookup silently blanks
+  multi-org people and turns a filter into a silent empty result. A filter that
+  cannot be satisfied must return no rows *because the data says so*, never
+  because a column was never populated. Guard id **REPORT-OWNER-ID-RESOLUTION**.
+- **AND/OR semantics (recorded decision):** filters AND across different columns;
+  repeating a membership filter (`=` / `is one of`) on the **same** column ORs
+  those values. This carries forward the semantics from
+  `codex/report-filter-or-wildcards` rather than forking it.
+- **Owner:** Product/Engineering. **Verify:**
+  `src/lib/reports/__tests__/task-report-owner-resolution.test.ts` (fails if the
+  profile lookup goes back to `organization_id`) ·
+  `src/lib/reports/__tests__/task-report-filters.test.ts` (wildcards, 1/2/3+
+  filter combinations, numeric and percentage filters, AND/OR, empty results).
+  Live check against DEV data:
+  `REPORT_FILTERS_VERIFY=1 npx vitest run src/lib/reports/__tests__/task-report-filters.live.test.ts`.
+
 ---
 
 ## REG-024 — Supabase email confirmation callback rewritten to a missing locale route

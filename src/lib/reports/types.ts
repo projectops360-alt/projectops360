@@ -78,12 +78,20 @@ export type FilterOperator =
   | "is_not_empty"
   | "date_before"
   | "date_after"
+  | "date_on_or_before"
+  | "date_on_or_after"
   | "date_between";
 
 export interface ReportFilter {
   column: string;
   operator: FilterOperator;
-  /** Single value, or [min,max] for between / date_between, or string[] for in/not_in. */
+  /**
+   * Single value, or [min,max] for between / date_between, or string[] for in/not_in.
+   *
+   * Text values support `*` (any run of characters) and `?` (one character)
+   * wildcards — e.g. `Paul*` on an "equals" filter matches "Paul Reyes". This is
+   * the in-memory equivalent of SQL `ILIKE 'Paul%'`.
+   */
   value?: string | number | boolean | (string | number)[] | null;
 }
 
