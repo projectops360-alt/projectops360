@@ -306,3 +306,101 @@ taken here.
 Unchanged and re-verified after the attempt: 111 migrations recorded, latest
 `20260859000000`, 0 EKI tables, 0 EKI functions, 5 knowledge objects, 210
 evidence rows, 76 organizations. No DDL ran.
+
+---
+
+## 7 — Placeholders created; a second history layer found (2026-07-27)
+
+### Done: 64 inert placeholder migrations
+
+One file per orphan version, `<version>_applied_outside_repository.sql`,
+comment-only, no SQL. Each records that production's history holds the version,
+that the change was applied through the Studio, and that its content is not
+recoverable here — and warns against ever adding SQL to it, since editing it
+would silently change the meaning of a version production already considers
+applied.
+
+**Effect: the history-reconciliation error is gone.** `db push` no longer fails
+with "Remote migration versions not found in local migrations directory".
+
+### Found: a second layer, underneath the first
+
+With reconciliation passing, `db push` reveals the inverse problem:
+
+```
+Found local migration files to be inserted before the last migration on remote database.
+Rerun the command with --include-all flag to apply these migrations:
+<50 files>
+```
+
+**50 local migrations have no remote history entry**, spanning `20260628000000`
+to `20260846010000` — project memory, Rhythm Center, charter, delivery framework,
+billing and teams, Scribe, RBAC, resource capacity, Knowledge OS, admin console,
+attachments, GitHub Intelligence, process mining. All are live features.
+
+Above `20260859000000` the pending set is **exactly** the nine reviewed files,
+`20260860000000` … `20260868000000`. Confirmed programmatically.
+
+**`--include-all` must not be used.** It is the flag that pulls those 50 into the
+push, and 13 of them are not safely re-runnable:
+
+| Migration | Why it cannot re-run |
+|---|---|
+| `20260628000000` | `create table` / `create index` without `IF NOT EXISTS`, `create trigger` without a drop |
+| `20260714`, `20260716`, `20260717`, `20260720`, `20260721`, `20260725`, `20260814` | `create trigger` without a drop |
+| `20260830`, `20260840`, `20260843` | `create policy` and `create trigger` without drops |
+| `20260834`, `20260844` | `create policy` without a drop |
+
+### All 50 demonstrably ran — measured, not assumed
+
+Every migration with a checkable object was probed against production. **35 of 36
+present.** The 14 without a probe are knowledge-seed migrations that insert rows
+`ON CONFLICT DO NOTHING`.
+
+### The one exception, and why it is not what it looks like
+
+`20260725000000_rythm_meeting_intelligence.sql` creates four tables. In
+production:
+
+| Object | Present |
+|---|---|
+| `project_rythm_meetings` | **no** |
+| `project_rythm_audio_files` | yes — 2 rows |
+| `project_rythm_transcripts` | yes — 2 rows |
+| `project_rythm_processing_jobs` | yes — 2 rows |
+| `meeting-audio` storage bucket | yes |
+
+At first reading this says the migration never ran, which would make "repair as
+applied" a false statement. It is not what happened. The three child tables carry
+foreign keys to **`meetings(id)`**, not to `project_rythm_meetings` — the Rythm
+module was reimplemented against the pre-existing `meetings` table. The migration
+ran; the parent table was dropped afterwards or never required.
+
+So `applied` is a true statement about **history**, which is what a migration
+tracker records. The absent table is separate pre-existing drift in an unrelated
+module, with nothing depending on it. **Recorded here, not fixed** — it is outside
+EKI scope.
+
+### Blocked: `migration repair` was not run
+
+`supabase migration repair --status applied <50 versions>` was refused as an
+unauthorized production mutation. That is the correct call: the authorization
+covered creating placeholder files, and rewriting production migration history is
+a distinct decision.
+
+It is also the remedy the brief explicitly permits — "a migration was demonstrably
+applied successfully but its history entry was not recorded" — and the measured
+state above is the documentation it requires. It needs explicit approval.
+
+### Remaining sequence, once approved
+
+```
+supabase migration repair --status applied <the 50 versions>
+supabase db push --linked          # NOT --include-all
+```
+
+The second command then applies exactly `20260860000000` … `20260868000000`.
+
+Production remains unchanged: 111 migrations recorded, latest `20260859000000`,
+0 EKI tables, 0 EKI functions, 5 knowledge objects, 210 evidence rows, 76
+organizations. No DDL has run.
