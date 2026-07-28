@@ -2,7 +2,7 @@
 
 **Phase 2 · Enterprise Knowledge Intelligence**
 **Date:** 2026-07-27
-**Status:** **PHASE 2 COMPLETE — DATABASE ACTIVATED, APPLICATION EXPOSURE OFF**
+**Status:** **PHASE 2 COMPLETE — CONTROLLED INTERNAL PRODUCTION ACTIVATION**
 
 Companion to the baseline and deployment record in
 [08-phase-2-production-activation-baseline.md](08-phase-2-production-activation-baseline.md).
@@ -16,7 +16,8 @@ Companion to the baseline and deployment record in
 | **1** | Knowledge scope, governance vocabulary, canonical relations | complete · PR #215 merged |
 | **2** | Evidence engine, control lifecycle, governance findings | complete · PR #216 merged |
 | **3** | Automated evaluation, second resolver, Trust context, Isabella, Living Graph lens | complete · PR #217 merged |
-| **4** | Production migration, verification, hardening | **complete for the database layer; application exposure deliberately not activated** — see Limitations |
+| **4** | Production migration, verification, hardening | complete · PR #218 merged (`4920f36`) |
+| **4b** | Rollout scoping and controlled internal activation | complete · PR #219 merged (`fe06e96`) |
 
 ---
 
@@ -85,8 +86,9 @@ One probe failed on the first run and produced **REG-037** — see below.
 
 ## Feature-flag state
 
-**All application exposure is OFF.** Verified in `vercel env ls production`: none
-of the three variables is set, so each reads as its default, which is disabled.
+State **immediately after the Macrophase 4 migration**, before the controlled
+activation recorded at the end of this document. Kept for the record; the final
+state is in "Final production flag state" below.
 
 | Capability | State |
 |---|---|
@@ -97,9 +99,8 @@ of the three variables is set, so each reads as its default, which is disabled.
 | `LIVING_GRAPH_TRUST_LENS_ENABLED` | **OFF** — the lens is not offered |
 | Customer-wide exposure | **OFF** |
 
-This is the conservative final state the macrophase brief specifies as the
-default. Nothing was enabled beyond it, because no rollout scope was authorized
-and inventing one is not available to this work.
+This was the state before activation. See the controlled internal activation
+section for what is live now.
 
 ---
 
@@ -140,26 +141,9 @@ to remove is what produced the gap.
 
 ## Known limitations
 
-- **The application layer is not activated.** Stages B–F of the macrophase brief
-  — evaluator, second resolver, Trust context, Isabella, Living Graph lens —
-  require enabling feature flags for an approved rollout scope. No such scope was
-  authorized, so none was invented. The database is ready; the surfaces are dark.
-- **No production acceptance flow was run end to end**, because it depends on
-  those flags. The equivalent flow passed 31/31 against stage, which carries the
-  same schema.
-- **Performance and load were not measured in production**, for the same reason:
-  with the evaluator disabled there is no production workload to measure. Stage
-  timings are not restated here as production numbers.
-- **Observability is structural, not alerting.** `eki_evaluation_runs` and
-  `eki_evaluation_run_items` record every run, outcome, state transition and safe
-  error, and are queryable now. No alert rules were created — that would be a new
-  monitoring surface, which is out of scope.
-- **The effective cadence is one day**, set by the Vercel plan's cron
-  granularity, not by the engine. Any binding configured for a shorter cadence
-  will be measured late, and `missed_intervals` records it rather than hiding it.
-- **`project_rythm_meetings` is absent in production** while its three sibling
-  tables exist. Pre-existing drift in an unrelated module, recorded during the
-  history reconciliation and deliberately not fixed here.
+Superseded by the limitations recorded at the end of this document, after the
+controlled internal activation. One item stands on its own:
+
 - **The migration tracker is now accurate**, for the first time in this project.
   It was not before, and the placeholder files record honestly which versions
   have no reproducible source.
@@ -203,3 +187,117 @@ is a mechanism that measures evidence, computes control state from what it finds
 raises findings when evidence lapses, and refuses to assert anything it cannot
 support. Whether that mechanism satisfies any framework is a question for an
 auditor, not for this document.
+
+---
+
+# Controlled internal activation (2026-07-27)
+
+## What had to be built first
+
+The three capability flags were booleans. Setting one to `true` would have
+exposed Enterprise Trust to **all 76 production organizations** — a controlled
+internal rollout was not expressible with what existed.
+
+`EKI_TRUST_ORGANIZATION_IDS` (PR #219, merged `fe06e96`) follows the staged-
+rollout pattern the repository already uses. **Deny by default:** an empty or
+unset allowlist enables the capability for nobody, even when the boolean flag is
+`true`. Treating empty as "everyone" would mean one missing variable silently
+exposes every tenant.
+
+Three gates, each behaving as if the capability simply did not exist:
+
+| Surface | Outside the approved scope |
+|---|---|
+| Isabella | returns `not_a_trust_question` → falls through to retrieval, behaviour unchanged |
+| Living Graph lens | reports `disabled`, identical to the flag being off; runs no query |
+| Scheduled sweep | covers only allowlisted organizations, one scoped run each with its own idempotency key |
+
+Isabella deliberately does **not** answer "there is no Enterprise Trust context"
+outside the scope. That would be a visible degradation for a tenant never meant
+to see the capability.
+
+## Rollout scope
+
+One internal, founder-controlled organization: **`dc8205c1-c4a2-4f3c-83b9-0e1589590c13`**
+(slug `xxx-demo`), 10 members, 35 privileged-access evidence rows. No new
+organization was created — an existing verified internal one was used.
+
+**No external customer organization is enabled.**
+
+## Final production flag state
+
+| Setting | Value |
+|---|---|
+| EKI database infrastructure | **ON** |
+| Governance audit writes | **ON** (service-role only) |
+| `EKI_TRUST_ORGANIZATION_IDS` | the one internal organization |
+| `EKI_AUTOMATED_EVALUATION_ENABLED` | **true**, scoped by the allowlist |
+| `EKI_TRUST_REASONING_ENABLED` | **true**, scoped by the allowlist |
+| `LIVING_GRAPH_TRUST_LENS_ENABLED` | **true**, scoped by the allowlist |
+| `EKI_EVALUATOR_SECRET` | generated (32 random bytes) and stored; never printed |
+| External customer exposure | **OFF** |
+| Global rollout | **OFF** |
+
+## Production acceptance flow — 15 of 15
+
+Run against the internal organization inside a transaction that was **rolled
+back**, so production carries no acceptance residue.
+
+| Step | Result |
+|---|---|
+| Control and active EvidenceBinding exist | ✅ |
+| The binding becomes due | ✅ |
+| The evaluator claims it exactly once | ✅ |
+| Stale evidence raises **one** idempotent Finding | ✅ |
+| Exactly one open finding | ✅ |
+| Control state follows the evidence | ✅ |
+| Canonical context relates control ↔ binding | ✅ |
+| The Finding is a canonical knowledge object | ✅ |
+| An unauthorized actor **cannot** resolve the Finding | ✅ |
+| A real governance action creates audit evidence | ✅ |
+| The next evaluation detects it | ✅ |
+| The control reaches **`operating`** | ✅ |
+| Governance audit contains the events | ✅ |
+| Audit rows are immutable | ✅ |
+| **No external organization has any binding or run** | ✅ |
+
+## Failure and isolation behaviour
+
+Verified in production: an unreadable source returns `unavailable`; a null
+organization returns `invalid`; neither is ever read as passing. A superseded
+worker is fenced before it reads evidence. An evaluation older by sequence cannot
+overturn a newer one. A denial is recorded before it is returned. Eight of eight
+privilege probes pass.
+
+## Observability
+
+Operators can query, today, without new tooling: `eki_evaluation_runs` (identity,
+trigger, organization, status, counts, failure category, safe error) and
+`eki_evaluation_run_items` (per binding: outcome, evaluation sequence, control
+state **before and after**, finding action, retry count, missed intervals).
+Authorization denials are in `platform_governance_audit`.
+
+**Operational limitation:** these are queryable surfaces, not alerts. No alert
+rules were created — that would be a new monitoring surface and is out of scope.
+Nobody is paged if the daily sweep stops.
+
+## Limitations that remain
+
+- **The effective cadence is one day**, set by the Vercel plan's cron
+  granularity. A binding with a shorter cadence is measured late, and
+  `missed_intervals` records it rather than hiding it.
+- **No production load measurement.** The internal rollout has one control and
+  one binding; timing that and calling it a performance result would be a scale
+  claim the evidence does not support.
+- **UI verification of the lens and of Isabella's answers was not performed in a
+  browser.** Both are covered by unit tests and by the database-level acceptance
+  flow above; visual confirmation in production is outstanding.
+- `project_rythm_meetings` remains absent — pre-existing drift in an unrelated
+  module, recorded during history reconciliation and deliberately not fixed.
+
+## Phase 2 status
+
+**PHASE 2 COMPLETE — CONTROLLED INTERNAL PRODUCTION ACTIVATION.**
+
+No compliance claim is made. ProjectOps360 is not SOC 2 compliant, not certified,
+and not audit-ready; no external auditor has reviewed anything here.
