@@ -112,67 +112,146 @@ interface TaskExecutionSubtaskRow {
   sort_order: number | null;
 }
 
+const RISK_SEVERITY_RANK: Record<string, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+const OPEN_RISK_STATUS = new Set(["open", "mitigating"]);
+const DAY_MS = 86_400_000;
+
+/** Whole days between two YYYY-MM-DD dates, DST-safe (UTC midnight arithmetic). */
+function dayDiff(from: string | null, to: string | null): number | null {
+  const a = from ? Date.parse(`${String(from).slice(0, 10)}T00:00:00Z`) : NaN;
+  const b = to ? Date.parse(`${String(to).slice(0, 10)}T00:00:00Z`) : NaN;
+  if (Number.isNaN(a) || Number.isNaN(b)) return null;
+  return Math.round((b - a) / DAY_MS);
+}
+
 async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: ReportConfig): Promise<ReportRow[]> {
   const projects = await projectNameMap(supabase, ctx.organizationId);
-  const [{ data: tasks }, { data: milestones }, { data: profiles }, { data: resources }] = await Promise.all([
-    scope(supabase.from("roadmap_tasks").select("id, title, status, priority, milestone_id, assigned_to, assigned_resource_id, trade_key, discipline, start_date, end_date, duration_days, progress, is_blocked, blocker_reason, is_critical, slack_days, estimated_labor_hours, project_id").is("deleted_at", null).limit(ROW_CAP), ctx.organizationId, ctx.projectId),
+  const [{ data: tasks }, { data: milestones }, { data: resources }] = await Promise.all([
+    scope(supabase.from("roadmap_tasks").select("id, title, status, priority, milestone_id, assigned_to, assigned_resource_id, trade_key, discipline, start_date, end_date, completed_at, duration_days, progress, is_blocked, blocker_reason, is_critical, slack_days, estimated_labor_hours, estimate_hours, actual_hours, project_id").is("deleted_at", null).limit(ROW_CAP), ctx.organizationId, ctx.projectId),
     supabase.from("milestones").select("id, title").eq("organization_id", ctx.organizationId).is("deleted_at", null),
-    supabase.from("profiles").select("id, display_name").eq("organization_id", ctx.organizationId),
     supabase.from("resources").select("id, name").eq("organization_id", ctx.organizationId).is("deleted_at", null),
   ]);
-  const msName = new Map((milestones ?? []).map((m) => [m.id, m.title]));
-  const personName = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "—"]));
-  const resName = new Map((resources ?? []).map((r) => [r.id, r.name]));
 
   const validTasks = (tasks ?? []).filter((task) => task.project_id != null && projects.has(task.project_id));
-  const taskRows = validTasks.map((task) => ({
-    task,
-    row: {
-      project_name: projects.get(task.project_id!) ?? "—",
-      _projectId: task.project_id ?? null,
-      _recordId: task.id,
-      _rowKind: "task",
-      milestone: task.milestone_id ? msName.get(task.milestone_id) ?? "—" : "—",
-      record_type: "task",
-      parent_task: "",
-      task_name: task.title,
-      status: task.status,
-      priority: task.priority,
-      owner: task.assigned_to ? personName.get(task.assigned_to) ?? "" : task.assigned_resource_id ? resName.get(task.assigned_resource_id) ?? "" : "",
-      trade: task.trade_key ?? "",
-      discipline: task.discipline ?? "",
-      planned_start: task.start_date,
-      planned_finish: task.end_date,
-      duration_days: task.duration_days,
-      progress_pct: task.progress ?? 0,
-      blocked: task.status === "blocked" || !!task.is_blocked,
-      blocker_reason: task.blocker_reason ?? "",
-      critical_path: !!task.is_critical,
-      total_float: task.slack_days,
-      estimated_hours: task.estimated_labor_hours,
-    } as ReportRow,
-  }));
+
+  // Subtasks are fetched before owner names so their assignees are resolved too.
+  const subtasksByTask = new Map<string, TaskExecutionSubtaskRow[]>();
+  if (config.includeSubtasks && validTasks.length > 0) {
+    const { data: subtasksData } = await scope(
+      supabase
+        .from("task_subtasks")
+        .select("id, task_id, project_id, title, status, priority, owner_id, start_date, due_date, estimated_hours, progress, is_critical, blocked_reason, sort_order")
+        .is("deleted_at", null)
+        .order("sort_order", { ascending: true })
+        .limit(ROW_CAP),
+      ctx.organizationId,
+      ctx.projectId,
+    );
+    const validTaskIds = new Set(validTasks.map((task) => task.id));
+    for (const subtask of (subtasksData ?? []) as TaskExecutionSubtaskRow[]) {
+      if (!validTaskIds.has(subtask.task_id)) continue;
+      const siblings = subtasksByTask.get(subtask.task_id) ?? [];
+      siblings.push(subtask);
+      subtasksByTask.set(subtask.task_id, siblings);
+    }
+  }
+
+  // Owner names are resolved from the ids these already-org-scoped rows
+  // reference. Selecting profiles by `organization_id` instead silently dropped
+  // every assignee whose home org differs from the project's org (multi-org
+  // members), which made any Owner filter return zero rows (REG-038).
+  const ownerIds = [...new Set([
+    ...validTasks.map((task) => task.assigned_to),
+    ...[...subtasksByTask.values()].flat().map((subtask) => subtask.owner_id),
+  ].filter((id): id is string => !!id))];
+  const { data: profiles } = ownerIds.length
+    ? await supabase.from("profiles").select("id, display_name").in("id", ownerIds)
+    : { data: [] as { id: string; display_name: string | null }[] };
+
+  const [{ data: risks }, { data: dependencies }] = validTasks.length
+    ? await Promise.all([
+        scope(supabase.from("risks").select("linked_task_id, severity, status").is("deleted_at", null).not("linked_task_id", "is", null).limit(ROW_CAP), ctx.organizationId, ctx.projectId),
+        scope(supabase.from("task_dependencies").select("successor_id, predecessor_id").limit(ROW_CAP * 4), ctx.organizationId, ctx.projectId),
+      ])
+    : [{ data: [] as { linked_task_id: string; severity: string | null; status: string }[] }, { data: [] as { successor_id: string; predecessor_id: string }[] }];
+
+  const msName = new Map((milestones ?? []).map((m) => [m.id, m.title]));
+  const personName = new Map((profiles ?? []).map((p) => [p.id, p.display_name || ""]));
+  const resName = new Map((resources ?? []).map((r) => [r.id, r.name]));
+
+  const riskByTask = new Map<string, { open: number; topRank: number }>();
+  for (const r of risks ?? []) {
+    if (!r.linked_task_id || !OPEN_RISK_STATUS.has(r.status)) continue;
+    const entry = riskByTask.get(r.linked_task_id) ?? { open: 0, topRank: 0 };
+    entry.open++;
+    entry.topRank = Math.max(entry.topRank, RISK_SEVERITY_RANK[r.severity ?? ""] ?? 0);
+    riskByTask.set(r.linked_task_id, entry);
+  }
+
+  const depCount = new Map<string, number>();
+  for (const d of dependencies ?? []) {
+    if (!d.successor_id) continue;
+    depCount.set(d.successor_id, (depCount.get(d.successor_id) ?? 0) + 1);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const severityLabel = (rank: number) => Object.keys(RISK_SEVERITY_RANK).find((k) => RISK_SEVERITY_RANK[k] === rank) ?? "";
+
+  /** Days past a planned finish: 0 when on time, null when there is no date. */
+  const lateness = (plannedFinish: string | null, done: boolean, completedAt: string | null): number | null => {
+    if (!plannedFinish) return null;
+    const ref = done ? (completedAt ? String(completedAt).slice(0, 10) : null) : today;
+    const diff = ref ? dayDiff(plannedFinish, ref) : null;
+    return diff === null ? null : Math.max(0, diff);
+  };
+
+  const taskRows = validTasks.map((task) => {
+    const estimated = task.estimated_labor_hours != null ? Number(task.estimated_labor_hours)
+      : task.estimate_hours != null ? Number(task.estimate_hours) : null;
+    const actual = task.actual_hours != null ? Number(task.actual_hours) : null;
+    const risk = riskByTask.get(task.id);
+    const deps = depCount.get(task.id) ?? 0;
+    return {
+      task,
+      row: {
+        project_name: projects.get(task.project_id!) ?? "—",
+        _projectId: task.project_id ?? null,
+        _recordId: task.id,
+        _rowKind: "task",
+        milestone: task.milestone_id ? msName.get(task.milestone_id) ?? "—" : "—",
+        record_type: "task",
+        parent_task: "",
+        task_name: task.title,
+        status: task.status,
+        priority: task.priority,
+        owner: task.assigned_to ? personName.get(task.assigned_to) ?? "" : task.assigned_resource_id ? resName.get(task.assigned_resource_id) ?? "" : "",
+        owner_id: task.assigned_to ?? task.assigned_resource_id ?? "",
+        trade: task.trade_key ?? "",
+        discipline: task.discipline ?? "",
+        planned_start: task.start_date,
+        planned_finish: task.end_date,
+        duration_days: task.duration_days,
+        days_late: lateness(task.end_date, DONE.has(task.status), task.completed_at ?? null),
+        progress_pct: task.progress ?? 0,
+        blocked: task.status === "blocked" || !!task.is_blocked,
+        blocker_reason: task.blocker_reason ?? "",
+        critical_path: !!task.is_critical,
+        total_float: task.slack_days,
+        estimated_hours: estimated,
+        actual_hours: actual,
+        hours_variance: estimated !== null && actual !== null ? Math.round((actual - estimated) * 100) / 100 : null,
+        hours_variance_pct: estimated !== null && actual !== null && estimated > 0
+          ? Math.round(((actual - estimated) / estimated) * 10000) / 100
+          : null,
+        open_risks: risk?.open ?? 0,
+        risk_severity: severityLabel(risk?.topRank ?? 0),
+        dependency_count: deps,
+        has_dependencies: deps > 0,
+      } as ReportRow,
+    };
+  });
 
   if (!config.includeSubtasks || validTasks.length === 0) return taskRows.map(({ row }) => row);
-
-  const { data: subtasksData } = await scope(
-    supabase
-      .from("task_subtasks")
-      .select("id, task_id, project_id, title, status, priority, owner_id, start_date, due_date, estimated_hours, progress, is_critical, blocked_reason, sort_order")
-      .is("deleted_at", null)
-      .order("sort_order", { ascending: true })
-      .limit(ROW_CAP),
-    ctx.organizationId,
-    ctx.projectId,
-  );
-  const validTaskIds = new Set(validTasks.map((task) => task.id));
-  const subtasksByTask = new Map<string, TaskExecutionSubtaskRow[]>();
-  for (const subtask of (subtasksData ?? []) as TaskExecutionSubtaskRow[]) {
-    if (!validTaskIds.has(subtask.task_id)) continue;
-    const siblings = subtasksByTask.get(subtask.task_id) ?? [];
-    siblings.push(subtask);
-    subtasksByTask.set(subtask.task_id, siblings);
-  }
 
   return taskRows.flatMap(({ task, row }) => {
     const children = (subtasksByTask.get(task.id) ?? []).map((subtask) => ({
@@ -188,17 +267,27 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
       status: subtask.status,
       priority: subtask.priority,
       owner: subtask.owner_id ? personName.get(subtask.owner_id) ?? "" : "",
+      owner_id: subtask.owner_id ?? "",
       trade: row.trade,
       discipline: row.discipline,
       planned_start: subtask.start_date,
       planned_finish: subtask.due_date,
       duration_days: null,
+      days_late: lateness(subtask.due_date, DONE.has(subtask.status), null),
       progress_pct: subtask.progress ?? 0,
       blocked: subtask.status === "blocked",
       blocker_reason: subtask.blocked_reason ?? "",
       critical_path: !!subtask.is_critical,
       total_float: null,
       estimated_hours: subtask.estimated_hours,
+      // Subtasks carry no effort actuals, linked risks or dependencies of their own.
+      actual_hours: null,
+      hours_variance: null,
+      hours_variance_pct: null,
+      open_risks: 0,
+      risk_severity: "",
+      dependency_count: 0,
+      has_dependencies: false,
     } as ReportRow));
     return [row, ...children];
   }).slice(0, ROW_CAP);
@@ -447,7 +536,7 @@ export async function runReport(
   const allRows = applyCalculated(rawRows, calcFields);
 
   // Filter → sort (calculated columns participate)
-  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, effectiveColumns);
+  const filtered = applySort(applyFilters(allRows, config.filters, effectiveColumns), config.sort, effectiveColumns);
 
   // Selected columns metadata (preserve order, fall back to defaults)
   const selected = config.columns.length > 0
@@ -466,15 +555,8 @@ export async function runReport(
 
 /** Run and return ALL filtered rows (for CSV export, capped at ROW_CAP). */
 export async function runReportForExport(config: ReportConfig, ctx: QueryContext): Promise<{ rows: ReportRow[]; columns: DatasetColumn[] } | RunReportError> {
+  // A single page of ROW_CAP already IS every filtered row, so one run is enough.
   const result = await runReport(config, ctx, { page: 1, pageSize: ROW_CAP });
   if ("error" in result) return result;
-  const dataset = getDataset(config.datasetId)!;
-  const fetcher = FETCHERS[config.datasetId]!;
-  const calcFields = config.calculatedFields ?? [];
-  const { calcCols } = buildCalcColumns(dataset, calcFields);
-  const effectiveColumns = [...dataset.columns, ...calcCols];
-  const supabase = createAdminClient();
-  const allRows = applyCalculated(await fetcher(supabase, ctx, config), calcFields);
-  const filtered = applySort(applyFilters(allRows, config.filters), config.sort, effectiveColumns);
-  return { rows: filtered, columns: result.columns };
+  return { rows: result.rows, columns: result.columns };
 }

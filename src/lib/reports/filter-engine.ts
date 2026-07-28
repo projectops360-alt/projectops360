@@ -19,12 +19,12 @@ import type {
 // ── Validation ────────────────────────────────────────────────────────────────
 
 /** Operators allowed per column type. */
-const OPERATORS_BY_TYPE: Record<ColumnType, FilterOperator[]> = {
+export const OPERATORS_BY_TYPE: Record<ColumnType, FilterOperator[]> = {
   text: ["equals", "not_equals", "contains", "not_contains", "starts_with", "ends_with", "in", "not_in", "is_empty", "is_not_empty"],
   number: ["equals", "not_equals", "greater_than", "greater_than_or_equal", "less_than", "less_than_or_equal", "between", "in", "not_in", "is_empty", "is_not_empty"],
-  date: ["equals", "not_equals", "date_before", "date_after", "date_between", "is_empty", "is_not_empty"],
+  date: ["equals", "not_equals", "date_before", "date_after", "date_on_or_before", "date_on_or_after", "date_between", "is_empty", "is_not_empty"],
   boolean: ["equals", "not_equals", "is_empty", "is_not_empty"],
-  enum: ["equals", "not_equals", "in", "not_in", "is_empty", "is_not_empty"],
+  enum: ["equals", "not_equals", "contains", "in", "not_in", "is_empty", "is_not_empty"],
 };
 
 export interface FilterValidationError {
@@ -75,101 +75,206 @@ function asTime(v: unknown): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-type TextMatchMode = "equals" | "contains" | "starts_with" | "ends_with";
+// ── Wildcards (the in-memory equivalent of SQL ILIKE) ────────────────────────
 
-function matchesText(raw: unknown, value: unknown, mode: TextMatchMode): boolean {
-  const input = raw === null || raw === undefined ? "" : String(raw);
-  const pattern = value === null || value === undefined ? "" : String(value);
-  const hasWildcard = pattern.includes("*") || pattern.includes("?");
-
-  if (!hasWildcard) {
-    const normalizedInput = input.toLowerCase();
-    const normalizedPattern = pattern.toLowerCase();
-    if (mode === "contains") return normalizedInput.includes(normalizedPattern);
-    if (mode === "starts_with") return normalizedInput.startsWith(normalizedPattern);
-    if (mode === "ends_with") return normalizedInput.endsWith(normalizedPattern);
-    return normalizedInput === normalizedPattern;
-  }
-
-  const escaped = pattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*+/g, ".*")
-    .replace(/\?/g, ".");
-  const prefix = mode === "equals" || mode === "starts_with" ? "^" : "";
-  const suffix = mode === "equals" || mode === "ends_with" ? "$" : "";
-  return new RegExp(`${prefix}${escaped}${suffix}`, "i").test(input);
+/** `*` = any run of characters, `?` = exactly one. Everything else is literal. */
+export function hasWildcard(value: unknown): boolean {
+  return typeof value === "string" && /[*?]/.test(value);
 }
 
-function matchesFilter(row: ReportRow, filter: ReportFilter): boolean {
-  const raw = row[filter.column] ?? null;
+const REGEX_SPECIALS = /[.+^${}()|[\]\\]/g;
+
+/**
+ * Compile a user pattern into a case-insensitive RegExp.
+ * `anchor: "full"` behaves like `ILIKE 'x'`, `"start"` like `ILIKE 'x%'`,
+ * `"end"` like `ILIKE '%x'`, `"loose"` like `ILIKE '%x%'`.
+ */
+function globToRegExp(pattern: string, anchor: "full" | "start" | "end" | "loose"): RegExp {
+  const body = pattern
+    .replace(REGEX_SPECIALS, "\\$&")   // escape regex metachars, leaving * and ?
+    .replace(/\*/g, "[\\s\\S]*")
+    .replace(/\?/g, "[\\s\\S]");
+  const prefix = anchor === "full" || anchor === "start" ? "^" : "";
+  const suffix = anchor === "full" || anchor === "end" ? "$" : "";
+  return new RegExp(`${prefix}${body}${suffix}`, "i");
+}
+
+function textValue(v: unknown): string {
+  return v === null || v === undefined ? "" : String(v).trim();
+}
+
+/** Equality that honours wildcards — used by equals/not_equals/in/not_in. */
+function makeEqualityTest(value: unknown): (str: string) => boolean {
+  const needle = textValue(value);
+  if (hasWildcard(needle)) {
+    const re = globToRegExp(needle, "full");
+    return (str) => re.test(str);
+  }
+  const lower = needle.toLowerCase();
+  return (str) => str.toLowerCase() === lower;
+}
+
+/** Substring/prefix/suffix test that honours wildcards. */
+function makeTextTest(value: unknown, anchor: "start" | "end" | "loose"): (str: string) => boolean {
+  const needle = textValue(value);
+  if (hasWildcard(needle)) {
+    const re = globToRegExp(needle, anchor);
+    return (str) => re.test(str);
+  }
+  const lower = needle.toLowerCase();
+  if (anchor === "start") return (str) => str.toLowerCase().startsWith(lower);
+  if (anchor === "end") return (str) => str.toLowerCase().endsWith(lower);
+  return (str) => str.toLowerCase().includes(lower);
+}
+
+// ── Filter compilation ───────────────────────────────────────────────────────
+
+type Predicate = (row: ReportRow) => boolean;
+
+const NEVER: Predicate = () => false;
+
+/**
+ * Compile one filter into a row predicate. Patterns, numbers and dates are
+ * parsed ONCE here instead of per row, so adding filters stays O(rows) with a
+ * small constant regardless of how many filters the report carries.
+ */
+function compileFilter(filter: ReportFilter, type: ColumnType | undefined): Predicate {
+  const col = filter.column;
   const op = filter.operator;
-
-  if (op === "is_empty") return raw === null || raw === "";
-  if (op === "is_not_empty") return raw !== null && raw !== "";
-
   const val = filter.value;
+
+  if (op === "is_empty") return (row) => { const r = row[col] ?? null; return r === null || r === ""; };
+  if (op === "is_not_empty") return (row) => { const r = row[col] ?? null; return r !== null && r !== ""; };
+
+  const asBool = (v: unknown) => v === true || v === "true";
 
   switch (op) {
     case "equals":
-      if (typeof raw === "boolean") return raw === (val === true || val === "true");
-      return matchesText(raw, val, "equals");
-    case "not_equals":
-      if (typeof raw === "boolean") return raw !== (val === true || val === "true");
-      return !matchesText(raw, val, "equals");
-    case "contains": return matchesText(raw, val, "contains");
-    case "not_contains": return !matchesText(raw, val, "contains");
-    case "starts_with": return matchesText(raw, val, "starts_with");
-    case "ends_with": return matchesText(raw, val, "ends_with");
-    case "in": return Array.isArray(val) && val.some((candidate) => matchesText(raw, candidate, "equals"));
-    case "not_in": return Array.isArray(val) && val.every((candidate) => !matchesText(raw, candidate, "equals"));
-    case "greater_than": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a > b; }
-    case "greater_than_or_equal": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a >= b; }
-    case "less_than": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a < b; }
-    case "less_than_or_equal": { const a = asNumber(raw), b = asNumber(val); return a !== null && b !== null && a <= b; }
+    case "not_equals": {
+      const negate = op === "not_equals";
+      // Numeric columns compare numerically so 30 === "30.0".
+      if (type === "number" && !hasWildcard(val)) {
+        const b = asNumber(val);
+        if (b === null) return NEVER;
+        return (row) => { const a = asNumber(row[col]); return a !== null && (negate ? a !== b : a === b); };
+      }
+      const test = makeEqualityTest(val);
+      return (row) => {
+        const raw = row[col] ?? null;
+        if (typeof raw === "boolean") return negate ? raw !== asBool(val) : raw === asBool(val);
+        const hit = test(textValue(raw));
+        return negate ? !hit : hit;
+      };
+    }
+    case "contains":
+    case "not_contains": {
+      const test = makeTextTest(val, "loose");
+      const negate = op === "not_contains";
+      return (row) => { const hit = test(textValue(row[col])); return negate ? !hit : hit; };
+    }
+    case "starts_with": {
+      const test = makeTextTest(val, "start");
+      return (row) => test(textValue(row[col]));
+    }
+    case "ends_with": {
+      const test = makeTextTest(val, "end");
+      return (row) => test(textValue(row[col]));
+    }
+    case "in":
+    case "not_in": {
+      const negate = op === "not_in";
+      const list = Array.isArray(val) ? val : val === null || val === undefined || val === "" ? [] : [val];
+      if (list.length === 0) return NEVER;
+      const tests = list.map((v) => makeEqualityTest(v));
+      return (row) => {
+        const str = textValue(row[col]);
+        const hit = tests.some((t) => t(str));
+        return negate ? !hit : hit;
+      };
+    }
+    case "greater_than":
+    case "greater_than_or_equal":
+    case "less_than":
+    case "less_than_or_equal": {
+      const b = asNumber(val);
+      if (b === null) return NEVER;
+      return (row) => {
+        const a = asNumber(row[col]);
+        if (a === null) return false;
+        if (op === "greater_than") return a > b;
+        if (op === "greater_than_or_equal") return a >= b;
+        if (op === "less_than") return a < b;
+        return a <= b;
+      };
+    }
     case "between": {
-      const a = asNumber(raw);
-      if (a === null || !Array.isArray(val)) return false;
+      if (!Array.isArray(val)) return NEVER;
       const lo = asNumber(val[0]), hi = asNumber(val[1]);
-      return lo !== null && hi !== null && a >= lo && a <= hi;
+      if (lo === null || hi === null) return NEVER;
+      // Tolerate reversed bounds ("between 60 and 30") instead of returning nothing.
+      const min = Math.min(lo, hi), max = Math.max(lo, hi);
+      return (row) => { const a = asNumber(row[col]); return a !== null && a >= min && a <= max; };
     }
-    case "date_before": { const a = asTime(raw), b = asTime(val); return a !== null && b !== null && a < b; }
-    case "date_after": { const a = asTime(raw), b = asTime(val); return a !== null && b !== null && a > b; }
+    case "date_before":
+    case "date_after":
+    case "date_on_or_before":
+    case "date_on_or_after": {
+      const b = asTime(val);
+      if (b === null) return NEVER;
+      return (row) => {
+        const a = asTime(row[col]);
+        if (a === null) return false;
+        if (op === "date_before") return a < b;
+        if (op === "date_after") return a > b;
+        if (op === "date_on_or_before") return a <= b;
+        return a >= b;
+      };
+    }
     case "date_between": {
-      const a = asTime(raw);
-      if (a === null || !Array.isArray(val)) return false;
+      if (!Array.isArray(val)) return NEVER;
       const lo = asTime(val[0]), hi = asTime(val[1]);
-      return lo !== null && hi !== null && a >= lo && a <= hi;
+      if (lo === null || hi === null) return NEVER;
+      const min = Math.min(lo, hi), max = Math.max(lo, hi);
+      return (row) => { const a = asTime(row[col]); return a !== null && a >= min && a <= max; };
     }
-    default: return true;
+    default:
+      return () => true;
   }
 }
 
+/** Operators that pick a value out of a set — repeating them reads as "or". */
+const MEMBERSHIP_OPS = new Set<FilterOperator>(["equals", "in"]);
+
 /**
- * Apply filters with AND semantics across columns and constraints. Repeated
- * positive membership filters (`equals` / `in`) on the same column are
- * alternatives, so Project=A + Project=B behaves as Project IN (A, B).
+ * Apply filters: AND across different columns, OR between repeated membership
+ * filters on the SAME column. So `Owner = Paul*` + `Owner = Marta` matches
+ * either person, while `Project = Agro*` + `Owner = Paul*` requires both —
+ * which is what a report builder with only an "Add filter" button can express.
+ *
+ * `columns` is optional but recommended: it lets numeric/date columns compare
+ * by value instead of by string.
  */
-export function applyFilters(rows: ReportRow[], filters: ReportFilter[]): ReportRow[] {
+export function applyFilters(rows: ReportRow[], filters: ReportFilter[], columns?: DatasetColumn[]): ReportRow[] {
   if (filters.length === 0) return rows;
+  const typeByKey = new Map((columns ?? []).map((c) => [c.key, c.type]));
 
-  const alternativesByColumn = new Map<string, ReportFilter[]>();
-  const constraints: ReportFilter[] = [];
-
-  for (const filter of filters) {
-    if (filter.operator === "equals" || filter.operator === "in") {
-      const alternatives = alternativesByColumn.get(filter.column) ?? [];
-      alternatives.push(filter);
-      alternativesByColumn.set(filter.column, alternatives);
+  // Patterns compile once here, never per row.
+  const required: Predicate[] = [];
+  const anyOfByColumn = new Map<string, Predicate[]>();
+  for (const f of filters) {
+    const predicate = compileFilter(f, typeByKey.get(f.column));
+    if (MEMBERSHIP_OPS.has(f.operator)) {
+      const group = anyOfByColumn.get(f.column) ?? [];
+      group.push(predicate);
+      anyOfByColumn.set(f.column, group);
     } else {
-      constraints.push(filter);
+      required.push(predicate);
     }
   }
+  const anyOfGroups = [...anyOfByColumn.values()];
 
   return rows.filter((row) =>
-    constraints.every((filter) => matchesFilter(row, filter))
-    && Array.from(alternativesByColumn.values()).every((alternatives) =>
-      alternatives.some((filter) => matchesFilter(row, filter)),
-    ),
+    required.every((p) => p(row)) && anyOfGroups.every((group) => group.some((p) => p(row))),
   );
 }
 
