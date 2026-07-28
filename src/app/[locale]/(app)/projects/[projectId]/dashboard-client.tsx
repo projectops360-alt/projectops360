@@ -38,6 +38,8 @@ import { buildProjectBriefing } from "@/lib/project-briefing/briefing-engine";
 import type { BriefingScope, ProjectBriefing } from "@/lib/project-briefing/types";
 import { overallStatusLine, healthBandLabel, attentionLabel, allStableLine } from "@/lib/project-briefing/briefing-copy";
 import type { OrgRole } from "@/lib/project-export/rbac";
+import type { ProjectEffortSummary } from "@/lib/time-tracking/project-effort";
+import type { EffortSeverity } from "@/lib/time-tracking/types";
 import { ExportProjectButton } from "./export-project-modal";
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -154,6 +156,8 @@ interface ProjectDashboardProps {
   statusScope: BriefingScope;
   /** Org role — gates the Export Project entry (CAP — Project Export). */
   userRole: OrgRole;
+  /** Planned vs logged effort. Null when the project has no estimates at all. */
+  effort?: ProjectEffortSummary | null;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────────
@@ -224,6 +228,40 @@ function HealthCard({
   return card;
 }
 
+/** Effort KPI. Green while inside the budget, amber at it, red well past it. */
+function EffortCard({
+  label,
+  value,
+  sub,
+  tone = "none",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: EffortSeverity;
+}) {
+  const color =
+    tone === "critical"
+      ? "text-red-600 dark:text-red-400"
+      : tone === "over"
+        ? "text-orange-600 dark:text-orange-400"
+        : tone === "warning"
+          ? "text-amber-600 dark:text-amber-400"
+          : tone === "on_track"
+            ? "text-green-600 dark:text-green-400"
+            : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="mb-1 flex items-center gap-2">
+        <Clock className={`h-4 w-4 ${color}`} />
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      </div>
+      <p className={`text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
 function StatusDot({ status }: { status: string }) {
   if (
     status === "completed" ||
@@ -259,6 +297,7 @@ export function ProjectDashboard({
   statusRisks,
   statusScope,
   userRole,
+  effort,
 }: ProjectDashboardProps) {
   const router = useRouter();
   const base = localizedHref(locale, `/projects/${projectId}`);
@@ -503,6 +542,32 @@ export function ProjectDashboard({
           color={traceHealth >= 80 ? "text-green-600 dark:text-green-400" : traceHealth >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}
         />
       </div>
+
+      {/* ════════════════════════════════════════════════════════════════════════
+          2a. EFFORT — planned vs logged. Actual comes from the Time Tracking
+          Engine (SUM of the time log), never from a typed-in number.
+          ════════════════════════════════════════════════════════════════════════ */}
+      {effort && effort.estimatedHours !== null && (
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <EffortCard label={locale === "es" ? "Horas estimadas" : "Estimated hours"} value={`${effort.estimatedHours}h`} />
+          <EffortCard
+            label={locale === "es" ? "Horas reales" : "Actual hours"}
+            value={`${effort.actualHours}h`}
+            tone={effort.severity}
+            sub={effort.consumedPct !== null ? `${effort.consumedPct}%` : undefined}
+          />
+          <EffortCard
+            label={locale === "es" ? "Horas restantes" : "Remaining hours"}
+            value={`${effort.remainingHours}h`}
+            tone={effort.remainingHours !== null && effort.remainingHours < 0 ? effort.severity : "on_track"}
+          />
+          <EffortCard
+            label={locale === "es" ? "Variación" : "Variance"}
+            value={`${effort.varianceHours !== null && effort.varianceHours > 0 ? "+" : ""}${effort.varianceHours}h`}
+            tone={effort.severity}
+          />
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════════════
           2b. PROJECT STATUS (REG-015) + REPORTS & EXECUTIVE OUTPUTS (UX-009)

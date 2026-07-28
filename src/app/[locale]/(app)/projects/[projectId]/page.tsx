@@ -12,6 +12,7 @@ import { Link as I18nLink } from "@/i18n/navigation";
 import { ProjectHeaderClient } from "./project-header-client";
 import type { AiCommSummaryTranslations } from "@/components/ai";
 import { ProjectDashboard } from "./dashboard-client";
+import { getProjectEffortSummary } from "@/lib/time-tracking/project-effort";
 import { computeRoadmapProgress } from "@/lib/roadmap/progress";
 import { CHARTER_STATUS_META, CHARTER_LOCKED_STATUSES, computeCharterCompletion, CHARTER_FIELDS, type CharterStatus, type CharterFieldKey } from "@/lib/charter/fields";
 import { DELIVERY_METHODS, type DeliveryMethod } from "@/lib/delivery/config";
@@ -408,6 +409,10 @@ export default async function ProjectDetailPage({
   const totalEntities = allDecisionIds.length + allMeetingIds.length + allCommIds.length + allDocIds.length;
   const linkedEntityCount = totalEntities - missingLinkEntities.length;
 
+  // Planned vs logged effort. Actual hours are the Time Tracking Engine's sum,
+  // never a typed-in number (SUBTASK-ACTUAL-HOURS-DERIVED).
+  const projectEffort = await getProjectEffortSummary(org.organizationId, projectId);
+
   // Build dashboard data
   const dashboardData: DashboardData = {
     stats: {
@@ -639,6 +644,7 @@ export default async function ProjectDetailPage({
         statusRisks={statusRisks}
         statusScope={statusScope}
         userRole={org.role}
+        effort={projectEffort}
       />
     </div>
   );

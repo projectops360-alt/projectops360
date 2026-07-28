@@ -168,12 +168,29 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
     ? await supabase.from("profiles").select("id, display_name").in("id", ownerIds)
     : { data: [] as { id: string; display_name: string | null }[] };
 
-  const [{ data: risks }, { data: dependencies }] = validTasks.length
+  const [{ data: risks }, { data: dependencies }, { data: timeEntries }] = validTasks.length
     ? await Promise.all([
         scope(supabase.from("risks").select("linked_task_id, severity, status").is("deleted_at", null).not("linked_task_id", "is", null).limit(ROW_CAP), ctx.organizationId, ctx.projectId),
         scope(supabase.from("task_dependencies").select("successor_id, predecessor_id").limit(ROW_CAP * 4), ctx.organizationId, ctx.projectId),
+        scope(supabase.from("subtask_time_entries").select("task_id, subtask_id, duration_hours").is("deleted_at", null).limit(ROW_CAP * 4), ctx.organizationId, ctx.projectId),
       ])
-    : [{ data: [] as { linked_task_id: string; severity: string | null; status: string }[] }, { data: [] as { successor_id: string; predecessor_id: string }[] }];
+    : [
+        { data: [] as { linked_task_id: string; severity: string | null; status: string }[] },
+        { data: [] as { successor_id: string; predecessor_id: string }[] },
+        { data: [] as { task_id: string; subtask_id: string | null; duration_hours: number }[] },
+      ];
+
+  // Logged effort comes from the Time Tracking Engine. A task that has entries
+  // NEVER falls back to the hand-typed roadmap_tasks.actual_hours; one that has
+  // none keeps showing what was captured before time logging existed.
+  const loggedByTask = new Map<string, number>();
+  const loggedBySubtask = new Map<string, number>();
+  for (const e of timeEntries ?? []) {
+    const hours = Number(e.duration_hours) || 0;
+    loggedByTask.set(e.task_id, (loggedByTask.get(e.task_id) ?? 0) + hours);
+    if (e.subtask_id) loggedBySubtask.set(e.subtask_id, (loggedBySubtask.get(e.subtask_id) ?? 0) + hours);
+  }
+  const round2 = (n: number) => Math.round(n * 100) / 100;
 
   const msName = new Map((milestones ?? []).map((m) => [m.id, m.title]));
   const personName = new Map((profiles ?? []).map((p) => [p.id, p.display_name || ""]));
@@ -208,7 +225,8 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
   const taskRows = validTasks.map((task) => {
     const estimated = task.estimated_labor_hours != null ? Number(task.estimated_labor_hours)
       : task.estimate_hours != null ? Number(task.estimate_hours) : null;
-    const actual = task.actual_hours != null ? Number(task.actual_hours) : null;
+    const logged = loggedByTask.has(task.id) ? round2(loggedByTask.get(task.id)!) : null;
+    const actual = logged ?? (task.actual_hours != null ? Number(task.actual_hours) : null);
     const risk = riskByTask.get(task.id);
     const deps = depCount.get(task.id) ?? 0;
     return {
@@ -239,6 +257,7 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
         total_float: task.slack_days,
         estimated_hours: estimated,
         actual_hours: actual,
+        logged_hours: logged ?? 0,
         hours_variance: estimated !== null && actual !== null ? Math.round((actual - estimated) * 100) / 100 : null,
         hours_variance_pct: estimated !== null && actual !== null && estimated > 0
           ? Math.round(((actual - estimated) / estimated) * 10000) / 100
@@ -254,7 +273,10 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
   if (!config.includeSubtasks || validTasks.length === 0) return taskRows.map(({ row }) => row);
 
   return taskRows.flatMap(({ task, row }) => {
-    const children = (subtasksByTask.get(task.id) ?? []).map((subtask) => ({
+    const children = (subtasksByTask.get(task.id) ?? []).map((subtask) => {
+      const subEstimated = subtask.estimated_hours == null ? null : Number(subtask.estimated_hours);
+      const subLogged = loggedBySubtask.has(subtask.id) ? round2(loggedBySubtask.get(subtask.id)!) : null;
+      return {
       project_name: row.project_name,
       _projectId: subtask.project_id,
       _recordId: task.id,
@@ -279,16 +301,21 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
       blocker_reason: subtask.blocked_reason ?? "",
       critical_path: !!subtask.is_critical,
       total_float: null,
-      estimated_hours: subtask.estimated_hours,
-      // Subtasks carry no effort actuals, linked risks or dependencies of their own.
-      actual_hours: null,
-      hours_variance: null,
-      hours_variance_pct: null,
+      estimated_hours: subEstimated,
+      // A subtask's actual hours ARE its time log — there is no manual field.
+      actual_hours: subLogged,
+      logged_hours: subLogged ?? 0,
+      hours_variance: subEstimated !== null && subLogged !== null ? round2(subLogged - subEstimated) : null,
+      hours_variance_pct: subEstimated !== null && subLogged !== null && subEstimated > 0
+        ? Math.round(((subLogged - subEstimated) / subEstimated) * 10000) / 100
+        : null,
+      // Risks and dependencies are tracked at task level, not per subtask.
       open_risks: 0,
       risk_severity: "",
       dependency_count: 0,
       has_dependencies: false,
-    } as ReportRow));
+      } as ReportRow;
+    });
     return [row, ...children];
   }).slice(0, ROW_CAP);
 }
