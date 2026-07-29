@@ -33,6 +33,16 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#022826",
+  // Without an explicit width the browser assumes a ~980px desktop canvas and
+  // scales the whole app down, which is what made every screen look like a
+  // shrunken desktop on a phone. Zoom stays enabled — capping it would fail
+  // WCAG 1.4.4.
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  // Lets `env(safe-area-inset-*)` resolve to real values on notched devices.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

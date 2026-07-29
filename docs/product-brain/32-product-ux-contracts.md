@@ -284,3 +284,44 @@ not resemble a task-flow diagram or expose the full evidence mesh by default.
 
 **The regression to never reintroduce:** rendering every evidence node and relationship at once so
 the Knowledge view becomes an unreadable evidence spaghetti graph.
+
+## UX-018 — The App Shell Adapts to the Viewport, Everywhere
+
+**Status:** APPROVED · **Guard:** `RESPONSIVE-SHELL-NO-MOBILE-GUTTER` · **Regression:** REG-040
+
+Breakpoints (Tailwind defaults, centralised in `src/lib/layout/responsive.ts`):
+
+| Band | Width | Sidebar | Content gutter |
+|---|---|---|---|
+| Mobile | 320–767px | Overlay drawer, off-canvas when closed | **0px** |
+| Tablet | 768–1023px | Icon-only rail | 64px |
+| Desktop | ≥1024px | User's collapse preference | 64 / 256px |
+
+**Rules**
+
+1. The desktop sidebar reserves **zero** horizontal space below 768px. The content
+   wrapper gets its gutter from `contentOffsetClass()`, which only ever emits
+   `md:`/`lg:`-prefixed classes.
+2. The band split is expressed in **CSS**, not in a width read in JS. Server-rendered
+   markup is already correct at every width, so there is no post-hydration reflow —
+   the previous `matchMedia` approach both flashed and still reserved a rail on phones.
+3. The drawer closes on navigation, on overlay tap and on Escape; it traps focus while
+   open and locks background scroll. Closed, it is `invisible`, so it leaves the tab
+   order and the accessibility tree.
+4. No page scrolls horizontally between 320px and desktop. A tab strip, table or graph
+   canvas may scroll **inside its own container**; the page may not.
+5. Overflow is fixed at the component that overflows. `overflow-x-hidden` is never used
+   on the shell to hide a layout defect.
+6. Interactive controls keep a ~44×44px touch target on mobile; no action sits outside
+   the viewport. Secondary actions collapse into an overflow rather than being clipped.
+7. **Desktop is unchanged.** Every mobile rule is additive and breakpoint-scoped, so the
+   layout, spacing and density at ≥1024px are what shipped before.
+8. The Living Graph re-frames on a genuine resize or rotation with `fitView` only —
+   nodes, edges, saved layouts, selection and focus survive because nothing remounts.
+   Small fluctuations (a collapsing mobile URL bar) are ignored so re-framing never
+   fights the user's own pan/zoom.
+9. `viewport` declares `width=device-width` and never disables pinch zoom (WCAG 1.4.4).
+
+**Executable guards:** `src/lib/layout/__tests__/responsive.test.ts` ·
+`src/components/layout/__tests__/responsive-shell.test.ts` ·
+`e2e/responsive-overflow.spec.ts` · `scripts/responsive-audit.mjs`

@@ -173,7 +173,7 @@ export function MilestoneFormDialog({
           </div>
 
           {/* Status + Lock Override */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="milestone-status" className="block text-sm font-medium text-foreground">
                 {t.fields.status}
@@ -270,7 +270,7 @@ export function MilestoneFormDialog({
           )}
 
           {/* Start Date + Target Date */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="milestone-start" className="block text-sm font-medium text-foreground">
                 {t.fields.startDate}

@@ -1273,17 +1273,21 @@ function ShellBody({
   const levelIsEmpty = projection.nodes.length === 0;
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // `min-h-0` lets the canvas row actually shrink inside this column, and
+  // `min-w-0` keeps a wide graph from stretching the page past the viewport.
+  // `dvh` rather than `vh` so a mobile browser's collapsing URL bar cannot
+  // leave the canvas taller than the screen.
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-0 min-w-0 flex-col">
+      <header className="border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h1 className="text-lg font-extrabold text-slate-950">{t("title")}</h1>
+          <div className="min-w-0">
+            <h1 className="text-base font-extrabold text-slate-950 sm:text-lg">{t("title")}</h1>
             <p className="text-xs text-slate-500">
               {t("subtitle")} · {organizationName}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             {/* Import / Ask AI / Report — all three delegate to the existing
                 flow rather than reimplementing a step of it (CAP-048 §6). */}
             {intelligence ? (
@@ -1452,7 +1456,10 @@ function ShellBody({
         ) : null}
 
         {intelligence && panels.overview ? (
-          <aside className="flex w-[260px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2">
+          // On a phone a 260px column would leave the canvas ~60px wide, so the
+          // rail floats over the graph instead of squeezing it. From `sm` up it
+          // is the same docked column as before.
+          <aside className="absolute inset-y-0 left-0 z-20 flex w-[85%] max-w-[260px] shrink-0 flex-col gap-2 overflow-y-auto border-r border-slate-200 bg-slate-50 p-2 shadow-xl sm:static sm:z-auto sm:w-[260px] sm:shadow-none">
             <button
               type="button"
               onClick={() => handleTogglePanel("overview")}
@@ -1589,7 +1596,7 @@ function ShellBody({
             its own tables. */}
         {scope.activeLens === "whatif" ? (
           simulationRailOpen ? (
-            <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-slate-50 p-2.5">
+            <aside className="absolute inset-y-0 right-0 z-20 flex w-[90%] max-w-[320px] shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-slate-50 p-2.5 shadow-xl sm:static sm:z-auto sm:w-[320px] sm:shadow-none">
               {/* Collapse control on the rail itself, not only in the toolbar:
                   the user who wants the canvas back is looking AT the panel. */}
               <button

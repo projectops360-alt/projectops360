@@ -156,7 +156,7 @@ export function EditCommunicationDialog({
           </div>
 
           {/* Source type + Date */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="edit-comm-source-type" className="block text-sm font-medium text-foreground">
                 {t("sourceType")}
@@ -190,7 +190,7 @@ export function EditCommunicationDialog({
           </div>
 
           {/* Sender + Recipients */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="edit-comm-sender" className="block text-sm font-medium text-foreground">
                 {t("sender")}
@@ -258,7 +258,7 @@ export function EditCommunicationDialog({
           </div>
 
           {/* Status + Requires follow-up */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="edit-comm-status" className="block text-sm font-medium text-foreground">
                 {t("status")}

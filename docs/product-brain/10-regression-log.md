@@ -1233,3 +1233,57 @@ cannot cover a privilege nobody thought of, including any PostgreSQL adds later.
 **Verify:** `src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts`
 → "REG-037". Production re-probed after `20260869000000`: 8 of 8 probes pass, 0
 write privileges held by any API role.
+
+## REG-040 — The desktop sidebar kept its gutter on phones, squeezing every page
+
+**Date:** 2026-07-28 · **Status:** closed · **Guard:** `RESPONSIVE-SHELL-NO-MOBILE-GUTTER`
+
+Reported as four broken screens — Team, Reports & Intelligence, Projects and the
+PMO Living Graph — all of them "cut off", overflowing sideways, with buttons
+half outside the viewport at 360–430px.
+
+They were one defect wearing four costumes.
+
+`app-frame.tsx` applied the sidebar gutter to the content wrapper with **no
+breakpoint**:
+
+```tsx
+<div className={cn("transition-[padding]", effectiveCollapsed ? "pl-16" : "pl-64")}>
+```
+
+A later change had added a `matchMedia("(max-width: 1023px)")` listener that
+forced `collapsed` below 1024px, which reads like a mobile fix and is not one:
+it swapped `pl-64` for `pl-16`, so a 360px phone still surrendered 64px of a
+360px screen to a sidebar rail — and the rail was still on screen, still taking
+taps. Every page then laid out inside ~296px minus its own padding, so page
+headers collapsed, action bars overflowed, and cards clipped. Fixing those pages
+individually would have treated the symptom in each of them and left the cause.
+
+Compounding it, `src/app/layout.tsx` exported a `viewport` with only
+`themeColor`. With no `width=device-width`, mobile browsers assume a ~980px
+canvas and scale the result down — which is why the app read as "a shrunken
+desktop" rather than a broken layout.
+
+**Root cause:** the shell expressed a desktop-only assumption as an unconditional
+class, and the later "responsive" patch changed *which* desktop width was
+reserved instead of removing the reservation.
+
+**Why it was not caught:** every existing test asserts behaviour, data or
+routing — none of them renders at a width. A layout defect that is invisible to
+`test:run` and to `build` can only be caught by something that measures.
+
+**Protection rule (binding):** the content gutter is derived from
+`lib/layout/responsive`, which cannot emit an unprefixed `pl-*` — every class it
+returns is scoped to `md:` or `lg:`, and `contentOffsetFor("mobile", …)` is `0`
+whether the sidebar is collapsed or not. Below `md` the sidebar is an overlay
+drawer: it renders off-canvas and `invisible` in CSS, so it is out of the tab
+order and the accessibility tree without waiting for hydration, and the docked
+desktop sidebar stays interactive. Mobile rules are additive and breakpoint-
+scoped, so desktop at ≥1024px is byte-for-byte the layout that shipped.
+
+**Verify:** `src/lib/layout/__tests__/responsive.test.ts` (tokens) ·
+`src/components/layout/__tests__/responsive-shell.test.ts` (the shell actually
+uses them — a token test alone would have stayed green through this regression) ·
+`e2e/responsive-overflow.spec.ts` and `scripts/responsive-audit.mjs` sweep the
+main routes at 11 viewports from 320×568 to 1440×900 and fail on any element
+that leaves the viewport unclipped.

@@ -254,7 +254,7 @@ export function ScribeModal({ projectId, locale, onClose }: { projectId: string;
                         {isEditing ? (
                           <div className="mt-2 space-y-1.5">
                             <textarea value={it.description} onChange={(e) => setItem(it.id, { description: e.target.value })} rows={2} className={inp} />
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                               <input value={it.suggested_owner ?? ""} onChange={(e) => setItem(it.id, { suggested_owner: e.target.value || null })} placeholder={isEs ? "Responsable" : "Owner"} className={inp} />
                               <input value={it.suggested_due_date ?? ""} onChange={(e) => setItem(it.id, { suggested_due_date: e.target.value || null })} placeholder="YYYY-MM-DD" className={inp} />
                             </div>

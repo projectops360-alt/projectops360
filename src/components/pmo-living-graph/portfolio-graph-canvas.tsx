@@ -8,18 +8,21 @@
 // place that decides what is on screen.
 // ============================================================================
 
+import { useEffect, useRef } from "react";
 import {
   Background,
   Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
+  useReactFlow,
   type EdgeMouseHandler,
   type NodeMouseHandler,
   type OnNodeDrag,
   type OnNodesChange,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useViewport as useAppViewport } from "@/lib/layout/use-viewport";
 import { HEALTH_COLOR, type GraphFlowEdge, type GraphFlowNode } from "./graph-flow-types";
 import { GraphNodeRenderer } from "./graph-nodes";
 import { GraphEdgeRenderer } from "./graph-edge";
@@ -28,6 +31,52 @@ import { GraphEdgeRenderer } from "./graph-edge";
 // its internal type registry and remount every node.
 const NODE_TYPES = { graphNode: GraphNodeRenderer };
 const EDGE_TYPES = { graphEdge: GraphEdgeRenderer };
+
+/** Below this relative width change a resize is treated as noise, not a reflow. */
+const REFIT_THRESHOLD = 0.15;
+
+/**
+ * Re-frames the graph when the canvas genuinely changes size — a device
+ * rotation, the sidebar docking at a breakpoint, a rail opening.
+ *
+ * It calls `fitView` and nothing else: no remount, no re-layout, no new
+ * simulation, so node positions, saved layouts, selection and focus all
+ * survive. Small fluctuations (a mobile browser's URL bar sliding away) are
+ * ignored, because re-framing on those would fight the user's own pan/zoom.
+ */
+function ViewportRefitOnResize() {
+  const { fitView } = useReactFlow();
+  const lastWidth = useRef<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const pane = document.querySelector<HTMLElement>(".react-flow__renderer")?.parentElement;
+    if (!pane) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width === 0) return;
+      const previous = lastWidth.current;
+      lastWidth.current = width;
+      if (previous == null) return;
+      if (Math.abs(width - previous) / previous < REFIT_THRESHOLD) return;
+
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        void fitView({ padding: 0.2, duration: 200 });
+      }, 150);
+    });
+
+    observer.observe(pane);
+    return () => {
+      observer.disconnect();
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [fitView]);
+
+  return null;
+}
 
 export function PortfolioGraphCanvas({
   nodes,
@@ -58,6 +107,8 @@ export function PortfolioGraphCanvas({
   onEdgeMouseLeave: EdgeMouseHandler<GraphFlowEdge>;
   onPaneClick: () => void;
 }) {
+  const isPhone = useAppViewport() === "mobile";
+
   return (
     <div className="absolute inset-0">
       <ReactFlow<GraphFlowNode, GraphFlowEdge>
@@ -105,22 +156,29 @@ export function PortfolioGraphCanvas({
         className="h-full w-full bg-slate-50"
       >
         <Background gap={24} size={1} color="#cbd5e1" />
+        <ViewportRefitOnResize />
+        {/* Zoom in / zoom out / fit-to-screen — the touch-accessible equivalent
+            of the scroll wheel, which a phone does not have. */}
         <Controls position="bottom-right" showInteractive={false} />
-        <MiniMap
-          position="bottom-left"
-          pannable
-          zoomable
-          nodeStrokeWidth={2}
-          // The minimap mirrors the health channel, so an at-risk cluster is
-          // findable without panning the whole portfolio.
-          // MiniMap widens the node type to the base `Node`, so the payload is
-          // narrowed back here rather than being trusted implicitly.
-          nodeColor={(node) =>
-            HEALTH_COLOR[(node as GraphFlowNode).data.node.health]
-          }
-          maskColor="rgba(248,250,252,0.75)"
-          className="!border !border-slate-200 !bg-white"
-        />
+        {/* The minimap costs a quarter of a phone screen and duplicates what
+            pinch-zoom already gives you, so it only appears once there is room. */}
+        {!isPhone && (
+          <MiniMap
+            position="bottom-left"
+            pannable
+            zoomable
+            nodeStrokeWidth={2}
+            // The minimap mirrors the health channel, so an at-risk cluster is
+            // findable without panning the whole portfolio.
+            // MiniMap widens the node type to the base `Node`, so the payload is
+            // narrowed back here rather than being trusted implicitly.
+            nodeColor={(node) =>
+              HEALTH_COLOR[(node as GraphFlowNode).data.node.health]
+            }
+            maskColor="rgba(248,250,252,0.75)"
+            className="!border !border-slate-200 !bg-white"
+          />
+        )}
       </ReactFlow>
     </div>
   );

@@ -217,7 +217,7 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
 
             {showLinker && (
               <div className="mb-3 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <select value={linkType} onChange={(e) => { setLinkType(e.target.value as LinkableEntityType); setLinkTargetId(""); }}
                     className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs" disabled={isPending}>
                     {ENTITY_ORDER.filter((t) => (entities[t] ?? []).length > 0).map((t) => (
@@ -270,7 +270,7 @@ export function MemoryDetailPanel({ locale, projectId, item, entities, onClose, 
           {/* Metadata / source info */}
           <section className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
             <h3 className="mb-2 font-semibold uppercase tracking-wide text-muted-foreground">{isEs ? "Detalles" : "Details"}</h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
               <dt className="text-muted-foreground">{isEs ? "Tipo de fuente" : "Source type"}</dt>
               <dd className="text-foreground">{item.sourceType}</dd>
               {item.sourceSystem && (<><dt className="text-muted-foreground">{isEs ? "Sistema" : "System"}</dt><dd className="text-foreground">{item.sourceSystem}</dd></>)}

@@ -34,7 +34,7 @@ export function ProjectListClient({
       <div className="flex justify-end">
         <button
           onClick={() => setIsDialogOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:w-auto sm:justify-start"
         >
           <Plus className="h-4 w-4" />
           {createLabel}

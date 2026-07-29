@@ -163,7 +163,7 @@ export function EditMeetingDialog({
           </div>
 
           {/* Date + Time + Duration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="edit-meeting-date" className="block text-sm font-medium text-foreground">
                 {t("meetingDate")}
@@ -195,7 +195,7 @@ export function EditMeetingDialog({
           </div>
 
           {/* Location + Status */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="edit-meeting-location" className="block text-sm font-medium text-foreground">
                 {t("location")}

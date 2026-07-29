@@ -176,9 +176,9 @@ export function RoadmapHero({
         </div>
 
         {/* Right: Stats grid */}
-        <div className="grid grid-cols-2 gap-3 lg:w-64 shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-64 shrink-0">
           {/* Overall progress — computed from tasks */}
-          <div className="col-span-2 rounded-xl border border-border bg-card p-4 text-center">
+          <div className="col-span-1 sm:col-span-2 rounded-xl border border-border bg-card p-4 text-center">
             <p className="text-3xl font-bold text-foreground tabular-nums">{progress.overallPercent}%</p>
             <p className="text-xs text-muted-foreground mt-1">{t.overallProgress}</p>
             <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">

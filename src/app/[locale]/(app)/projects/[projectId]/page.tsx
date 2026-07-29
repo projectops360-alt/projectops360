@@ -551,13 +551,13 @@ export default async function ProjectDetailPage({
       {/* Charter & Governance status strip */}
       <I18nLink
         href={`/projects/${projectId}/charter`}
-        className={`group flex items-center justify-between gap-3 rounded-xl border p-4 transition-colors ${
+        className={`group flex flex-col items-start gap-2 rounded-xl border p-4 transition-colors sm:flex-row sm:items-center sm:justify-between sm:gap-3 ${
           charterLocked
             ? "border-green-200 bg-green-50/50 hover:bg-green-100/50 dark:border-green-900 dark:bg-green-950/20"
             : "border-amber-200 bg-amber-50/50 hover:bg-amber-100/50 dark:border-amber-900 dark:bg-amber-950/20"
         }`}
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex w-full items-center gap-3 min-w-0 sm:w-auto">
           <ShieldCheck className={`h-5 w-5 shrink-0 ${charterLocked ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
@@ -578,9 +578,9 @@ export default async function ProjectDetailPage({
       {fwMethodLabel && (
         <I18nLink
           href={`/projects/${projectId}/delivery`}
-          className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40"
+          className="group flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
         >
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex w-full items-center gap-3 min-w-0 sm:w-auto">
             <Layers className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground">
@@ -600,9 +600,9 @@ export default async function ProjectDetailPage({
       {/* Team & Roles status strip */}
       <I18nLink
         href={`/projects/${projectId}/team`}
-        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40"
+        className="group flex flex-col items-start gap-2 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex w-full items-center gap-3 min-w-0 sm:w-auto">
           <Users className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">

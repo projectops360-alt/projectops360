@@ -62,6 +62,8 @@
     "notifications": "Notifications",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
     "adminConsole": "Admin Console",
     "pmoLivingGraph": "Dashboard 3"
   },

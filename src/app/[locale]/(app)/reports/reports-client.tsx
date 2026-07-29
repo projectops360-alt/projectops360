@@ -249,10 +249,10 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-            <BarChart3 className="h-6 w-6 text-brand-500" />
+            <BarChart3 className="h-6 w-6 shrink-0 text-brand-500" />
             {t.title}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t.subtitle}</p>
@@ -266,9 +266,9 @@ export function ReportsClient({ locale, initialSavedReports, initialReportId, in
           const Icon = { overview: LayoutGrid, library: BarChart3, builder: Wrench, saved: Bookmark, explorer: Compass, kpi: BookOpen }[key];
           return (
             <button key={key} type="button" onClick={() => setTab(key)}
-              className={`inline-flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${tab === key ? "border-b-2 border-brand-500 text-brand-600 dark:text-brand-400" : "text-muted-foreground hover:text-foreground"}`}>
-              <Icon className="h-4 w-4" />
-              {t.tabs[key]}
+              className={`inline-flex min-w-0 shrink items-center gap-1.5 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors ${tab === key ? "border-b-2 border-brand-500 text-brand-600 dark:text-brand-400" : "text-muted-foreground hover:text-foreground"}`}>
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{t.tabs[key]}</span>
             </button>
           );
         })}
@@ -371,22 +371,22 @@ function ProjectScopePicker({ t, projects, value, onChange }: {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative w-full sm:w-auto">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-brand-400"
+        className="inline-flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:border-brand-400 sm:w-auto"
       >
-        {selected ? <FolderKanban className="h-4 w-4 text-brand-500" /> : <Globe className="h-4 w-4 text-muted-foreground" />}
-        <span className="text-muted-foreground">{t.scope.label}:</span>
-        <span className="max-w-[12rem] truncate font-semibold text-foreground">{selected ? selected.name : t.scope.all}</span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        {selected ? <FolderKanban className="h-4 w-4 shrink-0 text-brand-500" /> : <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        <span className="shrink-0 text-muted-foreground">{t.scope.label}:</span>
+        <span className="min-w-0 max-w-[12rem] truncate font-semibold text-foreground">{selected ? selected.name : t.scope.all}</span>
+        <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground sm:ml-0" />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div className="absolute right-0 z-30 mt-1 w-[calc(100vw-2rem)] max-w-[20rem] overflow-hidden rounded-xl border border-border bg-card shadow-lg sm:w-80">
           {projects.length > 6 && (
             <div className="border-b border-border p-2">
               <input
@@ -456,10 +456,10 @@ function Overview({ t, locale, datasets, saved, onBuild, onLibrary, onExplore, o
   const cats = [...new Set(datasets.map((d) => d.category))];
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={onBuild} className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"><Wrench className="h-4 w-4" />{t.quick.build}</button>
-        <button type="button" onClick={onLibrary} className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"><BarChart3 className="h-4 w-4" />{t.quick.library}</button>
-        <button type="button" onClick={onExplore} className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"><Compass className="h-4 w-4" />{t.quick.explore}</button>
+      <div className="flex flex-wrap gap-2 sm:gap-3">
+        <button type="button" onClick={onBuild} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 sm:min-h-0 sm:flex-none sm:justify-start"><Wrench className="h-4 w-4 shrink-0" />{t.quick.build}</button>
+        <button type="button" onClick={onLibrary} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted sm:min-h-0 sm:flex-none sm:justify-start"><BarChart3 className="h-4 w-4 shrink-0" />{t.quick.library}</button>
+        <button type="button" onClick={onExplore} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted sm:min-h-0 sm:flex-none sm:justify-start"><Compass className="h-4 w-4 shrink-0" />{t.quick.explore}</button>
       </div>
 
       <div>
@@ -603,11 +603,11 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           <select value={config.visualization} onChange={(e) => setConfig({ ...config, visualization: e.target.value as VisualizationType })}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
+            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-1.5 text-sm sm:w-auto">
             {VIS_OPTIONS.map((v) => <option key={v.value} value={v.value}>{trReport(v.label, locale)}</option>)}
           </select>
           <select value={config.grouping?.column ?? ""} onChange={(e) => setConfig({ ...config, grouping: e.target.value ? { column: e.target.value, metrics: [{ column: config.columns[0] ?? "", fn: "count", label: t.count }] } : null })}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
+            className="w-full min-w-0 rounded-lg border border-border bg-background px-3 py-1.5 text-sm sm:w-auto">
             <option value="">{t.grouping}: {t.none}</option>
             {groupableCols.map((c) => <option key={c.key} value={c.key}>{t.grouping}: {c.label}</option>)}
           </select>
@@ -617,15 +617,15 @@ function Builder({ t, locale, datasets, config, setConfig, dataset, result, runn
               {t.includeSubtasks}
             </label>
           )}
-          <div className="ml-auto flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap">
             <button type="button" onClick={onRun} disabled={running || config.columns.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50">
-              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}{t.run}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 sm:min-h-0 sm:flex-none">
+              {running ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Play className="h-4 w-4 shrink-0" />}{t.run}
             </button>
-            <button type="button" onClick={onSave} disabled={config.columns.length === 0} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"><Save className="h-4 w-4" />{t.save}</button>
-            <button type="button" onClick={onExport} disabled={!result} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50"><Download className="h-4 w-4" />{t.exportCsv}</button>
-            <button type="button" onClick={onPrint} disabled={!result || printing} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50">
-              {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}{printing ? t.preparingPrint : t.print}
+            <button type="button" onClick={onSave} disabled={config.columns.length === 0} className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 sm:min-h-0 sm:flex-none"><Save className="h-4 w-4 shrink-0" />{t.save}</button>
+            <button type="button" onClick={onExport} disabled={!result} className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 sm:min-h-0 sm:flex-none"><Download className="h-4 w-4 shrink-0" />{t.exportCsv}</button>
+            <button type="button" onClick={onPrint} disabled={!result || printing} className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:opacity-50 sm:min-h-0 sm:flex-none">
+              {printing ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Printer className="h-4 w-4 shrink-0" />}{printing ? t.preparingPrint : t.print}
             </button>
           </div>
         </div>
@@ -832,7 +832,7 @@ function FilterBuilder({ t, columns, filters, onChange }: { t: Labels; columns: 
                       value={Array.isArray(f.value) ? f.value.join(",") : String(f.value ?? "")}
                       onChange={(e) => update(i, { value: ["in", "not_in"].includes(f.operator) ? e.target.value.split(",").map((s) => s.trim()) : e.target.value })}
                       maxLength={500}
-                      className="w-40 rounded-lg border border-border bg-background px-2 py-1 text-xs"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs sm:w-40 sm:flex-none"
                       placeholder={["in", "not_in"].includes(f.operator) ? "a, b, c" : type === "text" ? "Sofia*" : "…"}
                       title={showWildcardHint ? t.filterHint : undefined} />
                   )
@@ -864,7 +864,7 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
       <div className="space-y-3">
         <ResultMeta t={t} result={result} />
         {config.visualization === "kpi_cards" ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
             {grouped.map((g, i) => (
               <div key={i} className="rounded-lg border border-border p-3 text-center">
                 <div className="text-xl font-bold text-foreground">{String(g[metricKey])}</div>
@@ -876,7 +876,7 @@ function PreviewPane({ t, locale, config, result, emptyText }: { t: Labels; loca
           <div className="space-y-1.5 rounded-xl border border-border p-4">
             {grouped.map((g, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
-                <span className="w-40 shrink-0 truncate text-muted-foreground">{String(g[config.grouping!.column])}</span>
+                <span className="w-24 shrink-0 truncate text-muted-foreground sm:w-40">{String(g[config.grouping!.column])}</span>
                 <div className="h-4 flex-1 overflow-hidden rounded bg-muted">
                   <div className="h-full rounded bg-brand-500" style={{ width: `${((Number(g[metricKey]) || 0) / max) * 100}%` }} />
                 </div>

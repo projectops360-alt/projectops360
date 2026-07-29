@@ -62,6 +62,8 @@
     "notifications": "Notificaciones",
     "collapseSidebar": "Colapsar barra lateral",
     "expandSidebar": "Expandir barra lateral",
+    "openMenu": "Abrir menú de navegación",
+    "closeMenu": "Cerrar menú de navegación",
     "adminConsole": "Consola de Administración",
     "pmoLivingGraph": "Dashboard 3"
   },

@@ -117,8 +117,8 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
             <Users className="h-6 w-6 text-brand-500" />
             {tt("Team", "Equipo")}
@@ -129,13 +129,13 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
           </p>
         </div>
         {canManage && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap gap-2 sm:shrink-0 sm:items-center">
             <button type="button" onClick={() => setCreatingLogin(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950/30">
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50 sm:flex-none sm:justify-start dark:hover:bg-brand-950/30">
               <KeyRound className="h-4 w-4" />{tt("Create login", "Crear acceso")}
             </button>
             <button type="button" onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 sm:flex-none sm:justify-start">
               <Plus className="h-4 w-4" />{tt("Add person", "Agregar persona")}
             </button>
           </div>
@@ -149,16 +149,16 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+            <div key={i} className="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4 sm:flex-nowrap">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">{m.name.slice(0, 2).toUpperCase()}</span>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-32">
                 <p className="truncate text-sm font-medium text-foreground">{m.name}{m.isYou && <span className="ml-1 text-xs text-muted-foreground">({tt("you", "tú")})</span>}</p>
                 <p className="truncate text-xs text-muted-foreground">{roleLabel(m.role)}{m.email && <> · {m.email}</>}</p>
                 {m.status !== "active" && <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400">{m.status}</p>}
               </div>
               {canManage && (
                 <button type="button" title={tt("Manage user", "Gestionar usuario")} onClick={() => setEditingUser(m)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400">
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:border-brand-500 hover:text-brand-600 sm:min-h-0 dark:hover:text-brand-400">
                   <UserCog className="h-4 w-4" />{tt("Manage", "Gestionar")}
                 </button>
               )}
@@ -211,7 +211,7 @@ export function TeamClient({ locale, members, resources, projects, canManage }: 
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">{g.trades.size > 0 ? [...g.trades].join(", ") : "—"}</td>
                       <td className="px-4 py-2.5">
-                        <div className="flex flex-wrap gap-1">{[...g.projects].map((p) => <span key={p} className="max-w-[160px] truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" title={p}>{p}</span>)}</div>
+                        <div className="flex flex-wrap gap-1">{[...g.projects].map((p) => <span key={p} className="max-w-[110px] truncate rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground sm:max-w-[160px]" title={p}>{p}</span>)}</div>
                       </td>
                       {canManage && (
                         <td className="px-4 py-2.5">
@@ -324,7 +324,7 @@ function EditDialog({ tt, resource, onClose, onSaved }: { tt: TT; resource: Team
     <Dialog title={tt("Edit", "Editar")} onClose={onClose}>
       <div className="space-y-3">
         <Field label={tt("Name", "Nombre")}><input autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={200} className={inputCls} /></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={tt("Type", "Tipo")}><TypeSelect tt={tt} value={type} onChange={setType} /></Field>
           <Field label={tt("Status", "Estado")}>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls}>
@@ -336,7 +336,7 @@ function EditDialog({ tt, resource, onClose, onSaved }: { tt: TT; resource: Team
           </Field>
         </div>
         <Field label={tt("Trade (optional)", "Oficio (opcional)")}><input value={trade} onChange={(e) => setTrade(e.target.value)} maxLength={80} className={inputCls} /></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={tt("Cost rate (optional)", "Tarifa (opcional)")}><input type="number" min="0" step="0.01" value={costRate} onChange={(e) => setCostRate(e.target.value)} className={inputCls} /></Field>
           <Field label={tt("Per", "Por")}>
             <select value={costUnit} onChange={(e) => setCostUnit(e.target.value)} className={inputCls}>
@@ -415,7 +415,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
       <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
         <Field label={tt("Name", "Nombre")}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} className={inputCls} /></Field>
         <Field label={tt("Email (managed by the user)", "Correo (gestionado por el usuario)")}><input type="email" value={email} readOnly className={`${inputCls} cursor-not-allowed opacity-70`} /></Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={tt("Seat", "Asiento")}>
             <select value={seat} onChange={(e) => setSeat(e.target.value)} className={inputCls}>
               {SEAT_TYPES.map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
@@ -428,7 +428,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
             </select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={tt("Status", "Estado")}>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls} disabled={member.isYou}>
               {MEMBER_STATUSES.filter((s) => s.value !== "removed").map((s) => <option key={s.value} value={s.value}>{tt(s.en, s.es)}</option>)}
@@ -439,7 +439,7 @@ function EditUserDialog({ tt, member, onClose, onSaved, onRemoved }: {
         <Field label={tt("Job title", "Cargo")}><input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={80} className={inputCls} /></Field>
         <div className="rounded-lg border border-brand-200 bg-brand-50/50 p-3 dark:border-brand-900 dark:bg-brand-950/20">
           <p className="mb-2 text-xs font-semibold text-foreground">{tt("Financial rate card", "Tarifa financiera")}</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={tt("Cost rate", "Tarifa de costo")}><input type="number" min="0" step="0.01" value={costRate} onChange={(e) => setCostRate(e.target.value)} placeholder="0.00" className={inputCls} /></Field>
             <Field label={tt("Per", "Por")}>
               <select value={costUnit} onChange={(e) => setCostUnit(e.target.value)} className={inputCls}>
