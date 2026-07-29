@@ -18,6 +18,7 @@ import {
   sumHours,
   sumHoursBy,
   computeEffort,
+  consolidatedEstimatedHours,
   effortSeverity,
   effortBarPct,
   crossedEffortBudget,
@@ -148,11 +149,14 @@ describe("effort standing", () => {
     expect(effort.severity).toBe("on_track");
   });
 
-  it("shows the overrun instead of clamping remaining at zero", () => {
+  it("floors remaining budget at zero and carries the overrun in the variance", () => {
     const effort = computeEffort(40, 52);
-    expect(effort.remainingHours).toBe(-12);
+    // "Budget left" cannot be negative; the overrun is the variance, which is
+    // the same magnitude with the opposite sign — so nothing is hidden.
+    expect(effort.remainingHours).toBe(0);
     expect(effort.varianceHours).toBe(12);
     expect(effort.consumedPct).toBe(130);
+    expect(effort.severity).toBe("critical");
   });
 
   it("stays neutral when nothing was estimated", () => {
@@ -174,6 +178,40 @@ describe("effort standing", () => {
     expect(effort.consumedPct).toBe(0);
     expect(effort.remainingHours).toBe(40);
     expect(effort.severity).toBe("on_track");
+  });
+});
+
+describe("consolidated estimate (no double counting)", () => {
+  it("uses the task's own estimate when it has no subtasks", () => {
+    expect(consolidatedEstimatedHours(10, [])).toBe(10);
+  });
+
+  it("uses the subtasks' sum, NOT the task's number, when subtasks exist", () => {
+    // The scenario from the brief: B1 20h + B2 30h = 50h, and the task's own
+    // 999h is deliberately ignored rather than added on top.
+    expect(consolidatedEstimatedHours(999, [20, 30])).toBe(50);
+  });
+
+  it("never adds the task estimate to its subtasks' estimates", () => {
+    const consolidated = consolidatedEstimatedHours(50, [20, 30]);
+    expect(consolidated).toBe(50);
+    expect(consolidated).not.toBe(100);
+  });
+
+  it("falls back to the task estimate when subtasks exist but are unestimated", () => {
+    // Otherwise planned hours would DROP the moment an unestimated subtask is
+    // added — the plan would look like it shrank because someone decomposed it.
+    expect(consolidatedEstimatedHours(40, [null, null])).toBe(40);
+    expect(consolidatedEstimatedHours(40, [0, 0])).toBe(40);
+  });
+
+  it("reports no estimate at all rather than a misleading zero", () => {
+    expect(consolidatedEstimatedHours(null, [])).toBeNull();
+    expect(consolidatedEstimatedHours(0, [null])).toBeNull();
+  });
+
+  it("keeps decimal estimates exact", () => {
+    expect(consolidatedEstimatedHours(null, [1.25, 1.5, 2.75])).toBe(5.5);
   });
 });
 

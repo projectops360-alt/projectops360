@@ -6,6 +6,10 @@
 // Rendered from inside the subtask form, so it deliberately uses a <div> and
 // button handlers instead of a nested <form> (a form inside a form is invalid
 // HTML and the browser drops the inner one). Enter still submits.
+//
+// One dialog serves BOTH levels: pass `subtaskId` to log against a subtask,
+// omit it to log against the task itself. Same component, same action, same
+// table — a second "task time" dialog would be a parallel system.
 // ============================================================================
 
 import { useState, useTransition } from "react";
@@ -17,9 +21,17 @@ import type { TimeEntryView } from "@/lib/time-tracking/types";
 
 export interface TimeEntryDialogProps {
   projectId: string;
-  subtaskId: string;
+  taskId: string;
+  /** Null/omitted = the entry belongs to the task itself. */
+  subtaskId?: string | null;
   /** Null = new entry. */
   entry: TimeEntryView | null;
+  /**
+   * People the effort may be attributed to. Only offered when the viewer is
+   * allowed to log in someone else's name — a contributor records their own.
+   */
+  people?: { id: string; name: string }[];
+  canLogForOthers?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -31,7 +43,16 @@ function todayLocal(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function TimeEntryDialog({ projectId, subtaskId, entry, onClose, onSaved }: TimeEntryDialogProps) {
+export function TimeEntryDialog({
+  projectId,
+  taskId,
+  subtaskId,
+  entry,
+  people,
+  canLogForOthers,
+  onClose,
+  onSaved,
+}: TimeEntryDialogProps) {
   const t = useTranslations("taskExecutionMap.timeTracking");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +64,10 @@ export function TimeEntryDialog({ projectId, subtaskId, entry, onClose, onSaved 
     entry && !entry.start_time ? String(entry.duration_hours) : "",
   );
   const [comment, setComment] = useState(entry?.comment ?? "");
+  // Whose effort this is. Empty = the caller's own; the server defaults to the
+  // session user, so an unset picker can never mis-attribute.
+  const [userId, setUserId] = useState(entry?.user_id ?? "");
+  const showPeoplePicker = !!canLogForOthers && !!people && people.length > 0;
 
   // Live preview: as soon as both ends of the interval are known, the user sees
   // the hours that will actually be stored.
@@ -67,10 +92,11 @@ export function TimeEntryDialog({ projectId, subtaskId, entry, onClose, onSaved 
         endTime: usingInterval ? endTime : null,
         durationHours: usingInterval ? null : Number(duration),
         comment: comment.trim() || null,
+        userId: userId || null,
       };
       const res = entry
         ? await updateTimeEntryAction({ ...payload, entryId: entry.id })
-        : await logTimeEntryAction({ ...payload, subtaskId });
+        : await logTimeEntryAction({ ...payload, taskId, subtaskId: subtaskId ?? null });
       if (res.error) {
         setError(t.has(`errors.${res.error}`) ? t(`errors.${res.error}`) : t("errors.unexpected"));
         return;
@@ -123,6 +149,31 @@ export function TimeEntryDialog({ projectId, subtaskId, entry, onClose, onSaved 
             className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
           />
         </div>
+
+        {/* Whose effort — a manager may record work done by someone else. The
+            entry keeps both: user_id is the person who did the work, created_by
+            stays the person who typed it in. */}
+        {showPeoplePicker && (
+          <div>
+            <label htmlFor="tem-te-user" className="text-xs font-medium text-foreground">
+              {t("forUser")}
+            </label>
+            <select
+              id="tem-te-user"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
+            >
+              <option value="">{t("forUserSelf")}</option>
+              {people!.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t("forUserHint")}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <div>

@@ -1,27 +1,57 @@
 "use client";
 
 // ============================================================================
-// ProjectOps360° — Time Tracking · Subtask effort panel + time log
+// ProjectOps360° — Time Tracking · Effort panel + time log
 // ============================================================================
-// Shows the three numbers a PM actually asks for (estimated / actual /
-// remaining), the effort bar, and the full history. Actual hours are always the
-// sum of the entries below — there is no field to type them into, by design
-// (guard SUBTASK-ACTUAL-HOURS-DERIVED).
+// Shows the numbers a PM actually asks for (estimated / actual / remaining /
+// consumption / variance), the effort bar, and the full history. Actual hours
+// are always the sum of the entries below — there is no field to type them
+// into, by design (guard SUBTASK-ACTUAL-HOURS-DERIVED).
+//
+// ONE panel serves both levels. With `subtaskId` it is a subtask's log; without
+// it, it is the task's CONSOLIDATED log — the task's own entries plus every
+// subtask's, which is exactly the set its actual hours are summed from, so the
+// history always adds up to the total shown above it.
 // ============================================================================
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { Clock, Pencil, Trash2, Loader2 } from "lucide-react";
-import { listTimeEntriesAction, deleteTimeEntryAction } from "@/lib/time-tracking/actions";
+import {
+  listTimeEntriesAction,
+  deleteTimeEntryAction,
+  canLogTimeForOthersAction,
+  getTaskEffortAction,
+} from "@/lib/time-tracking/actions";
 import { computeEffort, effortBarPct, SUBTASK_THRESHOLDS } from "@/lib/time-tracking/effort";
+import type { EffortThresholds } from "@/lib/time-tracking/effort";
 import type { TimeEntryView, EffortSeverity } from "@/lib/time-tracking/types";
 import { TimeEntryDialog } from "./time-entry-dialog";
 
+export interface TimeLogPanelProps {
+  projectId: string;
+  taskId: string;
+  /** Null/omitted = the task's consolidated log instead of one subtask's. */
+  subtaskId?: string | null;
+  /**
+   * Only for subtask level, where the caller already holds the number. At task
+   * level it is read from the engine instead: the consolidated estimate depends
+   * on the subtasks, which the client does not have.
+   */
+  estimatedHours?: number | null;
+  thresholds?: EffortThresholds;
+  /** People a manager may attribute effort to. */
+  people?: { id: string; name: string }[];
+  /** Notifies the parent so the cached actual hours stay in sync on screen. */
+  onTotalChange?: (actualHours: number) => void;
+}
+
 export interface SubtaskTimeLogProps {
   projectId: string;
+  taskId: string;
   subtaskId: string;
   estimatedHours: number | null;
-  /** Notifies the parent so the cached actual hours stay in sync on screen. */
+  people?: { id: string; name: string }[];
   onTotalChange?: (actualHours: number) => void;
 }
 
@@ -41,17 +71,43 @@ const TEXT_COLOR: Record<EffortSeverity, string> = {
   critical: "text-red-600 dark:text-red-400",
 };
 
-export function SubtaskTimeLog({ projectId, subtaskId, estimatedHours, onTotalChange }: SubtaskTimeLogProps) {
+/** A subtask's time log — the original surface, unchanged in behaviour. */
+export function SubtaskTimeLog({ projectId, taskId, subtaskId, estimatedHours, people, onTotalChange }: SubtaskTimeLogProps) {
+  return (
+    <TimeLogPanel
+      projectId={projectId}
+      taskId={taskId}
+      subtaskId={subtaskId}
+      estimatedHours={estimatedHours}
+      thresholds={SUBTASK_THRESHOLDS}
+      people={people}
+      onTotalChange={onTotalChange}
+    />
+  );
+}
+
+export function TimeLogPanel({
+  projectId,
+  taskId,
+  subtaskId,
+  estimatedHours,
+  thresholds = SUBTASK_THRESHOLDS,
+  people,
+  onTotalChange,
+}: TimeLogPanelProps) {
   const t = useTranslations("taskExecutionMap.timeTracking");
   const [entries, setEntries] = useState<TimeEntryView[] | null>(null);
   const [actualHours, setActualHours] = useState(0);
+  const [taskEstimated, setTaskEstimated] = useState<number | null>(null);
   const [dialogFor, setDialogFor] = useState<{ entry: TimeEntryView | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [canLogForOthers, setCanLogForOthers] = useState(false);
   const [pending, startTransition] = useTransition();
+  const isTaskLevel = !subtaskId;
 
   const load = useCallback(() => {
     startTransition(async () => {
-      const res = await listTimeEntriesAction({ projectId, subtaskId });
+      const res = await listTimeEntriesAction({ projectId, taskId, subtaskId: subtaskId ?? null });
       if (res.error) {
         setError(t.has(`errors.${res.error}`) ? t(`errors.${res.error}`) : t("errors.unexpected"));
         setEntries([]);
@@ -60,10 +116,27 @@ export function SubtaskTimeLog({ projectId, subtaskId, estimatedHours, onTotalCh
       setEntries(res.entries ?? []);
       setActualHours(res.actualHours ?? 0);
       onTotalChange?.(res.actualHours ?? 0);
+      // At task level the consolidated estimate is the engine's to decide
+      // (subtasks when they exist), so it is refreshed alongside the log.
+      if (!subtaskId) {
+        const effortRes = await getTaskEffortAction(projectId, taskId);
+        setTaskEstimated(effortRes.effort?.estimatedHours ?? null);
+      }
     });
-  }, [projectId, subtaskId, t, onTotalChange]);
+  }, [projectId, taskId, subtaskId, t, onTotalChange]);
 
   useEffect(() => { load(); }, [load]);
+
+  // The picker is offered only when the server would actually accept someone
+  // else's id, so the UI never presents a choice the action will reject.
+  useEffect(() => {
+    let active = true;
+    if (!people || people.length === 0) return;
+    canLogTimeForOthersAction(projectId, taskId)
+      .then((allowed) => { if (active) setCanLogForOthers(allowed); })
+      .catch(() => { /* stay closed: deny-by-default */ });
+    return () => { active = false; };
+  }, [projectId, taskId, people]);
 
   const remove = (entry: TimeEntryView) => {
     if (!window.confirm(t("deleteConfirm"))) return;
@@ -77,21 +150,33 @@ export function SubtaskTimeLog({ projectId, subtaskId, estimatedHours, onTotalCh
     });
   };
 
-  const effort = computeEffort(estimatedHours, actualHours, SUBTASK_THRESHOLDS);
+  const effort = computeEffort(isTaskLevel ? taskEstimated : estimatedHours, actualHours, thresholds);
   const h = (value: number | null) => (value === null ? "—" : `${value} ${t("hoursShort")}`);
+  const signed = (value: number | null) =>
+    value === null ? "—" : `${value > 0 ? "+" : ""}${value} ${t("hoursShort")}`;
 
   return (
-    <div className="space-y-3" data-testid="tem-subtask-time-log">
+    <div
+      className="space-y-3"
+      data-testid={isTaskLevel ? "tem-task-time-log" : "tem-subtask-time-log"}
+    >
       {/* ── Effort summary ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Figure label={t("estimated")} value={h(effort.estimatedHours)} />
         <Figure label={t("actual")} value={h(effort.actualHours)} />
+        {/* Remaining is budget LEFT and floors at 0; the overrun is the variance
+            beside it, so the two together read as a full picture. */}
+        <Figure label={t("remaining")} value={h(effort.remainingHours)} />
         <Figure
-          label={t("remaining")}
-          value={h(effort.remainingHours)}
-          className={effort.remainingHours !== null && effort.remainingHours < 0 ? TEXT_COLOR[effort.severity] : undefined}
+          label={t("variance")}
+          value={signed(effort.varianceHours)}
+          className={effort.varianceHours !== null && effort.varianceHours > 0 ? TEXT_COLOR[effort.severity] : undefined}
         />
       </div>
+
+      {isTaskLevel && (
+        <p className="text-[11px] text-muted-foreground">{t("taskLevelHint")}</p>
+      )}
 
       {effort.consumedPct !== null && (
         <div>
@@ -168,7 +253,14 @@ export function SubtaskTimeLog({ projectId, subtaskId, estimatedHours, onTotalCh
                       </span>
                     )}
                   </td>
-                  <td className="py-1.5 pr-2 text-foreground">{entry.user_name || "—"}</td>
+                  <td className="py-1.5 pr-2 text-foreground">
+                    {entry.user_name || "—"}
+                    {/* In the consolidated view, say which entries arrived from a
+                        subtask so the total is auditable at a glance. */}
+                    {isTaskLevel && entry.subtask_id && (
+                      <span className="block text-[10px] text-muted-foreground">{t("viaSubtask")}</span>
+                    )}
+                  </td>
                   <td className="py-1.5 pr-2 text-right tabular-nums font-medium text-foreground">
                     {entry.duration_hours}
                   </td>
@@ -205,8 +297,13 @@ export function SubtaskTimeLog({ projectId, subtaskId, estimatedHours, onTotalCh
       {dialogFor && (
         <TimeEntryDialog
           projectId={projectId}
-          subtaskId={subtaskId}
+          taskId={taskId}
+          // Editing keeps the entry on whatever level it was filed under; a new
+          // entry follows the panel's own level.
+          subtaskId={dialogFor.entry ? dialogFor.entry.subtask_id : subtaskId ?? null}
           entry={dialogFor.entry}
+          people={people}
+          canLogForOthers={canLogForOthers}
           onClose={() => setDialogFor(null)}
           onSaved={load}
         />

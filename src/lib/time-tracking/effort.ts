@@ -115,6 +115,13 @@ export interface EffortThresholds {
 export const SUBTASK_THRESHOLDS: EffortThresholds = { warningPct: 90, overPct: 100, criticalPct: 120 };
 
 /**
+ * A task warns on the same early scale as a subtask, deliberately: it is still
+ * ONE piece of work in flight, not a portfolio. Named separately from
+ * SUBTASK_THRESHOLDS so the two can diverge later without hunting callers.
+ */
+export const TASK_THRESHOLDS: EffortThresholds = SUBTASK_THRESHOLDS;
+
+/**
  * Aggregates warn LATER: across a whole project, being at 95% of budget is
  * normal, so green holds until the estimate is actually passed (100% / 120%).
  * These are the two scales the product asked for; they are deliberately
@@ -133,7 +140,15 @@ export function effortSeverity(
   return "on_track";
 }
 
-/** Everything the UI needs about one work item's effort, in one call. */
+/**
+ * Everything the UI needs about one work item's effort, in one call.
+ *
+ * `remainingHours` is BUDGET LEFT, so it floors at 0: there is no such thing as
+ * "-12 hours of budget remaining". The overrun is not lost by that floor — it is
+ * `varianceHours`, which is the same number with the opposite sign
+ * (remaining_signed = estimated − actual = −variance), so clamping here removes
+ * a duplicate rather than information.
+ */
 export function computeEffort(
   estimatedHours: number | null | undefined,
   actualHours: number,
@@ -141,15 +156,70 @@ export function computeEffort(
 ): EffortSummary {
   const estimated = estimatedHours == null || estimatedHours <= 0 ? null : roundHours(estimatedHours);
   const actual = roundHours(actualHours);
+  // Guarded above: `estimated` is null when the divisor would be 0 or negative.
   const consumedPct = estimated === null ? null : Math.round((actual / estimated) * 1000) / 10;
   return {
     estimatedHours: estimated,
     actualHours: actual,
-    remainingHours: estimated === null ? null : roundHours(estimated - actual),
+    remainingHours: estimated === null ? null : roundHours(Math.max(estimated - actual, 0)),
     consumedPct,
     varianceHours: estimated === null ? null : roundHours(actual - estimated),
     severity: effortSeverity(consumedPct, thresholds),
   };
+}
+
+/**
+ * The estimate for one task, with subtask double-counting ruled out.
+ *
+ * When a task is broken into subtasks, the subtasks ARE the plan — adding the
+ * task's own number on top would count the same work twice. The task estimate
+ * survives as a fallback for the in-between state where subtasks exist but
+ * nobody has estimated them yet; without it a project's planned hours would
+ * silently DROP the moment someone adds an unestimated subtask.
+ */
+export function consolidatedEstimatedHours(
+  taskEstimatedHours: number | null | undefined,
+  subtaskEstimatedHours: (number | null | undefined)[],
+): number | null {
+  const fromSubtasks = subtaskEstimatedHours.reduce<number>(
+    (total, hours) => total + (Number(hours) || 0),
+    0,
+  );
+  if (fromSubtasks > 0) return roundHours(fromSubtasks);
+  const fromTask = Number(taskEstimatedHours) || 0;
+  return fromTask > 0 ? roundHours(fromTask) : null;
+}
+
+export interface TaskEffortInput {
+  /** The task's own planned hours, used only when it has no estimated subtasks. */
+  taskEstimatedHours: number | null | undefined;
+  subtasks: { estimatedHours: number | null | undefined; status?: string | null }[];
+  /**
+   * Live entries carrying this task's id — its own AND its subtasks'. Because
+   * every row stores task_id, this one list already covers both levels, which is
+   * why the total below is a single sum and not an addition of two subtotals.
+   */
+  entries: { duration_hours: number }[];
+}
+
+/**
+ * Effort standing for ONE task — the canonical formula, kept pure so the modal,
+ * the report, the dashboard, Isabella and the future EVM engine cannot drift
+ * into private arithmetic.
+ *
+ * Actual  = SUM(entries.duration_hours)               (each entry exactly once)
+ * Estimate= subtasks' sum when estimated, else the task's own number
+ */
+export function computeTaskEffort(
+  input: TaskEffortInput,
+  thresholds: EffortThresholds = TASK_THRESHOLDS,
+): EffortSummary {
+  const active = input.subtasks.filter((s) => s.status !== "cancelled");
+  const estimated = consolidatedEstimatedHours(
+    input.taskEstimatedHours,
+    active.map((s) => s.estimatedHours),
+  );
+  return computeEffort(estimated, sumHours(input.entries), thresholds);
 }
 
 /** Width of the effort bar: capped at 100 so the track never overflows. */

@@ -1233,3 +1233,53 @@ cannot cover a privilege nobody thought of, including any PostgreSQL adds later.
 **Verify:** `src/lib/eki-evidence/__tests__/automation-migration-contract.test.ts`
 → "REG-037". Production re-probed after `20260869000000`: 8 of 8 probes pass, 0
 write privileges held by any API role.
+
+---
+
+## REG-040 — Logged hours stopped at the subtask and never reached the task or the PM dashboard
+
+**Date:** 2026-07-29 · **Status:** closed · **Guard:** `TIME-TRACKING-TASK-ROLLUP`
+
+CAP-051 shipped a correct time log. Entries saved, the subtask modal showed real
+hours, and `task_subtasks.actual_hours` was refreshed on every change. One level
+up, nothing moved: with 11h logged across the subtasks of a task in the Valle
+Norte project, `roadmap_tasks.actual_hours` was **NULL**.
+
+Every task-level reader reads that column — the task detail page
+(`tasks/[taskId]/page.tsx` → `parent.actualHours`), the execution map's parent
+node, the PMO Living Graph read model. All of them showed 0h. The project
+dashboard's "Effort left" card was worse than stale: it computed
+`SUM(estimate_hours)` over tasks that are not `done` and never subtracted logged
+time at all, so it read the untouched plan back to the PM — ~1509h on the user's
+project — and could not move no matter how much time was logged.
+
+**Root cause:** the engine refreshed the subtask cache and there was no task-level
+rollup at all. `refreshSubtaskActualHours` existed; its task twin did not, and
+nothing in the product ever wrote `roadmap_tasks.actual_hours`. The table was
+already designed for this — `subtask_id` was deliberately made nullable so "task
+level logging needs no second table later" — but only the subtask half of that
+design was implemented, so time could not even be logged on a task: the schema
+required `subtaskId`, and update/delete rejected any entry whose `subtask_id` was
+NULL with `entry_not_found`.
+
+**Why it was not caught:** the shipped tests asserted the arithmetic (`SUM` over
+entries) and the subtask surface, both of which were right. Nothing asserted that
+the sum *arrives* anywhere above the subtask. The dashboard's own effort cards
+read the entries directly, so the one surface that did compute actual hours
+correctly hid the fact that the cache feeding every other surface was empty.
+
+**Protection rule (binding):** a task's actual hours are
+`SUM(duration_hours) WHERE task_id = task` — one sum over both levels, never
+"task hours + subtask hours", which is where double counting would enter. Both
+derived caches are refreshed on every mutation, the task one **unconditionally**,
+including for subtask-level entries. A task with estimated subtasks is estimated
+by those subtasks and never by adding its own number on top. No surface computes
+effort itself: they all call `computeTaskEffort` / `getProjectEffortSummary`.
+
+**Verify:** `src/lib/time-tracking/__tests__/task-consolidation.test.ts` (the 14
+required scenarios, including the brief's worked example: 60h estimated / 19h
+actual / 41h remaining / −41h variance / 31.7% consumed) ·
+`isolation-and-refresh.test.ts` (per-org scoping and revalidation on every
+mutation). Migration `20260871000000` rebuilds the cache for entries written
+before the rollup existed; verified on Stage — the Valle Norte task went from
+NULL to 11.00h, matching its log exactly.

@@ -178,7 +178,63 @@ counting both would double-count the same work.
    no submit/approve cycle, which a formal timesheet product would need.
 3. **No per-entry cost.** By design (section 6) — rates arrive with the billing
    capability.
-4. **Task-level logging is modelled but not exposed.** `subtask_id` may be NULL
-   and the report already sums those rows into the task, but no UI writes them yet.
-5. **Overlapping entries are allowed.** Two entries covering 09:00–12:00 on the
+4. **Overlapping entries are allowed.** Two entries covering 09:00–12:00 on the
    same day are not detected; catching that needs a per-person daily view.
+
+---
+
+## 10. Task-level logging and the rollup (REG-040)
+
+Sections 1–9 describe the engine as first shipped: correct at the subtask, absent
+above it. `subtask_id` was nullable from day one so task-level logging would need
+no second table — but only the subtask half was implemented, and the consequence
+was not a missing feature, it was a **wrong number on the PM dashboard**. See
+REG-040 in the regression log.
+
+**Time is anchored to a task always, to a subtask when there is one.** Logging on
+a task means `subtask_id IS NULL`. Both levels share one table, one dialog
+(`TimeEntryDialog`), one panel (`TimeLogPanel`) and one set of server actions —
+a second "task time" implementation would be the parallel system this capability
+exists to avoid.
+
+**A task's actual hours are ONE sum:**
+
+```
+actual = SUM(duration_hours) WHERE task_id = task AND deleted_at IS NULL
+```
+
+Because *every* row carries `task_id`, that single sum already spans both levels
+and counts each entry exactly once. **Nothing adds "task hours + subtask
+hours"** — that addition is the only way double counting could enter, and it
+appears nowhere in the engine.
+
+`roadmap_tasks.actual_hours` is now a derived cache on the same terms as the
+subtask one: written only by the engine, refreshed on **every** mutation
+including subtask-level ones, and rebuildable from the entries (migration
+`20260871000000` is that rebuild). It exists so the task detail, the execution
+map's parent node and the PMO Living Graph keep reading one number without a
+join — not as an alternative source of truth.
+
+**Estimate consolidation** mirrors the project rule from section 8, now shared by
+both through `consolidatedEstimatedHours`: a task with estimated subtasks is
+estimated **by** them. Its own number survives only as a fallback for the
+in-between state where subtasks exist but nobody has estimated them yet —
+without that, adding one unestimated subtask would make the plan appear to
+shrink.
+
+**Recorded decision — `remainingHours` floors at 0.** It previously went negative
+to expose the overrun. That made it identical to `−varianceHours`, so the pair
+carried one fact twice. `remaining` now means strictly "budget left" and
+`variance` carries the signed overrun; the effort test that asserted `-12` was
+updated to assert `0` alongside `variance: +12`. No information was lost — it
+moved to the field named for it.
+
+**Recorded decision — the Task Execution report keeps the task's OWN estimate.**
+It is a flat table where subtasks get their own rows, so consolidating the parent
+row would double-count within a single export. Consolidation belongs to the
+per-task and per-project summaries, where there is one row per task. Two shipped
+tests defend this and correctly rejected an attempt to change it.
+
+**Consumption is not progress.** `Consumption: 80%` next to `Progress: 65%` means
+80% of the budget bought 65% of the work. The dashboard shows them as separate
+cards for that reason and never derives one from the other.

@@ -115,8 +115,10 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
         {subtask && tab === "time" && (
           <SubtaskTimeLog
             projectId={projectId}
+            taskId={taskId}
             subtaskId={subtask.id}
             estimatedHours={estimatedHours === "" ? null : Number(estimatedHours)}
+            people={owners}
             onTotalChange={setActualHours}
           />
         )}

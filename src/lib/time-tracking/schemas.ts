@@ -16,7 +16,13 @@ const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "invalid_date");
 export const logTimeEntrySchema = z
   .object({
     projectId: z.string().uuid("invalid_project_id"),
-    subtaskId: z.string().uuid("invalid_subtask_id"),
+    /**
+     * Time is anchored to a task ALWAYS. `subtaskId` narrows it to one subtask
+     * when the work was decomposed; omitted/null means the time belongs to the
+     * task itself. Both land in the same table, so a task's hours are one SUM.
+     */
+    taskId: z.string().uuid("invalid_task_id"),
+    subtaskId: z.string().uuid("invalid_subtask_id").nullable().optional(),
     workDate: dateString,
     startTime: timeString.nullable().optional(),
     endTime: timeString.nullable().optional(),
@@ -39,6 +45,8 @@ export const updateTimeEntrySchema = z
     endTime: timeString.nullable().optional(),
     durationHours: z.coerce.number().positive("invalid_duration").max(24, "exceeds_day").nullable().optional(),
     comment: z.string().max(2000, "comment_too_long").nullable().optional(),
+    /** Re-attributing effort to a different person is a manager-only action. */
+    userId: z.string().uuid().nullable().optional(),
   });
 
 export const deleteTimeEntrySchema = z.object({
@@ -48,7 +56,12 @@ export const deleteTimeEntrySchema = z.object({
 
 export const listTimeEntriesSchema = z.object({
   projectId: z.string().uuid("invalid_project_id"),
-  subtaskId: z.string().uuid("invalid_subtask_id"),
+  taskId: z.string().uuid("invalid_task_id"),
+  /**
+   * Given → that subtask's entries only. Omitted → the task's CONSOLIDATED log
+   * (its own entries plus every subtask's), which is what the task modal shows.
+   */
+  subtaskId: z.string().uuid("invalid_subtask_id").nullable().optional(),
 });
 
 export type LogTimeEntryInput = z.input<typeof logTimeEntrySchema>;

@@ -9,8 +9,8 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
-import { sumHours, sumHoursBy, roundHours } from "./effort";
-import type { TimeEntry } from "./types";
+import { sumHours, sumHoursBy, roundHours, computeEffort, computeTaskEffort } from "./effort";
+import type { EffortSummary, TimeEntry } from "./types";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -112,6 +112,134 @@ export async function refreshSubtaskActualHours(
     .is("deleted_at", null);
   if (error) console.error("[time-tracking] actual_hours cache refresh failed:", error.message);
   return roundHours(total);
+}
+
+// ── Task level ───────────────────────────────────────────────────────────────
+// A task's actual hours are SUM(duration_hours) over every entry carrying its
+// task_id. Because every row — task-level or subtask-level — stores task_id,
+// that single sum already includes both, and includes each entry exactly once.
+// There is deliberately no "task hours + subtask hours" addition anywhere: that
+// is precisely how double counting would get in.
+
+/** Every entry for a task, its own and its subtasks', newest work first. */
+export async function listTaskTimeEntries(
+  supabase: Admin,
+  org: OrgContext,
+  projectId: string,
+  taskId: string,
+): Promise<TimeEntry[]> {
+  const { data } = await supabase
+    .from("subtask_time_entries")
+    .select(ENTRY_SELECT)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", projectId)
+    .eq("task_id", taskId)
+    .is("deleted_at", null)
+    .order("work_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  return ((data ?? []) as TimeEntry[]).map((e) => ({ ...e, duration_hours: Number(e.duration_hours) }));
+}
+
+/**
+ * Total logged hours for a task — the canonical consolidated "actual hours".
+ * Includes time logged directly on the task and time logged on any of its
+ * subtasks, each entry counted once.
+ */
+export async function getTaskActualHours(
+  supabase: Admin,
+  org: OrgContext,
+  projectId: string,
+  taskId: string,
+): Promise<number> {
+  const { data } = await supabase
+    .from("subtask_time_entries")
+    .select("duration_hours")
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", projectId)
+    .eq("task_id", taskId)
+    .is("deleted_at", null);
+  return sumHours((data ?? []) as { duration_hours: number }[]);
+}
+
+/**
+ * Refresh roadmap_tasks.actual_hours from the entries.
+ *
+ * The task-level twin of refreshSubtaskActualHours, and the reason logged time
+ * used to vanish above the subtask: the engine kept the subtask cache current
+ * but never rolled up, so every task-level reader (task detail, execution map
+ * parent node, PMO Living Graph, the old dashboard card) read a column nothing
+ * ever wrote and showed 0h. Same rule as the subtask cache — DERIVED, written
+ * only here, always rebuildable from the entries.
+ */
+export async function refreshTaskActualHours(
+  supabase: Admin,
+  org: OrgContext,
+  projectId: string,
+  taskId: string,
+): Promise<number> {
+  const total = await getTaskActualHours(supabase, org, projectId, taskId);
+  const { error } = await supabase
+    .from("roadmap_tasks")
+    .update({ actual_hours: total })
+    .eq("id", taskId)
+    .eq("organization_id", org.organizationId)
+    .eq("project_id", projectId)
+    .is("deleted_at", null);
+  if (error) console.error("[time-tracking] task actual_hours cache refresh failed:", error.message);
+  return roundHours(total);
+}
+
+/**
+ * Effort standing for ONE task — the single source every task-level surface
+ * reads (modal, detail, report, Isabella and the future EVM engine), so none of
+ * them can drift into its own arithmetic.
+ */
+export async function getTaskEffortSummary(
+  supabase: Admin,
+  org: OrgContext,
+  projectId: string,
+  taskId: string,
+  thresholds?: Parameters<typeof computeEffort>[2],
+): Promise<EffortSummary> {
+  const [{ data: task }, { data: subtasks }, { data: entries }] = await Promise.all([
+    supabase
+      .from("roadmap_tasks")
+      .select("estimated_labor_hours, estimate_hours")
+      .eq("id", taskId)
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", projectId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    supabase
+      .from("task_subtasks")
+      .select("estimated_hours, status")
+      .eq("task_id", taskId)
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", projectId)
+      .is("deleted_at", null),
+    supabase
+      .from("subtask_time_entries")
+      .select("duration_hours")
+      .eq("organization_id", org.organizationId)
+      .eq("project_id", projectId)
+      .eq("task_id", taskId)
+      .is("deleted_at", null),
+  ]);
+
+  const t = task as { estimated_labor_hours: number | null; estimate_hours: number | null } | null;
+  // The arithmetic itself lives in computeTaskEffort (pure, exhaustively tested);
+  // this function's only job is to fetch the rows it needs.
+  return computeTaskEffort(
+    {
+      taskEstimatedHours: t?.estimated_labor_hours ?? t?.estimate_hours ?? null,
+      subtasks: ((subtasks ?? []) as { estimated_hours: number | null; status: string }[]).map((s) => ({
+        estimatedHours: s.estimated_hours,
+        status: s.status,
+      })),
+      entries: (entries ?? []) as { duration_hours: number }[],
+    },
+    thresholds,
+  );
 }
 
 /** Display names for the people behind a set of entries. */

@@ -44,13 +44,17 @@ export interface TimeEntryView extends TimeEntry {
 }
 
 /**
- * Effort standing for one work item. `remaining` can go negative — that IS the
- * overrun, and hiding it behind a zero would hide the very thing a PM needs.
+ * Effort standing for one work item.
+ *
+ * The overrun lives in `varianceHours`, not in a negative `remainingHours`:
+ * those two were the same number with opposite signs, so `remaining` now means
+ * strictly "budget left" and floors at 0, while `variance` carries the sign.
+ * Nothing a PM needs is hidden — it moved to the field that is named for it.
  */
 export interface EffortSummary {
   estimatedHours: number | null;
   actualHours: number;
-  /** estimated − actual. Null when nothing was estimated. */
+  /** MAX(estimated − actual, 0) — budget left, never negative. Null when unestimated. */
   remainingHours: number | null;
   /** actual ÷ estimated × 100. Null when nothing was estimated. */
   consumedPct: number | null;

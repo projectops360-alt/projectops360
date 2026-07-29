@@ -10,7 +10,7 @@ import "server-only";
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { computeEffort, roundHours, PORTFOLIO_THRESHOLDS } from "./effort";
+import { computeEffort, roundHours, consolidatedEstimatedHours, PORTFOLIO_THRESHOLDS } from "./effort";
 import type { EffortSummary } from "./types";
 
 export interface ProjectEffortSummary extends EffortSummary {
@@ -45,32 +45,37 @@ export async function getProjectEffortSummary(
       .is("deleted_at", null),
     supabase
       .from("subtask_time_entries")
-      .select("subtask_id, duration_hours")
+      .select("task_id, subtask_id, duration_hours")
       .eq("organization_id", organizationId)
       .eq("project_id", projectId)
       .is("deleted_at", null),
   ]);
 
-  const tasksWithSubtasks = new Set(
-    ((subtasks ?? []) as { task_id: string; status: string }[])
-      .filter((s) => s.status !== "cancelled")
-      .map((s) => s.task_id),
-  );
+  // Estimates per task, then summed — the SAME consolidation the task modal and
+  // the report use (consolidatedEstimatedHours), so a task's hours read the same
+  // everywhere instead of each surface rolling its own arithmetic.
+  const subtaskEstimatesByTask = new Map<string, (number | null)[]>();
+  for (const s of (subtasks ?? []) as { task_id: string; estimated_hours: number | null; status: string }[]) {
+    if (s.status === "cancelled") continue;
+    const list = subtaskEstimatesByTask.get(s.task_id) ?? [];
+    list.push(s.estimated_hours);
+    subtaskEstimatesByTask.set(s.task_id, list);
+  }
 
   let estimated = 0;
-  for (const s of (subtasks ?? []) as { estimated_hours: number | null; status: string }[]) {
-    if (s.status === "cancelled") continue;
-    estimated += Number(s.estimated_hours ?? 0);
-  }
   for (const t of (tasks ?? []) as { id: string; estimated_labor_hours: number | null; estimate_hours: number | null }[]) {
-    // Skip tasks whose effort is already expressed by their subtasks.
-    if (tasksWithSubtasks.has(t.id)) continue;
-    estimated += Number(t.estimated_labor_hours ?? t.estimate_hours ?? 0);
+    estimated += consolidatedEstimatedHours(
+      t.estimated_labor_hours ?? t.estimate_hours ?? null,
+      subtaskEstimatesByTask.get(t.id) ?? [],
+    ) ?? 0;
   }
 
-  const rows = (entries ?? []) as { subtask_id: string | null; duration_hours: number }[];
+  const rows = (entries ?? []) as { task_id: string; subtask_id: string | null; duration_hours: number }[];
   const actual = rows.reduce((sum, e) => sum + (Number(e.duration_hours) || 0), 0);
-  const itemsWithTime = new Set(rows.map((e) => e.subtask_id).filter(Boolean)).size;
+  // Counted by WORK ITEM, so a task logged directly (subtask_id NULL) counts too
+  // — keying this on subtask_id alone reported "engine unused" for a project
+  // whose time was all logged at task level.
+  const itemsWithTime = new Set(rows.map((e) => e.subtask_id ?? `task:${e.task_id}`)).size;
 
   return {
     ...computeEffort(estimated > 0 ? roundHours(estimated) : null, roundHours(actual), PORTFOLIO_THRESHOLDS),

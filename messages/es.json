@@ -724,6 +724,12 @@
       "nearBudget": "Cerca del esfuerzo planificado",
       "hoursShort": "h",
       "readOnlyHint": "Las horas reales son la suma del registro de tiempo; no se escriben a mano.",
+      "variance": "Variación",
+      "forUser": "Horas de",
+      "forUserSelf": "Yo",
+      "forUserHint": "Se registran como trabajo de esa persona; tú quedas registrado como quien las introdujo.",
+      "taskLevelHint": "Incluye el tiempo registrado en esta tarea y en todas sus subtareas, contando cada registro una sola vez.",
+      "viaSubtask": "vía subtarea",
       "errors": {
         "invalid_time": "Escribe una hora válida (HH:MM).",
         "end_before_start": "La hora de fin es anterior a la de inicio.",
@@ -735,6 +741,8 @@
         "invalid_date": "Escribe una fecha válida.",
         "forbidden": "No tienes permiso para hacer esto.",
         "subtask_not_found": "Subtarea no encontrada.",
+        "task_not_found": "Tarea no encontrada.",
+        "invalid_task_id": "Tarea no válida.",
         "entry_not_found": "Registro de tiempo no encontrado.",
         "unexpected": "Algo salió mal."
       }
