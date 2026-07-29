@@ -72,12 +72,14 @@ export function GlobalSearch() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70"
+        // On a phone this collapses to a 44×44 icon button: the desktop-width
+        // label would otherwise push the header's right-hand actions off-screen.
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground transition-colors hover:bg-muted/70 md:h-auto md:w-auto md:justify-start md:gap-2 md:px-3 md:py-2"
         aria-label={isEs ? "Buscar" : "Search"}
       >
-        <Search className="h-4 w-4" />
-        <span>{isEs ? "Buscar en todo…" : "Search everything…"}</span>
-        <kbd className="ml-8 hidden rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline">⌘K</kbd>
+        <Search className="h-4 w-4 shrink-0" />
+        <span className="hidden md:inline">{isEs ? "Buscar en todo…" : "Search everything…"}</span>
+        <kbd className="ml-8 hidden rounded border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground lg:inline">⌘K</kbd>
       </button>
 
       {open && (

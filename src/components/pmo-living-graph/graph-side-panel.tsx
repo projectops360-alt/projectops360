@@ -68,7 +68,9 @@ export function GraphSidePanel({
   return (
     <aside
       aria-label={nodeContext ? t("nodeType") : t("relationship")}
-      className="flex h-full w-[340px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white"
+      // Floats over the canvas on a phone (340px would leave nothing to look
+      // at); unchanged docked column from `sm` up.
+      className="absolute inset-y-0 right-0 z-20 flex h-full w-[90%] max-w-[340px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white shadow-xl sm:static sm:z-auto sm:w-[340px] sm:shadow-none"
     >
       <header className="flex items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="min-w-0">

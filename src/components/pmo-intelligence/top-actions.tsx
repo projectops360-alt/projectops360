@@ -57,30 +57,32 @@ export function PmoTopActions({ base, projectIds, onAskIsabella }: PmoTopActions
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    // The three actions share the row evenly on a phone instead of the third
+    // one hanging off the edge; from `sm` up they size to their content again.
+    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
       <Link
         href={`${base}/import`}
-        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:min-h-0 sm:flex-none sm:justify-start"
       >
-        <Upload className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+        <Upload className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
         {t("actionImport")}
       </Link>
 
       <button
         type="button"
         onClick={onAskIsabella}
-        className="inline-flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:bg-purple-100"
+        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 hover:bg-purple-100 sm:min-h-0 sm:flex-none sm:justify-start"
       >
-        <MessageSquare className="h-3.5 w-3.5" aria-hidden />
+        <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden />
         {t("actionAskAi")}
       </button>
 
-      <details className="relative">
-        <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-          <FileText className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+      <details className="relative flex-1 sm:flex-none">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:min-h-0 sm:justify-start">
+          <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
           {t("actionReport")}
         </summary>
-        <div className="absolute right-0 z-30 mt-1 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+        <div className="absolute right-0 z-30 mt-1 w-[calc(100vw-2rem)] max-w-[16rem] rounded-lg border border-slate-200 bg-white p-2 shadow-lg sm:w-64">
           {/* A multi-project scope cannot be expressed as one project id, so
               the report runs org-wide and says so. Silently reporting on the
               first selected project would be a confidently wrong answer. */}
@@ -112,7 +114,7 @@ export function PmoTopActions({ base, projectIds, onAskIsabella }: PmoTopActions
       ) : null}
 
       {report ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-3 sm:p-6">
           <div className="flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
             <header className="flex items-center gap-2 border-b border-slate-200 px-4 py-2">
               <Download className="h-4 w-4 text-slate-400" aria-hidden />

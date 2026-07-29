@@ -237,6 +237,23 @@ export const UX_017_ACRONYMS_ARE_REACHABLE: ProductUxContract = {
   ],
 };
 
+export const UX_018_APP_SHELL_IS_RESPONSIVE: ProductUxContract = {
+  id: "UX-018",
+  title: "The App Shell Adapts to the Viewport, Everywhere",
+  status: "APPROVED",
+  rules: [
+    "The desktop sidebar reserves zero horizontal space below 768px; it becomes an overlay drawer and the content gets the full viewport width.",
+    "The mobile/tablet/desktop split is expressed in CSS from the shared tokens in `lib/layout/responsive`, never as a width read in JS — server-rendered markup must already be correct at every width.",
+    "The drawer closes on navigation, on overlay tap and on Escape, traps focus while open, and locks background scroll.",
+    "No page scrolls horizontally between 320px and desktop. A tab strip, table or graph canvas may scroll inside its own container; the page may not.",
+    "Horizontal overflow is fixed at the component that overflows — `overflow-x-hidden` is never used on the shell to hide a layout defect.",
+    "Interactive controls keep a ~44×44px touch target on mobile and no action may sit outside the viewport; secondary actions collapse into an overflow rather than being clipped.",
+    "Desktop layout, spacing, density and behaviour at 1024px and above are unchanged — every mobile rule is additive and scoped by a breakpoint prefix.",
+    "The Living Graph re-frames on a genuine resize or rotation via `fitView` only; nodes, edges, saved layouts, selection and focus survive because nothing remounts.",
+    "`viewport` declares `width=device-width` and never disables pinch zoom (WCAG 1.4.4).",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
   UX_012_LANGUAGE_CONSISTENCY,
@@ -245,4 +262,5 @@ export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE,
   UX_016_SIMULATION_IS_A_QUESTION,
   UX_017_ACRONYMS_ARE_REACHABLE,
+  UX_018_APP_SHELL_IS_RESPONSIVE,
 ];

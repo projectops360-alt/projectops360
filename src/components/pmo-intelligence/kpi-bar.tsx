@@ -109,7 +109,18 @@ export function PmoKpiBar({ kpis, locale, activeKpi, onKpiClick }: PmoKpiBarProp
                 row that grows to absorb the slack, and a subtitle row that
                 reserves its space even when empty.
               */}
-              <span className="line-clamp-1 h-4 w-full text-[10px] font-bold uppercase leading-4 tracking-wide text-slate-500">
+              {/*
+                Stays one line at every width — PMO-IC-KPI-ALIGNMENT. Labels
+                like "Shared Resources" were clipping on a phone only because
+                the shell still reserved 64px for a sidebar rail there
+                (REG-040); with that gutter gone the card is wide enough, and
+                wrapping to two lines would reintroduce the ragged rows this
+                guard exists to prevent. The tooltip carries the full string.
+              */}
+              <span
+                className="line-clamp-1 h-4 w-full text-[10px] font-bold uppercase leading-4 tracking-wide text-slate-500"
+                title={t(`kpi_${kpi.key}`)}
+              >
                 {t(`kpi_${kpi.key}`)}
               </span>
 

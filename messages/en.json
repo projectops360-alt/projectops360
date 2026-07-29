@@ -62,6 +62,8 @@
     "notifications": "Notifications",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
     "adminConsole": "Admin Console",
     "pmoLivingGraph": "Dashboard 3"
   },
@@ -3296,7 +3298,10 @@
     "dismiss": "Dismiss install invitation",
     "iosBody": "Add ProjectOps360° to your Home Screen for a full-screen app.",
     "iosStepShare": "Share",
-    "iosStepAdd": "Add to Home Screen"
+    "iosStepAdd": "Add to Home Screen",
+    "updateMessage": "A new version is available.",
+    "updateAction": "Update",
+    "updateDismiss": "Dismiss update notice"
   },
   "pmoLivingGraph": {
     "title": "PMO Living Graph",

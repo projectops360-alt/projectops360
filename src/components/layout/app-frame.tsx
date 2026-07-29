@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "@/i18n/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileNavContext } from "@/components/layout/mobile-nav-context";
+import { contentOffsetClass, PAGE_PADDING_CLASS } from "@/lib/layout/responsive";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "po360.sidebarCollapsed";
@@ -9,6 +12,15 @@ const STORAGE_KEY = "po360.sidebarCollapsed";
 /**
  * Client layout frame: owns the collapsible-sidebar state (persisted to
  * localStorage) and shifts the content padding to match the sidebar width.
+ *
+ * The gutter is applied from `md:` up only. Below that the sidebar becomes an
+ * overlay drawer and the content gets the whole viewport — previously the
+ * collapsed rail still reserved 64px of a 360px phone screen, which is what
+ * squeezed every page into an unusable column.
+ *
+ * The mobile/tablet/desktop split is expressed in CSS (see
+ * `@/lib/layout/responsive`) rather than in JS state, so the server-rendered
+ * markup is already correct at every width and there is no post-hydration flash.
  */
 export function AppFrame({
   header,
@@ -30,7 +42,8 @@ export function AppFrame({
   canViewPmoLivingGraph?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-  const [compactViewport, setCompactViewport] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const pathname = usePathname();
 
   // Hydrate the persisted preference after mount. We intentionally start at
   // `false` on the server/first render to avoid an SSR hydration mismatch,
@@ -43,13 +56,25 @@ export function AppFrame({
     }
   }, []);
 
+  // Close the drawer on navigation: picking a destination should reveal it, not
+  // leave the overlay sitting on top of the page you just asked for.
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 1023px)");
-    const update = () => setCompactViewport(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- route change is an external event
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  // Lock background scroll while the drawer is open.
+  useEffect(() => {
+    if (!mobileNavOpen || typeof document === "undefined") return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileNavOpen]);
+
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+  const openMobileNav = useCallback(() => setMobileNavOpen(true), []);
 
   function toggle() {
     setCollapsed((prev) => {
@@ -61,15 +86,26 @@ export function AppFrame({
     });
   }
 
-  const effectiveCollapsed = collapsed || compactViewport;
-
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar collapsed={effectiveCollapsed} onToggle={toggle} role={role} canViewProductBrain={canViewProductBrain} canViewAdminConsole={canViewAdminConsole} canViewPmoLivingGraph={canViewPmoLivingGraph} />
-      <div className={cn("transition-[padding] duration-200", effectiveCollapsed ? "pl-16" : "pl-64")}>
-        {header}
-        <main className="p-3 sm:p-4 lg:p-6">{children}</main>
+    <MobileNavContext.Provider value={{ open: mobileNavOpen, openMobileNav, closeMobileNav }}>
+      <div className="min-h-screen bg-background">
+        <Sidebar
+          collapsed={collapsed}
+          onToggle={toggle}
+          role={role}
+          canViewProductBrain={canViewProductBrain}
+          canViewAdminConsole={canViewAdminConsole}
+          canViewPmoLivingGraph={canViewPmoLivingGraph}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={closeMobileNav}
+        />
+        {/* `min-w-0` stops wide content (tables, graph canvases, unbroken
+            strings) from stretching this column past the viewport. */}
+        <div className={cn("min-w-0 transition-[padding] duration-200", contentOffsetClass(collapsed))}>
+          {header}
+          <main className={cn("min-w-0", PAGE_PADDING_CLASS)}>{children}</main>
+        </div>
       </div>
-    </div>
+    </MobileNavContext.Provider>
   );
 }

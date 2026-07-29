@@ -62,6 +62,8 @@
     "notifications": "Notificaciones",
     "collapseSidebar": "Colapsar barra lateral",
     "expandSidebar": "Expandir barra lateral",
+    "openMenu": "Abrir menú de navegación",
+    "closeMenu": "Cerrar menú de navegación",
     "adminConsole": "Consola de Administración",
     "pmoLivingGraph": "Dashboard 3"
   },
@@ -3296,7 +3298,10 @@
     "dismiss": "Descartar invitación de instalación",
     "iosBody": "Añade ProjectOps360° a tu pantalla de inicio para usarla como app a pantalla completa.",
     "iosStepShare": "Compartir",
-    "iosStepAdd": "Añadir a pantalla de inicio"
+    "iosStepAdd": "Añadir a pantalla de inicio",
+    "updateMessage": "Hay una versión nueva disponible.",
+    "updateAction": "Actualizar",
+    "updateDismiss": "Descartar aviso de actualización"
   },
   "pmoLivingGraph": {
     "title": "PMO Living Graph",

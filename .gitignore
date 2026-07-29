@@ -96,3 +96,7 @@ storageState.json
 # Local dev server output
 .dev.log
 .extract-report.json
+
+# Responsive audit artefacts
+responsive-audit/
+.auth/

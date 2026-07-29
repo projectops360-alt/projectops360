@@ -56,10 +56,10 @@ export function ProjectHeaderClient({
 
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="min-w-0 break-words text-2xl font-bold text-foreground">{title}</h1>
             <ProjectStatusBadge status={status} label={statusLabel} />
           </div>
           {description && (
@@ -67,7 +67,7 @@ export function ProjectHeaderClient({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           <button
             type="button"
             onClick={() => setShowEdit(true)}

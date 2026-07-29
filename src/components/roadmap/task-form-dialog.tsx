@@ -613,7 +613,7 @@ export function TaskFormDialog({
             </div>
 
             {/* Milestone + Status + Priority (3-col) */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor="task-milestone" className="block text-xs font-medium text-muted-foreground">
                   {t.fields.milestone}
@@ -1008,7 +1008,7 @@ export function TaskFormDialog({
               badge={detailsBadge}
             >
               {/* Sprint + Estimated hours (side by side) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="task-sprint" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.sprintName}
@@ -1087,7 +1087,7 @@ export function TaskFormDialog({
               badge={trackingBadge}
             >
               {/* Scheduling: Start + End date */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="task-start-date" className="block text-xs font-medium text-muted-foreground">
                     <Calendar className="mr-1 inline h-3 w-3" />
@@ -1194,7 +1194,7 @@ export function TaskFormDialog({
               onToggle={() => setShowNotes(!showNotes)}
             >
               {/* Implementation + Test notes (side by side) */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="task-implementation-notes" className="block text-xs font-medium text-muted-foreground">
                     {t.fields.implementationNotes}

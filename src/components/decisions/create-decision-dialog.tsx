@@ -142,7 +142,7 @@ export function CreateDecisionDialog({
           </div>
 
           {/* Decision Date + Status */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="decision-date" className="block text-sm font-medium text-foreground">
                 {t("decisionDate")}
@@ -174,7 +174,7 @@ export function CreateDecisionDialog({
           </div>
 
           {/* Decision Maker + Impact Area */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="decision-maker" className="block text-sm font-medium text-foreground">
                 {t("decisionMaker")}
@@ -209,7 +209,7 @@ export function CreateDecisionDialog({
           </div>
 
           {/* Source Type + Source Record ID */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="decision-source-type" className="block text-sm font-medium text-foreground">
                 {t("sourceType")}

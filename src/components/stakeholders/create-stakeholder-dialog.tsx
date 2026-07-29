@@ -74,8 +74,8 @@ export function CreateStakeholderDialog({
   const [state, formAction, isPending] = useActionState(handleCreate, null);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[90vh] w-full overflow-y-auto max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">{t("title")}</h2>
           <button
@@ -144,7 +144,7 @@ export function CreateStakeholderDialog({
           </div>
 
           {/* Influence & Interest side by side */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="stakeholder-influence" className="block text-sm font-medium text-foreground">
                 {t("influence")}
