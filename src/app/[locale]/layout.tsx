@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { AppPwaInstallPrompt } from "@/components/pwa/pwa-install-prompt.app";
+import { AppUpdateWatcherWithCopy } from "@/components/pwa/app-update-watcher.app";
 
 type Props = {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ export default async function LocaleLayout({ children, params }: Props) {
     <NextIntlClientProvider messages={messages}>
       {children}
       <AppPwaInstallPrompt />
+      <AppUpdateWatcherWithCopy />
     </NextIntlClientProvider>
   );
 }
