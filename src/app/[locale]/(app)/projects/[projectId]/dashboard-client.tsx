@@ -392,9 +392,16 @@ export function ProjectDashboard({
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((task) => task.status === "done").length;
   const pendingTasks = totalTasks - doneTasks;
-  const remainingHours = tasks
+  // Effort left comes from the Time Tracking Engine (estimated − logged), not
+  // from "add up the estimates of whatever is not done yet". The old sum ignored
+  // logged time entirely, so this card read the full plan back to the PM — 1509h
+  // remaining on a project where hours had already been logged — and never moved.
+  // The estimate-only sum survives ONLY as a fallback for projects with no
+  // estimate the engine can work from, so the card is never blank.
+  const pendingEstimateHours = tasks
     .filter((task) => task.status !== "done")
     .reduce((sum, task) => sum + (task.estimate_hours ?? 0), 0);
+  const remainingHours = effort?.remainingHours ?? pendingEstimateHours;
 
   // Milestone stats
   const totalMilestones = milestones.length;
@@ -547,23 +554,38 @@ export function ProjectDashboard({
           2a. EFFORT — planned vs logged. Actual comes from the Time Tracking
           Engine (SUM of the time log), never from a typed-in number.
           ════════════════════════════════════════════════════════════════════════ */}
-      {effort && effort.estimatedHours !== null && (
+      {effort && (effort.estimatedHours !== null || effort.actualHours > 0) && (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <EffortCard label={locale === "es" ? "Horas estimadas" : "Estimated hours"} value={`${effort.estimatedHours}h`} />
+          <EffortCard
+            label={locale === "es" ? "Horas estimadas" : "Estimated hours"}
+            value={effort.estimatedHours === null ? "—" : `${effort.estimatedHours}h`}
+          />
+          {/* Consumption is effort spent, NOT physical progress: 80% consumed
+              against 65% done means the budget is going faster than the work. */}
           <EffortCard
             label={locale === "es" ? "Horas reales" : "Actual hours"}
             value={`${effort.actualHours}h`}
             tone={effort.severity}
-            sub={effort.consumedPct !== null ? `${effort.consumedPct}%` : undefined}
+            sub={
+              effort.consumedPct !== null
+                ? `${locale === "es" ? "Consumo" : "Consumption"}: ${effort.consumedPct}%`
+                : undefined
+            }
           />
           <EffortCard
             label={locale === "es" ? "Horas restantes" : "Remaining hours"}
-            value={`${effort.remainingHours}h`}
-            tone={effort.remainingHours !== null && effort.remainingHours < 0 ? effort.severity : "on_track"}
+            value={effort.remainingHours === null ? "—" : `${effort.remainingHours}h`}
+            tone={effort.severity === "none" ? "none" : "on_track"}
           />
+          {/* The overrun lives here, which is why remaining can floor at 0. */}
           <EffortCard
-            label={locale === "es" ? "Variación" : "Variance"}
-            value={`${effort.varianceHours !== null && effort.varianceHours > 0 ? "+" : ""}${effort.varianceHours}h`}
+            label={locale === "es" ? "Variación de esfuerzo" : "Effort variance"}
+            value={
+              effort.varianceHours === null
+                ? "—"
+                : `${effort.varianceHours > 0 ? "+" : ""}${effort.varianceHours}h`
+            }
+            sub={locale === "es" ? "Real − Estimado" : "Actual − Estimated"}
             tone={effort.severity}
           />
         </div>

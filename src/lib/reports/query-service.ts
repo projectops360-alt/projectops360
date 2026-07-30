@@ -223,6 +223,12 @@ async function fetchTaskExecution(supabase: Admin, ctx: QueryContext, config: Re
   };
 
   const taskRows = validTasks.map((task) => {
+    // The task's OWN estimate on purpose, NOT the consolidated one: this report
+    // is a flat table where subtasks get their own rows, so rolling their
+    // estimates into the parent row would double-count them within a single
+    // export. Consolidation belongs to the per-task and per-project summaries
+    // (computeTaskEffort / getProjectEffortSummary), where there is one row per
+    // task and nothing to double against.
     const estimated = task.estimated_labor_hours != null ? Number(task.estimated_labor_hours)
       : task.estimate_hours != null ? Number(task.estimate_hours) : null;
     const logged = loggedByTask.has(task.id) ? round2(loggedByTask.get(task.id)!) : null;

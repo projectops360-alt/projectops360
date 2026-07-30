@@ -178,7 +178,112 @@ counting both would double-count the same work.
    no submit/approve cycle, which a formal timesheet product would need.
 3. **No per-entry cost.** By design (section 6) — rates arrive with the billing
    capability.
-4. **Task-level logging is modelled but not exposed.** `subtask_id` may be NULL
-   and the report already sums those rows into the task, but no UI writes them yet.
-5. **Overlapping entries are allowed.** Two entries covering 09:00–12:00 on the
+4. **Overlapping entries are allowed.** Two entries covering 09:00–12:00 on the
    same day are not detected; catching that needs a per-person daily view.
+
+---
+
+## 10. Task-level logging and the rollup (REG-041)
+
+Sections 1–9 describe the engine as first shipped: correct at the subtask, absent
+above it. `subtask_id` was nullable from day one so task-level logging would need
+no second table — but only the subtask half was implemented, and the consequence
+was not a missing feature, it was a **wrong number on the PM dashboard**. See
+REG-041 in the regression log.
+
+**Time is anchored to a task always, to a subtask when there is one.** Logging on
+a task means `subtask_id IS NULL`. Both levels share one table, one dialog
+(`TimeEntryDialog`), one panel (`TimeLogPanel`) and one set of server actions —
+a second "task time" implementation would be the parallel system this capability
+exists to avoid.
+
+**A task's actual hours are ONE sum:**
+
+```
+actual = SUM(duration_hours) WHERE task_id = task AND deleted_at IS NULL
+```
+
+Because *every* row carries `task_id`, that single sum already spans both levels
+and counts each entry exactly once. **Nothing adds "task hours + subtask
+hours"** — that addition is the only way double counting could enter, and it
+appears nowhere in the engine.
+
+`roadmap_tasks.actual_hours` is now a derived cache on the same terms as the
+subtask one: written only by the engine, refreshed on **every** mutation
+including subtask-level ones, and rebuildable from the entries (migration
+`20260871000000` is that rebuild). It exists so the task detail, the execution
+map's parent node and the PMO Living Graph keep reading one number without a
+join — not as an alternative source of truth.
+
+**Estimate consolidation** mirrors the project rule from section 8, now shared by
+both through `consolidatedEstimatedHours`: a task with estimated subtasks is
+estimated **by** them. Its own number survives only as a fallback for the
+in-between state where subtasks exist but nobody has estimated them yet —
+without that, adding one unestimated subtask would make the plan appear to
+shrink.
+
+**Recorded decision — `remainingHours` floors at 0.** It previously went negative
+to expose the overrun. That made it identical to `−varianceHours`, so the pair
+carried one fact twice. `remaining` now means strictly "budget left" and
+`variance` carries the signed overrun; the effort test that asserted `-12` was
+updated to assert `0` alongside `variance: +12`. No information was lost — it
+moved to the field named for it.
+
+**Recorded decision — the Task Execution report keeps the task's OWN estimate.**
+It is a flat table where subtasks get their own rows, so consolidating the parent
+row would double-count within a single export. Consolidation belongs to the
+per-task and per-project summaries, where there is one row per task. Two shipped
+tests defend this and correctly rejected an attempt to change it.
+
+**Consumption is not progress.** `Consumption: 80%` next to `Progress: 65%` means
+80% of the budget bought 65% of the work. The dashboard shows them as separate
+cards for that reason and never derives one from the other.
+
+---
+
+## 11. Crew entries (migration `20260872000000`)
+
+Field work is not reported one person at a time. "20 people, 10 hours each, that
+day" is 200 man-hours, and the original flat `duration_hours <= 24` ceiling
+rejected it outright — a PM logging real crew effort on a 1600h task hit a
+disabled Save button.
+
+**`duration_hours` keeps meaning the TOTAL man-hours.** That is the decision
+everything else follows from: every rollup above this table (task, project,
+report, Actual Cost, future EVM) goes on summing one column with **no crew-aware
+special case anywhere**. The crew is recorded beside the total, not instead of it:
+
+| column | meaning |
+|---|---|
+| `hours_per_person` | hours ONE person worked, ≤ 24 |
+| `crew_size` | how many people, 1 = an individual entry |
+| `duration_hours` | `hours_per_person × crew_size` — derived, never client-supplied |
+
+**The 24-hour rule was not relaxed, it was restated where it is actually true:**
+
+```
+before →  duration_hours <= 24              "a day cannot hold more than a day"
+after  →  duration_hours <= 24 * crew_size  "...per person"
+```
+
+A 200h crew entry passes; one person claiming 200 hours in a day still does not.
+A fourth constraint (`ROUND(hours_per_person * crew_size, 2) = ROUND(duration_hours, 2)`)
+stops a hand-written INSERT filing crew hours as an individual's. All four were
+exercised against Stage: crew 20×10 accepted, one-person-200h rejected,
+inconsistent total rejected, zero-size crew rejected, 0 legacy rows inconsistent.
+
+**Multi-day work stays multiple entries.** `crew_size` covers the people
+dimension only, deliberately: the day grain is what burn rate, daily utilisation
+and timesheets are built on, and collapsing it would cost more than the typing it
+saves.
+
+**Known limit.** On a crew entry, `user_id` is the person accountable for the
+shift, not 20 separate people, so per-person utilisation is approximate for those
+rows. Splitting them into per-person records is the upgrade path if utilisation
+ever needs to be exact; the totals and every cost figure are already correct.
+
+**Also fixed here.** Save was gated on validity while the only error message
+lived in `submit()`, which a disabled button can never reach — so an invalid
+duration produced a dead button and no explanation. Validation now surfaces as
+soon as there is something to judge, and the per-person cap is stated in the
+field hint instead of only on failure.

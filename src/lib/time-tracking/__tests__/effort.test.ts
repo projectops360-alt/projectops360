@@ -15,15 +15,19 @@ import {
   durationFromInterval,
   validateDuration,
   resolveEntryDuration,
+  resolveCrewEntry,
+  validateCrewSize,
   sumHours,
   sumHoursBy,
   computeEffort,
+  consolidatedEstimatedHours,
   effortSeverity,
   effortBarPct,
   crossedEffortBudget,
   SUBTASK_THRESHOLDS,
   PORTFOLIO_THRESHOLDS,
   MAX_DAILY_HOURS,
+  MAX_CREW_SIZE,
 } from "../effort";
 
 describe("duration from an interval", () => {
@@ -148,11 +152,14 @@ describe("effort standing", () => {
     expect(effort.severity).toBe("on_track");
   });
 
-  it("shows the overrun instead of clamping remaining at zero", () => {
+  it("floors remaining budget at zero and carries the overrun in the variance", () => {
     const effort = computeEffort(40, 52);
-    expect(effort.remainingHours).toBe(-12);
+    // "Budget left" cannot be negative; the overrun is the variance, which is
+    // the same magnitude with the opposite sign — so nothing is hidden.
+    expect(effort.remainingHours).toBe(0);
     expect(effort.varianceHours).toBe(12);
     expect(effort.consumedPct).toBe(130);
+    expect(effort.severity).toBe("critical");
   });
 
   it("stays neutral when nothing was estimated", () => {
@@ -174,6 +181,110 @@ describe("effort standing", () => {
     expect(effort.consumedPct).toBe(0);
     expect(effort.remainingHours).toBe(40);
     expect(effort.severity).toBe("on_track");
+  });
+});
+
+describe("crew entries", () => {
+  it("multiplies per-person hours by the crew and stores the man-hour total", () => {
+    // The case that motivated this: 20 people at 10 h/day = 200 man-hours, which
+    // the flat 24h ceiling used to reject outright.
+    const result = resolveCrewEntry({ hoursPerPerson: 10, crewSize: 20 });
+    expect(result.ok).toBe(true);
+    expect(result.hoursPerPerson).toBe(10);
+    expect(result.crewSize).toBe(20);
+    expect(result.totalHours).toBe(200);
+  });
+
+  it("treats an absent or 1-person crew as an ordinary individual entry", () => {
+    expect(resolveCrewEntry({ hoursPerPerson: 8 }).totalHours).toBe(8);
+    expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize: null }).totalHours).toBe(8);
+    expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize: 1 }).totalHours).toBe(8);
+  });
+
+  it("still refuses more than 24 hours from ONE person, crew or not", () => {
+    // The invariant is per person; the crew never buys a longer day.
+    expect(resolveCrewEntry({ hoursPerPerson: 25, crewSize: 1 }).error).toBe("exceeds_day");
+    expect(resolveCrewEntry({ hoursPerPerson: 25, crewSize: 20 }).error).toBe("exceeds_day");
+  });
+
+  it("allows a crew total far above 24 because it is spread over people", () => {
+    const result = resolveCrewEntry({ hoursPerPerson: 24, crewSize: 999 });
+    expect(result.ok).toBe(true);
+    expect(result.totalHours).toBe(23976);
+  });
+
+  it("rejects a crew that is not a whole number of at least one person", () => {
+    for (const crewSize of [0, -3, 2.5, 1000]) {
+      expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize }).error).toBe("invalid_crew_size");
+    }
+  });
+
+  it("derives per-person hours from an interval, then applies the crew", () => {
+    const result = resolveCrewEntry({ startTime: "07:00", endTime: "17:00", crewSize: 12 });
+    expect(result.hoursPerPerson).toBe(10);
+    expect(result.totalHours).toBe(120);
+  });
+
+  it("keeps rejecting a backwards interval regardless of the crew", () => {
+    expect(resolveCrewEntry({ startTime: "09:00", endTime: "08:00", crewSize: 5 }).error).toBe(
+      "end_before_start",
+    );
+  });
+
+  it("keeps decimal per-person hours exact through the multiplication", () => {
+    expect(resolveCrewEntry({ hoursPerPerson: 7.25, crewSize: 4 }).totalHours).toBe(29);
+    expect(resolveCrewEntry({ hoursPerPerson: 1.5, crewSize: 3 }).totalHours).toBe(4.5);
+  });
+
+  it("validates a crew size on its own", () => {
+    expect(validateCrewSize(20)).toBe(20);
+    expect(validateCrewSize(null)).toBe(1);
+    expect(validateCrewSize(undefined)).toBe(1);
+    expect(validateCrewSize(0)).toBeNull();
+    expect(validateCrewSize(MAX_CREW_SIZE)).toBe(MAX_CREW_SIZE);
+    expect(validateCrewSize(MAX_CREW_SIZE + 1)).toBeNull();
+  });
+
+  it("feeds the rollups a total that needs no crew-aware special case", () => {
+    // Two crew shifts and one individual entry: the rollup just sums the totals.
+    const shiftA = resolveCrewEntry({ hoursPerPerson: 10, crewSize: 20 }).totalHours!;
+    const shiftB = resolveCrewEntry({ hoursPerPerson: 8, crewSize: 5 }).totalHours!;
+    const solo = resolveCrewEntry({ hoursPerPerson: 6 }).totalHours!;
+    expect(sumHours([shiftA, shiftB, solo].map((duration_hours) => ({ duration_hours })))).toBe(246);
+  });
+});
+
+describe("consolidated estimate (no double counting)", () => {
+  it("uses the task's own estimate when it has no subtasks", () => {
+    expect(consolidatedEstimatedHours(10, [])).toBe(10);
+  });
+
+  it("uses the subtasks' sum, NOT the task's number, when subtasks exist", () => {
+    // The scenario from the brief: B1 20h + B2 30h = 50h, and the task's own
+    // 999h is deliberately ignored rather than added on top.
+    expect(consolidatedEstimatedHours(999, [20, 30])).toBe(50);
+  });
+
+  it("never adds the task estimate to its subtasks' estimates", () => {
+    const consolidated = consolidatedEstimatedHours(50, [20, 30]);
+    expect(consolidated).toBe(50);
+    expect(consolidated).not.toBe(100);
+  });
+
+  it("falls back to the task estimate when subtasks exist but are unestimated", () => {
+    // Otherwise planned hours would DROP the moment an unestimated subtask is
+    // added — the plan would look like it shrank because someone decomposed it.
+    expect(consolidatedEstimatedHours(40, [null, null])).toBe(40);
+    expect(consolidatedEstimatedHours(40, [0, 0])).toBe(40);
+  });
+
+  it("reports no estimate at all rather than a misleading zero", () => {
+    expect(consolidatedEstimatedHours(null, [])).toBeNull();
+    expect(consolidatedEstimatedHours(0, [null])).toBeNull();
+  });
+
+  it("keeps decimal estimates exact", () => {
+    expect(consolidatedEstimatedHours(null, [1.25, 1.5, 2.75])).toBe(5.5);
   });
 });
 

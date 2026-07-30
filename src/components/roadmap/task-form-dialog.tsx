@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { X, Loader2, Sparkles, ChevronDown, Calendar, ClipboardList, FileText, Users, Package, Plus } from "lucide-react";
+import { X, Loader2, Sparkles, ChevronDown, Calendar, ClipboardList, FileText, Users, Package, Plus, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   createTaskAction,
@@ -12,6 +12,9 @@ import {
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import { askIsabella } from "@/lib/isabella/ask-isabella";
 import { EntityAttachmentsSection } from "@/components/attachments/entity-attachments-section";
+// The SAME panel the subtask modal uses, at task level — one time-tracking
+// surface, one table, one set of formulas.
+import { TimeLogPanel } from "@/components/task-execution-map/subtask-time-log";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -540,6 +543,7 @@ export function TaskFormDialog({
   const [showNotes, setShowNotes] = useState(hasNotesData);
   const [showAiExec, setShowAiExec] = useState(hasAiExecData);
   const [showPlanning, setShowPlanning] = useState(true);
+  const [showTimeLog, setShowTimeLog] = useState(false);
 
   // Count filled fields per section for badges
   const detailsBadge = isEdit
@@ -1077,6 +1081,30 @@ export function TaskFormDialog({
                 />
               </div>
             </FormSection>
+
+            {/* ── Collapsible: Time log (edit only) ──
+                Time needs something to attach to, so this appears once the task
+                exists. Unlike the other sections the panel is rendered only when
+                open — it contributes NOTHING to FormData (actual hours are
+                derived from the entries, never submitted), so the keep-mounted
+                data-loss guard does not apply and eager loading would just cost
+                a needless round trip on every task edit. */}
+            {isEdit && task?.id && (
+              <FormSection
+                icon={<Clock className="h-4 w-4 text-blue-500" />}
+                label={isEs ? "Registro de tiempo" : "Time log"}
+                open={showTimeLog}
+                onToggle={() => setShowTimeLog(!showTimeLog)}
+              >
+                {showTimeLog && (
+                  <TimeLogPanel
+                    projectId={projectId}
+                    taskId={task.id}
+                    people={options?.people ?? []}
+                  />
+                )}
+              </FormSection>
+            )}
 
             {/* ── Collapsible: Tracking & Notes ── */}
             <FormSection

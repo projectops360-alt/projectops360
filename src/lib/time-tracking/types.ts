@@ -25,7 +25,15 @@ export interface TimeEntry {
   work_date: string;
   start_time: string | null;
   end_time: string | null;
+  /**
+   * TOTAL man-hours for this entry (`hours_per_person × crew_size`). Every
+   * rollup sums this column, so a crew entry needs no special case anywhere.
+   */
   duration_hours: number;
+  /** People the entry covers. 1 = an individual entry. */
+  crew_size: number;
+  /** Hours ONE person worked, ≤ 24. Null on rows predating crew support. */
+  hours_per_person: number | null;
   comment: string | null;
   source: TimeEntrySource;
   created_by: string | null;
@@ -44,13 +52,17 @@ export interface TimeEntryView extends TimeEntry {
 }
 
 /**
- * Effort standing for one work item. `remaining` can go negative — that IS the
- * overrun, and hiding it behind a zero would hide the very thing a PM needs.
+ * Effort standing for one work item.
+ *
+ * The overrun lives in `varianceHours`, not in a negative `remainingHours`:
+ * those two were the same number with opposite signs, so `remaining` now means
+ * strictly "budget left" and floors at 0, while `variance` carries the sign.
+ * Nothing a PM needs is hidden — it moved to the field that is named for it.
  */
 export interface EffortSummary {
   estimatedHours: number | null;
   actualHours: number;
-  /** estimated − actual. Null when nothing was estimated. */
+  /** MAX(estimated − actual, 0) — budget left, never negative. Null when unestimated. */
   remainingHours: number | null;
   /** actual ÷ estimated × 100. Null when nothing was estimated. */
   consumedPct: number | null;
