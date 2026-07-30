@@ -1236,7 +1236,7 @@ write privileges held by any API role.
 
 ---
 
-## REG-040 — Logged hours stopped at the subtask and never reached the task or the PM dashboard
+## REG-041 — Logged hours stopped at the subtask and never reached the task or the PM dashboard
 
 **Date:** 2026-07-29 · **Status:** closed · **Guard:** `TIME-TRACKING-TASK-ROLLUP`
 

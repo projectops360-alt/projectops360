@@ -183,13 +183,13 @@ counting both would double-count the same work.
 
 ---
 
-## 10. Task-level logging and the rollup (REG-040)
+## 10. Task-level logging and the rollup (REG-041)
 
 Sections 1–9 describe the engine as first shipped: correct at the subtask, absent
 above it. `subtask_id` was nullable from day one so task-level logging would need
 no second table — but only the subtask half was implemented, and the consequence
 was not a missing feature, it was a **wrong number on the PM dashboard**. See
-REG-040 in the regression log.
+REG-041 in the regression log.
 
 **Time is anchored to a task always, to a subtask when there is one.** Logging on
 a task means `subtask_id IS NULL`. Both levels share one table, one dialog
