@@ -152,3 +152,18 @@ export function togglePanel(
 ): PmoPanelPreferences {
   return { ...preferences, [key]: !preferences[key] };
 }
+
+/**
+ * Whether two preference sets say the same thing.
+ *
+ * `loadPanelPreferences` always returns a fresh object, so a reference check
+ * would report a change on every load. The consumer applies the stored value
+ * after mount and uses this to skip the state update when nothing actually
+ * differs — otherwise every visit costs a second render of the whole graph.
+ */
+export function samePanelPreferences(
+  a: PmoPanelPreferences,
+  b: PmoPanelPreferences,
+): boolean {
+  return a.isabella === b.isabella && a.overview === b.overview;
+}

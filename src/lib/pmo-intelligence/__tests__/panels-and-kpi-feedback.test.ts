@@ -31,6 +31,7 @@ import {
   loadPanelPreferences,
   panelPreferencesKey,
   parsePanelPreferences,
+  samePanelPreferences,
   savePanelPreferences,
   togglePanel,
 } from "../panel-preferences";
@@ -245,9 +246,14 @@ describe("panel preferences persist and stay scoped (PMO-IC-PANEL-PERSISTENCE)",
   it("persists on the transition rather than from an effect", () => {
     const shell = source("src/components/pmo-living-graph/portfolio-graph-shell.tsx");
     expect(shell).toContain("savePanelPreferences(organizationId, userId, next)");
-    // Lazy initialiser, so the panels never flash open and then collapse.
-    expect(shell).toContain("useState(() =>");
+    // Still read once per mount and still applied before the browser paints —
+    // but no longer DURING render. This assertion used to require the lazy
+    // `useState(() => loadPanelPreferences(...))` initialiser, which is exactly
+    // what made the server and the client disagree (REG-042); the no-flash intent
+    // it was protecting now lives in the layout effect, asserted under
+    // PMO-IC-PANEL-HYDRATION.
     expect(shell).toContain("loadPanelPreferences(organizationId, userId)");
+    expect(shell).toContain("useIsomorphicLayoutEffect");
   });
 });
 
@@ -325,6 +331,47 @@ describe("the left rail is visible by default (PMO-IC-OVERVIEW-ALWAYS-VISIBLE)",
 // same three rows, the row heights are fixed, and the value row absorbs the
 // slack. A CSS-only tweak would not survive the next content change.
 // ---------------------------------------------------------------------------
+
+describe("stored panel state never breaks hydration (PMO-IC-PANEL-HYDRATION)", () => {
+  // REG-042. The rail's stored state was read in a useState initialiser, so the
+  // server rendered DEFAULT_PANEL_PREFERENCES and the client rendered whatever
+  // localStorage held. When a user had collapsed the rail the two trees
+  // disagreed on `aria-pressed` and the button title, React discarded the tree
+  // and Next reported "Hydration failed because the server rendered text didn't
+  // match the client" on every load of the dashboard.
+  const shell = () => source("src/components/pmo-living-graph/portfolio-graph-shell.tsx");
+
+  it("does not read localStorage while rendering", () => {
+    // The whole bug in one assertion: loadPanelPreferences must not appear inside
+    // a useState initialiser, because rendering is the one place it cannot run.
+    expect(shell()).not.toMatch(/useState\(\s*\(\)\s*=>\s*\n?\s*loadPanelPreferences/);
+  });
+
+  it("starts from the shared default, which the server can also produce", () => {
+    expect(shell()).toMatch(/useState<PmoPanelPreferences>\(DEFAULT_PANEL_PREFERENCES\)/);
+  });
+
+  it("applies the stored preference after mount, before the browser paints", () => {
+    const text = shell();
+    // A layout effect rather than a plain effect: the rail must not visibly open
+    // and then collapse, which is what the original initialiser was avoiding.
+    expect(text).toMatch(/useIsomorphicLayoutEffect\(\(\) => \{[\s\S]*?loadPanelPreferences/);
+    expect(text).toMatch(/typeof window === "undefined" \? useEffect : useLayoutEffect/);
+  });
+
+  it("skips the extra render when the stored value already matches", () => {
+    expect(shell()).toMatch(/samePanelPreferences\(current, stored\)/);
+  });
+
+  it("compares preferences by value, since every load builds a new object", () => {
+    const a = { ...DEFAULT_PANEL_PREFERENCES };
+    const b = { ...DEFAULT_PANEL_PREFERENCES };
+    expect(a).not.toBe(b);
+    expect(samePanelPreferences(a, b)).toBe(true);
+    expect(samePanelPreferences(a, togglePanel(b, "overview"))).toBe(false);
+    expect(samePanelPreferences(a, togglePanel(b, "isabella"))).toBe(false);
+  });
+});
 
 describe("the KPI cards line up (PMO-IC-KPI-ALIGNMENT)", () => {
   const bar = () => source("src/components/pmo-intelligence/kpi-bar.tsx");

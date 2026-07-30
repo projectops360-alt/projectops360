@@ -1283,3 +1283,50 @@ actual / 41h remaining / −41h variance / 31.7% consumed) ·
 mutation). Migration `20260871000000` rebuilds the cache for entries written
 before the rollup existed; verified on Stage — the Valle Norte task went from
 NULL to 11.00h, matching its log exactly.
+
+---
+
+## REG-042 — The PMO dashboard threw a hydration error on every load
+
+**Date:** 2026-07-29 · **Status:** closed · **Guard:** `PMO-IC-PANEL-HYDRATION`
+
+The PMO Intelligence Center reported *"Hydration failed because the server
+rendered text didn't match the client"* on every visit, and React discarded the
+rendered tree and rebuilt it on the client. Six occurrences in one dev session
+before the fix.
+
+The left rail's collapsed state was read from `localStorage` inside a `useState`
+initialiser — that is, **during render**:
+
+```tsx
+const [panels, setPanels] = useState(() => loadPanelPreferences(organizationId, userId));
+```
+
+The server has no `localStorage`, so it rendered `DEFAULT_PANEL_PREFERENCES`
+(`overview: true`, rail open). A user who had collapsed the rail had
+`{"overview":false}` stored, so the client rendered it closed. The two trees
+disagreed on `aria-pressed` and on the button title (*"Ocultar el panorama"* vs
+*"Mostrar salud del portafolio"*) — exactly what React reported.
+
+**Root cause:** a per-user preference was treated as render-time input. It cannot
+be. The server is not allowed to know it, so any value read while rendering is
+guaranteed to differ from the client whenever the user has expressed a preference
+at all — the bug reproduced only for users who had actually used the feature.
+
+**Why it survived:** a green test was pinning it. `panels-and-kpi-feedback.test.ts`
+asserted `expect(shell).toContain("useState(() =>")` with the comment *"Lazy
+initialiser, so the panels never flash open and then collapse"* — a test
+defending the defective mechanism instead of the behaviour it meant to protect.
+It would have failed any correct fix, and it did.
+
+**Protection rule (binding):** browser-only state (`localStorage`, `window`,
+`matchMedia`, dates in the user's timezone) is never read during render. The
+first render is the server-reproducible default; the stored value is applied
+after mount in a LAYOUT effect, so it lands before the browser paints and the
+no-flash behaviour the original initialiser wanted is preserved. Assertions
+protect the behaviour, not the mechanism.
+
+**Verify:** `src/lib/pmo-intelligence/__tests__/panels-and-kpi-feedback.test.ts`
+→ "PMO-IC-PANEL-HYDRATION". Measured on the dashboard before and after: 6
+hydration errors → 0, projection rendering normally (22 nodes, 68 edges). The
+file was byte-identical to `origin/master`, so this was live in production too.

@@ -31,7 +31,18 @@
 // snaps a dragged node back to its layout position. See graph-node-sync.ts.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+
+/**
+ * useLayoutEffect, but silent during server rendering.
+ *
+ * This is a client component that Next still renders on the server, where
+ * useLayoutEffect does nothing and React says so on every request. Layout timing
+ * is what matters here — reading a stored preference in a plain effect would let
+ * the browser paint the default first — so the hook is selected per environment
+ * instead of downgraded everywhere.
+ */
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 import { useTranslations } from "next-intl";
 import {
   ReactFlowProvider,
@@ -91,7 +102,10 @@ import {
   loadPanelPreferences,
   savePanelPreferences,
   togglePanel,
+  DEFAULT_PANEL_PREFERENCES,
+  samePanelPreferences,
   type PmoPanelKey,
+  type PmoPanelPreferences,
 } from "@/lib/pmo-intelligence/panel-preferences";
 import {
   filterCriticalPathForSelection,
@@ -886,12 +900,26 @@ function ShellBody({
   // Isabella defaults CLOSED so there is exactly one Isabella on screen — the
   // global floating widget. This panel is her findings for the current scope,
   // reached from a labelled toolbar control rather than occupying 320px at all
-  // times. Read lazily so the first paint is already correct: initialising in an
-  // effect would render both panels open and then collapse them, which costs a
-  // reflow of the graph on every load.
-  const [panels, setPanels] = useState(() =>
-    loadPanelPreferences(organizationId, userId),
-  );
+  // times.
+  //
+  // The preference CANNOT be read while rendering. localStorage does not exist
+  // on the server, so a lazy initialiser made the server render the defaults and
+  // the client render the stored value — React saw two different trees and threw
+  // the tree away (hydration mismatch: `aria-pressed` and the button title
+  // disagreed on whether the rail was open).
+  //
+  // So the first render is the default on BOTH sides, and the stored preference
+  // is applied after mount in a LAYOUT effect: it runs before the browser paints,
+  // so the rail still never visibly opens and then collapses. The reflow the lazy
+  // initialiser existed to avoid does not come back.
+  const [panels, setPanels] = useState<PmoPanelPreferences>(DEFAULT_PANEL_PREFERENCES);
+
+  useIsomorphicLayoutEffect(() => {
+    const stored = loadPanelPreferences(organizationId, userId);
+    // Identity-stable when the stored value already matches, so a user who never
+    // touched the panels does not pay a second render on every load.
+    setPanels((current) => (samePanelPreferences(current, stored) ? current : stored));
+  }, [organizationId, userId]);
 
   const handleTogglePanel = useCallback(
     (key: PmoPanelKey) => {
