@@ -238,3 +238,52 @@ tests defend this and correctly rejected an attempt to change it.
 **Consumption is not progress.** `Consumption: 80%` next to `Progress: 65%` means
 80% of the budget bought 65% of the work. The dashboard shows them as separate
 cards for that reason and never derives one from the other.
+
+---
+
+## 11. Crew entries (migration `20260872000000`)
+
+Field work is not reported one person at a time. "20 people, 10 hours each, that
+day" is 200 man-hours, and the original flat `duration_hours <= 24` ceiling
+rejected it outright — a PM logging real crew effort on a 1600h task hit a
+disabled Save button.
+
+**`duration_hours` keeps meaning the TOTAL man-hours.** That is the decision
+everything else follows from: every rollup above this table (task, project,
+report, Actual Cost, future EVM) goes on summing one column with **no crew-aware
+special case anywhere**. The crew is recorded beside the total, not instead of it:
+
+| column | meaning |
+|---|---|
+| `hours_per_person` | hours ONE person worked, ≤ 24 |
+| `crew_size` | how many people, 1 = an individual entry |
+| `duration_hours` | `hours_per_person × crew_size` — derived, never client-supplied |
+
+**The 24-hour rule was not relaxed, it was restated where it is actually true:**
+
+```
+before →  duration_hours <= 24              "a day cannot hold more than a day"
+after  →  duration_hours <= 24 * crew_size  "...per person"
+```
+
+A 200h crew entry passes; one person claiming 200 hours in a day still does not.
+A fourth constraint (`ROUND(hours_per_person * crew_size, 2) = ROUND(duration_hours, 2)`)
+stops a hand-written INSERT filing crew hours as an individual's. All four were
+exercised against Stage: crew 20×10 accepted, one-person-200h rejected,
+inconsistent total rejected, zero-size crew rejected, 0 legacy rows inconsistent.
+
+**Multi-day work stays multiple entries.** `crew_size` covers the people
+dimension only, deliberately: the day grain is what burn rate, daily utilisation
+and timesheets are built on, and collapsing it would cost more than the typing it
+saves.
+
+**Known limit.** On a crew entry, `user_id` is the person accountable for the
+shift, not 20 separate people, so per-person utilisation is approximate for those
+rows. Splitting them into per-person records is the upgrade path if utilisation
+ever needs to be exact; the totals and every cost figure are already correct.
+
+**Also fixed here.** Save was gated on validity while the only error message
+lived in `submit()`, which a disabled button can never reach — so an invalid
+duration produced a dead button and no explanation. Validation now surfaces as
+soon as there is something to judge, and the per-person cap is stated in the
+field hint instead of only on failure.

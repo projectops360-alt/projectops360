@@ -15,6 +15,8 @@ import {
   durationFromInterval,
   validateDuration,
   resolveEntryDuration,
+  resolveCrewEntry,
+  validateCrewSize,
   sumHours,
   sumHoursBy,
   computeEffort,
@@ -25,6 +27,7 @@ import {
   SUBTASK_THRESHOLDS,
   PORTFOLIO_THRESHOLDS,
   MAX_DAILY_HOURS,
+  MAX_CREW_SIZE,
 } from "../effort";
 
 describe("duration from an interval", () => {
@@ -178,6 +181,76 @@ describe("effort standing", () => {
     expect(effort.consumedPct).toBe(0);
     expect(effort.remainingHours).toBe(40);
     expect(effort.severity).toBe("on_track");
+  });
+});
+
+describe("crew entries", () => {
+  it("multiplies per-person hours by the crew and stores the man-hour total", () => {
+    // The case that motivated this: 20 people at 10 h/day = 200 man-hours, which
+    // the flat 24h ceiling used to reject outright.
+    const result = resolveCrewEntry({ hoursPerPerson: 10, crewSize: 20 });
+    expect(result.ok).toBe(true);
+    expect(result.hoursPerPerson).toBe(10);
+    expect(result.crewSize).toBe(20);
+    expect(result.totalHours).toBe(200);
+  });
+
+  it("treats an absent or 1-person crew as an ordinary individual entry", () => {
+    expect(resolveCrewEntry({ hoursPerPerson: 8 }).totalHours).toBe(8);
+    expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize: null }).totalHours).toBe(8);
+    expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize: 1 }).totalHours).toBe(8);
+  });
+
+  it("still refuses more than 24 hours from ONE person, crew or not", () => {
+    // The invariant is per person; the crew never buys a longer day.
+    expect(resolveCrewEntry({ hoursPerPerson: 25, crewSize: 1 }).error).toBe("exceeds_day");
+    expect(resolveCrewEntry({ hoursPerPerson: 25, crewSize: 20 }).error).toBe("exceeds_day");
+  });
+
+  it("allows a crew total far above 24 because it is spread over people", () => {
+    const result = resolveCrewEntry({ hoursPerPerson: 24, crewSize: 999 });
+    expect(result.ok).toBe(true);
+    expect(result.totalHours).toBe(23976);
+  });
+
+  it("rejects a crew that is not a whole number of at least one person", () => {
+    for (const crewSize of [0, -3, 2.5, 1000]) {
+      expect(resolveCrewEntry({ hoursPerPerson: 8, crewSize }).error).toBe("invalid_crew_size");
+    }
+  });
+
+  it("derives per-person hours from an interval, then applies the crew", () => {
+    const result = resolveCrewEntry({ startTime: "07:00", endTime: "17:00", crewSize: 12 });
+    expect(result.hoursPerPerson).toBe(10);
+    expect(result.totalHours).toBe(120);
+  });
+
+  it("keeps rejecting a backwards interval regardless of the crew", () => {
+    expect(resolveCrewEntry({ startTime: "09:00", endTime: "08:00", crewSize: 5 }).error).toBe(
+      "end_before_start",
+    );
+  });
+
+  it("keeps decimal per-person hours exact through the multiplication", () => {
+    expect(resolveCrewEntry({ hoursPerPerson: 7.25, crewSize: 4 }).totalHours).toBe(29);
+    expect(resolveCrewEntry({ hoursPerPerson: 1.5, crewSize: 3 }).totalHours).toBe(4.5);
+  });
+
+  it("validates a crew size on its own", () => {
+    expect(validateCrewSize(20)).toBe(20);
+    expect(validateCrewSize(null)).toBe(1);
+    expect(validateCrewSize(undefined)).toBe(1);
+    expect(validateCrewSize(0)).toBeNull();
+    expect(validateCrewSize(MAX_CREW_SIZE)).toBe(MAX_CREW_SIZE);
+    expect(validateCrewSize(MAX_CREW_SIZE + 1)).toBeNull();
+  });
+
+  it("feeds the rollups a total that needs no crew-aware special case", () => {
+    // Two crew shifts and one individual entry: the rollup just sums the totals.
+    const shiftA = resolveCrewEntry({ hoursPerPerson: 10, crewSize: 20 }).totalHours!;
+    const shiftB = resolveCrewEntry({ hoursPerPerson: 8, crewSize: 5 }).totalHours!;
+    const solo = resolveCrewEntry({ hoursPerPerson: 6 }).totalHours!;
+    expect(sumHours([shiftA, shiftB, solo].map((duration_hours) => ({ duration_hours })))).toBe(246);
   });
 });
 

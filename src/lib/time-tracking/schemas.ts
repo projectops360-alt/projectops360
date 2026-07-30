@@ -26,7 +26,13 @@ export const logTimeEntrySchema = z
     workDate: dateString,
     startTime: timeString.nullable().optional(),
     endTime: timeString.nullable().optional(),
+    /**
+     * Hours ONE person worked, capped at 24. With a crew the total man-hours are
+     * derived (hours × crew), never typed — so the per-person day stays the rule.
+     */
     durationHours: z.coerce.number().positive("invalid_duration").max(24, "exceeds_day").nullable().optional(),
+    /** How many people those hours cover. 1 (or absent) = an individual entry. */
+    crewSize: z.coerce.number().int("invalid_crew_size").min(1, "invalid_crew_size").max(999, "invalid_crew_size").nullable().optional(),
     comment: z.string().max(2000, "comment_too_long").nullable().optional(),
     /** Whose effort this is. Defaults to the caller; only managers may differ. */
     userId: z.string().uuid().nullable().optional(),
@@ -44,6 +50,7 @@ export const updateTimeEntrySchema = z
     startTime: timeString.nullable().optional(),
     endTime: timeString.nullable().optional(),
     durationHours: z.coerce.number().positive("invalid_duration").max(24, "exceeds_day").nullable().optional(),
+    crewSize: z.coerce.number().int("invalid_crew_size").min(1, "invalid_crew_size").max(999, "invalid_crew_size").nullable().optional(),
     comment: z.string().max(2000, "comment_too_long").nullable().optional(),
     /** Re-attributing effort to a different person is a manager-only action. */
     userId: z.string().uuid().nullable().optional(),

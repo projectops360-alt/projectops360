@@ -15,7 +15,7 @@ import type { EffortSummary, TimeEntry } from "./types";
 type Admin = ReturnType<typeof createAdminClient>;
 
 const ENTRY_SELECT =
-  "id, organization_id, project_id, task_id, subtask_id, user_id, work_date, start_time, end_time, duration_hours, comment, source, created_by, updated_by, created_at, updated_at, deleted_at";
+  "id, organization_id, project_id, task_id, subtask_id, user_id, work_date, start_time, end_time, duration_hours, crew_size, hours_per_person, comment, source, created_by, updated_by, created_at, updated_at, deleted_at";
 
 /** Entries for one subtask, newest work first. */
 export async function listSubtaskTimeEntries(
@@ -33,7 +33,12 @@ export async function listSubtaskTimeEntries(
     .is("deleted_at", null)
     .order("work_date", { ascending: false })
     .order("created_at", { ascending: false });
-  return ((data ?? []) as TimeEntry[]).map((e) => ({ ...e, duration_hours: Number(e.duration_hours) }));
+  return ((data ?? []) as TimeEntry[]).map((e) => ({
+    ...e,
+    duration_hours: Number(e.duration_hours),
+    crew_size: Number(e.crew_size ?? 1),
+    hours_per_person: e.hours_per_person == null ? null : Number(e.hours_per_person),
+  }));
 }
 
 /** Total logged hours for one subtask — the canonical "actual hours". */
@@ -137,7 +142,12 @@ export async function listTaskTimeEntries(
     .is("deleted_at", null)
     .order("work_date", { ascending: false })
     .order("created_at", { ascending: false });
-  return ((data ?? []) as TimeEntry[]).map((e) => ({ ...e, duration_hours: Number(e.duration_hours) }));
+  return ((data ?? []) as TimeEntry[]).map((e) => ({
+    ...e,
+    duration_hours: Number(e.duration_hours),
+    crew_size: Number(e.crew_size ?? 1),
+    hours_per_person: e.hours_per_person == null ? null : Number(e.hours_per_person),
+  }));
 }
 
 /**

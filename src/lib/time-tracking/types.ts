@@ -25,7 +25,15 @@ export interface TimeEntry {
   work_date: string;
   start_time: string | null;
   end_time: string | null;
+  /**
+   * TOTAL man-hours for this entry (`hours_per_person × crew_size`). Every
+   * rollup sums this column, so a crew entry needs no special case anywhere.
+   */
   duration_hours: number;
+  /** People the entry covers. 1 = an individual entry. */
+  crew_size: number;
+  /** Hours ONE person worked, ≤ 24. Null on rows predating crew support. */
+  hours_per_person: number | null;
   comment: string | null;
   source: TimeEntrySource;
   created_by: string | null;

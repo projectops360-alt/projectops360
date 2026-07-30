@@ -263,6 +263,13 @@ export function TimeLogPanel({
                   </td>
                   <td className="py-1.5 pr-2 text-right tabular-nums font-medium text-foreground">
                     {entry.duration_hours}
+                    {/* Show how a crew total was built, so the number can be
+                        checked without opening the entry. */}
+                    {entry.crew_size > 1 && (
+                      <span className="block text-[10px] font-normal text-muted-foreground">
+                        {entry.crew_size} × {entry.hours_per_person ?? "—"} {t("hoursShort")}
+                      </span>
+                    )}
                   </td>
                   <td className="py-1.5 pr-2 text-muted-foreground">{entry.comment || "—"}</td>
                   <td className="py-1.5 text-right whitespace-nowrap">

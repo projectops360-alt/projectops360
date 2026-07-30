@@ -13,7 +13,15 @@ export function roundHours(hours: number): number {
   return Math.round(hours * 100) / 100;
 }
 
+/**
+ * A day cannot hold more than a day — PER PERSON. This is the real invariant,
+ * and framing it that way is what lets a crew entry hold 200 man-hours without
+ * ever claiming somebody worked 200 hours in one day.
+ */
 export const MAX_DAILY_HOURS = 24;
+
+/** Sanity bound on a crew, not a policy: past this it is a typo, not a crew. */
+export const MAX_CREW_SIZE = 999;
 
 // ── Duration from an interval ────────────────────────────────────────────────
 
@@ -21,7 +29,7 @@ export interface DurationResult {
   ok: boolean;
   hours: number | null;
   /** Machine-readable so the UI can phrase it in the user's language. */
-  error?: "invalid_time" | "end_before_start" | "zero_duration" | "exceeds_day";
+  error?: "invalid_time" | "end_before_start" | "zero_duration" | "exceeds_day" | "invalid_crew_size";
 }
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
@@ -73,6 +81,70 @@ export function resolveEntryDuration(input: {
     return { ok: false, hours: null, error: "zero_duration" };
   }
   return validateDuration(input.durationHours);
+}
+
+// ── Crew entries ─────────────────────────────────────────────────────────────
+// One entry may record a CREW rather than one person: "20 people, 10 hours each,
+// that day" is 200 man-hours of effort. The stored duration_hours stays the TOTAL
+// man-hours, so every sum above (task, project, report, AC) keeps working with no
+// special case. What changes is the ceiling: instead of a flat 24h it becomes
+// 24h × crew size, which enforces the same "nobody works more than a day in a
+// day" rule while letting real crew effort through.
+
+export interface CrewEntryInput {
+  startTime?: string | null;
+  endTime?: string | null;
+  /** Hours ONE person worked. Capped at 24 — this is the per-person day. */
+  hoursPerPerson?: number | null;
+  /** How many people worked them. 1 (or absent) is an ordinary personal entry. */
+  crewSize?: number | null;
+}
+
+export interface CrewEntryResult {
+  ok: boolean;
+  /** Hours per person, ≤ 24. */
+  hoursPerPerson: number | null;
+  crewSize: number;
+  /** What gets stored in duration_hours: hoursPerPerson × crewSize. */
+  totalHours: number | null;
+  error?: DurationResult["error"];
+}
+
+/** A whole-number crew of at least one, or null when the input is not that. */
+export function validateCrewSize(crewSize: number | null | undefined): number | null {
+  if (crewSize === null || crewSize === undefined || crewSize === ("" as unknown)) return 1;
+  const n = Number(crewSize);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > MAX_CREW_SIZE) return null;
+  return n;
+}
+
+/**
+ * Resolve one entry that may cover a crew.
+ *
+ * Per-person hours are validated by the SAME rules as an individual entry (an
+ * interval wins over a typed duration; a backwards interval is rejected), then
+ * multiplied by the crew. So the 24h ceiling is never weakened — it is applied
+ * where it is actually true, to one person's day.
+ */
+export function resolveCrewEntry(input: CrewEntryInput): CrewEntryResult {
+  const crewSize = validateCrewSize(input.crewSize);
+  if (crewSize === null) {
+    return { ok: false, hoursPerPerson: null, crewSize: 1, totalHours: null, error: "invalid_crew_size" };
+  }
+  const perPerson = resolveEntryDuration({
+    startTime: input.startTime,
+    endTime: input.endTime,
+    durationHours: input.hoursPerPerson,
+  });
+  if (!perPerson.ok || perPerson.hours === null) {
+    return { ok: false, hoursPerPerson: null, crewSize, totalHours: null, error: perPerson.error };
+  }
+  return {
+    ok: true,
+    hoursPerPerson: perPerson.hours,
+    crewSize,
+    totalHours: roundHours(perPerson.hours * crewSize),
+  };
 }
 
 // ── Aggregation ──────────────────────────────────────────────────────────────

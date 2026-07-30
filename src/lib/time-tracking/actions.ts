@@ -25,7 +25,7 @@ import { logAudit } from "@/lib/audit";
 import { emitProjectEventSafe } from "@/lib/events/ingestion";
 import { authorizeTimeEntryAction, type TimeEntryAction } from "./permissions";
 import {
-  resolveEntryDuration,
+  resolveCrewEntry,
   crossedEffortBudget,
   computeEffort,
   consolidatedEstimatedHours,
@@ -347,12 +347,15 @@ export async function logTimeEntryAction(input: LogTimeEntryInput): Promise<Time
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "invalid_input" };
   const data = parsed.data;
 
-  const duration = resolveEntryDuration({
+  // The stored total is DERIVED (hours per person × crew), never taken from the
+  // client: a caller must not be able to file 200 man-hours as one person's day.
+  const duration = resolveCrewEntry({
     startTime: data.startTime,
     endTime: data.endTime,
-    durationHours: data.durationHours,
+    hoursPerPerson: data.durationHours,
+    crewSize: data.crewSize,
   });
-  if (!duration.ok || duration.hours === null) return { error: duration.error ?? "invalid_duration" };
+  if (!duration.ok || duration.totalHours === null) return { error: duration.error ?? "invalid_duration" };
 
   const org = await getOrgContext();
   const supabase = createAdminClient();
@@ -381,7 +384,9 @@ export async function logTimeEntryAction(input: LogTimeEntryInput): Promise<Time
       work_date: data.workDate,
       start_time: hasInterval ? data.startTime : null,
       end_time: hasInterval ? data.endTime : null,
-      duration_hours: duration.hours,
+      duration_hours: duration.totalHours,
+      crew_size: duration.crewSize,
+      hours_per_person: duration.hoursPerPerson,
       comment: data.comment?.trim() || null,
       source: "manual",
       created_by: org.userId,
@@ -403,7 +408,9 @@ export async function logTimeEntryAction(input: LogTimeEntryInput): Promise<Time
     metadata: {
       subtask_id: ctx.subtaskId,
       task_id: ctx.taskId,
-      hours: duration.hours,
+      hours: duration.totalHours,
+      hours_per_person: duration.hoursPerPerson,
+      crew_size: duration.crewSize,
       work_date: data.workDate,
       for_user: targetUserId,
     },
@@ -413,7 +420,9 @@ export async function logTimeEntryAction(input: LogTimeEntryInput): Promise<Time
     task_id: ctx.taskId,
     subtask_id: ctx.subtaskId,
     entry_id: entryId,
-    duration_hours: duration.hours,
+    duration_hours: duration.totalHours,
+    hours_per_person: duration.hoursPerPerson,
+    crew_size: duration.crewSize,
     work_date: data.workDate,
     actual_hours: actualHours,
     task_actual_hours: taskActualHours,
@@ -438,7 +447,7 @@ export async function updateTimeEntryAction(input: UpdateTimeEntryInput): Promis
 
   const { data: existing } = await supabase
     .from("subtask_time_entries")
-    .select("id, task_id, subtask_id, user_id, created_by, work_date, start_time, end_time, duration_hours, comment")
+    .select("id, task_id, subtask_id, user_id, created_by, work_date, start_time, end_time, duration_hours, crew_size, hours_per_person, comment")
     .eq("id", data.entryId)
     .eq("project_id", data.projectId)
     .eq("organization_id", org.organizationId)
@@ -471,14 +480,29 @@ export async function updateTimeEntryAction(input: UpdateTimeEntryInput): Promis
     nextUserId = data.userId;
   }
 
-  // Preserve-on-absent: only what was sent changes. Interval and duration are
-  // resolved together so the stored pair can never contradict the total.
+  // Preserve-on-absent: only what was sent changes. Interval, per-person hours
+  // and crew are resolved TOGETHER so the stored trio can never contradict
+  // itself — editing the crew alone still recomputes the total.
   const startTime = data.startTime !== undefined ? data.startTime : entry.start_time;
   const endTime = data.endTime !== undefined ? data.endTime : entry.end_time;
+  const crewSize = data.crewSize !== undefined && data.crewSize !== null
+    ? data.crewSize
+    : (entry.crew_size ?? 1);
+  // Falls back to hours_per_person, not to duration_hours: on a crew row the
+  // total is the crew's, and re-feeding it as one person's hours would multiply
+  // the entry by the crew size again on every edit.
+  const perPersonFallback = entry.hours_per_person != null
+    ? Number(entry.hours_per_person)
+    : Number(entry.duration_hours) / (entry.crew_size ?? 1);
   const durationInput =
-    data.durationHours !== undefined ? data.durationHours : Number(entry.duration_hours);
-  const duration = resolveEntryDuration({ startTime, endTime, durationHours: durationInput });
-  if (!duration.ok || duration.hours === null) return { error: duration.error ?? "invalid_duration" };
+    data.durationHours !== undefined ? data.durationHours : perPersonFallback;
+  const duration = resolveCrewEntry({
+    startTime,
+    endTime,
+    hoursPerPerson: durationInput,
+    crewSize,
+  });
+  if (!duration.ok || duration.totalHours === null) return { error: duration.error ?? "invalid_duration" };
 
   const hasInterval = !!startTime && !!endTime;
   const previousActual = await scopedActualHours(supabase, org, data.projectId, ctx);
@@ -489,7 +513,9 @@ export async function updateTimeEntryAction(input: UpdateTimeEntryInput): Promis
       work_date: data.workDate ?? entry.work_date,
       start_time: hasInterval ? startTime : null,
       end_time: hasInterval ? endTime : null,
-      duration_hours: duration.hours,
+      duration_hours: duration.totalHours,
+      crew_size: duration.crewSize,
+      hours_per_person: duration.hoursPerPerson,
       comment: data.comment !== undefined ? data.comment?.trim() || null : entry.comment,
       user_id: nextUserId,
       updated_by: org.userId,
@@ -512,7 +538,8 @@ export async function updateTimeEntryAction(input: UpdateTimeEntryInput): Promis
       subtask_id: entry.subtask_id,
       task_id: entry.task_id,
       old_hours: Number(entry.duration_hours),
-      new_hours: duration.hours,
+      new_hours: duration.totalHours,
+      crew_size: duration.crewSize,
     },
   });
 
@@ -520,9 +547,11 @@ export async function updateTimeEntryAction(input: UpdateTimeEntryInput): Promis
     task_id: entry.task_id,
     subtask_id: entry.subtask_id,
     entry_id: data.entryId,
-    duration_hours: duration.hours,
+    duration_hours: duration.totalHours,
+    hours_per_person: duration.hoursPerPerson,
+    crew_size: duration.crewSize,
     old_value: Number(entry.duration_hours),
-    new_value: duration.hours,
+    new_value: duration.totalHours,
     actual_hours: actualHours,
     task_actual_hours: taskActualHours,
     title: ctx.title,
