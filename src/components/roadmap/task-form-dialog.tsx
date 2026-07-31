@@ -1096,13 +1096,11 @@ export function TaskFormDialog({
                 open={showTimeLog}
                 onToggle={() => setShowTimeLog(!showTimeLog)}
               >
-                {showTimeLog && (
-                  <TimeLogPanel
-                    projectId={projectId}
-                    taskId={task.id}
-                    people={options?.people ?? []}
-                  />
-                )}
+                {/* The panel resolves its own people from project membership.
+                    It used to receive `options.people`, which is
+                    `profiles WHERE organization_id` — a profile's HOME org, so
+                    the picker showed one name (REG-043). */}
+                {showTimeLog && <TimeLogPanel projectId={projectId} taskId={task.id} />}
               </FormSection>
             )}
 

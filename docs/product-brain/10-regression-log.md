@@ -1330,3 +1330,109 @@ protect the behaviour, not the mechanism.
 → "PMO-IC-PANEL-HYDRATION". Measured on the dashboard before and after: 6
 hydration errors → 0, projection rendering normally (22 nodes, 68 edges). The
 file was byte-identical to `origin/master`, so this was live in production too.
+
+---
+
+## REG-043 — "Whose effort" offered one person, twice
+
+**Date:** 2026-07-30 · **Status:** closed · **Guard:** `TIME-TRACKING-PEOPLE-SOURCE`
+
+The owner of the Agro project opened *Log time* and the picker offered exactly
+two options — *Myself* and *Efrain Prada* — the same human twice, while eight
+people were on the project. Two independent defects produced one symptom.
+
+**Defect 1 — the wrong source.** The list came from
+`profiles WHERE organization_id = <org>` (`getTaskFormOptionsAction`, threaded
+down as `options.people`). That column is a profile's **HOME** org, not every org
+they work in. Measured on the Agro organization:
+
+| person | home org matches? |
+|---|---|
+| Efrain Prada | ✅ the only one |
+| Cesar, Giovanna, Jose, Juan, Paul, Viveka, Yihad | ❌ seven different orgs |
+
+So the query returned **one row**. This is the same mistake REG-038 had already
+documented for report owners — the fix there was "resolve by id, never re-filter
+by organization_id", and this call site never got it.
+
+**Defect 2 — the duplicate.** The dialog rendered `<option value="">Myself</option>`
+and then mapped the whole list, so whenever the caller was in it they appeared
+twice as if they were two resources. That option was added with the person picker
+itself, in the same change that introduced task-level logging.
+
+**Root cause of defect 1, stated precisely:** membership was asked of the wrong
+table. "Who works on this project" is `project_team_members`; `profiles` only
+knows where a person's account lives.
+
+**Fix:** membership now comes from `project_team_members` scoped by
+`project_id` AND `organization_id`, excluding `status = 'removed'`, and the
+caller is folded INTO that list rather than bolted on beside it — so they render
+once, labelled *(Myself)*, sorted first. Names resolve by id (REG-038 rule),
+emails are best-effort context. Rows without a `user_id` are excluded and
+reported: `subtask_time_entries.user_id` is NOT NULL to `auth.users`, so a
+login-less contact or crew has nothing storable and offering them would build a
+save that always fails.
+
+**Deliberately not done:** workspace members who are not on the project are NOT
+merged in. Mixing every org user into every project is what the report asked us
+to avoid; adding someone to a project stays an explicit action.
+
+**Verify:** `src/lib/time-tracking/__tests__/people.test.ts` →
+`TIME-TRACKING-PEOPLE-SOURCE` (24 assertions, built on the real Agro rows
+including Paul's three roles and Efrain's removed membership). Measured against
+the DEV database: the old query returns 1 row, the new source returns the 8
+expected people with Paul de-duplicated.
+
+---
+
+## REG-044 — Microsoft Project files were refused, then refused again after being supported
+
+**Date:** 2026-07-30 · **Status:** closed · **Guard:** `IMPORT-MPP-SANDBOX`
+
+A customer's SAP plan (`CPVEN - Plan Tecnico SAP_v1.mpp`) could not be imported:
+the wizard answered *"Tipo de archivo no soportado"*. `.mpp` is an undocumented
+OLE2 binary; the only mature reader is MPXJ, which is Java, and Vercel Functions
+run Node — so nothing in the product could open it.
+
+**How it was solved.** A converter image (JRE 21 + MPXJ 16.5.0) published to the
+Vercel Container Registry, run in a **Vercel Sandbox created per conversion and
+destroyed after it**. Measured end to end against the real file: sandbox up in
+710 ms, 50 tasks / 19 resources / 39 assignments out, 2.5 s total.
+
+The three options were priced before choosing, because the cheap-looking one was
+the expensive one:
+
+| Option | Recurring cost | Verdict |
+|---|---|---|
+| Java microservice | MPXJ free (LGPL) + a host to run and pay for | a standing service to operate |
+| Browser via CheerpJ | **£100/developer/month**, and MPXJ ships no supported JS build | rejected |
+| **Vercel Sandbox** | pay-per-conversion, no standing host | chosen |
+
+**The second refusal, and the real lesson.** After all of that was built and
+green, the wizard still said *"Tipo de archivo no soportado"*. `.mpp` had been
+added to `ImportFileType`, to the parser's switch, to the file input's `accept`
+and to the conversion routing — but **not to `EXTENSION_MAP`**, the one table
+`detectFileType` reads. The upload was rejected before the converter was ever
+reached.
+
+Sixteen tests covered the conversion and every one passed: egress denied, the
+sandbox always released, absolute paths, error codes distinguishing a bad file
+from an unavailable converter. Not one asked *"is the file accepted?"*. The
+sophisticated properties were guarded and the front door was not.
+
+**Protection rule (binding):** a new import format is not supported until
+`detectFileType` returns it. Any test suite for an intake path asserts the
+entry point first, then the behaviour behind it.
+
+**Also recorded:** relative paths to `sandbox.writeFiles` fail with a bare
+`400` that names nothing — paths into a sandbox are always absolute. The
+uploaded file name is never one of them: it is user input, written to a fixed
+`input.mpp`, and `java` is invoked directly rather than through a shell. The
+sandbox runs with an empty allowlist (`networkPolicy: { allow: [] }`), which is
+how this SDK spells deny-all; omitting the policy leaves egress open.
+
+**Verify:** `src/lib/import-intelligence/__tests__/mpp-convert.test.ts`
+(`IMPORT-MPP-SANDBOX`, including the three assertions that would have caught the
+second refusal) · `mpp-model.test.ts` (`IMPORT-MPP-MAPPING`, 26 assertions over
+the real plan). The conversion itself needs a JVM and a Vercel account, so it is
+verified by `scripts/verify-mpp-sandbox.mjs` as an operator check, not in CI.

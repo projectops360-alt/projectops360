@@ -20,9 +20,10 @@ import { Clock, Pencil, Trash2, Loader2 } from "lucide-react";
 import {
   listTimeEntriesAction,
   deleteTimeEntryAction,
-  canLogTimeForOthersAction,
+  listTimeLogPeopleAction,
   getTaskEffortAction,
 } from "@/lib/time-tracking/actions";
+import type { TimeLogPerson } from "@/lib/time-tracking/people";
 import { computeEffort, effortBarPct, SUBTASK_THRESHOLDS } from "@/lib/time-tracking/effort";
 import type { EffortThresholds } from "@/lib/time-tracking/effort";
 import type { TimeEntryView, EffortSeverity } from "@/lib/time-tracking/types";
@@ -40,8 +41,6 @@ export interface TimeLogPanelProps {
    */
   estimatedHours?: number | null;
   thresholds?: EffortThresholds;
-  /** People a manager may attribute effort to. */
-  people?: { id: string; name: string }[];
   /** Notifies the parent so the cached actual hours stay in sync on screen. */
   onTotalChange?: (actualHours: number) => void;
 }
@@ -51,7 +50,6 @@ export interface SubtaskTimeLogProps {
   taskId: string;
   subtaskId: string;
   estimatedHours: number | null;
-  people?: { id: string; name: string }[];
   onTotalChange?: (actualHours: number) => void;
 }
 
@@ -72,7 +70,7 @@ const TEXT_COLOR: Record<EffortSeverity, string> = {
 };
 
 /** A subtask's time log — the original surface, unchanged in behaviour. */
-export function SubtaskTimeLog({ projectId, taskId, subtaskId, estimatedHours, people, onTotalChange }: SubtaskTimeLogProps) {
+export function SubtaskTimeLog({ projectId, taskId, subtaskId, estimatedHours, onTotalChange }: SubtaskTimeLogProps) {
   return (
     <TimeLogPanel
       projectId={projectId}
@@ -80,7 +78,6 @@ export function SubtaskTimeLog({ projectId, taskId, subtaskId, estimatedHours, p
       subtaskId={subtaskId}
       estimatedHours={estimatedHours}
       thresholds={SUBTASK_THRESHOLDS}
-      people={people}
       onTotalChange={onTotalChange}
     />
   );
@@ -92,7 +89,6 @@ export function TimeLogPanel({
   subtaskId,
   estimatedHours,
   thresholds = SUBTASK_THRESHOLDS,
-  people,
   onTotalChange,
 }: TimeLogPanelProps) {
   const t = useTranslations("taskExecutionMap.timeTracking");
@@ -102,6 +98,13 @@ export function TimeLogPanel({
   const [dialogFor, setDialogFor] = useState<{ entry: TimeEntryView | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canLogForOthers, setCanLogForOthers] = useState(false);
+  // Who effort may be attributed to. Owned here rather than passed in: the
+  // callers used to hand down `profiles WHERE organization_id`, which is a
+  // profile's HOME org and left the picker with a single name (REG-043).
+  const [peopleState, setPeopleState] = useState<{
+    status: "loading" | "ready" | "error";
+    list: TimeLogPerson[];
+  }>({ status: "loading", list: [] });
   const [pending, startTransition] = useTransition();
   const isTaskLevel = !subtaskId;
 
@@ -127,16 +130,32 @@ export function TimeLogPanel({
 
   useEffect(() => { load(); }, [load]);
 
-  // The picker is offered only when the server would actually accept someone
-  // else's id, so the UI never presents a choice the action will reject.
+  // One call answers both "who" and "may I". The picker is offered only when
+  // the server would actually accept someone else's id, so the UI never
+  // presents a choice the action will reject.
   useEffect(() => {
     let active = true;
-    if (!people || people.length === 0) return;
-    canLogTimeForOthersAction(projectId, taskId)
-      .then((allowed) => { if (active) setCanLogForOthers(allowed); })
-      .catch(() => { /* stay closed: deny-by-default */ });
+    setPeopleState({ status: "loading", list: [] });
+    listTimeLogPeopleAction(projectId, taskId)
+      .then((res) => {
+        if (!active) return;
+        if (res.error || !res.people) {
+          // Surfaced as a failure. Falling back to "just you" is what made the
+          // bug invisible: the picker looked complete while it was empty.
+          setPeopleState({ status: "error", list: [] });
+          setCanLogForOthers(false);
+          return;
+        }
+        setPeopleState({ status: "ready", list: res.people });
+        setCanLogForOthers(!!res.canLogForOthers);
+      })
+      .catch(() => {
+        if (!active) return;
+        setPeopleState({ status: "error", list: [] });
+        setCanLogForOthers(false); // deny-by-default
+      });
     return () => { active = false; };
-  }, [projectId, taskId, people]);
+  }, [projectId, taskId]);
 
   const remove = (entry: TimeEntryView) => {
     if (!window.confirm(t("deleteConfirm"))) return;
@@ -309,7 +328,8 @@ export function TimeLogPanel({
           // entry follows the panel's own level.
           subtaskId={dialogFor.entry ? dialogFor.entry.subtask_id : subtaskId ?? null}
           entry={dialogFor.entry}
-          people={people}
+          people={peopleState.list}
+          peopleStatus={peopleState.status}
           canLogForOthers={canLogForOthers}
           onClose={() => setDialogFor(null)}
           onSaved={load}
