@@ -1,0 +1,1219 @@
+{
+ "property_values": {
+  "project_title": "DEORSA - Plan Tecnico SAP",
+  "author": "Jose A. Roso"
+ },
+ "tasks": [
+  {
+   "start": "2013-06-06T09:00:00.0",
+   "name": "DEORSA - Plan Tecnico SAP",
+   "wbs": "0",
+   "critical": true,
+   "duration": 849600,
+   "unique_id": 0,
+   "summary": true,
+   "outline_number": "0",
+   "finish": "2013-07-17T13:00:00.0"
+  },
+  {
+   "start": "2013-06-06T09:00:00.0",
+   "name": "Proyecto SAP CPVEN COLOMBIA - Plan Tecnico",
+   "wbs": "1",
+   "critical": true,
+   "id": 1,
+   "duration": 849600,
+   "outline_level": 1,
+   "unique_id": 1,
+   "summary": true,
+   "outline_number": "1",
+   "parent_task_unique_id": 0,
+   "finish": "2013-07-17T13:00:00.0"
+  },
+  {
+   "start": "2013-06-06T09:00:00.0",
+   "name": "1. Preparacion inicial",
+   "wbs": "1.1",
+   "critical": true,
+   "id": 2,
+   "duration": 302400,
+   "outline_level": 2,
+   "unique_id": 2,
+   "summary": true,
+   "outline_number": "1.1",
+   "parent_task_unique_id": 1,
+   "finish": "2013-06-20T13:00:00.0"
+  },
+  {
+   "start": "2013-06-06T09:00:00.0",
+   "name": "Validar sizing Hardware",
+   "wbs": "1.1.1",
+   "critical": true,
+   "id": 3,
+   "duration": 14400,
+   "outline_level": 3,
+   "unique_id": 3,
+   "outline_number": "1.1.1",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-06T13:00:00.0"
+  },
+  {
+   "start": "2013-06-06T15:00:00.0",
+   "name": "Entregar diagrama tecnico de la solucion",
+   "wbs": "1.1.2",
+   "critical": true,
+   "id": 4,
+   "duration": 14400,
+   "predecessors": [
+    {
+     "unique_id": 1,
+     "predecessor_task_unique_id": 3,
+     "successor_task_unique_id": 4,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 4,
+   "outline_number": "1.1.2",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-06T19:00:00.0"
+  },
+  {
+   "start": "2013-06-07T09:00:00.0",
+   "name": "Suministrar pre-requisitos de instalacion",
+   "wbs": "1.1.3",
+   "critical": true,
+   "id": 5,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 114,
+     "predecessor_task_unique_id": 4,
+     "successor_task_unique_id": 5,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 5,
+   "outline_number": "1.1.3",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-07T19:00:00.0"
+  },
+  {
+   "start": "2013-06-10T09:00:00.0",
+   "name": "Seleccionar media de instalacion SAP",
+   "wbs": "1.1.4",
+   "critical": true,
+   "id": 6,
+   "duration": 14400,
+   "predecessors": [
+    {
+     "unique_id": 15,
+     "predecessor_task_unique_id": 5,
+     "successor_task_unique_id": 19,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 19,
+   "outline_number": "1.1.4",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-10T13:00:00.0"
+  },
+  {
+   "start": "2013-06-10T15:00:00.0",
+   "name": "Descargar media de instalacion SAP",
+   "wbs": "1.1.5",
+   "critical": true,
+   "id": 7,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 16,
+     "predecessor_task_unique_id": 19,
+     "successor_task_unique_id": 20,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 20,
+   "outline_number": "1.1.5",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-11T13:00:00.0"
+  },
+  {
+   "start": "2013-06-11T15:00:00.0",
+   "name": "Enviar Medios de Instalacion al Cliente",
+   "wbs": "1.1.6",
+   "id": 8,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 178,
+     "predecessor_task_unique_id": 20,
+     "successor_task_unique_id": 148,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 148,
+   "outline_number": "1.1.6",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-11T15:00:00.0",
+   "name": "Definir el Plan de trabajo",
+   "wbs": "1.1.7",
+   "critical": true,
+   "id": 9,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 183,
+     "predecessor_task_unique_id": 20,
+     "successor_task_unique_id": 21,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 21,
+   "outline_number": "1.1.7",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-12T15:00:00.0",
+   "name": "Actualizacion SAP Solution Manager",
+   "wbs": "1.1.8",
+   "critical": true,
+   "id": 10,
+   "duration": 172800,
+   "predecessors": [
+    {
+     "unique_id": 262,
+     "predecessor_task_unique_id": 21,
+     "successor_task_unique_id": 6,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 6,
+   "summary": true,
+   "outline_number": "1.1.8",
+   "parent_task_unique_id": 2,
+   "finish": "2013-06-20T13:00:00.0"
+  },
+  {
+   "start": "2013-06-12T15:00:00.0",
+   "name": "Upgrade y Actualizacion RDBMS",
+   "wbs": "1.1.8.1",
+   "id": 11,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 201,
+     "predecessor_task_unique_id": 21,
+     "successor_task_unique_id": 13,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 13,
+   "outline_number": "1.1.8.1",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-14T13:00:00.0"
+  },
+  {
+   "start": "2013-06-14T15:00:00.0",
+   "name": "Actualizacion Kernel - Central Instance",
+   "wbs": "1.1.8.2",
+   "id": 12,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 255,
+     "predecessor_task_unique_id": 13,
+     "successor_task_unique_id": 10,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 10,
+   "outline_number": "1.1.8.2",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-17T13:00:00.0"
+  },
+  {
+   "start": "2013-06-17T15:00:00.0",
+   "name": "Actividades post-actualizacion",
+   "wbs": "1.1.8.3",
+   "id": 13,
+   "duration": 86400,
+   "predecessors": [
+    {
+     "unique_id": 8,
+     "predecessor_task_unique_id": 10,
+     "successor_task_unique_id": 11,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 11,
+   "outline_number": "1.1.8.3",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-20T13:00:00.0"
+  },
+  {
+   "start": "2013-06-12T15:00:00.0",
+   "name": "Configuracion RTCCTOOL",
+   "wbs": "1.1.8.4",
+   "id": 14,
+   "duration": 57600,
+   "outline_level": 4,
+   "unique_id": 14,
+   "outline_number": "1.1.8.4",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-14T13:00:00.0"
+  },
+  {
+   "start": "2013-06-14T15:00:00.0",
+   "name": "Revision estrategia de respaldo",
+   "wbs": "1.1.8.5",
+   "id": 15,
+   "duration": 14400,
+   "predecessors": [
+    {
+     "unique_id": 11,
+     "predecessor_task_unique_id": 14,
+     "successor_task_unique_id": 15,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 15,
+   "outline_number": "1.1.8.5",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-14T19:00:00.0"
+  },
+  {
+   "start": "2013-06-12T15:00:00.0",
+   "name": "Documentacion y entrega del sistema",
+   "wbs": "1.1.8.6",
+   "critical": true,
+   "id": 16,
+   "milestone": true,
+   "duration": 28800,
+   "outline_level": 4,
+   "unique_id": 16,
+   "outline_number": "1.1.8.6",
+   "parent_task_unique_id": 6,
+   "finish": "2013-06-13T13:00:00.0"
+  },
+  {
+   "start": "2013-06-13T15:00:00.0",
+   "name": "2. Business Blue Print",
+   "wbs": "1.2",
+   "critical": true,
+   "id": 17,
+   "duration": 316800,
+   "predecessors": [
+    {
+     "unique_id": 263,
+     "predecessor_task_unique_id": 16,
+     "successor_task_unique_id": 17,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 2,
+   "unique_id": 17,
+   "summary": true,
+   "outline_number": "1.2",
+   "parent_task_unique_id": 1,
+   "finish": "2013-06-28T13:00:00.0"
+  },
+  {
+   "start": "2013-06-13T15:00:00.0",
+   "name": "Instalacion Ambiente Desarrollo ERP",
+   "wbs": "1.2.1",
+   "critical": true,
+   "id": 18,
+   "duration": 316800,
+   "outline_level": 3,
+   "unique_id": 18,
+   "summary": true,
+   "outline_number": "1.2.1",
+   "parent_task_unique_id": 17,
+   "finish": "2013-06-28T13:00:00.0"
+  },
+  {
+   "start": "2013-06-13T15:00:00.0",
+   "name": "Upgrade y Actualizacion RDBMS",
+   "wbs": "1.2.1.1",
+   "critical": true,
+   "id": 19,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 279,
+     "predecessor_task_unique_id": 16,
+     "successor_task_unique_id": 22,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 22,
+   "outline_number": "1.2.1.1",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-17T13:00:00.0"
+  },
+  {
+   "start": "2013-06-17T15:00:00.0",
+   "name": "Instalacion Central Instance",
+   "wbs": "1.2.1.2",
+   "critical": true,
+   "id": 20,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 20,
+     "predecessor_task_unique_id": 22,
+     "successor_task_unique_id": 23,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 23,
+   "outline_number": "1.2.1.2",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-18T13:00:00.0"
+  },
+  {
+   "start": "2013-06-18T15:00:00.0",
+   "name": "Actividades post-instalacion",
+   "wbs": "1.2.1.3",
+   "critical": true,
+   "id": 21,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 21,
+     "predecessor_task_unique_id": 23,
+     "successor_task_unique_id": 24,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 24,
+   "outline_number": "1.2.1.3",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-20T13:00:00.0"
+  },
+  {
+   "start": "2013-06-20T15:00:00.0",
+   "name": "Configuracion SMSY",
+   "wbs": "1.2.1.4",
+   "critical": true,
+   "id": 22,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 22,
+     "predecessor_task_unique_id": 24,
+     "successor_task_unique_id": 25,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 25,
+   "outline_number": "1.2.1.4",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-21T13:00:00.0"
+  },
+  {
+   "start": "2013-06-21T15:00:00.0",
+   "name": "Configuracion de Monitoreo RDBMS,SAP y SO",
+   "wbs": "1.2.1.5",
+   "critical": true,
+   "id": 23,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 280,
+     "predecessor_task_unique_id": 25,
+     "successor_task_unique_id": 159,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 159,
+   "outline_number": "1.2.1.5",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-25T13:00:00.0"
+  },
+  {
+   "start": "2013-06-25T15:00:00.0",
+   "name": "Configuracion EWA",
+   "wbs": "1.2.1.6",
+   "critical": true,
+   "id": 24,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 281,
+     "predecessor_task_unique_id": 159,
+     "successor_task_unique_id": 26,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 26,
+   "outline_number": "1.2.1.6",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-26T13:00:00.0"
+  },
+  {
+   "start": "2013-06-26T15:00:00.0",
+   "name": "Implementacion estrategia de respaldo",
+   "wbs": "1.2.1.7",
+   "critical": true,
+   "id": 25,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 24,
+     "predecessor_task_unique_id": 26,
+     "successor_task_unique_id": 27,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 27,
+   "outline_number": "1.2.1.7",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-27T13:00:00.0"
+  },
+  {
+   "start": "2013-06-27T15:00:00.0",
+   "name": "Documentacion y entrega del sistema",
+   "wbs": "1.2.1.8",
+   "critical": true,
+   "id": 26,
+   "milestone": true,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 260,
+     "predecessor_task_unique_id": 27,
+     "successor_task_unique_id": 28,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 28,
+   "outline_number": "1.2.1.8",
+   "parent_task_unique_id": 18,
+   "finish": "2013-06-28T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "3. Realizacion",
+   "wbs": "1.3",
+   "critical": true,
+   "id": 27,
+   "duration": 288000,
+   "predecessors": [
+    {
+     "unique_id": 264,
+     "predecessor_task_unique_id": 28,
+     "successor_task_unique_id": 45,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 2,
+   "unique_id": 45,
+   "summary": true,
+   "outline_number": "1.3",
+   "parent_task_unique_id": 1,
+   "finish": "2013-07-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "Instalacion Ambiente Calidad ERP",
+   "wbs": "1.3.1",
+   "id": 28,
+   "duration": 288000,
+   "outline_level": 3,
+   "unique_id": 46,
+   "summary": true,
+   "outline_number": "1.3.1",
+   "parent_task_unique_id": 45,
+   "finish": "2013-07-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "Upgrade y Actualizacion RDBMS",
+   "wbs": "1.3.1.1",
+   "id": 29,
+   "duration": 57600,
+   "outline_level": 4,
+   "unique_id": 47,
+   "outline_number": "1.3.1.1",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-02T13:00:00.0"
+  },
+  {
+   "start": "2013-07-02T15:00:00.0",
+   "name": "Instalacion Central Instance",
+   "wbs": "1.3.1.2",
+   "id": 30,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 41,
+     "predecessor_task_unique_id": 47,
+     "successor_task_unique_id": 48,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 48,
+   "outline_number": "1.3.1.2",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-03T13:00:00.0"
+  },
+  {
+   "start": "2013-07-03T15:00:00.0",
+   "name": "Actividades post-instalacion",
+   "wbs": "1.3.1.3",
+   "id": 31,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 42,
+     "predecessor_task_unique_id": 48,
+     "successor_task_unique_id": 49,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 49,
+   "outline_number": "1.3.1.3",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-05T13:00:00.0"
+  },
+  {
+   "start": "2013-07-05T15:00:00.0",
+   "name": "Configuracion SMSY",
+   "wbs": "1.3.1.4",
+   "id": 32,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 43,
+     "predecessor_task_unique_id": 49,
+     "successor_task_unique_id": 50,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 50,
+   "outline_number": "1.3.1.4",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-08T13:00:00.0"
+  },
+  {
+   "start": "2013-07-08T15:00:00.0",
+   "name": "Configuracion de Monitoreo RDBMS,SAP y SO",
+   "wbs": "1.3.1.5",
+   "id": 33,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 269,
+     "predecessor_task_unique_id": 16,
+     "successor_task_unique_id": 161,
+     "type": "FS"
+    },
+    {
+     "unique_id": 270,
+     "predecessor_task_unique_id": 50,
+     "successor_task_unique_id": 161,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 161,
+   "outline_number": "1.3.1.5",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-10T13:00:00.0"
+  },
+  {
+   "start": "2013-07-10T15:00:00.0",
+   "name": "Configuracion EWA",
+   "wbs": "1.3.1.6",
+   "id": 34,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 272,
+     "predecessor_task_unique_id": 161,
+     "successor_task_unique_id": 51,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 51,
+   "outline_number": "1.3.1.6",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-11T13:00:00.0"
+  },
+  {
+   "start": "2013-07-11T15:00:00.0",
+   "name": "Documentacion y entrega del sistema",
+   "wbs": "1.3.1.7",
+   "id": 35,
+   "milestone": true,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 212,
+     "predecessor_task_unique_id": 51,
+     "successor_task_unique_id": 53,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 53,
+   "outline_number": "1.3.1.7",
+   "parent_task_unique_id": 46,
+   "finish": "2013-07-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "Instalacion Ambiente Produccion ERP",
+   "wbs": "1.3.2",
+   "critical": true,
+   "id": 36,
+   "duration": 288000,
+   "outline_level": 3,
+   "unique_id": 65,
+   "summary": true,
+   "outline_number": "1.3.2",
+   "parent_task_unique_id": 45,
+   "finish": "2013-07-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "Upgrade y Actualizacion RDBMS",
+   "wbs": "1.3.2.1",
+   "id": 37,
+   "duration": 57600,
+   "outline_level": 4,
+   "unique_id": 66,
+   "outline_number": "1.3.2.1",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-02T13:00:00.0"
+  },
+  {
+   "start": "2013-07-02T15:00:00.0",
+   "name": "Instalacion Central Instance",
+   "wbs": "1.3.2.2",
+   "id": 38,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 60,
+     "predecessor_task_unique_id": 66,
+     "successor_task_unique_id": 67,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 67,
+   "outline_number": "1.3.2.2",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-03T13:00:00.0"
+  },
+  {
+   "start": "2013-07-03T15:00:00.0",
+   "name": "Actividades post-instalacion",
+   "wbs": "1.3.2.3",
+   "id": 39,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 61,
+     "predecessor_task_unique_id": 67,
+     "successor_task_unique_id": 68,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 68,
+   "outline_number": "1.3.2.3",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-05T13:00:00.0"
+  },
+  {
+   "start": "2013-07-05T15:00:00.0",
+   "name": "Configuracion SMSY",
+   "wbs": "1.3.2.4",
+   "id": 40,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 109,
+     "predecessor_task_unique_id": 68,
+     "successor_task_unique_id": 69,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 69,
+   "outline_number": "1.3.2.4",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-08T13:00:00.0"
+  },
+  {
+   "start": "2013-07-08T15:00:00.0",
+   "name": "Configuracion de Monitoreo RDBMS,SAP y SO",
+   "wbs": "1.3.2.5",
+   "id": 41,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 275,
+     "predecessor_task_unique_id": 16,
+     "successor_task_unique_id": 163,
+     "type": "FS"
+    },
+    {
+     "unique_id": 276,
+     "predecessor_task_unique_id": 69,
+     "successor_task_unique_id": 163,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 163,
+   "outline_number": "1.3.2.5",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-10T13:00:00.0"
+  },
+  {
+   "start": "2013-07-10T15:00:00.0",
+   "name": "Configuracion EWA",
+   "wbs": "1.3.2.6",
+   "id": 42,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 278,
+     "predecessor_task_unique_id": 163,
+     "successor_task_unique_id": 70,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 70,
+   "outline_number": "1.3.2.6",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-11T13:00:00.0"
+  },
+  {
+   "start": "2013-07-11T15:00:00.0",
+   "name": "Solicitud Golive Check",
+   "wbs": "1.3.2.7",
+   "id": 43,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 74,
+     "predecessor_task_unique_id": 70,
+     "successor_task_unique_id": 81,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 81,
+   "outline_number": "1.3.2.7",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-12T13:00:00.0"
+  },
+  {
+   "start": "2013-06-28T15:00:00.0",
+   "name": "Documentacion y entrega del sistema",
+   "wbs": "1.3.2.8",
+   "critical": true,
+   "id": 44,
+   "duration": 144000,
+   "outline_level": 4,
+   "unique_id": 147,
+   "outline_number": "1.3.2.8",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-05T13:00:00.0"
+  },
+  {
+   "start": "2013-07-05T15:00:00.0",
+   "name": "Entonacion del Ambiente de ERP Prodducion  MSSQL",
+   "wbs": "1.3.2.9",
+   "critical": true,
+   "id": 45,
+   "duration": 28800,
+   "predecessors": [
+    {
+     "unique_id": 199,
+     "predecessor_task_unique_id": 147,
+     "successor_task_unique_id": 158,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 4,
+   "unique_id": 158,
+   "outline_number": "1.3.2.9",
+   "parent_task_unique_id": 65,
+   "finish": "2013-07-08T13:00:00.0"
+  },
+  {
+   "start": "2013-07-08T15:00:00.0",
+   "name": "4. Preparacion Final",
+   "wbs": "1.4",
+   "critical": true,
+   "id": 46,
+   "duration": 57600,
+   "predecessors": [
+    {
+     "unique_id": 265,
+     "predecessor_task_unique_id": 158,
+     "successor_task_unique_id": 96,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 2,
+   "unique_id": 96,
+   "summary": true,
+   "outline_number": "1.4",
+   "parent_task_unique_id": 1,
+   "finish": "2013-07-10T13:00:00.0"
+  },
+  {
+   "start": "2013-07-08T15:00:00.0",
+   "name": "Ajustes del Golive check en el ambiente ERP",
+   "wbs": "1.4.1",
+   "critical": true,
+   "id": 47,
+   "duration": 57600,
+   "outline_level": 3,
+   "unique_id": 85,
+   "outline_number": "1.4.1",
+   "parent_task_unique_id": 96,
+   "finish": "2013-07-10T13:00:00.0"
+  },
+  {
+   "start": "2013-07-10T15:00:00.0",
+   "name": "5. Golive and Support",
+   "wbs": "1.5",
+   "critical": true,
+   "id": 48,
+   "duration": 144000,
+   "outline_level": 2,
+   "unique_id": 99,
+   "summary": true,
+   "outline_number": "1.5",
+   "parent_task_unique_id": 1,
+   "finish": "2013-07-17T13:00:00.0"
+  },
+  {
+   "start": "2013-07-10T15:00:00.0",
+   "name": "Soporte Basis",
+   "wbs": "1.5.1",
+   "critical": true,
+   "id": 49,
+   "duration": 144000,
+   "predecessors": [
+    {
+     "unique_id": 261,
+     "predecessor_task_unique_id": 85,
+     "successor_task_unique_id": 100,
+     "type": "FS"
+    }
+   ],
+   "outline_level": 3,
+   "unique_id": 100,
+   "outline_number": "1.5.1",
+   "parent_task_unique_id": 99,
+   "finish": "2013-07-17T13:00:00.0"
+  }
+ ],
+ "resources": [
+  {
+   "type": "WORK"
+  },
+  {
+   "id": 1,
+   "name": "DEOCSA",
+   "unique_id": 1,
+   "type": "WORK"
+  },
+  {
+   "id": 2,
+   "name": "LAT",
+   "unique_id": 2,
+   "type": "WORK"
+  },
+  {
+   "id": 3,
+   "name": "LAT/DEOCSA",
+   "unique_id": 3,
+   "type": "WORK"
+  },
+  {
+   "id": 4,
+   "name": "LATSM",
+   "unique_id": 4,
+   "type": "WORK"
+  },
+  {
+   "id": 5,
+   "name": "CASSA  & LAT",
+   "unique_id": 5,
+   "type": "WORK"
+  },
+  {
+   "id": 6,
+   "name": "CASSA",
+   "unique_id": 6,
+   "type": "WORK"
+  },
+  {
+   "id": 7,
+   "name": "LAT & CASA",
+   "unique_id": 7,
+   "type": "WORK"
+  },
+  {
+   "id": 8,
+   "name": "CASA",
+   "unique_id": 8,
+   "type": "WORK"
+  },
+  {
+   "id": 9,
+   "name": "LAT/SYBASE",
+   "unique_id": 9,
+   "type": "WORK"
+  },
+  {
+   "id": 10,
+   "name": "LAT / SYBASE",
+   "unique_id": 10,
+   "type": "WORK"
+  },
+  {
+   "id": 11,
+   "name": "LAT/MIAMI",
+   "unique_id": 11,
+   "type": "WORK"
+  },
+  {
+   "id": 12,
+   "name": "Basis1",
+   "unique_id": 12,
+   "type": "WORK"
+  },
+  {
+   "id": 13,
+   "name": "BasisSM",
+   "unique_id": 13,
+   "type": "WORK"
+  },
+  {
+   "id": 14,
+   "name": "Basis2",
+   "unique_id": 14,
+   "type": "WORK"
+  },
+  {
+   "id": 15,
+   "name": "Bais1",
+   "unique_id": 15,
+   "type": "WORK"
+  },
+  {
+   "id": 16,
+   "name": "CPVEN  & TANDEM",
+   "unique_id": 16,
+   "type": "WORK"
+  },
+  {
+   "id": 17,
+   "name": "TANDEM",
+   "unique_id": 17,
+   "type": "WORK"
+  },
+  {
+   "id": 18,
+   "name": "CPVEN",
+   "unique_id": 18,
+   "type": "WORK"
+  }
+ ],
+ "assignments": [
+  {
+   "work": 14400,
+   "task_unique_id": 3
+  },
+  {
+   "work": 14400,
+   "task_unique_id": 4
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 5
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 10
+  },
+  {
+   "work": 86400,
+   "task_unique_id": 11
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 13
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 14
+  },
+  {
+   "work": 14400,
+   "task_unique_id": 15
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 16
+  },
+  {
+   "work": 14400,
+   "task_unique_id": 19
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 20
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 21
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 22
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 23
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 24
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 25
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 26
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 27
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 28
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 47
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 48
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 49
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 50
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 51
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 53
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 66
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 67
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 68
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 69
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 70
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 81
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 85
+  },
+  {
+   "work": 144000,
+   "task_unique_id": 100
+  },
+  {
+   "work": 144000,
+   "task_unique_id": 147
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 148
+  },
+  {
+   "work": 28800,
+   "task_unique_id": 158
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 159
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 161
+  },
+  {
+   "work": 57600,
+   "task_unique_id": 163
+  }
+ ]
+}

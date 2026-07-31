@@ -228,7 +228,12 @@
       "permission_error": "Permiso denegado",
       "not_authenticated": "No autenticado",
       "job_not_retryable": "Solo se pueden reintentar trabajos fallidos",
-      "validation_error": "Solicitud inválida"
+      "validation_error": "Solicitud inválida",
+      "mpp_too_large": "Este archivo de Microsoft Project está vacío o supera los 25 MB.",
+      "mpp_unreadable": "No se pudo leer este archivo de Microsoft Project. Puede estar dañado o protegido con contraseña.",
+      "mpp_converter_unavailable": "El conversor de Microsoft Project no está disponible en este momento. Tu archivo está bien; vuelve a intentarlo en un momento.",
+      "mpp_conversion_failed": "La conversión de este archivo de Microsoft Project falló de forma inesperada.",
+      "mpp_requires_conversion": "Los archivos de Microsoft Project se convierten antes de analizarse; este se saltó ese paso."
     },
     "actionsMenu": {
       "view": "Ver",
@@ -748,8 +753,13 @@
         "task_not_found": "Tarea no encontrada.",
         "invalid_task_id": "Tarea no válida.",
         "entry_not_found": "Registro de tiempo no encontrado.",
-        "unexpected": "Algo salió mal."
-      }
+        "unexpected": "Algo salió mal.",
+        "people_unavailable": "No se pudo cargar la lista de personas. Vuelve a intentarlo."
+      },
+      "forUserLoading": "Cargando personas…",
+      "forUserEmpty": "Todavía no hay más personas asignadas a este proyecto.",
+      "forUserSearch": "Buscar personas…",
+      "forUserNoMatch": "Nadie coincide con esa búsqueda."
     }
   },
   "dashboard": {

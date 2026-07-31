@@ -311,7 +311,7 @@ export function ImportClient({
             <input
               type="file"
               className="hidden"
-              accept=".xlsx,.xlsm,.csv,.json,.docx,.pdf,.txt,.md"
+              accept=".xlsx,.xlsm,.csv,.json,.docx,.pdf,.txt,.md,.mpp"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               disabled={busy}
             />

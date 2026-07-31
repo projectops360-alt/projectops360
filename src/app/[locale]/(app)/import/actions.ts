@@ -15,6 +15,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { parseImportFile, detectFileType, ImportParseError } from "@/lib/import-intelligence/parse";
+import { mpxjToParsedFile } from "@/lib/import-intelligence/mpp-model";
+import { convertMppToMpxjJson, MppConversionError } from "@/lib/import-intelligence/mpp-convert.server";
 import { extractCanonicalImport, buildFieldMappings } from "@/lib/import-intelligence/extract";
 import { aiExtractCanonicalImport } from "@/lib/import-intelligence/ai-extract";
 import { validateCanonicalImport } from "@/lib/import-intelligence/validate";
@@ -162,8 +164,19 @@ export async function analyzeImportJobAction(input: {
     }
     const buffer = new Uint8Array(await blob.arrayBuffer());
 
-    // Parse → heuristic extraction
-    const parsedFile = await parseImportFile(job.source_file_name, buffer);
+    // Parse → heuristic extraction.
+    //
+    // .mpp takes a detour: it is an OLE2 binary that only MPXJ (Java) reads and
+    // there is no JVM here, so a Vercel Sandbox converts it to MPXJ JSON first.
+    // From `ParsedFile` onwards it is the same pipeline as every other source —
+    // no .mpp-specific extraction exists, on purpose.
+    const parsedFile =
+      detectFileType(job.source_file_name) === "mpp"
+        ? mpxjToParsedFile(
+            (await convertMppToMpxjJson(job.source_file_name, buffer)).project,
+            job.source_file_name,
+          )
+        : await parseImportFile(job.source_file_name, buffer);
     let canonical = extractCanonicalImport(parsedFile, job.source_file_name);
 
     // AI fallback for unstructured content (no tables → nothing extracted)
@@ -339,7 +352,17 @@ export async function analyzeImportJobAction(input: {
     await audit(org.organizationId, job.id, "analysis_completed", `Extracted ${counts.tasks} tasks, ${counts.milestones} milestones`, org.userId, counts);
     return { status: newStatus };
   } catch (e) {
-    const raw = e instanceof ImportParseError ? e.code : e instanceof Error ? e.message : "unexpected";
+    // A conversion failure carries its own code so the UI can tell "this file
+    // cannot be read" (the user can act) from "the converter is unavailable"
+    // (an operator problem the user must not be blamed for).
+    const raw =
+      e instanceof MppConversionError
+        ? e.code
+        : e instanceof ImportParseError
+          ? e.code
+          : e instanceof Error
+            ? e.message
+            : "unexpected";
     const code = raw.startsWith("storage_error") ? "storage_error" : raw;
     await supabase
       .from("project_import_jobs")

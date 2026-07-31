@@ -22,7 +22,12 @@ export type ImportJobStatus =
   | "failed"
   | "cancelled";
 
-export type ImportFileType = "xlsx" | "csv" | "json" | "docx" | "pdf" | "txt" | "md";
+/**
+ * `mpp` is decoded outside the application process: it is an undocumented OLE2
+ * binary that only MPXJ (Java) reads, so a Vercel Sandbox converts it to JSON
+ * first. From `ParsedFile` onwards it behaves like every other source.
+ */
+export type ImportFileType = "xlsx" | "csv" | "json" | "docx" | "pdf" | "txt" | "md" | "mpp";
 
 export interface ProjectImportJob {
   id: string;

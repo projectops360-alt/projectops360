@@ -21,6 +21,11 @@ const EXTENSION_MAP: Record<string, ImportFileType> = {
   txt: "txt",
   md: "md",
   markdown: "md",
+  // Microsoft Project. Accepted here so the UPLOAD is allowed; the file is then
+  // converted in a sandbox before parsing (parseImportFile refuses it on
+  // purpose). Leaving this out is what made the wizard answer "unsupported file
+  // type" while every other part of the .mpp path was already in place.
+  mpp: "mpp",
 };
 
 /** Detect file type from the file name only — client metadata is not trusted. */
@@ -167,7 +172,9 @@ export class ImportParseError extends Error {
       | "empty_file"
       | "invalid_json"
       | "corrupted_file"
-      | "no_extractable_content",
+      | "no_extractable_content"
+      /** .mpp must be converted in a Sandbox before it reaches the parser. */
+      | "mpp_requires_conversion",
     message?: string,
   ) {
     super(message ?? code);
@@ -185,6 +192,14 @@ export async function parseImportFile(
   if (buffer.byteLength > MAX_FILE_BYTES) throw new ImportParseError("file_too_large");
 
   switch (fileType) {
+    // .mpp never reaches this function. It is an OLE2 binary that only MPXJ
+    // (Java) can decode, and there is no JVM in a Vercel Function, so the
+    // upload route converts it in a Sandbox first and then parses the resulting
+    // MPXJ JSON through `mpxjToParsedFile`. Failing loudly here beats a silent
+    // "unsupported file" that would look like the extension was never added.
+    case "mpp":
+      throw new ImportParseError("mpp_requires_conversion");
+
     case "csv": {
       const text = new TextDecoder("utf-8").decode(buffer);
       const rows = parseCsvText(text);
