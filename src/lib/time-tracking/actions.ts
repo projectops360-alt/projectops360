@@ -41,8 +41,10 @@ import {
   type DeleteTimeEntryInput,
   type ListTimeEntriesInput,
 } from "./schemas";
+import { buildTimeLogPeople, membersWithoutLogin, type TimeLogPerson } from "./people";
 import {
   listSubtaskTimeEntries,
+  listProjectTimeLogPeople,
   listTaskTimeEntries,
   getSubtaskActualHours,
   getTaskActualHours,
@@ -711,6 +713,82 @@ export async function canLogTimeAction(
     });
   } catch {
     return false;
+  }
+}
+
+export interface TimeLogPeopleResult {
+  error?: string;
+  people?: TimeLogPerson[];
+  /** False → the caller may only record their own effort. */
+  canLogForOthers?: boolean;
+  /** Project members with no login, which the model cannot attribute time to. */
+  withoutLogin?: string[];
+}
+
+/**
+ * Who the caller may attribute effort to on this task's project.
+ *
+ * Replaces the old source, which was `profiles WHERE organization_id = org` —
+ * a profile's HOME org, not its memberships. Seven of the eight people on the
+ * Agro project have a different home org, so that query returned one row and
+ * the picker offered the owner alone (REG-043, same root as REG-038).
+ *
+ * A contributor gets exactly themselves: the list must not become a roster of
+ * colleagues for someone who cannot log on their behalf anyway.
+ */
+export async function listTimeLogPeopleAction(
+  projectId: string,
+  taskId: string,
+): Promise<TimeLogPeopleResult> {
+  let org: OrgContext;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "forbidden" };
+  }
+  const supabase = createAdminClient();
+
+  // Resolving the work item first is the authorization boundary: a task id from
+  // another project or organization does not resolve, so this cannot be used to
+  // enumerate people outside what the caller can already see.
+  const ctx = await loadWorkItem(supabase, org, projectId, taskId, null);
+  if (!ctx) return { error: "task_not_found" };
+
+  const self: TimeLogPerson = {
+    id: org.userId,
+    name: org.displayName ?? "",
+    email: null,
+    isSelf: true,
+    projectRole: null,
+  };
+
+  const canLogForOthers = !authorize(org, "log", {
+    subtaskOwnerId: ctx.ownerId,
+    taskAssignedTo: ctx.taskAssignedTo,
+    targetUserId: "00000000-0000-0000-0000-000000000000",
+  });
+  if (!canLogForOthers) {
+    return { people: [{ ...self, name: self.name || org.userId.slice(0, 8) }], canLogForOthers: false };
+  }
+
+  try {
+    const { members, nameById, emailById } = await listProjectTimeLogPeople(supabase, org, projectId);
+    return {
+      people: buildTimeLogPeople({
+        members,
+        nameById,
+        emailById,
+        selfId: org.userId,
+        selfName: org.displayName ?? "",
+        selfEmail: emailById.get(org.userId) ?? null,
+      }),
+      canLogForOthers: true,
+      withoutLogin: membersWithoutLogin(members),
+    };
+  } catch {
+    // Surfaced to the UI as a real failure. Quietly returning just the caller
+    // would reproduce the very bug this replaces, as if they were alone.
+    return { error: "people_unavailable" };
   }
 }
 

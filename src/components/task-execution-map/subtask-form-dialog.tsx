@@ -118,7 +118,6 @@ export function SubtaskFormDialog({ projectId, taskId, subtask, owners, onClose 
             taskId={taskId}
             subtaskId={subtask.id}
             estimatedHours={estimatedHours === "" ? null : Number(estimatedHours)}
-            people={owners}
             onTotalChange={setActualHours}
           />
         )}

@@ -10,6 +10,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { OrgContext } from "@/lib/auth";
 import { sumHours, sumHoursBy, roundHours, computeEffort, computeTaskEffort } from "./effort";
+import type { RawProjectMember } from "./people";
 import type { EffortSummary, TimeEntry } from "./types";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -250,6 +251,49 @@ export async function getTaskEffortSummary(
     },
     thresholds,
   );
+}
+
+/**
+ * Who effort may be attributed to on one project.
+ *
+ * Membership comes from `project_team_members`, NOT from
+ * `profiles.organization_id`. That column is a profile's HOME org: in a real
+ * project seven of eight members had a different home org, so filtering by it
+ * returned a single row and the picker looked empty (same trap as REG-038).
+ * Names are therefore resolved BY ID, never re-filtered by organization.
+ */
+export async function listProjectTimeLogPeople(
+  supabase: Admin,
+  org: OrgContext,
+  projectId: string,
+): Promise<{ members: RawProjectMember[]; nameById: Map<string, string>; emailById: Map<string, string> }> {
+  const { data } = await supabase
+    .from("project_team_members")
+    .select("user_id, display_name, project_role, status")
+    .eq("project_id", projectId)
+    .eq("organization_id", org.organizationId)
+    .neq("status", "removed");
+
+  const members = (data ?? []) as RawProjectMember[];
+  const ids = [...new Set(members.map((m) => m.user_id).filter((id): id is string => !!id))];
+  if (!ids.includes(org.userId)) ids.push(org.userId);
+
+  const nameById = await resolveUserNames(supabase, ids);
+
+  // Emails are best-effort context, never identity: a failure here must not
+  // empty the picker, so it degrades to names alone.
+  const emailById = new Map<string, string>();
+  try {
+    const { data: list } = await supabase.auth.admin.listUsers();
+    const wanted = new Set(ids);
+    for (const u of list?.users ?? []) {
+      if (wanted.has(u.id) && u.email) emailById.set(u.id, u.email);
+    }
+  } catch {
+    /* names alone are enough to pick a person */
+  }
+
+  return { members, nameById, emailById };
 }
 
 /** Display names for the people behind a set of entries. */

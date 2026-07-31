@@ -12,11 +12,16 @@
 // table — a second "task time" dialog would be a parallel system.
 // ============================================================================
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
-import { X, Clock } from "lucide-react";
+import { X, Clock, Loader2 } from "lucide-react";
 import { logTimeEntryAction, updateTimeEntryAction } from "@/lib/time-tracking/actions";
 import { resolveCrewEntry } from "@/lib/time-tracking/effort";
+import {
+  filterPeople,
+  PEOPLE_SEARCH_THRESHOLD,
+  type TimeLogPerson,
+} from "@/lib/time-tracking/people";
 import type { TimeEntryView } from "@/lib/time-tracking/types";
 
 export interface TimeEntryDialogProps {
@@ -27,10 +32,12 @@ export interface TimeEntryDialogProps {
   /** Null = new entry. */
   entry: TimeEntryView | null;
   /**
-   * People the effort may be attributed to. Only offered when the viewer is
-   * allowed to log in someone else's name — a contributor records their own.
+   * People the effort may be attributed to, already de-duplicated and sorted
+   * with the caller first. Only offered when the viewer is allowed to log in
+   * someone else's name — a contributor records their own.
    */
-  people?: { id: string; name: string }[];
+  people?: TimeLogPerson[];
+  peopleStatus?: "loading" | "ready" | "error";
   canLogForOthers?: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -49,6 +56,7 @@ export function TimeEntryDialog({
   subtaskId,
   entry,
   people,
+  peopleStatus = "ready",
   canLogForOthers,
   onClose,
   onSaved,
@@ -70,9 +78,28 @@ export function TimeEntryDialog({
   const [crewSize, setCrewSize] = useState(String(entry?.crew_size ?? 1));
   const [comment, setComment] = useState(entry?.comment ?? "");
   // Whose effort this is. Empty = the caller's own; the server defaults to the
-  // session user, so an unset picker can never mis-attribute.
+  // session user, so an unset picker can never mis-attribute. On an existing
+  // entry it is the person already recorded.
   const [userId, setUserId] = useState(entry?.user_id ?? "");
-  const showPeoplePicker = !!canLogForOthers && !!people && people.length > 0;
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const showPeoplePicker = !!canLogForOthers;
+  const visiblePeople = filterPeople(people ?? [], peopleQuery);
+  const needsSearch = (people?.length ?? 0) > PEOPLE_SEARCH_THRESHOLD;
+
+  // Preselect the caller by their real id once the list arrives. Leaving the
+  // value empty would need a placeholder option, and that placeholder was the
+  // duplicate "Myself" this fix removes.
+  useEffect(() => {
+    if (userId || peopleStatus !== "ready") return;
+    const self = people?.find((p) => p.isSelf);
+    if (self) setUserId(self.id);
+  }, [people, peopleStatus, userId]);
+
+  /** "Efrain Prada (Myself)" — one entry per human, never a separate "Myself". */
+  const personLabel = (person: TimeLogPerson): string => {
+    const base = person.isSelf ? `${person.name} (${t("forUserSelf")})` : person.name;
+    return person.email ? `${base} · ${person.email}` : base;
+  };
 
   // Live preview: as soon as both ends of the interval are known, the user sees
   // the hours that will actually be stored — including the crew multiplication,
@@ -177,19 +204,59 @@ export function TimeEntryDialog({
             <label htmlFor="tem-te-user" className="text-xs font-medium text-foreground">
               {t("forUser")}
             </label>
-            <select
-              id="tem-te-user"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
-            >
-              <option value="">{t("forUserSelf")}</option>
-              {people!.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
+
+            {peopleStatus === "loading" && (
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {t("forUserLoading")}
+              </p>
+            )}
+
+            {/* A failed lookup says so. Silently showing only the current user is
+                what made the original bug look like correct behaviour. */}
+            {peopleStatus === "error" && (
+              <p role="alert" className="mt-1 rounded border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-600">
+                {t("errors.people_unavailable")}
+              </p>
+            )}
+
+            {peopleStatus === "ready" && (people?.length ?? 0) === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">{t("forUserEmpty")}</p>
+            )}
+
+            {peopleStatus === "ready" && (people?.length ?? 0) > 0 && (
+              <>
+                {needsSearch && (
+                  <input
+                    type="search"
+                    value={peopleQuery}
+                    onChange={(e) => setPeopleQuery(e.target.value)}
+                    placeholder={t("forUserSearch")}
+                    aria-label={t("forUserSearch")}
+                    className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
+                  />
+                )}
+                <select
+                  id="tem-te-user"
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  className="mt-1 w-full rounded border border-border bg-background p-1.5 text-sm"
+                >
+                  {/* No separate "Myself" option: the caller is already the
+                      first row, labelled. Two entries for one human was the
+                      reported bug, not a convenience. */}
+                  {visiblePeople.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {personLabel(person)}
+                    </option>
+                  ))}
+                </select>
+                {needsSearch && visiblePeople.length === 0 && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t("forUserNoMatch")}</p>
+                )}
+              </>
+            )}
+
             <p className="mt-1 text-[11px] text-muted-foreground">{t("forUserHint")}</p>
           </div>
         )}
