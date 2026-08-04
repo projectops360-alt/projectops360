@@ -6,6 +6,7 @@
 > **Rama obligatoria:** `agent/template-db-audit-instructions`  
 > **Rama base:** `master`  
 > **Fecha de emisión:** 2026-08-03  
+> **Validación contra workbook real:** 2026-08-04  
 > **Prohibido:** implementar, migrar, modificar datos, crear PR, hacer merge o desplegar
 
 ## 1. Orden de ejecución
@@ -65,13 +66,14 @@ Trata estas decisiones como restricciones, no como hipótesis:
 
 Localiza y registra la ruta exacta, tamaño, fecha y hash de cada artefacto encontrado:
 
-1. `ProjectOps360_Plantilla_Proyecto_SAP_v1.xlsx`
+1. `ProjectOps360_Plantilla_Proyecto_SAP_v1.xlsx` o una copia equivalente cuyo nombre incluya un sufijo automático, por ejemplo `ProjectOps360_Plantilla_Proyecto_SAP_v1(1).xlsx`
 2. `Plan_Integracion_Proyecto_SAP_ProjectOps360.docx`
 3. La plantilla o las plantillas actuales de creación/importación de proyectos de ProjectOps360.
 4. Cualquier especificación, JSON, CSV, XLSX, mapper, seed o fixture vigente relacionado con plantillas de proyecto.
 
 La plantilla SAP debe revisarse completa. Como mínimo, valida estas hojas:
 
+- `INICIO`
 - `DATOS_PROYECTO`
 - `PLAN_PROYECTO`
 - `EQUIPO_RACI`
@@ -83,6 +85,29 @@ La plantilla SAP debe revisarse completa. Como mínimo, valida estas hojas:
 - `DASHBOARD`
 
 Estas hojas son el mínimo conocido, no una autorización para ignorar otras hojas, columnas ocultas, fórmulas, validaciones, tablas, nombres definidos o relaciones que existan en el archivo real.
+
+No declares el workbook como ausente únicamente porque el sistema operativo haya agregado `(1)`, `(2)`, `- copia` u otro sufijo al nombre. Confirma su identidad mediante estructura, nombres de hojas y hash. Registra el nombre físico exacto encontrado y úsalo como `source_file` en la evidencia.
+
+Clasifica cada hoja antes de mapearla:
+
+- `INICIO` es una hoja **instructiva y de control de uso**. Debe revisarse para conocer reglas de importación, pero sus textos, pasos y leyenda no son campos de datos ni deben proponerse como columnas de base de datos.
+- `DATOS_PROYECTO`, `PLAN_PROYECTO`, `HITOS_GATES`, `PLAN_PRUEBAS`, `EQUIPO_RACI`, `RIESGOS` y `CAMBIOS` contienen entradas o registros de negocio.
+- `PRESUPUESTO` y `DASHBOARD` contienen principalmente cálculos, agregaciones y presentación. No dupliques en base de datos un valor que deba calcularse desde fuentes canónicas.
+
+### 4.1 Huella estructural observada del workbook validado
+
+Usa esta huella para identificar la versión examinada y luego reproduce las validaciones; no aceptes los conteos como sustituto de volver a comprobar el archivo:
+
+- 10 hojas: `INICIO`, `DATOS_PROYECTO`, `PLAN_PROYECTO`, `HITOS_GATES`, `PLAN_PRUEBAS`, `EQUIPO_RACI`, `RIESGOS`, `CAMBIOS`, `PRESUPUESTO` y `DASHBOARD`.
+- `PLAN_PROYECTO`: 291 registros y 38 columnas de negocio.
+- 291 IDs de tarea presentes y únicos; una raíz conocida (`SAP-W1-001`).
+- 163 referencias de predecesora observadas.
+- `PLAN_PRUEBAS`: 241 pruebas con referencia a tarea.
+- `HITOS_GATES`: 77 registros con referencia a tarea.
+- 1,027 fórmulas observadas en total: 873 en `PLAN_PROYECTO`, 20 en `RIESGOS`, 72 en `PRESUPUESTO` y 62 en `DASHBOARD`.
+- Un gráfico observado en `DASHBOARD`.
+
+Si cualquier conteo difiere, no fuerces el resultado para hacerlo coincidir. Registra el hash, identifica la versión y explica la diferencia.
 
 Debes preservar literalmente en el inventario:
 
@@ -97,7 +122,7 @@ Debes preservar literalmente en el inventario:
 - valores permitidos y catálogos;
 - dependencias entre hojas.
 
-Si alguno de los dos artefactos principales no está disponible, no inventes su contenido. Puedes avanzar con el inventario del repositorio y la base de datos, pero debes marcar la auditoría de columnas como `BLOCKED_SOURCE_MISSING` y no declarar cobertura completa.
+Si alguno de los dos artefactos principales no está disponible después de buscar variantes de nombre razonables, no inventes su contenido. Puedes avanzar con el inventario del repositorio y la base de datos, pero debes marcar la auditoría de columnas como `BLOCKED_SOURCE_MISSING` y no declarar cobertura completa.
 
 ## 5. Guardrails operativos
 
@@ -186,7 +211,7 @@ No aceptes la existencia de una tabla como prueba de capacidad completa. Verific
 
 ### 8.1 Modelo SAP Activate
 
-Contrasta explícitamente estas fases:
+Contrasta explícitamente las seis fases canónicas de SAP Activate:
 
 - Discover
 - Prepare
@@ -194,6 +219,34 @@ Contrasta explícitamente estas fases:
 - Realize
 - Deploy
 - Run
+
+El workbook validado usa una descomposición operativa en español que no coincide uno-a-uno con esas seis etiquetas. Aplica inicialmente este crosswalk y valida si es correcto según la semántica real:
+
+| Etiqueta observada en `PLAN_PROYECTO` | Conteo observado | Correspondencia SAP Activate a validar |
+|---|---:|---|
+| `Programa` | 1 | Contenedor superior; no es fase Activate |
+| `Ola 1` | 1 | Contenedor de ola; no es fase Activate |
+| `Preparación` | 56 | Prepare |
+| `Exploración` | 96 | Explore |
+| `Realización` | 80 | Realize |
+| `Despliegue` | 30 | Deploy |
+| `Salida en Vivo - GoLive` | 1 | Hito o subfase de Deploy |
+| `Soporte a la Operación` | 25 | Run / estabilización |
+| `Cierre Ola 1` | 1 | Cierre de ola; validar si pertenece a Run o al gobierno del programa |
+
+`Discover` no aparece como fase explícita en esta versión. Determina con evidencia si:
+
+1. ocurre antes de la creación formal del proyecto;
+2. está representada por datos de intake, oportunidad, business case o portfolio en otra parte de ProjectOps360;
+3. debe incorporarse como configuración opcional de la plantilla;
+4. o es una omisión real.
+
+No marques automáticamente como conflicto una traducción, un hito GoLive o una subdivisión de Run. Tampoco renombres fases. Primero separa:
+
+- fase canónica;
+- etiqueta visible de la plantilla;
+- tipo de nodo (`Proyecto`, `Ola`, `Fase`, `Hito`, `Quality Gate`, etc.);
+- configuración necesaria para mapearlas.
 
 Para cada fase identifica workstreams, actividades, entregables, hitos, gates, criterios de entrada/salida, responsables, dependencias, evidencias y estados.
 
@@ -224,6 +277,20 @@ Para cada salto identifica:
 - contexto recuperable por Isabella;
 - huecos y riesgos de integridad.
 
+El workbook ofrece cobertura parcial de esta cadena, pero no debes confundir una celda de texto con un objeto canónico relacionado:
+
+- `PLAN_PROYECTO` aporta trabajo, jerarquía, dependencias, criterios y evidencia requerida.
+- `PLAN_PRUEBAS` enlaza pruebas con `ID de tarea` y dispone de `Defecto / Ticket`, pero esa referencia puede ser solo texto.
+- `HITOS_GATES` contiene decisión, aprobación y evidencia asociadas a hitos, entregables y gates.
+- `CAMBIOS` contiene decisión y aprobación de solicitudes de cambio.
+- No se observaron en el workbook hojas u objetos explícitos e independientes para `Proceso`, `Requerimiento/Gap` o `Resultado`.
+
+La ausencia de una hoja en Excel no demuestra que la capacidad falte en ProjectOps360. Busca primero objetos canónicos, relaciones y eventos existentes. Registra por separado:
+
+1. `SOURCE_TEMPLATE_GAP`: la plantilla no captura el concepto.
+2. `PLATFORM_GAP`: la plataforma tampoco lo soporta con evidencia suficiente.
+3. `MAPPING_GAP`: ambos lados existen, pero no hay transformación o relación de importación.
+
 ### 8.3 Jerarquía del plan
 
 Valida de forma especial:
@@ -241,9 +308,40 @@ Valida de forma especial:
 
 No recomiendes regenerar IDs si eso rompe trazabilidad o reimportación.
 
+Reproduce y documenta como controles de integridad:
+
+- IDs vacíos o duplicados;
+- padres inexistentes, autorreferencias y ciclos;
+- predecesoras inexistentes;
+- pruebas y gates que apunten a tareas inexistentes;
+- registros ejecutables sin validación esperada;
+- diferencias entre nodos resumen y actividades ejecutables.
+
+La versión observada tenía 291 IDs únicos, cero padres inexistentes, cero ciclos, cero predecesoras inválidas, 241 referencias válidas desde pruebas y 77 referencias válidas desde hitos/gates. Si no reproduces esos resultados, registra la diferencia de versión o el defecto.
+
+### 8.4 Equipo, asignación y RACI real
+
+No concluyas que existe una matriz RACI solo porque la hoja se llama `EQUIPO_RACI`.
+
+En la versión observada, esa hoja funciona principalmente como catálogo de 19 roles/personas e incluye organización, correo, disponibilidad, fechas y confirmación. `PLAN_PROYECTO` contiene `Responsable` y `Rol responsable`, pero el workbook no presenta una matriz explícita R/A/C/I por actividad.
+
+Audita por separado:
+
+1. roster de personas y roles;
+2. membresía y disponibilidad/capacidad;
+3. asignación de responsable a la tarea;
+4. accountability y aprobación;
+5. consultas y participación (`Consulted` / `Informed`);
+6. RACI por tarea, entregable, gate o decisión;
+7. capacidad actual de ProjectOps360 para importar y mantener esas relaciones.
+
+Si solo existen `Responsable` y `Rol responsable`, no declares cobertura RACI completa. Determina si la solución correcta es reutilizar relaciones existentes, añadir configuración/import mapping o reconocer un gap genérico de responsabilidad múltiple.
+
 ## 9. Fase 3 — Matriz campo por campo
 
-Crea una fila por cada columna no vacía de cada hoja del workbook. No agrupes varios campos bajo una descripción genérica.
+Primero clasifica cada hoja como `INSTRUCTIONAL_CONTROL`, `SOURCE_INPUT`, `TRANSACTION_REGISTER`, `CALCULATED_SUMMARY` o `PRESENTATION`.
+
+Crea una fila por cada campo de negocio no vacío de las hojas que capturan datos. No agrupes varios campos bajo una descripción genérica. Para una hoja instructiva como `INICIO`, crea una sola fila de control de hoja y **no conviertas sus pasos, colores o mensajes en supuestos campos importables**. Para `PRESUPUESTO` y `DASHBOARD`, crea una fila por indicador o fórmula material, no por cada celda vacía o espacio de diseño.
 
 La matriz debe incluir como mínimo:
 
@@ -251,6 +349,8 @@ La matriz debe incluir como mínimo:
 |---|---|
 | `source_file` | Archivo fuente |
 | `sheet` | Hoja exacta |
+| `sheet_role` | Clasificación funcional de la hoja |
+| `source_range` | Celda, columna o rango exacto |
 | `excel_column` | Encabezado literal |
 | `business_meaning` | Significado funcional |
 | `required_or_optional` | Obligatoriedad real |
@@ -286,6 +386,7 @@ Usa únicamente estos estados de mapeo:
 - `CONFLICT`: plantilla, código, Product Brain o base de datos discrepan.
 - `UNKNOWN_NO_EVIDENCE`: no existe evidencia suficiente.
 - `BLOCKED_SOURCE_MISSING`: falta el artefacto necesario para auditarlo.
+- `NOT_IMPORTABLE_CONTROL`: instrucción, leyenda o presentación que no debe persistirse como dato de negocio.
 
 Una coincidencia de nombre no es suficiente para declarar `EXISTS_DIRECT`; compara significado, granularidad, lifecycle, seguridad y consumidores.
 
@@ -305,6 +406,49 @@ Una coincidencia de nombre no es suficiente para declarar `EXISTS_DIRECT`; compa
 - Distingue dato fuente, dato calculado y dato presentado.
 - Detecta KPIs que duplican EVM u otras métricas canónicas.
 - Toda recomendación de readiness debe explicar pesos, umbrales y evidencia.
+
+La versión observada incluye:
+
+- presupuesto por actividad;
+- costo comprometido;
+- costo real (`AC` si la semántica coincide);
+- `ETC`;
+- `EAC`;
+- `VAC`;
+- porcentaje consumido;
+- horas estimadas, reales, restantes y variación.
+
+No se observaron campos explícitos para `PV`, `EV`, `CPI` o `SPI`; `BAC` podría corresponder a `Presupuesto aprobado`, pero debe validarse semánticamente. No declares EVM completo solo por la presencia de `EAC` y `VAC`.
+
+Traza y valida de manera especial:
+
+- `PLAN_PROYECTO!AA`: variación de horas respecto a estimado, real y restante;
+- `PLAN_PROYECTO!AF`: cálculo de `EAC` desde costo real y `ETC`;
+- `PLAN_PROYECTO!AG`: cálculo de `VAC` desde presupuesto y `EAC`;
+- `PRESUPUESTO`: agregaciones globales y por fase;
+- el tratamiento de reservas de contingencia frente a `BAC`;
+- la fuente necesaria para plan value y earned value antes de recomendar `CPI` o `SPI`.
+
+### 10.2.1 Semántica y rollups del dashboard
+
+No valides un dashboard únicamente porque sus fórmulas calculen sin error. Comprueba que el universo contado represente el indicador anunciado.
+
+En la versión observada:
+
+- `Actividades incluidas` cuenta todas las filas con `Incluir = Sí`, incluidas filas de tipo `Proyecto`, `Ola`, `Fase`, grupos, entregables, gates, hitos y tareas.
+- `Avance promedio` puede promediar nodos resumen y actividades ejecutables sin ponderación.
+- los agregados por fase pueden mezclar padres e hijos y producir doble conteo de horas, presupuesto, costo o avance si ambos almacenan valores.
+
+Audita y reporta por separado:
+
+1. todos los nodos del plan;
+2. actividades ejecutables;
+3. nodos resumen;
+4. entregables, hitos y quality gates;
+5. rollups calculados frente a valores persistidos;
+6. promedio simple frente a avance ponderado por duración, esfuerzo, costo o peso aprobado.
+
+Si el KPI no define claramente su población y ponderación, marca `CONFLICT` o `UNKNOWN_NO_EVIDENCE`; no elijas una interpretación silenciosamente.
 
 ### 10.3 Living Graph y Process Intelligence
 
@@ -344,6 +488,8 @@ Y dentro de ella:
    - veredicto ejecutivo;
    - porcentajes y conteos por estado de mapeo;
    - principales P0/P1;
+   - integridad estructural reproducida del workbook;
+   - veredicto específico sobre fases, RACI, EVM, trazabilidad y rollups;
    - nivel de confianza y limitaciones.
 2. `02_TEMPLATE_DATABASE_MATRIX.csv`
    - una fila por campo;
@@ -355,6 +501,7 @@ Y dentro de ella:
    - jerarquía y dependencias del plan.
 4. `04_GAP_REGISTER.md`
    - gap, evidencia, impacto, severidad, recomendación y dependencia;
+   - separar `SOURCE_TEMPLATE_GAP`, `PLATFORM_GAP` y `MAPPING_GAP`;
    - separar configuración, transformación y desarrollo genérico.
 5. `05_EVIDENCE_LOG.md`
    - archivos y líneas revisadas;
@@ -396,14 +543,22 @@ La auditoría solo puede declararse completa cuando:
 - [ ] Se revisó `CLAUDE.md` y el Product Brain pertinente.
 - [ ] Se identificaron y versionaron los dos artefactos SAP principales, o se declaró formalmente el bloqueo.
 - [ ] Se inventariaron todas las hojas reales del workbook.
-- [ ] Se mapeó el 100 % de las columnas no vacías, incluidas las ocultas.
+- [ ] Se aceptaron variantes de nombre del workbook después de verificar su identidad por estructura y hash.
+- [ ] `INICIO` se clasificó como hoja instructiva y no se modelaron sus textos como campos de base de datos.
+- [ ] Se mapeó el 100 % de los campos de negocio no vacíos, incluidas columnas ocultas; indicadores y fórmulas materiales quedaron trazados por rango.
 - [ ] Se preservaron y validaron IDs de tarea e IDs padre.
+- [ ] Se reprodujeron controles de duplicados, padres, ciclos, predecesoras y referencias desde pruebas y gates.
 - [ ] Se auditaron claves, relaciones, tipos, constraints, índices, RLS y RBAC.
 - [ ] Se compararon migraciones, tipos generados, código consumidor y esquema aplicado disponible.
 - [ ] Se distinguió claramente entre capacidad existente, configuración, transformación y desarrollo genérico.
-- [ ] Se validaron las seis fases SAP Activate.
+- [ ] Se validaron las seis fases SAP Activate mediante un crosswalk explícito con las etiquetas operativas del workbook.
+- [ ] Se determinó con evidencia el tratamiento de `Discover`, GoLive, Soporte a la Operación y Cierre de Ola.
+- [ ] Se distinguió el roster de `EQUIPO_RACI` de una matriz R/A/C/I real por actividad.
 - [ ] Se auditó la cadena Proceso → Requerimiento/Gap → Decisión → Trabajo → Prueba → Defecto → Aprobación → Resultado.
+- [ ] Se separaron gaps de plantilla, plataforma y mapping en la cadena de trazabilidad.
 - [ ] Se trazaron KPIs, dashboard y readiness hasta sus datos y fórmulas fuente.
+- [ ] Se determinó si existe EVM completo; no se asumió soporte de PV, EV, CPI, SPI o BAC por analogía de nombres.
+- [ ] Se verificó que conteos y rollups del dashboard separen nodos resumen de actividades ejecutables y eviten doble conteo.
 - [ ] Se evaluó la cobertura de Living Graph, Process Intelligence e Isabella con evidencia.
 - [ ] No se propuso una base, módulo o lógica SAP aislada.
 - [ ] No se modificó código, schema, datos, RLS, migraciones ni comportamiento.
