@@ -1512,3 +1512,66 @@ outline number and an activity id, the **id that predecessors cite** is the
 tarea` mis-binding, row-kind routing, and an end-to-end synthetic workbook.
 The real 291-row plan is asserted as a fixture-gated smoke test (row-level
 coverage), skipped when the file is absent.
+
+## REG-046 — An import wrote 201 of 274 tasks and reported success
+
+**Date:** 2026-08-04 · **Status:** closed · **Guard:** `IMPORT-WRITE-INTEGRITY`
+
+Immediately after REG-045 made the SAP Activate plan readable, importing it
+produced **201 tasks out of the 274 the review step had listed and the user had
+approved**. The summary said 274. No error was shown, no warning, nothing in the
+validation panel. The loss only became visible because the milestone counts on
+three different screens did not add up.
+
+**Root cause — two independent defects, either of which is enough to lose data.**
+
+*1. Zero-duration rows were rejected.* `roadmap_tasks` constrains the column:
+
+```sql
+CHECK ((duration_days IS NULL) OR (duration_days > 0))
+```
+
+A plan legitimately carries zero-duration rows — milestones, deliverables and
+quality gates are points in time, not spans — and the importer passed the
+literal `0` straight through. The correlation was total: **all 73 missing rows
+had `duration_days = 0`; all 201 written rows did not.**
+
+*2. The rejection was swallowed.* Every write in the executor read only `data`:
+
+```ts
+const { data: row } = await supabase.from("roadmap_tasks").insert({...});
+if (row) { …track it, count it… }        // no row → silently skipped
+```
+
+`error` was never inspected. A refused row did not throw, did not warn and did
+not decrement the count — it simply ceased to exist. The same pattern was in
+**all eight** inserts (milestones, resources, budget, tasks, dependencies,
+materials, risks), so any constraint on any of those tables could silently drop
+records. The zero-duration constraint is what happened to fire first.
+
+**How it was solved.** `normalizeDurationDays` maps an explicit `0` (and any
+non-finite or negative value) to `NULL`. The model cannot express "zero days",
+and writing `1` would invent a span the plan never stated, so the row is stored
+with **no duration** — its start and end dates are still imported and the
+schedule still draws it. All eight inserts now capture `error`, and every
+refusal is recorded as an `ImportWriteFailure` and written to
+`project_import_validation_results` with severity **error**, grouped by entity
+type and naming the rows that did not make it.
+
+**Why the canonical import still holds `0`.** The extraction stays faithful to
+the source — a `0` in the sheet is a `0` in the review screen — and the *writer*
+translates it into the column's domain. Sanitizing during extraction would have
+made the review step misreport what the file actually says.
+
+**Protection rule (binding):** a write whose result is not inspected is a silent
+data-loss bug. Every insert in an import path checks `error`, and any row the
+database refuses is reported to the user — an import may import less than was
+approved, but it may never *claim* it imported more than it did. A count shown
+to the user is the count of rows the database accepted, never the count of rows
+attempted.
+
+**Verify:** `src/lib/import-intelligence/__tests__/import-write-integrity.test.ts`
+(`IMPORT-WRITE-INTEGRITY`) — zero maps to NULL and specifically not to 1, real
+durations are untouched, the canonical keeps the source `0`, and the real
+291-row plan (fixture-gated) has >50 zero-duration rows of which none is
+unwritable.
