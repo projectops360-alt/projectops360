@@ -12,12 +12,15 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
-// Importing a large plan writes thousands of rows. The real time limit is
-// declared on the route (`import/page.tsx` exports maxDuration) because a
-// "use server" module may only export async functions; server actions inherit
-// the budget of the route they are invoked from. This mirrors it so the
-// projection phase can stop before the platform kills it mid-write (REG-048).
-const IMPORT_MAX_DURATION_SECONDS = 800;
+// Mirrors `maxDuration` on import/page.tsx — the real limit is declared there
+// because a "use server" module may only export async functions, and server
+// actions inherit the budget of the route they are invoked from. 300s is the
+// platform ceiling on this plan, so it cannot be raised; the projection phase
+// must fit inside it or stop cleanly (REG-048).
+const IMPORT_MAX_DURATION_SECONDS = 300;
+
+/** Margin left for marking the job complete after the projections stop. */
+const PROJECTION_RESERVE_SECONDS = 60;
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -542,7 +545,8 @@ export async function executeImportAction(input: {
 
   // Leave headroom inside maxDuration so the derived projections stop on their
   // own terms instead of being killed mid-write by the platform.
-  const projectionDeadline = Date.now() + (IMPORT_MAX_DURATION_SECONDS - 120) * 1000;
+  const projectionDeadline =
+    Date.now() + (IMPORT_MAX_DURATION_SECONDS - PROJECTION_RESERVE_SECONDS) * 1000;
 
   try {
     const result = await executeImport({
