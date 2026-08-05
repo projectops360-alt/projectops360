@@ -87,11 +87,56 @@ function pickDelimiter(text: string): string {
   return semis > commas ? ";" : ",";
 }
 
+/** How many leading rows may be title banners before the real header row. */
+const HEADER_SCAN_DEPTH = 25;
+
+function filledCount(row: string[]): number {
+  return row.filter((c) => c.trim() !== "").length;
+}
+
+/**
+ * Planning templates rarely start with the header row: they open with a title
+ * banner, a subtitle, and sometimes a merged "group band" (e.g. `Scope |
+ * Planning | Execution` spanning the columns above the real headers). Taking
+ * row 0 blindly turned every such sheet into a table with one junk header and
+ * zero recognizable columns — the whole workbook then extracted nothing.
+ *
+ * Pick the row that actually looks like a header: near-maximum width, short
+ * unique non-numeric labels, and followed by data of comparable width. Ties
+ * break toward the earliest row, so files whose row 0 IS the header are
+ * unaffected.
+ */
+export function detectHeaderRowIndex(rows: string[][]): number {
+  const depth = Math.min(rows.length, HEADER_SCAN_DEPTH);
+  const widest = Math.max(...rows.slice(0, depth).map(filledCount));
+  if (widest <= 1) return 0;
+
+  let bestIndex = 0;
+  let bestScore = -Infinity;
+  for (let i = 0; i < depth; i++) {
+    const cells = rows[i].filter((c) => c.trim() !== "");
+    // A title banner is one wide cell; a header spans the sheet.
+    if (cells.length < 2 || cells.length < widest * 0.9) continue;
+    const unique = new Set(cells.map((c) => c.trim().toLowerCase())).size;
+    const numeric = cells.filter((c) => /^[-+$€£\s]*\d[\d.,%\s]*$/.test(c.trim())).length;
+    const verbose = cells.filter((c) => c.trim().length > 60).length;
+    let score = cells.length + unique - numeric * 3 - verbose * 3 - i * 0.5;
+    // Headers are followed by data, not by the end of the sheet.
+    if (rows[i + 1] && filledCount(rows[i + 1]) >= cells.length * 0.5) score += 3;
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
 function rowsToTable(name: string, rows: string[][]): ParsedTable | null {
   if (rows.length === 0) return null;
-  const headers = rows[0].map((h) => h.trim());
+  const headerIndex = detectHeaderRowIndex(rows);
+  const headers = rows[headerIndex].map((h) => h.trim());
   if (headers.every((h) => h === "")) return null;
-  return { name, headers, rows: rows.slice(1).map((r) => r.map((c) => c.trim())) };
+  return { name, headers, rows: rows.slice(headerIndex + 1).map((r) => r.map((c) => c.trim())) };
 }
 
 // ── Markdown tables / headings ──────────────────────────────────────────────
