@@ -551,6 +551,7 @@ export default async function ProjectDetailPage({
           trigger: t("detail.deletePermanently"),
           step1Title: t("detail.deleteStep1Title", { name: title }),
           step1Body: t("detail.deleteStep1Body"),
+          loading: t("detail.deleteLoadingImpact"),
           // Raw templates, not functions: a Server Component may only hand a
           // Client Component serializable props, and the counts are not known
           // until the dialog fetches them. The client substitutes {count}.

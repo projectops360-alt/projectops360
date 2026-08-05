@@ -1041,7 +1041,8 @@
       "deleteStep2Confirm": "Yes, delete for good",
       "deleteCancel": "Cancel",
       "deleting": "Deleting…",
-      "deleteFailed": "The project could not be deleted. Nothing was removed."
+      "deleteFailed": "The project could not be deleted. Nothing was removed.",
+      "deleteLoadingImpact": "Checking what would be deleted…"
     },
     "aiCommSummary": {
       "button": "Summarize Communications",
