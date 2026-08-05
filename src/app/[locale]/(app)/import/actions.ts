@@ -11,6 +11,12 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// Importing a large plan writes thousands of rows. The default budget is not
+// enough for a 274-task workbook, and overrunning it kills the process before
+// any catch can run — which is exactly how a job ended up stranded in
+// 'importing' with no error and no way back (REG-048).
+export const maxDuration = 800;
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -21,6 +27,7 @@ import { extractCanonicalImport, buildFieldMappings } from "@/lib/import-intelli
 import { aiExtractCanonicalImport } from "@/lib/import-intelligence/ai-extract";
 import { validateCanonicalImport } from "@/lib/import-intelligence/validate";
 import { executeImport, rollbackImport } from "@/lib/import-intelligence/execute";
+import { canRollbackJob } from "@/lib/import-intelligence/job-recovery";
 import type {
   ImportEntityType,
   ProjectImportJob,
@@ -532,6 +539,10 @@ export async function executeImportAction(input: {
   await supabase.from("project_import_jobs").update({ status: "importing" }).eq("id", job.id);
   await audit(org.organizationId, job.id, "import_started", "Import execution started", org.userId);
 
+  // Leave headroom inside maxDuration so the derived projections stop on their
+  // own terms instead of being killed mid-write by the platform.
+  const projectionDeadline = Date.now() + (maxDuration - 120) * 1000;
+
   try {
     const result = await executeImport({
       organizationId: org.organizationId,
@@ -543,6 +554,7 @@ export async function executeImportAction(input: {
       selectedProjectType: input.selectedProjectType || job.selected_project_type || job.detected_project_type || "general",
       entities: (entities ?? []) as Parameters<typeof executeImport>[0]["entities"],
       locale: (org.locale as "en" | "es") ?? "en",
+      projectionDeadline,
     });
 
     await supabase
@@ -551,7 +563,15 @@ export async function executeImportAction(input: {
         status: "imported",
         project_id: result.projectId,
         completed_at: new Date().toISOString(),
-        summary_json: { ...job.summary_json, created: result.created, skipped_duplicates: result.skippedDuplicates, critical_path_calculated: result.criticalPathCalculated },
+        summary_json: {
+          ...job.summary_json,
+          created: result.created,
+          skipped_duplicates: result.skippedDuplicates,
+          critical_path_calculated: result.criticalPathCalculated,
+          // Say so when the graph is partial rather than let the summary imply
+          // a complete projection.
+          projections_complete: result.projectionsComplete,
+        },
       })
       .eq("id", job.id);
     await audit(org.organizationId, job.id, "import_completed", "Import completed", org.userId, result.created);
@@ -589,7 +609,7 @@ export async function rollbackImportAction(input: { jobId: string }): Promise<{ 
   }
   const job = await loadJob(org.organizationId, input.jobId);
   if (!job) return { error: "job_not_found" };
-  if (job.status !== "imported" && job.status !== "failed") return { error: "invalid_status" };
+  if (!canRollbackJob(job.status, job.updated_at ?? job.created_at)) return { error: "invalid_status" };
 
   const removed = await rollbackImport(org.organizationId, job.id);
   const supabase = createAdminClient();
