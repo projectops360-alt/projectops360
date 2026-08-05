@@ -30,14 +30,19 @@ interface ProjectHeaderClientProps {
   archiveConfirm: string;
   /** Only owners/admins may destroy a project; the server enforces it too. */
   canDeletePermanently: boolean;
+  /**
+   * Plain strings only — these cross the server/client boundary, where React
+   * cannot serialize a function. The count templates carry a literal `{count}`
+   * that this component substitutes once the impact is known.
+   */
   deleteLabels: {
     trigger: string;
     step1Title: string;
     step1Body: string;
-    tasks: (count: number) => string;
-    milestones: (count: number) => string;
-    dependencies: (count: number) => string;
-    events: (count: number) => string;
+    tasks: string;
+    milestones: string;
+    dependencies: string;
+    events: string;
     step1Confirm: string;
     step2Title: string;
     step2Body: string;
@@ -46,6 +51,11 @@ interface ProjectHeaderClientProps {
     deleting: string;
     failed: string;
   };
+}
+
+/** Fill a `{count}` template. The message itself is authored in messages/*.json. */
+function withCount(template: string, count: number): string {
+  return template.replace("{count}", String(count));
 }
 
 export function ProjectHeaderClient({
@@ -147,10 +157,10 @@ export function ProjectHeaderClient({
           labels={{
             step1Title: deleteLabels.step1Title,
             step1Body: deleteLabels.step1Body,
-            tasks: deleteLabels.tasks(deleteImpact.tasks),
-            milestones: deleteLabels.milestones(deleteImpact.milestones),
-            dependencies: deleteLabels.dependencies(deleteImpact.dependencies),
-            events: deleteLabels.events(deleteImpact.events),
+            tasks: withCount(deleteLabels.tasks, deleteImpact.tasks),
+            milestones: withCount(deleteLabels.milestones, deleteImpact.milestones),
+            dependencies: withCount(deleteLabels.dependencies, deleteImpact.dependencies),
+            events: withCount(deleteLabels.events, deleteImpact.events),
             step1Confirm: deleteLabels.step1Confirm,
             step2Title: deleteLabels.step2Title,
             step2Body: deleteLabels.step2Body,

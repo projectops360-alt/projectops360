@@ -1687,3 +1687,52 @@ itself.
 under a live run, an abandoned one is recoverable, states that were never dead
 ends stay untouched, and a missing/unparseable timestamp refuses rather than
 guesses.
+
+## REG-049 — Every project page threw: a Server Component handed a Client Component functions
+
+**Date:** 2026-08-05 · **Status:** closed · **Guard:** `RSC-SERIALIZABLE-PROPS`
+
+Opening **any** project failed in production:
+
+```
+Error: Functions cannot be passed directly to Client Components unless you
+explicitly expose it by marking it with "use server".
+{trigger: …, tasks: function tasks, milestones: …, events: …}
+routes=/[locale]/projects/[projectId]   count=64   users=2
+```
+
+**Root cause.** PD-020 added a delete dialog whose count labels need a number
+that is only known once the dialog fetches the deletion impact. The page — a
+**Server Component** — passed them as functions:
+
+```ts
+tasks: (count: number) => t("detail.deleteStep1Tasks", { count }),
+```
+
+React cannot serialize a function across the server/client boundary, so
+rendering the header threw before anything else could happen. The feature was
+harmless in isolation; it broke the page that hosts it.
+
+**Why nothing caught it.** A function *is* assignable to a
+`(count: number) => string` prop, so **typecheck passed**. The **build passed**
+— the boundary is a runtime concern. **3672 tests passed**, because none of
+them render a Server Component. Every gate the repo relies on was green while
+production was down.
+
+**How it was solved.** The templates cross the boundary as **plain strings**
+via `t.raw("detail.deleteStep1Tasks")` — which yields the literal
+`"{count} tasks"` — and the client substitutes the number with `withCount()`
+once the impact is known. This is the pattern already used elsewhere in the
+codebase (`execution-map/page.tsx`).
+
+**Protection rule (binding):** a client component rendered **by a Server
+Component** declares only serializable props. `onX` callbacks are the sole
+exception, and only because they are wired up by another client component —
+never by a server one. When a label needs a runtime value, the **template**
+crosses the boundary (`t.raw`), not a function that would produce it.
+
+**Verify:** `src/app/[locale]/(app)/projects/[projectId]/__tests__/server-client-props.test.ts`
+(`RSC-SERIALIZABLE-PROPS`) — parses the props interfaces of client components
+that Server Components render and fails on any function-typed prop. The
+detector is itself checked against the exact broken shape, so a later refactor
+cannot quietly turn it into a no-op.
