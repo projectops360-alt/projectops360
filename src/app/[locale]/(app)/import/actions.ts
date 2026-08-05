@@ -32,6 +32,11 @@ import { aiExtractCanonicalImport } from "@/lib/import-intelligence/ai-extract";
 import { validateCanonicalImport } from "@/lib/import-intelligence/validate";
 import { executeImport, rollbackImport } from "@/lib/import-intelligence/execute";
 import { canRollbackJob } from "@/lib/import-intelligence/job-recovery";
+import {
+  shouldWriteProgress,
+  type ImportPhase,
+  type ImportProgress,
+} from "@/lib/import-intelligence/progress";
 import type {
   ImportEntityType,
   ProjectImportJob,
@@ -548,6 +553,40 @@ export async function executeImportAction(input: {
   const projectionDeadline =
     Date.now() + (IMPORT_MAX_DURATION_SECONDS - PROJECTION_RESERVE_SECONDS) * 1000;
 
+  // Progress is written onto the job and polled by the client. Throttled,
+  // because one write per row would add exactly the cost that makes a large
+  // import slow in the first place.
+  let lastProgressWrite = 0;
+  let lastPhaseDone = 0;
+  let currentPhase: ImportPhase | null = null;
+  const completedPhases: { phase: ImportPhase; count: number }[] = [];
+
+  const writeProgress = async (phase: ImportPhase, done: number, total: number) => {
+    const now = Date.now();
+    // A phase change is always worth reporting, whatever the interval.
+    const phaseChanged = phase !== currentPhase;
+    if (phaseChanged && currentPhase) {
+      completedPhases.push({ phase: currentPhase, count: lastPhaseDone });
+    }
+    if (phaseChanged) currentPhase = phase;
+    lastPhaseDone = done;
+
+    if (!phaseChanged && !shouldWriteProgress(done, total, lastProgressWrite, now)) return;
+    lastProgressWrite = now;
+
+    const progress: ImportProgress = {
+      phase,
+      done,
+      total,
+      completed: [...completedPhases],
+      updatedAt: new Date(now).toISOString(),
+    };
+    await supabase
+      .from("project_import_jobs")
+      .update({ summary_json: { ...job.summary_json, progress } })
+      .eq("id", job.id);
+  };
+
   try {
     const result = await executeImport({
       organizationId: org.organizationId,
@@ -560,6 +599,7 @@ export async function executeImportAction(input: {
       entities: (entities ?? []) as Parameters<typeof executeImport>[0]["entities"],
       locale: (org.locale as "en" | "es") ?? "en",
       projectionDeadline,
+      onProgress: writeProgress,
     });
 
     await supabase
@@ -601,6 +641,31 @@ export async function executeImportAction(input: {
     await audit(org.organizationId, job.id, "failed", message, org.userId);
     return { error: "import_failed" };
   }
+}
+
+// ── 5b. Progress (polled while an import runs) ───────────────────────────────
+
+/** Current progress of a running import. Cheap by design: the client polls it. */
+export async function getImportProgressAction(
+  input: { jobId: string },
+): Promise<{ error?: string; status?: string; progress?: ImportProgress | null }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("project_import_jobs")
+    .select("status, summary_json")
+    .eq("id", input.jobId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+
+  if (!data) return { error: "job_not_found" };
+  const summary = (data.summary_json ?? {}) as { progress?: ImportProgress };
+  return { status: data.status as string, progress: summary.progress ?? null };
 }
 
 // ── 6. Rollback ──────────────────────────────────────────────────────────────

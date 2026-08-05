@@ -7,7 +7,7 @@
 // Done. Nothing is imported without preview and explicit approval.
 // ============================================================================
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import {
   getImportJobAction,
   toggleImportEntityAction,
   executeImportAction,
+  getImportProgressAction,
   listProjectsForImportAction,
 } from "./actions";
 import { loadGovernanceUnitsAction } from "@/app/[locale]/(app)/projects/actions";
@@ -70,6 +71,23 @@ const LABELS = {
     statusLabels: { valid: "Valid", needs_review: "Needs review", invalid: "Invalid", duplicate: "Duplicate", missing_required_data: "Missing data" } as Record<string, string>,
     approve: "Approve & import",
     importing: "Importing…",
+    progressTitle: "Importing your plan…",
+    progressStarting: "Starting…",
+    progressStalled: "This import has stopped responding. Nothing is lost — you can roll it back and try again.",
+    progressPhases: {
+      project: "Project",
+      charter: "Charter",
+      milestones: "Milestones",
+      resources: "Resources",
+      budget_items: "Budget lines",
+      tasks: "Tasks",
+      dependencies: "Dependencies",
+      materials: "Materials",
+      risks: "Risks",
+      graph: "Living Graph",
+      critical_path: "Critical path",
+    },
+
     cancel: "Start over",
     doneTitle: "Import completed",
     openProject: "Open project",
@@ -128,6 +146,23 @@ const LABELS = {
     statusLabels: { valid: "Válido", needs_review: "Por revisar", invalid: "Inválido", duplicate: "Duplicado", missing_required_data: "Faltan datos" } as Record<string, string>,
     approve: "Aprobar e importar",
     importing: "Importando…",
+    progressTitle: "Importando tu plan…",
+    progressStarting: "Iniciando…",
+    progressStalled: "Esta importación dejó de responder. No se pierde nada: puedes deshacerla y reintentar.",
+    progressPhases: {
+      project: "Proyecto",
+      charter: "Acta de constitución",
+      milestones: "Hitos",
+      resources: "Recursos",
+      budget_items: "Partidas de presupuesto",
+      tasks: "Tareas",
+      dependencies: "Dependencias",
+      materials: "Materiales",
+      risks: "Riesgos",
+      graph: "Living Graph",
+      critical_path: "Ruta crítica",
+    },
+
     cancel: "Empezar de nuevo",
     doneTitle: "Importación completada",
     openProject: "Abrir proyecto",
@@ -169,6 +204,13 @@ const TYPE_LABELS: Record<string, { en: string; es: string }> = {
   industrial: { en: "Industrial", es: "Industrial" },
 };
 
+import { ImportProgressPanel } from "@/components/import/import-progress-panel";
+import {
+  isProgressStalled,
+  type ImportPhase,
+  type ImportProgress,
+} from "@/lib/import-intelligence/progress";
+
 type Step = "upload" | "analyzing" | "review" | "importing" | "done";
 
 const ENTITY_TABS: ImportEntityType[] = ["task", "milestone", "dependency", "resource", "material", "budget_item", "risk"];
@@ -194,6 +236,7 @@ export function ImportClient({
   const [projects, setProjects] = useState<{ id: string; title: string }[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
   const [job, setJob] = useState<ProjectImportJob | null>(null);
   const [entities, setEntities] = useState<ProjectImportEntity[]>([]);
   const [validations, setValidations] = useState<ProjectImportValidationResult[]>([]);
@@ -302,6 +345,22 @@ export function ImportClient({
     await toggleImportEntityAction({ entityId: entity.id, willImport: next });
   }
 
+  // Poll progress while the import runs. The state lives on the job row, so a
+  // page reload picks it back up instead of losing sight of the import.
+  useEffect(() => {
+    if (step !== "importing" || !job) return;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      const res = await getImportProgressAction({ jobId: job.id });
+      if (cancelled) return;
+      if (res.progress) setProgress(res.progress);
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [step, job]);
+
   // ── Execute ───────────────────────────────────────────────────────────────
   async function handleImport() {
     if (!job) return;
@@ -310,6 +369,7 @@ export function ImportClient({
       return;
     }
     setError(null);
+    setProgress(null);
     setStep("importing");
     const res = await executeImportAction({
       jobId: job.id,
@@ -452,6 +512,19 @@ export function ImportClient({
       )}
 
       {/* ── Step: Review ── */}
+      {step === "importing" && (
+        <ImportProgressPanel
+          progress={progress}
+          stalled={isProgressStalled(progress)}
+          labels={{
+            title: t.progressTitle,
+            starting: t.progressStarting,
+            stalled: t.progressStalled,
+            phases: t.progressPhases as Record<ImportPhase, string>,
+          }}
+        />
+      )}
+
       {(step === "review" || step === "importing") && job && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-border bg-card p-4">
