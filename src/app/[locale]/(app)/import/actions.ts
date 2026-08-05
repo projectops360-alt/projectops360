@@ -12,11 +12,12 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
-// Importing a large plan writes thousands of rows. The default budget is not
-// enough for a 274-task workbook, and overrunning it kills the process before
-// any catch can run — which is exactly how a job ended up stranded in
-// 'importing' with no error and no way back (REG-048).
-export const maxDuration = 800;
+// Importing a large plan writes thousands of rows. The real time limit is
+// declared on the route (`import/page.tsx` exports maxDuration) because a
+// "use server" module may only export async functions; server actions inherit
+// the budget of the route they are invoked from. This mirrors it so the
+// projection phase can stop before the platform kills it mid-write (REG-048).
+const IMPORT_MAX_DURATION_SECONDS = 800;
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -541,7 +542,7 @@ export async function executeImportAction(input: {
 
   // Leave headroom inside maxDuration so the derived projections stop on their
   // own terms instead of being killed mid-write by the platform.
-  const projectionDeadline = Date.now() + (maxDuration - 120) * 1000;
+  const projectionDeadline = Date.now() + (IMPORT_MAX_DURATION_SECONDS - 120) * 1000;
 
   try {
     const result = await executeImport({
