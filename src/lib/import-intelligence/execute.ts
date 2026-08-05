@@ -12,7 +12,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { emitProcessNode, emitProcessEdge } from "@/lib/graph/emit-event";
+import { emitProcessNode, emitProcessNodes, emitProcessEdges } from "@/lib/graph/emit-event";
+import { buildImportGraphNodes, buildImportGraphEdges } from "./graph-projection";
 import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
 import {
   buildMilestoneCreatedEvents,
@@ -686,6 +687,9 @@ export async function executeImport(params: {
     return true;
   };
 
+  // Everything is described first, then written in two bulk statements. Emitting
+  // one row at a time cost ~800 round trips for this plan, which is what made
+  // the phase unaffordable in the first place.
   const importNodeId = await emitProcessNode({
     organizationId,
     projectId,
@@ -696,61 +700,31 @@ export async function executeImport(params: {
     metadata: { created, skipped_duplicates: skippedDuplicates },
   });
 
-  // Milestone nodes + contains edges to their tasks; imported_from edges to the import node
-  const milestoneNodeByTitleKey = new Map<string, string>();
-  for (const [titleKey, msId] of milestoneIdBySourceName) {
-    if (outOfTime()) break;
-    const nodeId = await emitProcessNode({
-      organizationId, projectId,
-      nodeType: "milestone_gate", sourceEntityType: "milestones", sourceEntityId: msId,
-      title: titleKey,
-      metadata: {
-        origin: "import",
-        canonical_event_emitted: semanticallyCapturedIds.has(msId),
-      },
-    });
-    if (nodeId) {
-      milestoneNodeByTitleKey.set(titleKey, nodeId);
-      if (importNodeId) {
-        await emitProcessEdge({ organizationId, projectId, fromNodeId: importNodeId, toNodeId: nodeId, edgeType: "imported_from" });
-      }
-    }
-  }
-  for (const task of canonical.tasks) {
-    if (outOfTime()) break;
-    const taskDbId = taskIdBySourceId.get(task.source_id);
-    if (!taskDbId) continue;
-    const taskNodeId = await emitProcessNode({
-      organizationId, projectId,
-      nodeType: "task_transition", sourceEntityType: "roadmap_tasks", sourceEntityId: taskDbId,
-      title: task.name,
-      metadata: {
-        origin: "import",
-        new_status: task.status,
-        canonical_event_emitted: semanticallyCapturedIds.has(taskDbId),
-      },
-    });
-    if (!taskNodeId) continue;
-    if (importNodeId) {
-      await emitProcessEdge({ organizationId, projectId, fromNodeId: importNodeId, toNodeId: taskNodeId, edgeType: "imported_from" });
-    }
-    const msNode = milestoneNodeByTitleKey.get(normTitle(task.milestone || task.phase));
-    if (msNode) {
-      await emitProcessEdge({ organizationId, projectId, fromNodeId: msNode, toNodeId: taskNodeId, edgeType: "contains" });
-    }
-  }
-  for (const mat of canonical.materials) {
-    if (outOfTime()) break;
-    const matDbId = materialIdBySourceId.get(mat.source_id);
-    if (!matDbId) continue;
-    const matNodeId = await emitProcessNode({
-      organizationId, projectId,
-      nodeType: "material_event", sourceEntityType: "material_requirements", sourceEntityId: matDbId,
-      title: mat.name, metadata: { origin: "import" },
-    });
-    if (matNodeId && importNodeId) {
-      await emitProcessEdge({ organizationId, projectId, fromNodeId: importNodeId, toNodeId: matNodeId, edgeType: "imported_from" });
-    }
+  const nodeSpecs = buildImportGraphNodes({
+    organizationId,
+    projectId,
+    canonical,
+    milestoneIdBySourceName,
+    taskIdBySourceId,
+    materialIdBySourceId,
+    semanticallyCapturedIds,
+  });
+
+  const nodeIdByKey = outOfTime() ? new Map<string, string>() : await emitProcessNodes(nodeSpecs);
+
+  const edgeSpecs = buildImportGraphEdges({
+    organizationId,
+    projectId,
+    canonical,
+    importNodeId,
+    nodeIdByKey,
+    milestoneIdBySourceName,
+    taskIdBySourceId,
+    materialIdBySourceId,
+  });
+
+  if (!outOfTime() && edgeSpecs.length > 0) {
+    await emitProcessEdges(edgeSpecs);
   }
 
   // ── 10. Critical path ──────────────────────────────────────────────────────
