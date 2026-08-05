@@ -1027,7 +1027,21 @@
       "documents": "Documents",
       "viewDocuments": "View and manage documents",
       "roadmap": "Roadmap",
-      "viewRoadmap": "View and manage project milestones"
+      "viewRoadmap": "View and manage project milestones",
+      "deletePermanently": "Delete permanently",
+      "deleteStep1Title": "Delete “{name}” permanently?",
+      "deleteStep1Body": "This will destroy the project and everything in it:",
+      "deleteStep1Tasks": "{count} tasks",
+      "deleteStep1Milestones": "{count} milestones",
+      "deleteStep1Dependencies": "{count} dependencies",
+      "deleteStep1Events": "{count} process events",
+      "deleteStep1Confirm": "Yes, delete",
+      "deleteStep2Title": "Are you completely sure?",
+      "deleteStep2Body": "This action CANNOT be undone. The project and its data will be gone for good — only a record that it was deleted is kept.",
+      "deleteStep2Confirm": "Yes, delete for good",
+      "deleteCancel": "Cancel",
+      "deleting": "Deleting…",
+      "deleteFailed": "The project could not be deleted. Nothing was removed."
     },
     "aiCommSummary": {
       "button": "Summarize Communications",

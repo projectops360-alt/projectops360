@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { ProjectStatusBadge } from "@/components/projects/status-badge";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
-import { archiveProjectAction } from "@/app/[locale]/(app)/projects/actions";
+import {
+  archiveProjectAction,
+  deleteProjectPermanentlyAction,
+  getProjectDeletionImpactAction,
+  type ProjectDeletionImpact,
+} from "@/app/[locale]/(app)/projects/actions";
+import { DeleteProjectDialog } from "@/components/projects/delete-project-dialog";
 import type { ProjectStatus, ProjectType, Locale } from "@/types/database";
 
 interface ProjectHeaderClientProps {
@@ -22,6 +28,24 @@ interface ProjectHeaderClientProps {
   editLabel: string;
   archiveLabel: string;
   archiveConfirm: string;
+  /** Only owners/admins may destroy a project; the server enforces it too. */
+  canDeletePermanently: boolean;
+  deleteLabels: {
+    trigger: string;
+    step1Title: string;
+    step1Body: string;
+    tasks: (count: number) => string;
+    milestones: (count: number) => string;
+    dependencies: (count: number) => string;
+    events: (count: number) => string;
+    step1Confirm: string;
+    step2Title: string;
+    step2Body: string;
+    step2Confirm: string;
+    cancel: string;
+    deleting: string;
+    failed: string;
+  };
 }
 
 export function ProjectHeaderClient({
@@ -37,9 +61,27 @@ export function ProjectHeaderClient({
   editLabel,
   archiveLabel,
   archiveConfirm,
+  canDeletePermanently,
+  deleteLabels,
 }: ProjectHeaderClientProps) {
   const [showEdit, setShowEdit] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<ProjectDeletionImpact | null>(null);
   const router = useRouter();
+
+  // The impact is fetched before the first dialog so it can state real numbers.
+  const openDeleteDialog = async () => {
+    const result = await getProjectDeletionImpactAction(projectId);
+    if (result.impact) setDeleteImpact(result.impact);
+    else console.error("Failed to read deletion impact:", result.error);
+  };
+
+  const handlePermanentDelete = async (): Promise<string | undefined> => {
+    const result = await deleteProjectPermanentlyAction(projectId);
+    if (result.error) return result.error;
+    router.push(localizedHref(locale, `/projects`));
+    router.refresh();
+    return undefined;
+  };
 
   const handleArchive = async () => {
     if (!confirm(archiveConfirm)) return;
@@ -84,8 +126,41 @@ export function ProjectHeaderClient({
             <Trash2 className="h-4 w-4" />
             {archiveLabel}
           </button>
+          {canDeletePermanently && (
+            <button
+              type="button"
+              onClick={openDeleteDialog}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-600 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleteLabels.trigger}
+            </button>
+          )}
         </div>
       </div>
+
+      {deleteImpact && (
+        <DeleteProjectDialog
+          impact={deleteImpact}
+          onConfirm={handlePermanentDelete}
+          onClose={() => setDeleteImpact(null)}
+          labels={{
+            step1Title: deleteLabels.step1Title,
+            step1Body: deleteLabels.step1Body,
+            tasks: deleteLabels.tasks(deleteImpact.tasks),
+            milestones: deleteLabels.milestones(deleteImpact.milestones),
+            dependencies: deleteLabels.dependencies(deleteImpact.dependencies),
+            events: deleteLabels.events(deleteImpact.events),
+            step1Confirm: deleteLabels.step1Confirm,
+            step2Title: deleteLabels.step2Title,
+            step2Body: deleteLabels.step2Body,
+            step2Confirm: deleteLabels.step2Confirm,
+            cancel: deleteLabels.cancel,
+            deleting: deleteLabels.deleting,
+            failed: deleteLabels.failed,
+          }}
+        />
+      )}
 
       {showEdit && (
         <EditProjectDialog

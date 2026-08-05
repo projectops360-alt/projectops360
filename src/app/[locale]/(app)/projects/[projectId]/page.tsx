@@ -546,6 +546,23 @@ export default async function ProjectDetailPage({
         editLabel={t("detail.edit")}
         archiveLabel={t("detail.archive")}
         archiveConfirm={t("detail.archiveConfirm")}
+        canDeletePermanently={org.role === "owner" || org.role === "admin"}
+        deleteLabels={{
+          trigger: t("detail.deletePermanently"),
+          step1Title: t("detail.deleteStep1Title", { name: title }),
+          step1Body: t("detail.deleteStep1Body"),
+          tasks: (count: number) => t("detail.deleteStep1Tasks", { count }),
+          milestones: (count: number) => t("detail.deleteStep1Milestones", { count }),
+          dependencies: (count: number) => t("detail.deleteStep1Dependencies", { count }),
+          events: (count: number) => t("detail.deleteStep1Events", { count }),
+          step1Confirm: t("detail.deleteStep1Confirm"),
+          step2Title: t("detail.deleteStep2Title"),
+          step2Body: t("detail.deleteStep2Body"),
+          step2Confirm: t("detail.deleteStep2Confirm"),
+          cancel: t("detail.deleteCancel"),
+          deleting: t("detail.deleting"),
+          failed: t("detail.deleteFailed"),
+        }}
       />
 
       {/* Charter & Governance status strip */}

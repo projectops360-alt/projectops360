@@ -418,3 +418,113 @@ export async function archiveProjectAction(
 
   return {};
 }
+
+// ── Permanently delete a project ────────────────────────────────────────────
+// Archiving hides a project; this destroys it. Irreversible, so it is gated on
+// an owner/admin role and, in the UI, on two separate confirmations.
+
+export interface ProjectDeletionImpact {
+  title: string;
+  tasks: number;
+  milestones: number;
+  dependencies: number;
+  events: number;
+}
+
+/** What would be destroyed. Read-only: it makes the confirmation concrete
+ *  instead of asking the user to accept an abstraction. */
+export async function getProjectDeletionImpactAction(
+  projectId: string,
+): Promise<{ impact?: ProjectDeletionImpact; error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  if (org.role !== "owner" && org.role !== "admin") return { error: "forbidden" };
+
+  const supabase = createAdminClient();
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, title_i18n")
+    .eq("id", projectId)
+    .eq("organization_id", org.organizationId)
+    .maybeSingle();
+  if (!project) return { error: "not_found" };
+
+  const countOf = async (table: string) => {
+    const { count } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    return count ?? 0;
+  };
+  const [tasks, milestones, dependencies, events] = await Promise.all([
+    countOf("roadmap_tasks"),
+    countOf("milestones"),
+    countOf("task_dependencies"),
+    countOf("project_event_log"),
+  ]);
+
+  const titleI18n = (project.title_i18n ?? {}) as Record<string, string>;
+  return {
+    impact: {
+      title: titleI18n.en ?? titleI18n.es ?? Object.values(titleI18n)[0] ?? "",
+      tasks,
+      milestones,
+      dependencies,
+      events,
+    },
+  };
+}
+
+/**
+ * Destroy a project and everything cascading from it.
+ *
+ * The write is a single `delete_project_permanently` call: it records an act in
+ * `compliance_archive.project_purges` before anything is destroyed, and it is
+ * the only sanctioned way to remove append-only `project_event_log` rows
+ * (recorded exception to the CAP-045 immutability contract). Deleting table by
+ * table from here would leave a half-destroyed project the moment one
+ * statement failed.
+ */
+export async function deleteProjectPermanentlyAction(
+  projectId: string,
+): Promise<{ error?: string }> {
+  let org;
+  try {
+    org = await getOrgContext();
+  } catch {
+    return { error: "not_authenticated" };
+  }
+  // Irreversible and tenant-wide: members and viewers may never reach it.
+  if (org.role !== "owner" && org.role !== "admin") return { error: "forbidden" };
+
+  const supabase = createAdminClient();
+
+  // Audit BEFORE the fact: afterwards there is no project row to reference,
+  // and audit_logs.project_id is ON DELETE SET NULL.
+  await logAudit({
+    org,
+    projectId,
+    action: "delete",
+    entityType: "projects",
+    entityId: projectId,
+    metadata: { permanent: true },
+  });
+
+  const { error } = await supabase.rpc("delete_project_permanently", {
+    p_project_id: projectId,
+    p_organization_id: org.organizationId,
+    p_actor_id: org.userId,
+    p_actor_email: org.email,
+  });
+
+  if (error) {
+    console.error("Failed to permanently delete project:", error);
+    return { error: error.message.includes("project_not_found") ? "not_found" : "unexpected" };
+  }
+
+  return {};
+}

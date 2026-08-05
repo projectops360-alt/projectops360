@@ -509,3 +509,79 @@ Framework (CAP-039, baseline) · Project Memory (CAP-006, history). See
 - **PD-006:** verify any disconnected Risk/SOP nodes are explained-only, not edge/layout bugs.
 - A standalone **Workboard** module doc and a **Variance/Baseline** module doc could be created when
   those areas next get focused work (today they live in the sprint docs + this log).
+
+## PD-020 — Permanent project deletion, and the one sanctioned exception to event immutability
+
+**Date:** 2026-08-05 · **Status:** approved · **Guard:** `PROJECT-DELETE-DOUBLE-CONFIRM`
+· **Supersedes nothing; amends CAP-045 §immutability with a named exception.**
+
+### Context
+
+Archiving a project soft-deletes it. That is the right default, but until now it
+was the *only* option, and it left two real problems:
+
+1. A project could never actually be removed — test data, a mis-imported plan,
+   or data a customer asks us to erase stayed in the tenant forever.
+2. Because `projects_organization_id_slug_key` is `UNIQUE (organization_id,
+   slug)` **without** a `deleted_at` predicate, an archived project keeps its
+   slug reserved. That is what made REG-047 possible: the same plan could never
+   be re-imported under its own name.
+
+### The conflict
+
+Destroying a project necessarily destroys its rows in `project_event_log`,
+which **CAP-045 declares append-only** and a `BEFORE DELETE` trigger enforces.
+Two binding rules pointed in opposite directions:
+
+| | Says |
+|---|---|
+| Product requirement | A project must be deletable, completely |
+| CAP-045 §immutability | The event log is append-only; corrections are compensating events, never deletions |
+
+Per CLAUDE.md rule 4 this was surfaced rather than silently resolved, and the
+decision below was taken explicitly.
+
+### Decision
+
+**Permanent deletion is allowed, through exactly one audited door.** Rather than
+weaken append-only globally, `delete_project_permanently()`:
+
+1. **writes an act first** into `compliance_archive.project_purges` — who, what,
+   when, per-table row counts, and a SHA-256 that **seals the event hash chain**
+   (the log already chains `event_hash`/`previous_event_hash`, so hashing them
+   in `global_seq` order proves precisely which events ceased to exist, without
+   retaining a single payload);
+2. only then sets `app.purge_project` — transaction-local — to that project's
+   id, which is the **sole** condition under which the immutability trigger
+   permits a DELETE, and the guard is **per row**, so purging project A can
+   never touch an event of project B;
+3. deletes the project, letting the 121 `ON DELETE CASCADE` relationships do the
+   rest. `audit_logs` and four other tables are `ON DELETE SET NULL` and survive
+   by design — the audit outlives the project.
+
+The act table is itself append-only (`UPDATE`/`DELETE` rejected) and carries no
+RLS policy, so it is unreachable from the application surface. Erasure therefore
+becomes **possible, provable and attributable** instead of impossible.
+
+**Authorisation.** Owner/admin only, enforced server-side in
+`deleteProjectPermanentlyAction` — not merely hidden in the UI. The RPC is
+`REVOKE ... FROM PUBLIC` and granted to `service_role` alone (REG-036: a grant
+to PUBLIC on a `SECURITY DEFINER` function is a cross-tenant leak).
+
+**Two confirmations.** The first states the damage in real numbers (tasks,
+milestones, dependencies, events) read from the database rather than asking the
+user to accept an abstraction; the second states that it cannot be undone. The
+transition lives in `advanceDeletion()` as pure logic, so "one click can never
+destroy a project" is an executable guarantee rather than a property of some
+JSX.
+
+### What this does NOT change
+
+Append-only still holds for every other caller and every other operation. A
+correction is still a compensating event. Nothing in the product may delete an
+event except a purge that has already recorded its act.
+
+**Verify:** `src/lib/projects/__tests__/deletion-confirmation.test.ts`
+(`PROJECT-DELETE-DOUBLE-CONFIRM`) — the first confirmation never destroys, only
+the second does, cancelling returns to the first gate, and the impact list omits
+empty categories instead of padding the warning with zeros.
