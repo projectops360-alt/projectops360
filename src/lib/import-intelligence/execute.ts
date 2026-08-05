@@ -52,16 +52,40 @@ export interface ImportEntityRow {
   will_import: boolean;
 }
 
+/** A row the database refused. Never swallowed: an import that writes less
+ *  than it promised has to say so. */
+export interface ImportWriteFailure {
+  entity_type: string;
+  source_id: string;
+  title: string;
+  reason: string;
+}
+
 export interface ExecuteImportResult {
   projectId: string;
   created: Record<string, number>;
   skippedDuplicates: number;
   criticalPathCalculated: boolean;
   recommendations: { type: string; message_i18n: Record<string, string | undefined> }[];
+  /** Rows accepted for import that the database rejected. Empty on a clean run. */
+  writeFailures: ImportWriteFailure[];
 }
 
 function normTitle(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+}
+
+/**
+ * A plan legitimately carries zero-duration rows — milestones, deliverables
+ * and quality gates are points in time, not spans. `roadmap_tasks` constrains
+ * `duration_days` to NULL or > 0, so a literal 0 made Postgres reject the row.
+ * The model cannot express "zero days", and claiming one day would invent a
+ * span the plan never stated, so an explicit 0 becomes "no duration" — the
+ * dates are still imported and the schedule still draws it.
+ */
+export function normalizeDurationDays(v: number | null | undefined): number | null {
+  if (v == null || !Number.isFinite(v) || v <= 0) return null;
+  return v;
 }
 
 async function track(
@@ -122,6 +146,24 @@ export async function executeImport(params: {
   const created: Record<string, number> = {};
   let skippedDuplicates = 0;
   const bump = (k: string) => { created[k] = (created[k] ?? 0) + 1; };
+  // A rejected INSERT used to vanish: only `data` was read, so the row was
+  // dropped and the summary still reported it as imported. Every refusal is
+  // now recorded and surfaced to the review step.
+  const writeFailures: ImportWriteFailure[] = [];
+  const recordFailure = (
+    entityType: string,
+    sourceId: string,
+    title: string,
+    error: { message?: string } | null,
+  ) => {
+    writeFailures.push({
+      entity_type: entityType,
+      source_id: sourceId,
+      title,
+      reason: error?.message ?? "unknown database error",
+    });
+    console.error(`[import] ${entityType} "${title}" rejected:`, error?.message ?? error);
+  };
   const semanticallyCapturedIds = new Set<string>();
   const captureSource: ProcessMiningCaptureSource = {
     actorType: "human",
@@ -235,7 +277,7 @@ export async function executeImport(params: {
       skippedDuplicates++;
       continue;
     }
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("milestones")
       .insert({
         organization_id: organizationId,
@@ -249,6 +291,7 @@ export async function executeImport(params: {
       })
       .select("id, title, status")
       .single();
+    if (!row) recordFailure("milestone", ms.source_id, ms.name, rowError);
     if (row) {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
@@ -273,7 +316,7 @@ export async function executeImport(params: {
     if (!ref) continue;
     const tKey = normTitle(ref);
     if (milestoneIdBySourceName.has(tKey) || existingMilestonesByTitle.has(tKey)) continue;
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("milestones")
       .insert({
         organization_id: organizationId,
@@ -285,6 +328,7 @@ export async function executeImport(params: {
       })
       .select("id, title, status")
       .single();
+    if (!row) recordFailure("milestone", ref, ref, rowError);
     if (row) {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
@@ -318,7 +362,7 @@ export async function executeImport(params: {
       continue;
     }
     const validTypes = new Set(["person", "crew", "team", "role", "skill", "material", "equipment", "tool", "software_license", "cloud_service", "vendor", "supplier", "subcontractor", "facility", "budget_pool", "ai_agent"]);
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("resources")
       .insert({
         organization_id: organizationId,
@@ -334,6 +378,7 @@ export async function executeImport(params: {
       })
       .select("id")
       .single();
+    if (!row) recordFailure("resource", res.source_id, res.name, rowError);
     if (row) {
       resourceIdByName.set(nKey, row.id);
       await track(supabase, organizationId, jobId, "resources", row.id);
@@ -345,7 +390,7 @@ export async function executeImport(params: {
   const budgetIdBySourceId = new Map<string, string>();
   const validCategories = new Set(["labor", "material", "equipment", "subcontractor", "software", "cloud", "permit", "contingency", "other"]);
   for (const b of canonical.budget_items) {
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("budget_items")
       .insert({
         organization_id: organizationId,
@@ -360,6 +405,7 @@ export async function executeImport(params: {
       })
       .select("id")
       .single();
+    if (!row) recordFailure("budget_item", b.source_id, b.name, rowError);
     if (row) {
       budgetIdBySourceId.set(b.source_id, row.id);
       await track(supabase, organizationId, jobId, "budget_items", row.id);
@@ -378,7 +424,7 @@ export async function executeImport(params: {
     const milestoneRef = normTitle(task.milestone || task.phase);
     const validStatuses = new Set(["not_started", "prompt_ready", "sent_to_ai", "in_progress", "implemented", "tested", "done", "blocked", "deferred"]);
     const assignedResourceId = task.assigned_to ? resourceIdByName.get(normTitle(task.assigned_to)) ?? null : null;
-    const { data: row } = await supabase
+    const { data: row, error: taskError } = await supabase
       .from("roadmap_tasks")
       .insert({
         organization_id: organizationId,
@@ -392,7 +438,7 @@ export async function executeImport(params: {
         external_key: task.source_id,
         start_date: task.planned_start || null,
         end_date: task.planned_finish || null,
-        duration_days: task.duration_days,
+        duration_days: normalizeDurationDays(task.duration_days),
         // One figure from the source file, two readers. `estimate_hours` is the
         // generic effort estimate that the CPM, the generic capacity engine,
         // process mining and Isabella all read; `estimated_labor_hours` is the
@@ -421,6 +467,7 @@ export async function executeImport(params: {
       })
       .select("id, title, status, milestone_id, assigned_to, assigned_resource_id, project_team_member_id, priority, estimate_hours, start_date, end_date")
       .single();
+    if (!row) recordFailure("task", task.source_id, task.name, taskError);
     if (row) {
       taskIdBySourceId.set(task.source_id, row.id);
       await track(supabase, organizationId, jobId, "roadmap_tasks", row.id);
@@ -452,7 +499,7 @@ export async function executeImport(params: {
     const predecessorId = taskIdBySourceId.get(dep.predecessor_source_id);
     const successorId = taskIdBySourceId.get(dep.successor_source_id);
     if (!predecessorId || !successorId || predecessorId === successorId) continue;
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("task_dependencies")
       .insert({
         organization_id: organizationId,
@@ -464,6 +511,7 @@ export async function executeImport(params: {
       })
       .select("id, predecessor_id, successor_id, dependency_type, lag_days")
       .single();
+    if (!row) recordFailure("dependency", `${dep.predecessor_source_id}->${dep.successor_source_id}`, "dependency", rowError);
     if (row) {
       await track(supabase, organizationId, jobId, "task_dependencies", row.id);
       bump("dependencies");
@@ -486,7 +534,7 @@ export async function executeImport(params: {
   // ── 7. Materials ───────────────────────────────────────────────────────────
   const materialIdBySourceId = new Map<string, string>();
   for (const mat of canonical.materials) {
-    const { data: row } = await supabase
+    const { data: row, error: rowError } = await supabase
       .from("material_requirements")
       .insert({
         organization_id: organizationId,
@@ -508,6 +556,7 @@ export async function executeImport(params: {
       })
       .select("id")
       .single();
+    if (!row) recordFailure("material", mat.source_id, mat.name, rowError);
     if (row) {
       materialIdBySourceId.set(mat.source_id, row.id);
       await track(supabase, organizationId, jobId, "material_requirements", row.id);
@@ -562,10 +611,12 @@ export async function executeImport(params: {
     if (captured.ok && captured.riskId) {
       riskId = captured.riskId;
     } else if (captured.error === "flag_off") {
-      const { data: row } = await supabase.from("risks").insert(riskFields).select("id").single();
+      const { data: row, error: rowError } = await supabase.from("risks").insert(riskFields).select("id").single();
       riskId = row ? (row.id as string) : null;
+      if (!row) recordFailure("risk", risk.source_id, risk.title, rowError);
     } else {
       console.error("[import] atomic risk_registered capture failed:", captured.error, captured.errors ?? "");
+      recordFailure("risk", risk.source_id, risk.title, { message: captured.error });
     }
     if (riskId) {
       await track(supabase, organizationId, jobId, "risks", riskId);
@@ -663,7 +714,39 @@ export async function executeImport(params: {
     });
   }
 
-  return { projectId, created, skippedDuplicates, criticalPathCalculated, recommendations };
+  // ── 12. Rows the database refused ──────────────────────────────────────────
+  // Reported as errors, grouped by entity type, naming the rows. Silence here
+  // is what let 73 tasks disappear from a 274-task plan while the summary
+  // still said they had been imported.
+  if (writeFailures.length > 0) {
+    const byType = new Map<string, ImportWriteFailure[]>();
+    for (const f of writeFailures) {
+      if (!byType.has(f.entity_type)) byType.set(f.entity_type, []);
+      byType.get(f.entity_type)!.push(f);
+    }
+    for (const [entityType, failures] of byType) {
+      const sample = failures.slice(0, 5).map((f) => `"${f.title}"`).join(", ");
+      const more = failures.length > 5 ? ` (+${failures.length - 5})` : "";
+      const message =
+        params.locale === "es"
+          ? `${failures.length} ${entityType}(s) no se pudieron guardar y no están en el proyecto: ${sample}${more}. Motivo: ${failures[0].reason}`
+          : `${failures.length} ${entityType}(s) could not be saved and are NOT in the project: ${sample}${more}. Reason: ${failures[0].reason}`;
+      await supabase.from("project_import_validation_results").insert({
+        organization_id: organizationId,
+        import_job_id: jobId,
+        severity: "error",
+        validation_type: `write_failed:${entityType}`,
+        message,
+        affected_entity_type: entityType,
+        recommended_action:
+          params.locale === "es"
+            ? "Revisa el origen, corrige esas filas y vuelve a importar (o deshaz la importación)."
+            : "Review the source, fix those rows and import again (or roll the import back).",
+      });
+    }
+  }
+
+  return { projectId, created, skippedDuplicates, criticalPathCalculated, recommendations, writeFailures };
 }
 
 // ── Rollback ────────────────────────────────────────────────────────────────
