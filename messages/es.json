@@ -1027,7 +1027,21 @@
       "documents": "Documentos",
       "viewDocuments": "Ver y gestionar documentos",
       "roadmap": "Hoja de ruta",
-      "viewRoadmap": "Ver y gestionar los hitos del proyecto"
+      "viewRoadmap": "Ver y gestionar los hitos del proyecto",
+      "deletePermanently": "Eliminar definitivamente",
+      "deleteStep1Title": "¿Eliminar “{name}” definitivamente?",
+      "deleteStep1Body": "Se destruirá el proyecto y todo su contenido:",
+      "deleteStep1Tasks": "{count} tareas",
+      "deleteStep1Milestones": "{count} hitos",
+      "deleteStep1Dependencies": "{count} dependencias",
+      "deleteStep1Events": "{count} eventos de proceso",
+      "deleteStep1Confirm": "Sí, eliminar",
+      "deleteStep2Title": "¿Estás completamente seguro?",
+      "deleteStep2Body": "Esta acción NO se puede deshacer. El proyecto y sus datos desaparecerán para siempre; solo se conserva constancia de que fue eliminado.",
+      "deleteStep2Confirm": "Sí, eliminar para siempre",
+      "deleteCancel": "Cancelar",
+      "deleting": "Eliminando…",
+      "deleteFailed": "No se pudo eliminar el proyecto. No se borró nada."
     },
     "aiCommSummary": {
       "button": "Resumir Comunicaciones",
