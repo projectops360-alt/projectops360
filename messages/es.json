@@ -1152,8 +1152,17 @@
         "invalidStatus": "Estado inválido",
         "invalidLanguage": "Idioma inválido",
         "slugExists": "Ya existe un proyecto con este nombre",
-        "unexpected": "Algo salió mal. Por favor intenta de nuevo."
+        "unexpected": "Algo salió mal. Por favor intenta de nuevo.",
+        "not_authorized": "No tienes autorización para crear un proyecto en esta organización.",
+        "governance_unit_required": "Selecciona la PMO propietaria de este proyecto.",
+        "no_active_organization": "No tienes ninguna organización activa."
       },
+      "governanceUnit": "PMO propietaria",
+      "governanceUnitPlaceholder": "Selecciona la PMO propietaria de este proyecto",
+      "organization": "Organización",
+      "organizationPlaceholder": "Selecciona una organización",
+      "noActiveOrganization": "No perteneces a ninguna organización activa, así que no puedes crear un proyecto. Pide acceso a un administrador o acepta una invitación pendiente.",
+      "noGovernanceUnit": "Esta organización no tiene ninguna PMO disponible para ser propietaria del proyecto.",
       "projectType": "Tipo de proyecto",
       "useTemplate": "Crear desde plantilla (fases, tareas, dependencias, recursos, presupuesto y riesgos iniciales)",
       "types": {
@@ -1174,6 +1183,14 @@
       "on_hold": "En Pausa",
       "completed": "Completado",
       "cancelled": "Cancelado"
+    }
+  },
+  "import": {
+    "governanceUnit": "PMO propietaria",
+    "governanceUnitHelp": "La PMO que será propietaria del proyecto importado.",
+    "noGovernanceUnit": "Esta organización no tiene ninguna PMO disponible para ser propietaria del proyecto.",
+    "errors": {
+      "governance_unit_required": "Selecciona la PMO propietaria del proyecto importado."
     }
   },
   "stakeholders": {

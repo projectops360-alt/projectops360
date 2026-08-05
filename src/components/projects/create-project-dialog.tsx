@@ -1,12 +1,16 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { localizedHref } from "@/i18n/href";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { X, Loader2 } from "lucide-react";
-import { createProjectAction } from "@/app/[locale]/(app)/projects/actions";
-import type { Locale } from "@/types/database";
+import {
+  createProjectAction,
+  loadGovernanceUnitsAction,
+  loadProjectCreationScopeAction,
+} from "@/app/[locale]/(app)/projects/actions";
+import { getI18nValue, type I18nField, type Locale } from "@/types/database";
 
 type CreateState =
   | { error: string; success?: undefined; projectId?: undefined }
@@ -18,11 +22,83 @@ interface CreateProjectDialogProps {
   onClose: () => void;
 }
 
+type ScopeState =
+  | "ACTIVE_ORGANIZATION"
+  | "ORGANIZATION_SELECTION_REQUIRED"
+  | "NO_ACTIVE_ORGANIZATION";
+
+type OrganizationOption = { id: string; slug: string; name: unknown };
+type GovernanceUnitOption = { id: string; name: string; code: string; isDefault: boolean };
+
 export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProps) {
   const t = useTranslations("projects.form");
   const tStatus = useTranslations("projects");
   const router = useRouter();
   const [isOpen] = useState(true);
+
+  // Creation scope: which organizations the server would actually accept, and
+  // which PMO unit inside the chosen one will own the project. Both are decided
+  // server-side; the form only mirrors what the command already allows.
+  const [scopeState, setScopeState] = useState<ScopeState | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
+  const [organizationId, setOrganizationId] = useState("");
+  const [units, setUnits] = useState<GovernanceUnitOption[]>([]);
+  const [governanceUnitId, setGovernanceUnitId] = useState("");
+  const [unitsLoading, setUnitsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadProjectCreationScopeAction().then((scope) => {
+      if (cancelled) return;
+      setScopeState(scope.state);
+      setOrganizations(scope.organizations);
+      // Exactly one creatable organization is not a choice — take it and keep
+      // the dropdown out of the form.
+      setOrganizationId(
+        scope.state === "ACTIVE_ORGANIZATION" ? (scope.organizations[0]?.id ?? "") : "",
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    // With no organization there is nothing to load, and nothing to clear:
+    // `units` is only ever read alongside a chosen organization, and the next
+    // successful load replaces it wholesale. Clearing state synchronously here
+    // would be an extra render and a lint error, for no observable difference.
+    if (!organizationId) return;
+
+    let cancelled = false;
+    void (async () => {
+      setUnitsLoading(true);
+      const result = await loadGovernanceUnitsAction(organizationId);
+      if (cancelled) return;
+      setUnits(result.units);
+      // One unit is not a choice. Several: honour the system default if there
+      // is one, otherwise make the user say which PMO owns this.
+      const preselected =
+        result.units.length === 1
+          ? result.units[0]
+          : result.units.find((u) => u.isDefault);
+      setGovernanceUnitId(preselected?.id ?? "");
+      setUnitsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId]);
+
+  const orgLabel = useCallback(
+    (org: OrganizationOption) =>
+      getI18nValue(org.name as I18nField | null | undefined, locale, org.slug) || org.slug,
+    [locale],
+  );
+
+  const noOrganization = scopeState === "NO_ACTIVE_ORGANIZATION";
+  const noUnits = Boolean(organizationId) && !unitsLoading && units.length === 0;
+  const scopeReady = Boolean(organizationId) && Boolean(governanceUnitId);
 
   async function handleCreate(
     _prevState: CreateState,
@@ -39,6 +115,14 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
       return { error: t("errors.nameRequired") };
     }
 
+    if (!organizationId) {
+      return { error: t("errors.no_active_organization") };
+    }
+
+    if (!governanceUnitId) {
+      return { error: t("errors.governance_unit_required") };
+    }
+
     const result = await createProjectAction({
       name,
       description,
@@ -47,11 +131,18 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
       useTemplate,
       defaultLanguage,
       locale,
+      organizationId,
+      governanceUnitId,
     });
 
     if (result.error) {
       const errorKey = result.error as string;
       if (errorKey === "slug_exists") return { error: t("errors.slugExists") };
+      if (errorKey === "not_authorized") return { error: t("errors.not_authorized") };
+      if (errorKey === "governance_unit_required")
+        return { error: t("errors.governance_unit_required") };
+      if (errorKey === "no_active_organization")
+        return { error: t("errors.no_active_organization") };
       return { error: t("errors.unexpected") };
     }
 
@@ -88,7 +179,73 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
           </div>
         )}
 
+        {noOrganization && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            {t("noActiveOrganization")}
+          </div>
+        )}
+
         <form action={formAction} className="mt-4 space-y-4">
+          {/* Organization — only shown when there is an actual choice to make */}
+          {scopeState === "ORGANIZATION_SELECTION_REQUIRED" && (
+            <div className="space-y-2">
+              <label
+                htmlFor="project-organization"
+                className="block text-sm font-medium text-foreground"
+              >
+                {t("organization")}
+              </label>
+              <select
+                id="project-organization"
+                name="organizationId"
+                required
+                value={organizationId}
+                onChange={(e) => setOrganizationId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                disabled={isPending}
+              >
+                <option value="">{t("organizationPlaceholder")}</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {orgLabel(org)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Owning PMO */}
+          {organizationId && (
+            <div className="space-y-2">
+              <label
+                htmlFor="project-governance-unit"
+                className="block text-sm font-medium text-foreground"
+              >
+                {t("governanceUnit")}
+              </label>
+              {noUnits ? (
+                <p className="text-sm text-muted-foreground">{t("noGovernanceUnit")}</p>
+              ) : (
+                <select
+                  id="project-governance-unit"
+                  name="governanceUnitId"
+                  required
+                  value={governanceUnitId}
+                  onChange={(e) => setGovernanceUnitId(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  disabled={isPending || unitsLoading}
+                >
+                  <option value="">{t("governanceUnitPlaceholder")}</option>
+                  {units.map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Project Name */}
           <div className="space-y-2">
             <label htmlFor="project-name" className="block text-sm font-medium text-foreground">
@@ -211,7 +368,7 @@ export function CreateProjectDialog({ locale, onClose }: CreateProjectDialogProp
             </button>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isPending || !scopeReady}
               className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}

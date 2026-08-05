@@ -24,6 +24,7 @@ import {
   executeImportAction,
   listProjectsForImportAction,
 } from "./actions";
+import { loadGovernanceUnitsAction } from "@/app/[locale]/(app)/projects/actions";
 import type { Locale } from "@/types/database";
 import type {
   ProjectImportJob,
@@ -48,6 +49,10 @@ const LABELS = {
     modeMerge: "Merge into existing project",
     targetProject: "Target project",
     projectType: "Project type",
+    governanceUnit: "Owning PMO",
+    governanceUnitHelp: "The PMO that will own the imported project.",
+    governanceUnitPlaceholder: "Select the PMO that will own this project",
+    noGovernanceUnit: "This organization has no PMO available to own the project.",
     analyze: "Analyze file",
     analyzing: "Analyzing… extracting tasks, milestones, materials, budget and risks",
     uploading: "Uploading…",
@@ -83,6 +88,7 @@ const LABELS = {
       upload_failed: "Upload failed. Try again.",
       storage_error: "The uploaded file could not be retrieved from storage. Try uploading again.",
       project_required: "Select a target project for merge mode.",
+      governance_unit_required: "Select the PMO that will own the imported project.",
       blocker_unresolved: "Resolve the blocking issues (e.g. disable circular dependencies) before importing.",
       import_failed: "Import failed and was rolled back. No partial data was left behind.",
       unexpected: "Something unexpected happened. Try again.",
@@ -101,6 +107,10 @@ const LABELS = {
     modeMerge: "Fusionar con proyecto existente",
     targetProject: "Proyecto destino",
     projectType: "Tipo de proyecto",
+    governanceUnit: "PMO propietaria",
+    governanceUnitHelp: "La PMO que será propietaria del proyecto importado.",
+    governanceUnitPlaceholder: "Selecciona la PMO propietaria de este proyecto",
+    noGovernanceUnit: "Esta organización no tiene ninguna PMO disponible para ser propietaria del proyecto.",
     analyze: "Analizar archivo",
     analyzing: "Analizando… extrayendo tareas, hitos, materiales, presupuesto y riesgos",
     uploading: "Subiendo…",
@@ -136,6 +146,7 @@ const LABELS = {
       upload_failed: "Falló la subida. Intenta de nuevo.",
       storage_error: "No se pudo recuperar el archivo subido desde el almacenamiento. Sube el archivo de nuevo.",
       project_required: "Selecciona un proyecto destino para el modo fusión.",
+      governance_unit_required: "Selecciona la PMO propietaria del proyecto importado.",
       blocker_unresolved: "Resuelve los bloqueos (p. ej. desactiva dependencias circulares) antes de importar.",
       import_failed: "La importación falló y se revirtió. No quedaron datos parciales.",
       unexpected: "Ocurrió algo inesperado. Intenta de nuevo.",
@@ -188,11 +199,34 @@ export function ImportClient({
   const [validations, setValidations] = useState<ProjectImportValidationResult[]>([]);
   const [activeTab, setActiveTab] = useState<string>("summary");
   const [selectedType, setSelectedType] = useState<string>("general");
+  const [units, setUnits] = useState<{ id: string; name: string; code: string; isDefault: boolean }[]>([]);
+  const [unitsLoading, setUnitsLoading] = useState(true);
+  const [governanceUnitId, setGovernanceUnitId] = useState<string>("");
   const [result, setResult] = useState<{ projectId: string; created: Record<string, number>; skippedDuplicates: number; criticalPathCalculated: boolean } | null>(null);
 
   useEffect(() => {
     listProjectsForImportAction().then((res) => setProjects(res.projects ?? []));
   }, []);
+
+  // The owning PMO is only asked for when the import will create a project.
+  // The options come from the same server-side predicate `create_project_v2`
+  // enforces, so the select can never offer a unit the command would refuse.
+  useEffect(() => {
+    let cancelled = false;
+    setUnitsLoading(true);
+    void loadGovernanceUnitsAction(organizationId).then((res) => {
+      if (cancelled) return;
+      setUnits(res.units);
+      // One unit is not a choice. Several: honour the system default if there
+      // is one, otherwise make the user say which PMO owns this.
+      const preselected = res.units.length === 1 ? res.units[0] : res.units.find((u) => u.isDefault);
+      setGovernanceUnitId(preselected?.id ?? "");
+      setUnitsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId]);
 
   const refreshJob = useCallback(async (jobId: string) => {
     const res = await getImportJobAction({ jobId });
@@ -255,6 +289,12 @@ export function ImportClient({
     }
   }
 
+  // Mirrors the server branch (`import_mode === "create_new" || !project_id`):
+  // only an import that creates a project needs an owning PMO.
+  const createsNewProject = job ? job.import_mode === "create_new" || !job.project_id : mode === "create_new";
+  const noUnits = !unitsLoading && units.length === 0;
+  const unitBlocked = createsNewProject && !governanceUnitId;
+
   // ── Toggle row ────────────────────────────────────────────────────────────
   async function handleToggle(entity: ProjectImportEntity) {
     const next = !entity.will_import;
@@ -265,9 +305,17 @@ export function ImportClient({
   // ── Execute ───────────────────────────────────────────────────────────────
   async function handleImport() {
     if (!job) return;
+    if (createsNewProject && !governanceUnitId) {
+      setError(t.errors.governance_unit_required);
+      return;
+    }
     setError(null);
     setStep("importing");
-    const res = await executeImportAction({ jobId: job.id, selectedProjectType: selectedType });
+    const res = await executeImportAction({
+      jobId: job.id,
+      selectedProjectType: selectedType,
+      governanceUnitId: createsNewProject ? governanceUnitId : undefined,
+    });
     if (res.error || !res.projectId) {
       setError(t.errors[res.error ?? "unexpected"] ?? t.errors.unexpected);
       setStep("review");
@@ -424,6 +472,32 @@ export function ImportClient({
                   ))}
                 </select>
               </div>
+              {createsNewProject && (
+                <div className="space-y-1">
+                  <label htmlFor="import-governance-unit" className="block text-xs font-medium text-muted-foreground">
+                    {t.governanceUnit}
+                  </label>
+                  {noUnits ? (
+                    <p className="text-sm text-muted-foreground">{t.noGovernanceUnit}</p>
+                  ) : (
+                    <>
+                      <select
+                        id="import-governance-unit"
+                        value={governanceUnitId}
+                        onChange={(e) => setGovernanceUnitId(e.target.value)}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:border-brand-500 focus:outline-none"
+                        disabled={step === "importing" || unitsLoading}
+                      >
+                        <option value="">{t.governanceUnitPlaceholder}</option>
+                        {units.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-muted-foreground">{t.governanceUnitHelp}</p>
+                    </>
+                  )}
+                </div>
+              )}
               <div className="ml-auto flex items-center gap-3">
                 <button
                   type="button"
@@ -437,7 +511,7 @@ export function ImportClient({
                 <button
                   type="button"
                   onClick={handleImport}
-                  disabled={step === "importing"}
+                  disabled={step === "importing" || unitBlocked}
                   className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {step === "importing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
