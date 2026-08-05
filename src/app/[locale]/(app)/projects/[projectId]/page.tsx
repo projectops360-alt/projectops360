@@ -551,10 +551,13 @@ export default async function ProjectDetailPage({
           trigger: t("detail.deletePermanently"),
           step1Title: t("detail.deleteStep1Title", { name: title }),
           step1Body: t("detail.deleteStep1Body"),
-          tasks: (count: number) => t("detail.deleteStep1Tasks", { count }),
-          milestones: (count: number) => t("detail.deleteStep1Milestones", { count }),
-          dependencies: (count: number) => t("detail.deleteStep1Dependencies", { count }),
-          events: (count: number) => t("detail.deleteStep1Events", { count }),
+          // Raw templates, not functions: a Server Component may only hand a
+          // Client Component serializable props, and the counts are not known
+          // until the dialog fetches them. The client substitutes {count}.
+          tasks: t.raw("detail.deleteStep1Tasks"),
+          milestones: t.raw("detail.deleteStep1Milestones"),
+          dependencies: t.raw("detail.deleteStep1Dependencies"),
+          events: t.raw("detail.deleteStep1Events"),
           step1Confirm: t("detail.deleteStep1Confirm"),
           step2Title: t("detail.deleteStep2Title"),
           step2Body: t("detail.deleteStep2Body"),
