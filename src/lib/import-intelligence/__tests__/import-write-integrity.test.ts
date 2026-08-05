@@ -17,7 +17,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
-import { normalizeDurationDays } from "../execute";
+import { normalizeDurationDays, projectSlugCandidates } from "../execute";
 import { parseImportFile } from "../parse";
 import { extractCanonicalImport } from "../extract";
 
@@ -76,6 +76,47 @@ describe("zero-duration rows reach the writer", () => {
     // …and the writer turns the 0 into a value the column accepts.
     expect(normalizeDurationDays(byId.get("T-1")!.duration_days)).toBeNull();
     expect(normalizeDurationDays(byId.get("T-2")!.duration_days)).toBe(32);
+  });
+});
+
+// ============================================================================
+// REG-047 — Rolling an import back burned its project slug forever
+// ============================================================================
+// `projects_organization_id_slug_key` is UNIQUE (organization_id, slug) with
+// NO deleted_at predicate, but a rollback only soft-deletes. The executor
+// looked for slug clashes with `.is("deleted_at", null)`, so it judged the
+// slug free while the database still counted it — re-importing the same file
+// after a rollback died on "duplicate key value violates unique constraint".
+// ============================================================================
+
+describe("projectSlugCandidates", () => {
+  const JOB = "8c1ff62a-4d8a-4cfc-b110-ebed636e2864";
+
+  it("offers the clean slug first", () => {
+    expect(projectSlugCandidates("Proyecto Aurora Retail", JOB)[0]).toBe("proyecto-aurora-retail");
+  });
+
+  it("strips accents and punctuation", () => {
+    expect(projectSlugCandidates("Implementación SAP S/4HANA — Ola 1", JOB)[0]).toBe(
+      "implementacion-sap-s-4hana-ola-1",
+    );
+  });
+
+  it("falls back to a name for an unnamed project", () => {
+    expect(projectSlugCandidates("", JOB)[0]).toBe("imported-project");
+    expect(projectSlugCandidates("///", JOB)[0]).toBe("imported-project");
+  });
+
+  it("never runs out, and never ends on a plain numbered suffix", () => {
+    const candidates = projectSlugCandidates("Aurora", JOB);
+    // Numbered alternatives, then a job-derived one that cannot collide.
+    expect(candidates[1]).toBe("aurora-1");
+    expect(candidates.at(-1)).toBe("aurora-8c1ff62a");
+    expect(new Set(candidates).size).toBe(candidates.length);
+  });
+
+  it("is stable for the same job, so a retry reuses the same name", () => {
+    expect(projectSlugCandidates("Aurora", JOB)).toEqual(projectSlugCandidates("Aurora", JOB));
   });
 });
 
