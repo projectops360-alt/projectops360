@@ -11,6 +11,7 @@
 // ============================================================================
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { emitProcessNode, emitProcessEdge } from "@/lib/graph/emit-event";
 import { captureRiskRegisteredAtomic } from "@/lib/events/risk-events";
 import {
@@ -109,6 +110,7 @@ export async function executeImport(params: {
   jobId: string;
   importMode: "create_new" | "merge_existing";
   targetProjectId: string | null;
+  governanceUnitId: string | null;
   selectedProjectType: string;
   entities: ImportEntityRow[];
   locale: "en" | "es";
@@ -145,23 +147,34 @@ export async function executeImport(params: {
       if (!clash) break;
       slug = `${slugBase}-${suffix}`;
     }
-    const { data: project, error } = await supabase
-      .from("projects")
-      .insert({
-        organization_id: organizationId,
-        slug,
-        title_i18n: { [params.locale]: name },
-        description_i18n: canonical.project.description ? { [params.locale]: canonical.project.description } : {},
-        status: "planning",
-        project_type: params.selectedProjectType || "general",
-        start_date: canonical.project.start_date || null,
-        target_end_date: canonical.project.target_finish_date || null,
-        created_by: params.userId,
+    // WHY A SESSION CLIENT ONLY HERE
+    // Creating a project is the one authorisation decision in this pipeline.
+    // `create_project_v2` is the single governed command that writes the
+    // `projects` row, its `multi_pmo_v2` contract and its owner assignment in
+    // one transaction; it authorises via `auth.uid()` plus the `project.create`
+    // capability, so it MUST run on the caller's own session — the admin client
+    // is `service_role` and would bypass RLS, which is exactly how imports used
+    // to produce ungoverned legacy projects owned by whatever unit the
+    // `trg_projects_sync_governance_owner` trigger happened to pick.
+    // Every later write (milestones, tasks, dependencies, risks, resources,
+    // budget, events, process nodes) stays on the admin client: those are
+    // follow-up writes on a project whose authorisation is already settled.
+    if (!params.governanceUnitId) throw new Error("governance_unit_required");
+    const sessionClient = await createClient();
+    const { data: project, error } = await sessionClient
+      .rpc("create_project_v2", {
+        p_organization_id: organizationId,
+        p_governance_unit_id: params.governanceUnitId,
+        p_slug: slug,
+        p_title_i18n: { [params.locale]: name },
+        p_description_i18n: canonical.project.description ? { [params.locale]: canonical.project.description } : {},
+        p_project_type: params.selectedProjectType || "general",
+        p_start_date: canonical.project.start_date || null,
+        p_target_end_date: canonical.project.target_finish_date || null,
       })
-      .select("id")
       .single();
     if (error || !project) throw new Error(`Project creation failed: ${error?.message}`);
-    projectId = project.id as string;
+    projectId = (project as { project_id: string }).project_id;
     await track(supabase, organizationId, jobId, "projects", projectId);
     bump("projects");
   } else {

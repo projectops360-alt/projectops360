@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { getTemplateForType } from "@/lib/execution/templates";
@@ -56,6 +57,75 @@ function generateSlug(name: string): string {
 
 // ── Server Action ────────────────────────────────────────────────────────────────
 
+/**
+ * Load what the create-project form may offer.
+ *
+ * Both lists come from the same predicate the command enforces, so the form
+ * cannot show an organization or a unit that `create_project_v2` would then
+ * refuse. A selector that offers an option the server rejects is worse than no
+ * selector: the user learns the rule by hitting it.
+ */
+export async function loadProjectCreationScopeAction(): Promise<{
+  state: "ACTIVE_ORGANIZATION" | "ORGANIZATION_SELECTION_REQUIRED" | "NO_ACTIVE_ORGANIZATION";
+  organizations: { id: string; slug: string; name: unknown }[];
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("v2_creatable_organizations");
+  if (error) return { state: "NO_ACTIVE_ORGANIZATION", organizations: [] };
+
+  const organizations = (data ?? []).map(
+    (r: { organization_id: string; slug: string; name_i18n: unknown }) => ({
+      id: r.organization_id,
+      slug: r.slug,
+      name: r.name_i18n,
+    }),
+  );
+
+  if (organizations.length === 0) return { state: "NO_ACTIVE_ORGANIZATION", organizations };
+  if (organizations.length === 1) return { state: "ACTIVE_ORGANIZATION", organizations };
+  return { state: "ORGANIZATION_SELECTION_REQUIRED", organizations };
+}
+
+export async function loadGovernanceUnitsAction(
+  organizationId: string,
+): Promise<{ units: { id: string; name: string; code: string; isDefault: boolean }[] }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("v2_creatable_units", {
+    p_organization_id: organizationId,
+  });
+  if (error) return { units: [] };
+  return {
+    units: (data ?? []).map(
+      (r: { unit_id: string; name: string; code: string; is_system_default: boolean }) => ({
+        id: r.unit_id,
+        name: r.name,
+        code: r.code,
+        isDefault: r.is_system_default,
+      }),
+    ),
+  };
+}
+
+/**
+ * Create a project.
+ *
+ * Every project created from the interface is now a governed V2 project: one
+ * `projects` row, one active `multi_pmo_v2` contract and exactly one active
+ * owner assignment, written by `create_project_v2` in a single transaction. If
+ * any of the three fails, none of them exist.
+ *
+ * WHY THIS NO LONGER USES THE ADMIN CLIENT FOR THE INSERT
+ * It used to `createAdminClient().from("projects").insert(...)`, which runs as
+ * `service_role` and therefore bypasses RLS entirely. The organization came
+ * from `getOrgContext()`, so it was not forgeable — but nothing in that path
+ * asked whether the caller was ALLOWED to create a project, only which
+ * organization they belonged to. The RPC runs on the session client and decides
+ * with the capability resolver.
+ *
+ * The admin client is still used afterwards for the charter and the template.
+ * Those are internal follow-up work on a project that already exists and whose
+ * authorisation has already been settled.
+ */
 export async function createProjectAction(input: {
   name: string;
   description: string;
@@ -64,8 +134,9 @@ export async function createProjectAction(input: {
   useTemplate?: boolean;
   defaultLanguage: string;
   locale: string;
+  organizationId?: string;
+  governanceUnitId?: string;
 }): Promise<{ error?: string; projectId?: string }> {
-  // ── Authenticate ────────────────────────────────────────────────────────
   let org;
   try {
     org = await getOrgContext();
@@ -73,7 +144,6 @@ export async function createProjectAction(input: {
     return { error: "not_authenticated" };
   }
 
-  // ── Validate ─────────────────────────────────────────────────────────────
   const parsed = createProjectSchema.safeParse({
     name: input.name,
     description: input.description,
@@ -91,93 +161,88 @@ export async function createProjectAction(input: {
 
   const data = parsed.data;
 
-  // ── Generate slug ───────────────────────────────────────────────────────
-  const slug = generateSlug(data.name);
+  // The client may propose an organization; it never decides one. The command
+  // re-checks it against the session regardless of what arrives here.
+  const organizationId = input.organizationId ?? org.organizationId;
+  if (!organizationId) return { error: "no_active_organization" };
 
-  // ── Insert project ──────────────────────────────────────────────────────
-  const supabase = createAdminClient();
+  const governanceUnitId = input.governanceUnitId;
+  if (!governanceUnitId) return { error: "governance_unit_required" };
 
-  // Check for slug uniqueness within the org
+  const supabase = await createClient();
+
+  // Slug uniqueness, read through the caller's own RLS rather than around it.
+  const base = generateSlug(data.name);
+  let finalSlug = base;
   let suffix = 0;
-  let finalSlug = slug;
-
-  while (true) {
+  while (suffix < 50) {
     const { data: existing } = await supabase
       .from("projects")
       .select("id")
-      .eq("organization_id", org.organizationId)
+      .eq("organization_id", organizationId)
       .eq("slug", finalSlug)
       .is("deleted_at", null)
       .maybeSingle();
-
     if (!existing) break;
-
     suffix++;
-    finalSlug = `${slug}-${suffix}`;
+    finalSlug = `${base}-${suffix}`;
   }
 
-  // Build i18n fields — put the name/description in the selected language
-  const titleI18n =
-    data.locale === "es"
-      ? { es: data.name }
-      : { en: data.name };
+  const titleI18n = data.locale === "es" ? { es: data.name } : { en: data.name };
+  const descriptionI18n = data.description
+    ? data.locale === "es"
+      ? { es: data.description }
+      : { en: data.description }
+    : {};
 
-  const descriptionI18n =
-    data.locale === "es"
-      ? { es: data.description || undefined }
-      : { en: data.description || undefined };
-
-  const { data: project, error: insertError } = await supabase
-    .from("projects")
-    .insert({
-      organization_id: org.organizationId,
-      slug: finalSlug,
-      title_i18n: titleI18n,
-      description_i18n: descriptionI18n || {},
-      status: data.status,
-      project_type: data.projectType,
-      created_by: org.userId,
+  const { data: created, error: rpcError } = await supabase
+    .rpc("create_project_v2", {
+      p_organization_id: organizationId,
+      p_governance_unit_id: governanceUnitId,
+      p_slug: finalSlug,
+      p_title_i18n: titleI18n,
+      p_description_i18n: descriptionI18n,
+      p_project_type: data.projectType,
     })
-    .select("id")
     .single();
 
-  if (insertError) {
-    // Handle unique constraint violation
-    if (insertError.code === "23505") {
-      return { error: "slug_exists" };
-    }
+  if (rpcError || !created) {
+    // The command speaks in SQLSTATEs. 42501 is every authorisation refusal it
+    // makes — wrong organization, no capability, a unit from another tenant.
+    if (rpcError?.code === "42501") return { error: "not_authorized" };
+    if (rpcError?.code === "23505") return { error: "slug_exists" };
+    console.error("create_project_v2 failed:", rpcError?.message);
     return { error: "unexpected" };
   }
 
-  // ── Create the empty Project Charter (the official foundation step) ───────
-  // The user is redirected here right after creation to define the charter
-  // before real execution begins.
+  const projectId = (created as { project_id: string }).project_id;
+
+  // Follow-up work on a project that exists and is already authorised.
+  const admin = createAdminClient();
   try {
-    await createCharterForProject(supabase, org.organizationId, project.id, org.userId, data.name);
+    await createCharterForProject(admin, organizationId, projectId, org.userId, data.name);
   } catch (e) {
     console.error("Charter creation failed:", e);
   }
 
-  // ── Instantiate template (milestones, tasks, dependencies, resources,
-  //    budget placeholders, risk placeholders) ─────────────────────────────
   if (data.useTemplate) {
     const template = getTemplateForType(data.projectType);
     if (template) {
       try {
         await instantiateTemplate({
-          organizationId: org.organizationId,
-          projectId: project.id,
+          organizationId,
+          projectId,
           template,
           createdBy: org.userId,
         });
       } catch (e) {
-        // The project itself was created; a template failure should not lose it.
+        // The project itself exists; a template failure must not lose it.
         console.error("Template instantiation failed:", e);
       }
     }
   }
 
-  return { projectId: project.id };
+  return { projectId };
 }
 
 // ── Update Project ──────────────────────────────────────────────────────────────

@@ -1152,8 +1152,17 @@
         "invalidStatus": "Invalid status",
         "invalidLanguage": "Invalid language",
         "slugExists": "A project with this name already exists",
-        "unexpected": "Something went wrong. Please try again."
+        "unexpected": "Something went wrong. Please try again.",
+        "not_authorized": "You are not authorized to create a project in this organization.",
+        "governance_unit_required": "Select the PMO that will own this project.",
+        "no_active_organization": "You have no active organization."
       },
+      "governanceUnit": "Owning PMO",
+      "governanceUnitPlaceholder": "Select the PMO that will own this project",
+      "organization": "Organization",
+      "organizationPlaceholder": "Select an organization",
+      "noActiveOrganization": "You do not belong to any active organization, so you cannot create a project. Ask an administrator for access or accept a pending invitation.",
+      "noGovernanceUnit": "This organization has no PMO available to own the project.",
       "projectType": "Project type",
       "useTemplate": "Start from a template (phases, tasks, dependencies, resources, budget and risk placeholders)",
       "types": {
@@ -1174,6 +1183,14 @@
       "on_hold": "On Hold",
       "completed": "Completed",
       "cancelled": "Cancelled"
+    }
+  },
+  "import": {
+    "governanceUnit": "Owning PMO",
+    "governanceUnitHelp": "The PMO that will own the imported project.",
+    "noGovernanceUnit": "This organization has no PMO available to own the project.",
+    "errors": {
+      "governance_unit_required": "Select the PMO that will own the imported project."
     }
   },
   "stakeholders": {

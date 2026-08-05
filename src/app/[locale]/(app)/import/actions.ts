@@ -475,6 +475,7 @@ export async function updateImportEntityAction(input: {
 export async function executeImportAction(input: {
   jobId: string;
   selectedProjectType?: string;
+  governanceUnitId?: string;
 }): Promise<{
   error?: string;
   projectId?: string;
@@ -492,6 +493,13 @@ export async function executeImportAction(input: {
   const job = await loadJob(org.organizationId, input.jobId);
   if (!job) return { error: "job_not_found" };
   if (!["ready_to_import", "needs_review", "mapped"].includes(job.status)) return { error: "invalid_status" };
+
+  // An import that creates a project must say which PMO owns it, exactly like
+  // the create-project form. Merging into an existing project creates nothing,
+  // so it needs no unit. The condition mirrors `executeImport`'s own branch
+  // (`import_mode === "create_new" || !project_id`) so the two cannot drift.
+  const createsNewProject = job.import_mode === "create_new" || !job.project_id;
+  if (createsNewProject && !input.governanceUnitId) return { error: "governance_unit_required" };
 
   // Blockers must be resolved (disabled) before import
   const { data: blockers } = await supabase
@@ -531,6 +539,7 @@ export async function executeImportAction(input: {
       jobId: job.id,
       importMode: job.import_mode,
       targetProjectId: job.project_id,
+      governanceUnitId: input.governanceUnitId ?? null,
       selectedProjectType: input.selectedProjectType || job.selected_project_type || job.detected_project_type || "general",
       entities: (entities ?? []) as Parameters<typeof executeImport>[0]["entities"],
       locale: (org.locale as "en" | "es") ?? "en",
