@@ -1436,3 +1436,79 @@ how this SDK spells deny-all; omitting the policy leaves egress open.
 second refusal) · `mpp-model.test.ts` (`IMPORT-MPP-MAPPING`, 26 assertions over
 the real plan). The conversion itself needs a JVM and a Vercel account, so it is
 verified by `scripts/verify-mpp-sandbox.mjs` as an operator check, not in CI.
+
+## REG-045 — A structured plan workbook imported nothing at all
+
+**Date:** 2026-08-04 · **Status:** closed · **Guard:** `IMPORT-MULTI-HEADER-WORKBOOK`
+
+A complete SAP Activate plan (`ProjectOps360_Proyecto_Aurora_SAP_Completo.xlsx`
+— 10 sheets, 291 WBS rows, 77 gates, 19 people, 10 risks) was accepted by the
+wizard and then imported **zero tasks, zero milestones, zero resources and zero
+budget lines**. The only entities produced were 12 phantom "risks" scraped out
+of a title row. Nothing errored: the review step simply showed an empty plan,
+which reads as *"your file had nothing in it"* rather than *"we could not read
+it"*.
+
+**Root cause.** `rowsToTable` took **row 0 as the header row**. Real planning
+templates almost never start there: they open with a title banner, a subtitle,
+and frequently a merged *group band* (`Estructura y alcance | Planificación |
+Ejecución`) spanning the columns above the actual headers. So every sheet became
+a table whose single header was a sentence — `"Plan de Pruebas y Validación"` —
+and the extractor's synonym table matched none of it. With no `name` column,
+each extractor returned early. The workbook was structurally perfect and
+completely unreadable.
+
+This is the same shape as REG-044: the sophisticated layers were fine and the
+front door was not. `extractCharterFromTable` even carried the comment *"the
+title row often becomes the headers"* and scanned `[headers, ...rows]` to work
+around it — the symptom was known and routed around instead of fixed.
+
+**Four further defects surfaced once the sheets could be read:**
+
+1. **Silent mis-binding.** `findColumn` fell back to substring matching, and
+   `"area"` is inside `"ID de t·area·"` — the activity id was bound to
+   `location`. `"real"` inside `"Horas reales"` was the same trap. Short
+   synonyms are now exact-match only.
+2. **The wrong id.** `source_id` preferred the hierarchical WBS outline number
+   (`1.1.1.1`) over the referenceable activity id (`SAP-W1-004`) that the
+   *Predecesoras* column and every satellite sheet actually cite. Dependencies
+   went unresolved and the test-plan sheet minted duplicate tasks instead of
+   matching existing ones.
+3. **Rows lost to name collisions.** Task dedup treated equal names as
+   duplicates, but a WBS legitimately repeats a group name once per phase; 28
+   real rows were folded away. An explicit, distinct id now outranks the name.
+4. **`out_of_scope` filed as `in_scope`.** The exclusion pattern required
+   *"fuera **del** alcance"*; the sheet said *"Fuera de alcance"*, so it fell
+   through to `/alcance/` and the project's exclusions were recorded as things
+   it **would** deliver.
+
+**How it was solved.** `detectHeaderRowIndex` scores the first rows of a sheet
+and picks the one that behaves like a header — near-maximum width, short unique
+non-numeric labels, followed by data of comparable width — with ties breaking
+toward the earliest row, so files whose row 0 *is* the header are untouched.
+On top of that, a row-kind column (`Tipo`) routes rows to what they are: the
+project row seeds project identity, phases/waves/gates become milestones, and
+everything else stays work. An include column (`Incluir = No`) is honoured, and
+key/value sheets (`DATOS_PROYECTO`, budget summaries) are read in a first pass
+so a declared project name always beats the root row of a WBS.
+
+Measured on the real workbook: **0 → 274 tasks, 16 milestones, 155 dependencies,
+19 resources, 7 budget lines, 10 risks**, project name/dates/budget and seven
+charter fields. Every one of the 291 plan rows is accounted for — 274 tasks + 16
+milestones + the single `Proyecto` row absorbed into the project itself — and no
+sheet is left unexplained.
+
+**Protection rule (binding):** the header row of a sheet is **detected, never
+assumed to be row 0**. Any workaround that compensates for a bad header (such
+as scanning `[headers, ...rows]`) is a signal that the header is wrong —
+fix the detection, do not route around it. A synonym short enough to appear
+inside an unrelated word is exact-match only. When a plan carries both a WBS
+outline number and an activity id, the **id that predecessors cite** is the
+`source_id`.
+
+**Verify:** `src/lib/import-intelligence/__tests__/multi-header-workbook.test.ts`
+(`IMPORT-MULTI-HEADER-WORKBOOK`) — header detection incl. the group-band and
+"do not mistake a numeric data row for the header" cases, the `area`/`ID de
+tarea` mis-binding, row-kind routing, and an end-to-end synthetic workbook.
+The real 291-row plan is asserted as a fixture-gated smoke test (row-level
+coverage), skipped when the file is absent.

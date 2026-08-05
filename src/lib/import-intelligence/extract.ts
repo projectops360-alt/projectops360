@@ -15,6 +15,7 @@ import type {
   CanonicalMilestone,
   CanonicalDependency,
   CanonicalResource,
+  CanonicalProject,
 } from "@/types/import-intelligence";
 import type { ProjectType } from "@/types/execution";
 
@@ -27,13 +28,16 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   priority: ["priority", "prioridad"],
   phase: ["phase", "stage", "fase", "etapa"],
   milestone: ["milestone", "hito"],
-  start: ["start", "start date", "planned start", "begin", "from", "inicio", "fecha inicio", "fecha de inicio", "comienzo"],
-  finish: ["finish", "end", "end date", "due", "due date", "planned finish", "to", "fin", "fecha fin", "fecha de fin", "término", "termino", "entrega", "fecha entrega"],
+  start: ["start", "start date", "planned start", "begin", "from", "inicio", "fecha inicio", "fecha de inicio", "comienzo", "inicio planificado", "fecha planificada"],
+  finish: ["finish", "end", "end date", "due", "due date", "planned finish", "target date", "to", "fin", "fecha fin", "fecha de fin", "término", "termino", "entrega", "fecha entrega", "fin planificado", "fecha objetivo", "fecha límite", "fecha limite"],
   duration: ["duration", "duration days", "days", "estimate", "estimated duration", "duración", "duracion", "días", "dias", "estimación", "estimacion", "estimado"],
   hours: ["hours", "estimated hours", "effort", "labor hours", "horas", "horas estimadas", "esfuerzo"],
   assignee: ["assigned to", "assignee", "owner", "responsible", "resource", "who", "asignado", "asignado a", "responsable", "encargado", "dueño", "dueno"],
   predecessor: ["predecessor", "predecessors", "depends on", "dependency", "dependencies", "after", "blocked by", "predecesor", "predecesores", "predecesora", "depende de", "dependencia", "dependencias"],
   wbs: ["wbs", "id", "no", "no.", "#", "code", "edt", "código", "codigo", "item no", "task id", "task no", "activity id", "id tarea", "id de tarea", "código tarea"],
+  // The referenceable activity id, as opposed to the hierarchical WBS outline
+  // number. Predecessor columns cite this one, so it must win as source_id.
+  task_id: ["task id", "task no", "activity id", "unique id", "id de tarea", "id tarea", "id de actividad", "código tarea", "codigo tarea"],
   quantity: ["quantity", "qty", "amount", "cantidad", "cant", "cant."],
   unit: ["unit", "uom", "unit of measure", "unidad", "u.m.", "um"],
   unit_cost: ["unit cost", "unit price", "rate", "price", "costo unitario", "precio unitario", "tarifa"],
@@ -48,6 +52,11 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   mitigation: ["mitigation", "response", "plan", "mitigación", "mitigacion", "respuesta"],
   role: ["role", "trade", "discipline", "rol", "oficio", "especialidad", "disciplina"],
   location: ["location", "zone", "area", "ubicación", "ubicacion", "zona", "área"],
+  // Structured plan exports (SAP Activate, PMI templates) carry a row-kind
+  // column that says whether a row is a phase, a gate or real work, plus an
+  // opt-in column the planner uses to descope rows without deleting them.
+  item_type: ["item type", "record type", "row type", "tipo", "tipo de elemento", "tipo de registro"],
+  include: ["include", "in scope", "incluir", "incluido", "en alcance", "aplica"],
 };
 
 /** Table-level keywords that identify what entity a sheet/table contains. */
@@ -76,6 +85,13 @@ function normalizeHeader(h: string): string {
   return h.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
 
+/**
+ * Short synonyms that are only safe as an exact header match: as substrings
+ * they fire inside unrelated Spanish headers ("area" inside "ID de tarea",
+ * "real" inside "Horas reales"), silently binding a column to the wrong field.
+ */
+const EXACT_ONLY_SYNONYMS = new Set(["area", "real", "days", "dias", "tipo", "type", "code", "plan", "item"]);
+
 /** Find the column index for a canonical field; exact synonym match first,
  *  then containment. Returns -1 if not found. */
 export function findColumn(headers: string[], field: keyof typeof FIELD_SYNONYMS): number {
@@ -85,7 +101,12 @@ export function findColumn(headers: string[], field: keyof typeof FIELD_SYNONYMS
     if (synonyms.includes(normalized[i])) return i;
   }
   for (let i = 0; i < normalized.length; i++) {
-    if (normalized[i] && synonyms.some((s) => s.length > 3 && normalized[i].includes(s))) return i;
+    if (
+      normalized[i] &&
+      synonyms.some((s) => s.length > 3 && !EXACT_ONLY_SYNONYMS.has(s) && normalized[i].includes(s))
+    ) {
+      return i;
+    }
   }
   return -1;
 }
@@ -182,6 +203,9 @@ export function normalizeStatus(v: string | undefined): string {
 }
 
 const PRIORITY_MAP: Record<string, string> = {
+  // P0 is the top band in plans that start numbering at zero — it must not
+  // silently fall through to the p2 default.
+  "p0": "p1", "0": "p1",
   "high": "p1", "critical": "p1", "p1": "p1", "1": "p1", "alta": "p1", "crítica": "p1", "critica": "p1", "urgente": "p1",
   "medium": "p2", "p2": "p2", "2": "p2", "media": "p2", "normal": "p2",
   "low": "p3", "p3": "p3", "3": "p3", "baja": "p3",
@@ -190,6 +214,29 @@ const PRIORITY_MAP: Record<string, string> = {
 export function normalizePriority(v: string | undefined): string {
   if (!v) return "p2";
   return PRIORITY_MAP[v.toLowerCase().trim()] ?? "p2";
+}
+
+// ── Row-kind routing (structured plan exports) ──────────────────────────────
+
+/** True for an explicit "no" in an include/in-scope column. */
+export function isNegative(v: string): boolean {
+  return /^(no|n|false|0|off|excluido|excluida|fuera)$/i.test(normalizeHeader(v));
+}
+
+const MILESTONE_ROW_KINDS = /^(phase|stage|wave|milestone|gate|quality gate|stage gate|fase|etapa|ola|hito|compuerta|marcador de fase)$/;
+const PROJECT_ROW_KINDS = /^(project|programme|program|proyecto|programa)$/;
+
+/**
+ * Map a row-kind cell ("Task", "Fase", "Quality Gate", "Entregable") onto what
+ * the row should become. Anything unrecognized stays work — never drop a row
+ * just because its kind is unfamiliar.
+ */
+export function classifyRowKind(v: string): "project" | "milestone" | "task" {
+  const n = normalizeHeader(v);
+  if (!n) return "task";
+  if (PROJECT_ROW_KINDS.test(n)) return "project";
+  if (MILESTONE_ROW_KINDS.test(n)) return "milestone";
+  return "task";
 }
 
 // ── Dependency phrase detection ─────────────────────────────────────────────
@@ -238,6 +285,7 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
     assignee: findColumn(table.headers, "assignee"),
     predecessor: findColumn(table.headers, "predecessor"),
     wbs: findColumn(table.headers, "wbs"),
+    taskId: findColumn(table.headers, "task_id"),
     location: findColumn(table.headers, "location"),
     role: findColumn(table.headers, "role"),
   };
@@ -257,6 +305,13 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
     /acceptance|criterio.*aceptaci/i.test(h),
   );
 
+  // Structured plans (SAP Activate & friends) mix row kinds in one sheet: the
+  // project header, wave/phase summary rows, quality gates and real work. Only
+  // work becomes a task; phases and gates become milestones, and the project
+  // row seeds project dates. Without this the whole WBS lands as flat tasks.
+  const itemTypeCol = findColumn(table.headers, "item_type");
+  const includeCol = findColumn(table.headers, "include");
+
   // Base confidence from how many schedule columns were recognized
   const recognized = Object.values(col).filter((c) => c >= 0).length;
   const baseConfidence = Math.min(0.95, 0.5 + recognized * 0.05);
@@ -271,10 +326,52 @@ function extractTasksFromTable(table: ParsedTable, ctx: ExtractionContext): void
   for (const [rowIdx, row] of table.rows.entries()) {
     const name = cell(row, col.name);
     if (!name) continue;
-    ctx.taskCounter.n++;
-    const sourceId = cell(row, col.wbs) || `task-${ctx.taskCounter.n}`;
+    // An explicit opt-out column means the planner descoped the row.
+    if (includeCol >= 0 && isNegative(cell(row, includeCol))) continue;
+
+    const rowKind = classifyRowKind(cell(row, itemTypeCol));
+    // Prefer the referenceable activity id over the WBS outline number: it is
+    // what predecessor columns cite, and what sibling sheets (test plans, gate
+    // registers) use to point back at the same row.
+    const sourceId = cell(row, col.taskId) || cell(row, col.wbs) || `task-${ctx.taskCounter.n + 1}`;
     const start = toIsoDate(cell(row, col.start));
     const finish = toIsoDate(cell(row, col.finish));
+
+    // The single "project" row carries the plan's own name and date span.
+    if (rowKind === "project") {
+      if (!ctx.result.project.name) ctx.result.project.name = name;
+      if (!ctx.result.project.start_date) ctx.result.project.start_date = start;
+      if (!ctx.result.project.target_finish_date) ctx.result.project.target_finish_date = finish;
+      if (!ctx.result.project.description) ctx.result.project.description = cell(row, col.description);
+      continue;
+    }
+    // Phase / gate rows are milestones, not work.
+    if (rowKind === "milestone") {
+      const rowPhase = cell(row, col.phase);
+      // Plans reuse one gate name per phase ("Run Quality Gate" in each of
+      // them). Those are distinct gates, so qualify the repeat by its phase
+      // instead of collapsing them and losing the row.
+      let milestoneName = name;
+      if (seenMilestoneNames.has(milestoneName.toLowerCase().trim()) && rowPhase && rowPhase !== name) {
+        milestoneName = `${name} — ${rowPhase}`;
+      }
+      const nameKey = milestoneName.toLowerCase().trim();
+      if (!seenMilestoneNames.has(nameKey)) {
+        seenMilestoneNames.add(nameKey);
+        ctx.result.milestones.push({
+          source_id: sourceId,
+          name: milestoneName,
+          description: cell(row, col.description),
+          phase: rowPhase,
+          target_date: finish,
+          status: normalizeStatus(cell(row, col.status)) === "done" ? "completed" : "planned",
+          confidence_score: 0.9,
+          source_reference: `${table.name} · row ${rowIdx + 2}`,
+        });
+      }
+      continue;
+    }
+    ctx.taskCounter.n++;
     let duration = toDurationDays(cell(row, col.duration));
     if (duration == null && start && finish) {
       const d = (Date.parse(finish) - Date.parse(start)) / 86_400_000 + 1;
@@ -459,8 +556,14 @@ function extractMaterialsFromTable(table: ParsedTable, ctx: ExtractionContext): 
 }
 
 function extractBudgetFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  // Cost breakdowns label the line column by what it breaks down by — "Phase",
+  // "Workstream", "Cost centre" — rather than "Name". Fall back to the first
+  // column, as the material and risk extractors already do.
+  let nameCol = findColumn(table.headers, "name");
+  if (nameCol === -1) nameCol = findColumn(table.headers, "phase");
+  if (nameCol === -1 && table.headers.length > 0) nameCol = 0;
   const col = {
-    name: findColumn(table.headers, "name"),
+    name: nameCol,
     category: findColumn(table.headers, "category"),
     estimated: findColumn(table.headers, "estimated_cost"),
     total: findColumn(table.headers, "total_cost"),
@@ -472,6 +575,11 @@ function extractBudgetFromTable(table: ParsedTable, ctx: ExtractionContext): voi
     const name = cell(row, col.name);
     if (!name) continue;
     const estimated = toNumber(cell(row, col.estimated)) ?? toNumber(cell(row, col.total));
+    // A grand-total row is the project budget, not another budget line.
+    if (/^(total|totales?|grand total|suma)$/i.test(name.trim())) {
+      if (ctx.result.project.budget == null) ctx.result.project.budget = estimated;
+      continue;
+    }
     ctx.result.budget_items.push({
       source_id: `bud-${ctx.result.budget_items.length + 1}`,
       name,
@@ -579,7 +687,10 @@ function extractResourcesFromTable(table: ParsedTable, ctx: ExtractionContext): 
 // more specific patterns come first (e.g. out_of_scope before in_scope).
 
 const CHARTER_KEY_PATTERNS: [string, RegExp][] = [
-  ["out_of_scope", /out.?of.?scope|fuera del alcance|no alcance|non.?goals?/i],
+  // Must stay ahead of in_scope AND match without the article: "Fuera de
+  // alcance" otherwise fell through to /alcance/ and filed the exclusions as
+  // things the project WOULD deliver.
+  ["out_of_scope", /out.?of.?scope|fuera de(l)? alcance|no alcance|non.?goals?|exclusiones/i],
   ["in_scope", /in.?scope|dentro del alcance|alcance/i],
   ["executive_summary", /executive summary|resumen ejecutivo/i],
   ["background", /background|antecedentes|context/i],
@@ -652,7 +763,18 @@ function extractCharterFromTable(table: ParsedTable, ctx: ExtractionContext): vo
 }
 
 export function isGovernanceTable(table: ParsedTable): boolean {
-  return /governance|gates?\b|gobernanza|control de cambios/i.test(table.name);
+  // A bare "gates" match also swallowed milestone registers such as
+  // "HITOS_GATES", which are entity rows and must stay milestones. Governance
+  // sheets are named for governance or for the change log, never for the
+  // milestones they gate.
+  if (/\bgovernance\b|\bgobernanza\b|stage.?gates?|control de cambios|registro de cambios|change (requests?|log|control)|^cambios$/i.test(table.name)) {
+    return true;
+  }
+  // …unless the sheet is plainly a register of named entities with dates.
+  const isEntityRegister =
+    findColumn(table.headers, "name") >= 0 &&
+    (findColumn(table.headers, "finish") >= 0 || findColumn(table.headers, "status") >= 0);
+  return /gates?\b/i.test(table.name) && !isEntityRegister;
 }
 
 /** Stage gates + change-control rules → charter governance text fields. */
@@ -700,6 +822,74 @@ function extractDataDependenciesFromTable(table: ParsedTable, ctx: ExtractionCon
       rule ? `Rule / Regla: ${rule}` : "",
     ].filter(Boolean);
     appendCharterField(ctx, "dependencies", parts.join(" · "), table.name);
+  }
+}
+
+// ── Project data sheets (key/value) ─────────────────────────────────────────
+
+/** Label/value pairs describing the project itself, e.g. a "DATOS_PROYECTO"
+ *  or "Presupuesto" sheet laid out as Section | Field | Value. */
+export function isProjectDataTable(table: ParsedTable): boolean {
+  // Key/value sheets are narrow. A wide sheet with the same name is a real
+  // breakdown table (e.g. budget per phase) and must reach its own extractor.
+  const width = table.headers.filter((h) => h.trim() !== "").length;
+  if (width > 4) return false;
+  if (/datos del proyecto|datos_proyecto|project (data|info|details)|ficha del proyecto|budget summary|resumen de costos/i.test(table.name)) {
+    return true;
+  }
+  const blob = table.headers.map(normalizeHeader).join(" ");
+  return /\b(campo|indicador|concepto)\b/.test(blob) && /\bvalor\b/.test(blob);
+}
+
+type ProjectTextField = Extract<keyof CanonicalProject, "name" | "description" | "location">;
+type ProjectDateField = Extract<keyof CanonicalProject, "start_date" | "target_finish_date">;
+
+const PROJECT_FIELD_PATTERNS: [ProjectTextField | ProjectDateField | "budget", RegExp][] = [
+  ["name", /^(nombre del proyecto|nombre|project name|título del proyecto)$/i],
+  ["start_date", /^(fecha de inicio|fecha inicio|inicio|start date|inicio planificado)$/i],
+  ["target_finish_date", /^(fecha fin objetivo|fecha de fin|fecha fin|end date|target (end|finish) date|fin planificado)$/i],
+  ["description", /^(descripción|descripcion|description|resumen)$/i],
+  ["location", /^(ubicación|ubicacion|location|país|pais|region|región|sede)$/i],
+  ["budget", /^(presupuesto aprobado|presupuesto total|approved budget|total budget|presupuesto)$/i],
+];
+
+/**
+ * Read a key/value project sheet. Recognized labels populate the canonical
+ * project; everything else is preserved on the charter (scope, assumptions,
+ * constraints, success criteria…) so no planner-authored text is dropped.
+ */
+function extractProjectDataFromTable(table: ParsedTable, ctx: ExtractionContext): void {
+  // The label column is the last non-value column ("Sección | Campo | Valor").
+  const normalized = table.headers.map(normalizeHeader);
+  let valueIdx = normalized.findIndex((h) => /^(valor|value|definici[óo]n)$/.test(h));
+  let labelIdx = normalized.findIndex((h) => /^(campo|field|indicador|concepto|dato)$/.test(h));
+  if (valueIdx === -1 || labelIdx === -1) {
+    labelIdx = 0;
+    valueIdx = 1;
+  }
+
+  for (const row of table.rows) {
+    const label = (row[labelIdx] ?? "").trim();
+    const value = (row[valueIdx] ?? "").trim();
+    if (!label || !value) continue;
+
+    const match = PROJECT_FIELD_PATTERNS.find(([, pattern]) => pattern.test(label));
+    if (match) {
+      const [field] = match;
+      if (field === "budget") {
+        if (ctx.result.project.budget == null) ctx.result.project.budget = toNumber(value);
+      } else if (field === "start_date" || field === "target_finish_date") {
+        if (!ctx.result.project[field]) ctx.result.project[field] = toIsoDate(value);
+      } else if (!ctx.result.project[field]) {
+        ctx.result.project[field] = value;
+      }
+      continue;
+    }
+    // Unmapped labels are charter content, not noise. A recognized charter
+    // field keeps the value verbatim; anything else is preserved with its
+    // label so the planner's wording survives the import.
+    const charterKey = charterKeyFor(label);
+    appendCharterField(ctx, charterKey ?? "background", charterKey ? value : `${label}: ${value}`, table.name);
   }
 }
 
@@ -824,6 +1014,10 @@ export function detectProjectType(text: string): { type: ProjectType; score: num
 
 // ── Main extraction ─────────────────────────────────────────────────────────
 
+/** Sheets that summarize or explain the workbook instead of holding records. */
+const INFORMATIONAL_SHEET =
+  /dashboard|tablero|^inicio$|^portada$|^summary$|^resumen$|read ?me|l[ée]eme|instrucciones|instructions|overview/i;
+
 function dispatchTable(table: ParsedTable, type: string, ctx: ExtractionContext): void {
   switch (type) {
     case "task": extractTasksFromTable(table, ctx); break;
@@ -867,7 +1061,24 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
     extractFromJson(parsed.rawJson, ctx);
   }
 
+  // Pass 1 — sheets that declare the project itself. They run first so a
+  // declared project name/date always beats the root row of a WBS, whatever
+  // order the sheets happen to sit in. These sheets yield no tasks or
+  // milestones, so entity order (and therefore source_order) is unaffected.
+  const consumed = new Set<ParsedTable>();
   for (const table of parsed.tables) {
+    if (INFORMATIONAL_SHEET.test(table.name)) continue;
+    if (isCharterTable(table) || isGovernanceTable(table) || isDataDependenciesTable(table) || isAcceptanceCriteriaTable(table)) {
+      continue;
+    }
+    if (isProjectDataTable(table)) {
+      extractProjectDataFromTable(table, ctx);
+      consumed.add(table);
+    }
+  }
+
+  for (const table of parsed.tables) {
+    if (consumed.has(table)) continue;
     // Charter-family sheets are routed by shape/name before generic
     // classification — they are key/value or register sheets, not entity rows.
     if (isCharterTable(table)) {
@@ -886,8 +1097,12 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
       extractAcceptanceCriteriaFromTable(table, ctx);
       continue;
     }
+    // Cover pages, dashboards and instruction sheets restate numbers that
+    // already exist elsewhere. Importing them mints phantom budget lines and
+    // tasks, so they are skipped outright rather than classified.
+    if (INFORMATIONAL_SHEET.test(table.name)) continue;
     const { type } = classifyTable(table);
-    if (type === "unknown" && !/summary|resumen|portada|overview|dashboard|read ?me|l[ée]eme|instrucciones|instructions/i.test(table.name)) {
+    if (type === "unknown") {
       // Honesty: the review step must SAY a sheet was not understood instead
       // of silently dropping it.
       ctx.result.unparsed_tables.push(table.name);
@@ -899,14 +1114,30 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
   // Deduplicate tasks across sheets (e.g. a "Critical Path" sheet repeating
   // the WBS): same source_id or same name = one task; later occurrences only
   // fill fields the first one left empty.
+  // Name collisions are only evidence of a duplicate when the rows do not
+  // already identify themselves. A WBS legitimately repeats a group name
+  // ("Process Design") once per phase, and folding those together silently
+  // dropped real rows — an explicit, distinct id always wins over the name.
+  const explicitIds = new Set<string>();
+  for (const task of ctx.result.tasks) {
+    if (!/^task-\d+$/.test(task.source_id)) explicitIds.add(task.source_id.toLowerCase());
+  }
+
   const taskByKey = new Map<string, CanonicalTask>();
   for (const task of ctx.result.tasks) {
     const k = (task.source_id || task.name).toLowerCase();
     const nameKey = `name:${task.name.toLowerCase().trim()}`;
-    const existing = taskByKey.get(k) ?? taskByKey.get(nameKey);
+    const hasExplicitId = !/^task-\d+$/.test(task.source_id) && explicitIds.has(k);
+    const byName = taskByKey.get(nameKey);
+    // Two explicitly-identified rows that merely share a name are distinct.
+    const existing =
+      taskByKey.get(k) ??
+      (hasExplicitId && byName && !/^task-\d+$/.test(byName.source_id) && byName.source_id.toLowerCase() !== k
+        ? undefined
+        : byName);
     if (!existing) {
       taskByKey.set(k, task);
-      taskByKey.set(nameKey, task);
+      if (!taskByKey.has(nameKey)) taskByKey.set(nameKey, task);
       continue;
     }
     if (!existing.planned_start && task.planned_start) existing.planned_start = task.planned_start;
@@ -923,6 +1154,31 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
     }
   }
   ctx.result.tasks = [...new Set(taskByKey.values())];
+
+  // A row promoted to a milestone must not reappear as a task because a
+  // satellite sheet (test plan, gate register) cites the same activity id.
+  // The id match is the strong signal, so it is applied first.
+  const milestoneSourceIds = new Set(
+    ctx.result.milestones.map((m) => m.source_id.toLowerCase().trim()).filter(Boolean),
+  );
+  if (milestoneSourceIds.size > 0) {
+    ctx.result.tasks = ctx.result.tasks.filter(
+      (t) => !milestoneSourceIds.has(t.source_id.toLowerCase().trim()),
+    );
+  }
+
+  // A workbook often lists the same deliverable twice: once as a row of the
+  // WBS and once in a dedicated milestone/gate register. Keep it as the task
+  // (that is where the work, dates and owner live) instead of importing a
+  // milestone that shadows it. Dedupe milestones among themselves too.
+  const taskNames = new Set(ctx.result.tasks.map((t) => t.name.toLowerCase().trim()));
+  const seenMilestoneNameKeys = new Set<string>();
+  ctx.result.milestones = ctx.result.milestones.filter((m) => {
+    const nameKey = m.name.toLowerCase().trim();
+    if (!nameKey || taskNames.has(nameKey) || seenMilestoneNameKeys.has(nameKey)) return false;
+    seenMilestoneNameKeys.add(nameKey);
+    return true;
+  });
 
   // Project name: a summary/dashboard sheet whose only header is a long
   // title. Summary-like sheets win over dashboards.
