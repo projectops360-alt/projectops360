@@ -69,6 +69,12 @@ export interface ExecuteImportResult {
   recommendations: { type: string; message_i18n: Record<string, string | undefined> }[];
   /** Rows accepted for import that the database rejected. Empty on a clean run. */
   writeFailures: ImportWriteFailure[];
+  /**
+   * False when the derived projections (Living Graph, critical path) ran out
+   * of budget. The import still succeeded — the user's data is complete — but
+   * the graph is partial and can be rebuilt.
+   */
+  projectionsComplete: boolean;
 }
 
 function normTitle(s: string): string {
@@ -157,6 +163,13 @@ export async function executeImport(params: {
   selectedProjectType: string;
   entities: ImportEntityRow[];
   locale: "en" | "es";
+  /**
+   * `Date.now()` after which the derived projections stop. The user's data is
+   * always written in full; only the graph/critical-path phase is bounded, so
+   * a large plan can no longer run the function out of time and strand the job
+   * in 'importing' with no error and no way back.
+   */
+  projectionDeadline?: number | null;
 }): Promise<ExecuteImportResult> {
   const supabase = createAdminClient();
   const { organizationId, jobId } = params;
@@ -650,7 +663,29 @@ export async function executeImport(params: {
   }
 
   // ── 9. Living Graph ────────────────────────────────────────────────────────
+  // DERIVED, AND DELIBERATELY INTERRUPTIBLE.
+  //
+  // Everything above is the user's data; everything from here down is a
+  // projection of it. This phase alone issues two writes per task, so a
+  // 274-task plan spends most of the invocation here — and when the function
+  // hit its time limit mid-way, the timeout killed the process before the
+  // caller's catch could run: no error, no rollback, and the job sat in
+  // 'importing' forever even though every row had been written correctly.
+  //
+  // So the budget is checked between items and the phase stops cleanly when it
+  // runs low. Whatever is left is reported as pending rather than silently
+  // treated as done: the graph is rebuildable, the user's data is not.
   if (!projectId) throw new Error("No project id after import");
+
+  const projectionDeadline = params.projectionDeadline ?? null;
+  let projectionsComplete = true;
+  const outOfTime = (): boolean => {
+    if (projectionDeadline == null) return false;
+    if (Date.now() < projectionDeadline) return false;
+    projectionsComplete = false;
+    return true;
+  };
+
   const importNodeId = await emitProcessNode({
     organizationId,
     projectId,
@@ -664,6 +699,7 @@ export async function executeImport(params: {
   // Milestone nodes + contains edges to their tasks; imported_from edges to the import node
   const milestoneNodeByTitleKey = new Map<string, string>();
   for (const [titleKey, msId] of milestoneIdBySourceName) {
+    if (outOfTime()) break;
     const nodeId = await emitProcessNode({
       organizationId, projectId,
       nodeType: "milestone_gate", sourceEntityType: "milestones", sourceEntityId: msId,
@@ -681,6 +717,7 @@ export async function executeImport(params: {
     }
   }
   for (const task of canonical.tasks) {
+    if (outOfTime()) break;
     const taskDbId = taskIdBySourceId.get(task.source_id);
     if (!taskDbId) continue;
     const taskNodeId = await emitProcessNode({
@@ -703,6 +740,7 @@ export async function executeImport(params: {
     }
   }
   for (const mat of canonical.materials) {
+    if (outOfTime()) break;
     const matDbId = materialIdBySourceId.get(mat.source_id);
     if (!matDbId) continue;
     const matNodeId = await emitProcessNode({
@@ -717,7 +755,7 @@ export async function executeImport(params: {
 
   // ── 10. Critical path ──────────────────────────────────────────────────────
   let criticalPathCalculated = false;
-  if ((created["dependencies"] ?? 0) > 0 || (created["tasks"] ?? 0) > 1) {
+  if (!outOfTime() && ((created["dependencies"] ?? 0) > 0 || (created["tasks"] ?? 0) > 1)) {
     try {
       await recalculateCriticalPath(organizationId, projectId, "dependency_change");
       criticalPathCalculated = true;
@@ -771,7 +809,15 @@ export async function executeImport(params: {
     }
   }
 
-  return { projectId, created, skippedDuplicates, criticalPathCalculated, recommendations, writeFailures };
+  return {
+    projectId,
+    created,
+    skippedDuplicates,
+    criticalPathCalculated,
+    recommendations,
+    writeFailures,
+    projectionsComplete,
+  };
 }
 
 // ── Rollback ────────────────────────────────────────────────────────────────

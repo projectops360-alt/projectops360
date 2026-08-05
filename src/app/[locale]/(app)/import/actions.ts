@@ -11,6 +11,16 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+
+// Mirrors `maxDuration` on import/page.tsx — the real limit is declared there
+// because a "use server" module may only export async functions, and server
+// actions inherit the budget of the route they are invoked from. 300s is the
+// platform ceiling on this plan, so it cannot be raised; the projection phase
+// must fit inside it or stop cleanly (REG-048).
+const IMPORT_MAX_DURATION_SECONDS = 300;
+
+/** Margin left for marking the job complete after the projections stop. */
+const PROJECTION_RESERVE_SECONDS = 60;
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -21,6 +31,7 @@ import { extractCanonicalImport, buildFieldMappings } from "@/lib/import-intelli
 import { aiExtractCanonicalImport } from "@/lib/import-intelligence/ai-extract";
 import { validateCanonicalImport } from "@/lib/import-intelligence/validate";
 import { executeImport, rollbackImport } from "@/lib/import-intelligence/execute";
+import { canRollbackJob } from "@/lib/import-intelligence/job-recovery";
 import type {
   ImportEntityType,
   ProjectImportJob,
@@ -532,6 +543,11 @@ export async function executeImportAction(input: {
   await supabase.from("project_import_jobs").update({ status: "importing" }).eq("id", job.id);
   await audit(org.organizationId, job.id, "import_started", "Import execution started", org.userId);
 
+  // Leave headroom inside maxDuration so the derived projections stop on their
+  // own terms instead of being killed mid-write by the platform.
+  const projectionDeadline =
+    Date.now() + (IMPORT_MAX_DURATION_SECONDS - PROJECTION_RESERVE_SECONDS) * 1000;
+
   try {
     const result = await executeImport({
       organizationId: org.organizationId,
@@ -543,6 +559,7 @@ export async function executeImportAction(input: {
       selectedProjectType: input.selectedProjectType || job.selected_project_type || job.detected_project_type || "general",
       entities: (entities ?? []) as Parameters<typeof executeImport>[0]["entities"],
       locale: (org.locale as "en" | "es") ?? "en",
+      projectionDeadline,
     });
 
     await supabase
@@ -551,7 +568,15 @@ export async function executeImportAction(input: {
         status: "imported",
         project_id: result.projectId,
         completed_at: new Date().toISOString(),
-        summary_json: { ...job.summary_json, created: result.created, skipped_duplicates: result.skippedDuplicates, critical_path_calculated: result.criticalPathCalculated },
+        summary_json: {
+          ...job.summary_json,
+          created: result.created,
+          skipped_duplicates: result.skippedDuplicates,
+          critical_path_calculated: result.criticalPathCalculated,
+          // Say so when the graph is partial rather than let the summary imply
+          // a complete projection.
+          projections_complete: result.projectionsComplete,
+        },
       })
       .eq("id", job.id);
     await audit(org.organizationId, job.id, "import_completed", "Import completed", org.userId, result.created);
@@ -589,7 +614,7 @@ export async function rollbackImportAction(input: { jobId: string }): Promise<{ 
   }
   const job = await loadJob(org.organizationId, input.jobId);
   if (!job) return { error: "job_not_found" };
-  if (job.status !== "imported" && job.status !== "failed") return { error: "invalid_status" };
+  if (!canRollbackJob(job.status, job.updated_at ?? job.created_at)) return { error: "invalid_status" };
 
   const removed = await rollbackImport(org.organizationId, job.id);
   const supabase = createAdminClient();

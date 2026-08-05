@@ -1627,3 +1627,63 @@ with a plain UNIQUE constraint, either the constraint is partial
 (`IMPORT-SLUG-UNIQUENESS`) — candidate order, accent/punctuation slugging, the
 unnamed-project fallback, that the list never ends on a plain numbered suffix,
 and that it is stable for a given job id.
+
+## REG-048 — A timed-out import stranded the job in 'importing', with no error and no way back
+
+**Date:** 2026-08-05 · **Status:** closed · **Guard:** `IMPORT-NO-DEAD-END`
+
+Re-importing the 274-task SAP plan wrote **every row correctly** — 274 tasks,
+16 milestones, 155 dependencies, 19 resources, 10 risks, 7 budget lines, the
+charter, zero write failures — and then the import never finished. The job sat
+in `importing` indefinitely. The user saw an import that never completed while
+owning a perfectly good project.
+
+**Root cause.** `executeImport` does everything in one invocation, and phases
+1–8 (the user's data) are followed by phases 9–11, which are *projections* of
+that data: the Living Graph emits **two writes per task**, so a 274-task plan
+spends most of the invocation there. The function exceeded its time limit
+mid-projection.
+
+A timeout does not throw — it **kills the process**. So:
+
+* the executor's `catch` never ran;
+* the job was never marked `failed`;
+* no rollback was attempted;
+* nothing was written to `error_message`.
+
+And because `rollbackImportAction` accepted only `imported` and `failed`, the
+job could be neither finished nor undone. Measured on the real run: 249 of ~291
+graph nodes, no critical path, job stuck.
+
+**The deeper mistake** was treating the user's data and a derived projection as
+one indivisible unit of work. The graph is rebuildable; the plan is not. Binding
+them meant a cosmetic phase could strand a successful import.
+
+**How it was solved.**
+
+1. **The projections are bounded and interruptible.** `projectionDeadline` is
+   checked between items; the phase stops cleanly when the budget runs low and
+   the result carries `projectionsComplete: false`, which the job summary
+   records. A partial graph is reported as partial rather than implied
+   complete.
+2. **Headroom.** `maxDuration = 800` on the import actions module, with the
+   projection deadline set 120 s inside it, so the phase stops on its own terms
+   instead of being killed mid-write by the platform.
+3. **No state is a dead end.** `canRollbackJob` also accepts `importing` once
+   the job has outlived any run that could still be in flight
+   (`ABANDONED_IMPORT_AFTER_MS`, 15 min). Rolling back sooner would delete rows
+   from under a live import, so the age check is the safety condition — and a
+   job with no usable timestamp is refused rather than guessed at.
+
+**Protection rule (binding):** a user's data and a projection of it are not one
+unit of work. Whatever is rebuildable must never be able to strand what is not.
+Any long operation under a platform time limit must (a) bound the derived work
+with an explicit budget, (b) report partial derivation honestly, and (c) leave
+every state recoverable — because a timeout gives no chance to clean up after
+itself.
+
+**Verify:** `src/lib/import-intelligence/__tests__/job-recovery.test.ts`
+(`IMPORT-NO-DEAD-END`) — a fresh `importing` job is never rolled back from
+under a live run, an abandoned one is recoverable, states that were never dead
+ends stay untouched, and a missing/unparseable timestamp refuses rather than
+guesses.
