@@ -40,6 +40,7 @@ import type {
 } from "@/types/import-intelligence";
 import { emptyCanonicalImport } from "./extract";
 import { orderImportEntities } from "./source-order";
+import type { ImportPhase } from "./progress";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -171,6 +172,12 @@ export async function executeImport(params: {
    * in 'importing' with no error and no way back.
    */
   projectionDeadline?: number | null;
+  /**
+   * Reports what is being written, so the UI can show progress per category
+   * instead of a spinner. Throttling is the caller's business; the executor
+   * simply says where it is.
+   */
+  onProgress?: (phase: ImportPhase, done: number, total: number) => void | Promise<void>;
 }): Promise<ExecuteImportResult> {
   const supabase = createAdminClient();
   const { organizationId, jobId } = params;
@@ -196,6 +203,15 @@ export async function executeImport(params: {
       reason: error?.message ?? "unknown database error",
     });
     console.error(`[import] ${entityType} "${title}" rejected:`, error?.message ?? error);
+  };
+  const report = async (phase: ImportPhase, done: number, total: number) => {
+    if (!params.onProgress) return;
+    try {
+      await params.onProgress(phase, done, total);
+    } catch (e) {
+      // Progress is a courtesy; never let it break the import.
+      console.error("[import] progress report failed:", e);
+    }
   };
   const semanticallyCapturedIds = new Set<string>();
   const captureSource: ProcessMiningCaptureSource = {
@@ -258,6 +274,7 @@ export async function executeImport(params: {
     projectId = (project as { project_id: string }).project_id;
     await track(supabase, organizationId, jobId, "projects", projectId);
     bump("projects");
+    await report("project", 1, 1);
   } else {
     // Merge mode: load existing titles for duplicate detection — never overwrite.
     const [{ data: tasks }, { data: milestones }] = await Promise.all([
@@ -335,6 +352,7 @@ export async function executeImport(params: {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
       bump("milestones");
+      await report("milestones", created["milestones"] ?? 0, canonical.milestones.length);
       const capture = await captureProcessMiningEvents(buildMilestoneCreatedEvents({
         milestone: {
           milestoneId: row.id,
@@ -372,6 +390,7 @@ export async function executeImport(params: {
       milestoneIdBySourceName.set(tKey, row.id);
       await track(supabase, organizationId, jobId, "milestones", row.id);
       bump("milestones");
+      await report("milestones", created["milestones"] ?? 0, canonical.milestones.length);
       const capture = await captureProcessMiningEvents(buildMilestoneCreatedEvents({
         milestone: {
           milestoneId: row.id,
@@ -422,6 +441,7 @@ export async function executeImport(params: {
       resourceIdByName.set(nKey, row.id);
       await track(supabase, organizationId, jobId, "resources", row.id);
       bump("resources");
+      await report("resources", created["resources"] ?? 0, canonical.resources.length);
     }
   }
 
@@ -449,6 +469,7 @@ export async function executeImport(params: {
       budgetIdBySourceId.set(b.source_id, row.id);
       await track(supabase, organizationId, jobId, "budget_items", row.id);
       bump("budget_items");
+      await report("budget_items", created["budget_items"] ?? 0, canonical.budget_items.length);
     }
   }
 
@@ -511,6 +532,7 @@ export async function executeImport(params: {
       taskIdBySourceId.set(task.source_id, row.id);
       await track(supabase, organizationId, jobId, "roadmap_tasks", row.id);
       bump("tasks");
+      await report("tasks", created["tasks"] ?? 0, canonical.tasks.length);
       const capture = await captureProcessMiningEvents(buildTaskCreatedEvents({
         task: {
           taskId: row.id,
@@ -554,6 +576,7 @@ export async function executeImport(params: {
     if (row) {
       await track(supabase, organizationId, jobId, "task_dependencies", row.id);
       bump("dependencies");
+      await report("dependencies", created["dependencies"] ?? 0, canonical.dependencies.length);
       await captureProcessMiningEvents([buildTaskDependencyEvent({
         dependency: {
           dependencyId: row.id,
@@ -600,6 +623,7 @@ export async function executeImport(params: {
       materialIdBySourceId.set(mat.source_id, row.id);
       await track(supabase, organizationId, jobId, "material_requirements", row.id);
       bump("materials");
+      await report("materials", created["materials"] ?? 0, canonical.materials.length);
     }
   }
 
@@ -660,6 +684,7 @@ export async function executeImport(params: {
     if (riskId) {
       await track(supabase, organizationId, jobId, "risks", riskId);
       bump("risks");
+      await report("risks", created["risks"] ?? 0, canonical.risks.length);
     }
   }
 
@@ -710,7 +735,9 @@ export async function executeImport(params: {
     semanticallyCapturedIds,
   });
 
+  await report("graph", 0, nodeSpecs.length);
   const nodeIdByKey = outOfTime() ? new Map<string, string>() : await emitProcessNodes(nodeSpecs);
+  await report("graph", nodeIdByKey.size, nodeSpecs.length);
 
   const edgeSpecs = buildImportGraphEdges({
     organizationId,
@@ -731,6 +758,7 @@ export async function executeImport(params: {
   let criticalPathCalculated = false;
   if (!outOfTime() && ((created["dependencies"] ?? 0) > 0 || (created["tasks"] ?? 0) > 1)) {
     try {
+      await report("critical_path", 0, 0);
       await recalculateCriticalPath(organizationId, projectId, "dependency_change");
       criticalPathCalculated = true;
     } catch (e) {
