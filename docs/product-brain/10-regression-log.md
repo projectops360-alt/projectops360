@@ -1575,3 +1575,55 @@ attempted.
 durations are untouched, the canonical keeps the source `0`, and the real
 291-row plan (fixture-gated) has >50 zero-duration rows of which none is
 unwritable.
+
+## REG-047 — Rolling an import back burned its project slug forever
+
+**Date:** 2026-08-05 · **Status:** closed · **Guard:** `IMPORT-SLUG-UNIQUENESS`
+
+After rolling back the REG-046 import and re-importing the same file, the
+import died with *"Import failed and was rolled back"* and:
+
+```
+Project creation failed: duplicate key value violates unique constraint
+"projects_organization_id_slug_key"
+```
+
+**Root cause.** The constraint counts every row:
+
+```sql
+UNIQUE (organization_id, slug)          -- no deleted_at predicate
+```
+
+An import rollback only **soft-deletes** the project. The executor's clash
+check, however, excluded soft-deleted rows:
+
+```ts
+.eq("slug", slug).is("deleted_at", null).maybeSingle()   // ← disagrees with the DB
+```
+
+So the executor judged the slug free while the database still considered it
+taken. The consequence is worse than one failed import: **a rolled-back import
+burns its slug permanently** — every future attempt to import that same plan
+picks the same base slug and fails the same way. The recovery path we had just
+told the user to take was itself broken.
+
+The fallback compounded it: after 49 suffixes the loop exited with `slug` still
+set to the last colliding candidate and attempted the insert anyway.
+
+**How it was solved.** `projectSlugCandidates(name, jobId)` returns the ordered
+candidate list — the clean slug, then `-1…-49`, then one derived from the job id
+that cannot collide and is stable across retries of the same job. The executor
+walks it and takes the first slug that is free **against every row, deleted or
+not**.
+
+**Protection rule (binding):** a uniqueness pre-check must use the *same*
+predicate as the constraint it is anticipating. Filtering soft-deleted rows out
+of a check whose constraint counts them makes the application and the database
+disagree, and the database always wins. Where a soft-delete convention coexists
+with a plain UNIQUE constraint, either the constraint is partial
+(`WHERE deleted_at IS NULL`) or the check must not filter — never one of each.
+
+**Verify:** `src/lib/import-intelligence/__tests__/import-write-integrity.test.ts`
+(`IMPORT-SLUG-UNIQUENESS`) — candidate order, accent/punctuation slugging, the
+unnamed-project fallback, that the list never ends on a plain numbered suffix,
+and that it is stable for a given job id.

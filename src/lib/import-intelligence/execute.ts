@@ -88,6 +88,25 @@ export function normalizeDurationDays(v: number | null | undefined): number | nu
   return v;
 }
 
+/**
+ * Slug candidates for an imported project, in the order they should be tried.
+ *
+ * Uniqueness must be judged against EVERY row, soft-deleted included: the
+ * constraint is UNIQUE (organization_id, slug) with no deleted_at predicate,
+ * while an import rollback only soft-deletes. The last candidate is derived
+ * from the job id so the sequence can never run out and never repeats a name
+ * already known to clash.
+ */
+export function projectSlugCandidates(name: string, jobId: string): string[] {
+  const base =
+    normTitle(name || "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) ||
+    "imported-project";
+  const candidates = [base];
+  for (let suffix = 1; suffix < 50; suffix++) candidates.push(`${base}-${suffix}`);
+  candidates.push(`${base}-${jobId.slice(0, 8)}`);
+  return candidates;
+}
+
 async function track(
   supabase: Admin,
   organizationId: string,
@@ -180,14 +199,20 @@ export async function executeImport(params: {
 
   if (params.importMode === "create_new" || !projectId) {
     const name = canonical.project.name || "Imported Project";
-    const slugBase = normTitle(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "imported-project";
-    let slug = slugBase;
-    for (let suffix = 1; suffix < 50; suffix++) {
+    // NOTE the absence of `.is("deleted_at", null)`: a rollback soft-deletes,
+    // and the unique constraint counts soft-deleted rows. Filtering them out
+    // made this check disagree with the database, so rolling an import back
+    // and re-importing the same file always died on a duplicate key.
+    const candidates = projectSlugCandidates(name, jobId);
+    let slug = candidates[candidates.length - 1];
+    for (const candidate of candidates) {
       const { data: clash } = await supabase
         .from("projects").select("id")
-        .eq("organization_id", organizationId).eq("slug", slug).is("deleted_at", null).maybeSingle();
-      if (!clash) break;
-      slug = `${slugBase}-${suffix}`;
+        .eq("organization_id", organizationId).eq("slug", candidate).maybeSingle();
+      if (!clash) {
+        slug = candidate;
+        break;
+      }
     }
     // WHY A SESSION CLIENT ONLY HERE
     // Creating a project is the one authorisation decision in this pipeline.
