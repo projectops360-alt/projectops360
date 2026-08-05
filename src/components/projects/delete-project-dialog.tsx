@@ -20,13 +20,15 @@ import {
 import type { ProjectDeletionImpact } from "@/app/[locale]/(app)/projects/actions";
 
 interface DeleteProjectDialogProps {
-  impact: ProjectDeletionImpact;
+  /** Null while the counts are still being read. */
+  impact: ProjectDeletionImpact | null;
   /** Resolves to an error key, or undefined on success. */
   onConfirm: () => Promise<string | undefined>;
   onClose: () => void;
   labels: {
     step1Title: string;
     step1Body: string;
+    loading: string;
     tasks: string;
     milestones: string;
     dependencies: string;
@@ -46,9 +48,14 @@ export function DeleteProjectDialog({ impact, onConfirm, onClose, labels }: Dele
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Until the impact is known the dialog cannot say what would be destroyed,
+  // so confirming is withheld rather than asking for a blind "yes".
+  const loadingImpact = impact === null;
+
   // The state machine decides when destruction is authorised — the button
   // never calls onConfirm on its own.
   const handleConfirm = async () => {
+    if (loadingImpact) return;
     const next = advanceDeletion(step);
     setStep(next.step);
     if (!next.destroy) return;
@@ -63,7 +70,7 @@ export function DeleteProjectDialog({ impact, onConfirm, onClose, labels }: Dele
     }
   };
 
-  const counts = deletionImpactLines(impact, {
+  const counts = impact === null ? [] : deletionImpactLines(impact, {
     tasks: labels.tasks,
     milestones: labels.milestones,
     dependencies: labels.dependencies,
@@ -90,6 +97,12 @@ export function DeleteProjectDialog({ impact, onConfirm, onClose, labels }: Dele
             {step === 1 ? (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">{labels.step1Body}</p>
+                {loadingImpact && (
+                  <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {labels.loading}
+                  </p>
+                )}
                 {counts.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm text-foreground">
                     {counts.map((line) => (
@@ -121,7 +134,7 @@ export function DeleteProjectDialog({ impact, onConfirm, onClose, labels }: Dele
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={busy}
+            disabled={busy || loadingImpact}
             className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}

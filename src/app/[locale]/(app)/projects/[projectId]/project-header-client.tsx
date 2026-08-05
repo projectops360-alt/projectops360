@@ -39,6 +39,7 @@ interface ProjectHeaderClientProps {
     trigger: string;
     step1Title: string;
     step1Body: string;
+    loading: string;
     tasks: string;
     milestones: string;
     dependencies: string;
@@ -75,14 +76,25 @@ export function ProjectHeaderClient({
   deleteLabels,
 }: ProjectHeaderClientProps) {
   const [showEdit, setShowEdit] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteImpact, setDeleteImpact] = useState<ProjectDeletionImpact | null>(null);
   const router = useRouter();
 
-  // The impact is fetched before the first dialog so it can state real numbers.
+  // Open FIRST, then fetch. Waiting for the counts before showing anything left
+  // the button looking dead for the length of a round trip; the dialog now
+  // appears at once and fills in its numbers, keeping "confirm" disabled until
+  // it can say what would actually be destroyed.
   const openDeleteDialog = async () => {
+    setDeleteOpen(true);
+    setDeleteImpact(null);
     const result = await getProjectDeletionImpactAction(projectId);
     if (result.impact) setDeleteImpact(result.impact);
     else console.error("Failed to read deletion impact:", result.error);
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteOpen(false);
+    setDeleteImpact(null);
   };
 
   const handlePermanentDelete = async (): Promise<string | undefined> => {
@@ -149,18 +161,19 @@ export function ProjectHeaderClient({
         </div>
       </div>
 
-      {deleteImpact && (
+      {deleteOpen && (
         <DeleteProjectDialog
           impact={deleteImpact}
           onConfirm={handlePermanentDelete}
-          onClose={() => setDeleteImpact(null)}
+          onClose={closeDeleteDialog}
           labels={{
             step1Title: deleteLabels.step1Title,
             step1Body: deleteLabels.step1Body,
-            tasks: withCount(deleteLabels.tasks, deleteImpact.tasks),
-            milestones: withCount(deleteLabels.milestones, deleteImpact.milestones),
-            dependencies: withCount(deleteLabels.dependencies, deleteImpact.dependencies),
-            events: withCount(deleteLabels.events, deleteImpact.events),
+            loading: deleteLabels.loading,
+            tasks: withCount(deleteLabels.tasks, deleteImpact?.tasks ?? 0),
+            milestones: withCount(deleteLabels.milestones, deleteImpact?.milestones ?? 0),
+            dependencies: withCount(deleteLabels.dependencies, deleteImpact?.dependencies ?? 0),
+            events: withCount(deleteLabels.events, deleteImpact?.events ?? 0),
             step1Confirm: deleteLabels.step1Confirm,
             step2Title: deleteLabels.step2Title,
             step2Body: deleteLabels.step2Body,

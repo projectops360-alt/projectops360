@@ -1041,7 +1041,8 @@
       "deleteStep2Confirm": "Sí, eliminar para siempre",
       "deleteCancel": "Cancelar",
       "deleting": "Eliminando…",
-      "deleteFailed": "No se pudo eliminar el proyecto. No se borró nada."
+      "deleteFailed": "No se pudo eliminar el proyecto. No se borró nada.",
+      "deleteLoadingImpact": "Comprobando qué se eliminaría…"
     },
     "aiCommSummary": {
       "button": "Resumir Comunicaciones",
