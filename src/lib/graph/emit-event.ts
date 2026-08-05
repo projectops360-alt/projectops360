@@ -123,6 +123,125 @@ export async function emitProcessEdge(input: EmitEdgeInput): Promise<boolean> {
   }
 }
 
+// ── Bulk emitters ─────────────────────────────────────────────────────────────
+// One row at a time is fine for a status change; it is not fine for an import.
+// A 274-task plan emits roughly 800 nodes and edges, and at one round trip each
+// that phase alone consumed the whole function budget and was cut short
+// (REG-048). These write in chunks, turning ~800 round trips into a handful.
+
+/** Rows per statement. Large enough to matter, small enough for the payload. */
+const BULK_CHUNK = 400;
+
+/** Identity of a node in the map returned by `emitProcessNodes`. */
+export function processNodeKey(
+  sourceEntityType: string,
+  sourceEntityId: string,
+  nodeType: string,
+): string {
+  return `${sourceEntityType}:${sourceEntityId}:${nodeType}`;
+}
+const nodeKey = processNodeKey;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Insert many process_nodes.
+ *
+ * Returns a map from `sourceEntityType:sourceEntityId:nodeType` to node id, so
+ * callers can wire edges without holding on to positional results.
+ *
+ * The uniqueness index is PARTIAL (`WHERE deleted_at IS NULL`), which PostgREST
+ * cannot target with `on_conflict`. So a chunk is inserted plainly and, if it
+ * trips a duplicate, that chunk alone falls back to the single-row emitter,
+ * which already resolves an existing node to its id. The fast path stays fast;
+ * the rare path stays correct.
+ */
+export async function emitProcessNodes(inputs: EmitNodeInput[]): Promise<Map<string, string>> {
+  const byKey = new Map<string, string>();
+  if (inputs.length === 0) return byKey;
+
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+
+  for (const group of chunk(inputs, BULK_CHUNK)) {
+    const rows = group.map((input) => ({
+      organization_id: input.organizationId,
+      project_id: input.projectId,
+      node_type: input.nodeType,
+      source_entity_type: input.sourceEntityType,
+      source_entity_id: input.sourceEntityId,
+      title: input.title,
+      metadata: input.metadata ?? {},
+      occurred_at: input.occurredAt ?? now,
+    }));
+
+    const { data, error } = await supabase
+      .from("process_nodes")
+      .insert(rows)
+      .select("id, source_entity_type, source_entity_id, node_type");
+
+    if (!error && data) {
+      for (const row of data) {
+        byKey.set(nodeKey(row.source_entity_type, row.source_entity_id, row.node_type), row.id);
+      }
+      continue;
+    }
+
+    console.error("[graph] emitProcessNodes chunk failed, falling back:", error?.message);
+    for (const input of group) {
+      const id = await emitProcessNode(input);
+      if (id) byKey.set(nodeKey(input.sourceEntityType, input.sourceEntityId, input.nodeType), id);
+    }
+  }
+
+  return byKey;
+}
+
+/**
+ * Insert many process_edges, ignoring ones that already exist.
+ *
+ * Unlike nodes, the edge constraint is a plain UNIQUE, so duplicates can be
+ * skipped by the database in a single statement.
+ */
+export async function emitProcessEdges(inputs: EmitEdgeInput[]): Promise<number> {
+  if (inputs.length === 0) return 0;
+
+  const supabase = createAdminClient();
+  let written = 0;
+
+  for (const group of chunk(inputs, BULK_CHUNK)) {
+    const rows = group.map((input) => ({
+      organization_id: input.organizationId,
+      project_id: input.projectId,
+      from_node_id: input.fromNodeId,
+      to_node_id: input.toNodeId,
+      edge_type: input.edgeType,
+      weight: input.weight ?? 1.0,
+      metadata: input.metadata ?? {},
+    }));
+
+    const { data, error } = await supabase
+      .from("process_edges")
+      .upsert(rows, { onConflict: "from_node_id,to_node_id,edge_type", ignoreDuplicates: true })
+      .select("id");
+
+    if (error) {
+      console.error("[graph] emitProcessEdges chunk failed, falling back:", error.message);
+      for (const input of group) {
+        if (await emitProcessEdge(input)) written++;
+      }
+      continue;
+    }
+    written += data?.length ?? 0;
+  }
+
+  return written;
+}
+
 // ── Auto-link: find related nodes and create edges ────────────────────────────
 
 /**
