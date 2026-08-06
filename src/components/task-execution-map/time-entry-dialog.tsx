@@ -38,6 +38,12 @@ export interface TimeEntryDialogProps {
    */
   people?: TimeLogPerson[];
   peopleStatus?: "loading" | "ready" | "error";
+  /**
+   * Project members who cannot receive time because they have no login.
+   * Named rather than silently omitted: a picker that is missing the person a
+   * task is assigned to reads as broken unless it says why.
+   */
+  peopleWithoutLogin?: string[];
   canLogForOthers?: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -57,6 +63,7 @@ export function TimeEntryDialog({
   entry,
   people,
   peopleStatus = "ready",
+  peopleWithoutLogin = [],
   canLogForOthers,
   onClose,
   onSaved,
@@ -222,6 +229,20 @@ export function TimeEntryDialog({
 
             {peopleStatus === "ready" && (people?.length ?? 0) === 0 && (
               <p className="mt-1 text-xs text-muted-foreground">{t("forUserEmpty")}</p>
+            )}
+
+            {/* Time is stored against an auth user, so a member with no login
+                cannot receive it. Say who, instead of leaving a gap the user
+                has to guess at — including, often, the very person the task is
+                assigned to. */}
+            {peopleStatus === "ready" && peopleWithoutLogin.length > 0 && (
+              <p className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+                {t("forUserNoLogin", {
+                  count: peopleWithoutLogin.length,
+                  names: peopleWithoutLogin.slice(0, 3).join(", "),
+                })}
+                {peopleWithoutLogin.length > 3 && ` (+${peopleWithoutLogin.length - 3})`}
+              </p>
             )}
 
             {peopleStatus === "ready" && (people?.length ?? 0) > 0 && (

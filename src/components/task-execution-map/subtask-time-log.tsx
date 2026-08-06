@@ -104,7 +104,9 @@ export function TimeLogPanel({
   const [peopleState, setPeopleState] = useState<{
     status: "loading" | "ready" | "error";
     list: TimeLogPerson[];
-  }>({ status: "loading", list: [] });
+    /** People on the project who cannot receive time: they have no login. */
+    withoutLogin: string[];
+  }>({ status: "loading", list: [], withoutLogin: [] });
   const [pending, startTransition] = useTransition();
   const isTaskLevel = !subtaskId;
 
@@ -135,23 +137,23 @@ export function TimeLogPanel({
   // presents a choice the action will reject.
   useEffect(() => {
     let active = true;
-    setPeopleState({ status: "loading", list: [] });
+    setPeopleState({ status: "loading", list: [], withoutLogin: [] });
     listTimeLogPeopleAction(projectId, taskId)
       .then((res) => {
         if (!active) return;
         if (res.error || !res.people) {
           // Surfaced as a failure. Falling back to "just you" is what made the
           // bug invisible: the picker looked complete while it was empty.
-          setPeopleState({ status: "error", list: [] });
+          setPeopleState({ status: "error", list: [], withoutLogin: [] });
           setCanLogForOthers(false);
           return;
         }
-        setPeopleState({ status: "ready", list: res.people });
+        setPeopleState({ status: "ready", list: res.people, withoutLogin: res.withoutLogin ?? [] });
         setCanLogForOthers(!!res.canLogForOthers);
       })
       .catch(() => {
         if (!active) return;
-        setPeopleState({ status: "error", list: [] });
+        setPeopleState({ status: "error", list: [], withoutLogin: [] });
         setCanLogForOthers(false); // deny-by-default
       });
     return () => { active = false; };
@@ -330,6 +332,7 @@ export function TimeLogPanel({
           entry={dialogFor.entry}
           people={peopleState.list}
           peopleStatus={peopleState.status}
+          peopleWithoutLogin={peopleState.withoutLogin}
           canLogForOthers={canLogForOthers}
           onClose={() => setDialogFor(null)}
           onSaved={load}

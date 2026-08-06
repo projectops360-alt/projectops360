@@ -759,7 +759,8 @@
       "forUserLoading": "Loading people…",
       "forUserEmpty": "No other people are assigned to this project yet.",
       "forUserSearch": "Search people…",
-      "forUserNoMatch": "No one matches that search."
+      "forUserNoMatch": "No one matches that search.",
+      "forUserNoLogin": "{count} project member(s) cannot be logged against because they have no account yet: {names}. Invite them to log time for them."
     }
   },
   "dashboard": {
