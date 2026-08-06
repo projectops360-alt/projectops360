@@ -236,36 +236,58 @@ export function timelineLayout(
   const max = Math.max(...times);
   const span = Math.max(1, max - min);
 
-  // Track per-lane occupancy to avoid overlap when many events share a date
-  const laneSlots = new Map<string, number[]>();
+  // Cards are packed into rows within their lane so that none overlaps.
+  //
+  // The previous attempt could not have worked. It recorded
+  // `x + subRow * 1_000_000` and then measured `|recorded − x|` against it, so
+  // every row above the first read as astronomically far away; and its row
+  // test compared `index / 1000` — an array position — against the row number,
+  // which is only ever true for row zero. It then gave up after five rows.
+  // Hundreds of cards ended up stacked on the same spot, unreadable without
+  // dragging them apart by hand.
+  //
+  // Packing is greedy in time order: each card takes the first row in its lane
+  // whose previous card ends far enough to the left. For fixed-width items on
+  // a line that is optimal, and it needs no row limit.
+  const MIN_GAP = NODE_WIDTH + 24;
 
-  nodes.forEach((node, i) => {
-    const t = times[i];
-    const laneIndex = Math.max(0, LANE_ORDER.indexOf(node.nodeType));
-    const x = 40 + ((t - min) / span) * TIMELINE_WIDTH;
+  const order = nodes.map((_, i) => i).sort((a, b) => times[a] - times[b]);
+  const laneRowEnds = new Map<number, number[]>();
+  const placement = new Map<string, { lane: number; row: number; x: number }>();
 
-    const slotKey = `${laneIndex}`;
-    const used = laneSlots.get(slotKey) ?? [];
-    // Push down within the lane if another node is horizontally too close
-    let subRow = 0;
-    while (
-      used.some(
-        (ux, idx) =>
-          Math.abs(ux - x) < NODE_WIDTH + 24 &&
-          Math.floor(idx / 1000) === subRow,
-      )
-    ) {
-      subRow++;
-      if (subRow > 5) break;
+  for (const i of order) {
+    const node = nodes[i];
+    const lane = Math.max(0, LANE_ORDER.indexOf(node.nodeType));
+    const x = 40 + ((times[i] - min) / span) * TIMELINE_WIDTH;
+
+    const rowEnds = laneRowEnds.get(lane) ?? [];
+    let row = rowEnds.findIndex((endX) => x >= endX);
+    if (row === -1) {
+      rowEnds.push(x + MIN_GAP);
+      row = rowEnds.length - 1;
+    } else {
+      rowEnds[row] = x + MIN_GAP;
     }
-    used.push(x + subRow * 1_000_000); // encode subRow implicitly (cheap)
-    laneSlots.set(slotKey, used);
+    laneRowEnds.set(lane, rowEnds);
+    placement.set(node.id, { lane, row, x });
+  }
 
-    positions.set(node.id, {
-      x,
-      y: 40 + laneIndex * LANE_HEIGHT * 2 + subRow * (NODE_HEIGHT + 16),
+  // Lanes stack by the height they actually needed. A fixed per-lane offset
+  // let a busy lane spill into the one below it.
+  const laneOffsets = new Map<number, number>();
+  let laneY = 40;
+  for (const lane of [...laneRowEnds.keys()].sort((a, b) => a - b)) {
+    laneOffsets.set(lane, laneY);
+    const rows = laneRowEnds.get(lane)?.length ?? 1;
+    laneY += rows * (NODE_HEIGHT + 16) + LANE_HEIGHT;
+  }
+
+  for (const [nodeId, place] of placement) {
+    positions.set(nodeId, {
+      x: place.x,
+      y: (laneOffsets.get(place.lane) ?? 40) + place.row * (NODE_HEIGHT + 16),
     });
-  });
+  }
 
   return positions;
 }
