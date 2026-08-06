@@ -643,31 +643,6 @@ export async function executeImportAction(input: {
   }
 }
 
-// ── 5b. Progress (polled while an import runs) ───────────────────────────────
-
-/** Current progress of a running import. Cheap by design: the client polls it. */
-export async function getImportProgressAction(
-  input: { jobId: string },
-): Promise<{ error?: string; status?: string; progress?: ImportProgress | null }> {
-  let org;
-  try {
-    org = await getOrgContext();
-  } catch {
-    return { error: "not_authenticated" };
-  }
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("project_import_jobs")
-    .select("status, summary_json")
-    .eq("id", input.jobId)
-    .eq("organization_id", org.organizationId)
-    .maybeSingle();
-
-  if (!data) return { error: "job_not_found" };
-  const summary = (data.summary_json ?? {}) as { progress?: ImportProgress };
-  return { status: data.status as string, progress: summary.progress ?? null };
-}
-
 // ── 6. Rollback ──────────────────────────────────────────────────────────────
 
 export async function rollbackImportAction(input: { jobId: string }): Promise<{ error?: string; removed?: number }> {

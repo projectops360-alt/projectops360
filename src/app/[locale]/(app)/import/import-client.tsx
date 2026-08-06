@@ -22,7 +22,6 @@ import {
   getImportJobAction,
   toggleImportEntityAction,
   executeImportAction,
-  getImportProgressAction,
   listProjectsForImportAction,
 } from "./actions";
 import { loadGovernanceUnitsAction } from "@/app/[locale]/(app)/projects/actions";
@@ -347,14 +346,26 @@ export function ImportClient({
 
   // Poll progress while the import runs. The state lives on the job row, so a
   // page reload picks it back up instead of losing sight of the import.
+  //
+  // This reads a ROUTE HANDLER, not a server action. Server Actions are
+  // serialized by Next.js — one at a time per client — so polling with an
+  // action queued behind the very import it was meant to observe and the
+  // panel sat on "Starting…" until the import had already finished.
   useEffect(() => {
     if (step !== "importing" || !job) return;
     let cancelled = false;
-    const timer = setInterval(async () => {
-      const res = await getImportProgressAction({ jobId: job.id });
-      if (cancelled) return;
-      if (res.progress) setProgress(res.progress);
-    }, 2000);
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/import/progress?jobId=${job.id}`, { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as { progress?: ImportProgress | null };
+        if (!cancelled && body.progress) setProgress(body.progress);
+      } catch {
+        // A dropped poll is not worth surfacing; the next tick retries.
+      }
+    };
+    void poll();
+    const timer = setInterval(poll, 2000);
     return () => {
       cancelled = true;
       clearInterval(timer);
