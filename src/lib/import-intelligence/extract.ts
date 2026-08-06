@@ -57,6 +57,9 @@ const FIELD_SYNONYMS: Record<string, string[]> = {
   // opt-in column the planner uses to descope rows without deleting them.
   item_type: ["item type", "record type", "row type", "tipo", "tipo de elemento", "tipo de registro"],
   include: ["include", "in scope", "incluir", "incluido", "en alcance", "aplica"],
+  email: ["email", "e-mail", "mail", "correo", "correo electrónico", "correo electronico"],
+  company: ["company", "organization", "organisation", "employer", "empresa", "organización", "organizacion", "compañía", "compania"],
+  allocation: ["allocation", "availability", "% allocation", "asignación", "asignacion", "disponibilidad", "disponibilidad %", "dedicación", "dedicacion"],
 };
 
 /** Table-level keywords that identify what entity a sheet/table contains. */
@@ -184,6 +187,23 @@ function toIsoDate(v: string | undefined): string {
   const parsed = Date.parse(t);
   if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
   return "";
+}
+
+/**
+ * A share of someone's time, as a whole percentage.
+ *
+ * A spreadsheet stores a percent-formatted cell as a FRACTION — 100% is 1 and
+ * 15% is 0.15 — so reading the raw value and rounding turned a 15% allocation
+ * into 0. A value carrying an explicit "%" is already scaled; one below or at
+ * 1 without it is a fraction; anything above is already a percentage.
+ */
+export function toPercentage(v: string | undefined): number | null {
+  if (!v) return null;
+  const hadSymbol = v.includes("%");
+  const n = toNumber(v.replace("%", ""));
+  if (n == null) return null;
+  const scaled = hadSymbol || n > 1 ? n : n * 100;
+  return Math.round(scaled);
 }
 
 const STATUS_MAP: Record<string, string> = {
@@ -659,6 +679,12 @@ function extractResourcesFromTable(table: ParsedTable, ctx: ExtractionContext): 
     name: findColumn(table.headers, "name"),
     role: findColumn(table.headers, "role"),
     unit_cost: findColumn(table.headers, "unit_cost"),
+    email: findColumn(table.headers, "email"),
+    company: findColumn(table.headers, "company"),
+    allocation: findColumn(table.headers, "allocation"),
+    responsibility: findColumn(table.headers, "description"),
+    start: findColumn(table.headers, "start"),
+    finish: findColumn(table.headers, "finish"),
   };
   if (col.name === -1) return;
   for (const [rowIdx, row] of table.rows.entries()) {
@@ -667,6 +693,7 @@ function extractResourcesFromTable(table: ParsedTable, ctx: ExtractionContext): 
     const role = normalizeHeader(cell(row, col.role));
     const isCrew = ["crew", "cuadrilla", "team", "equipo"].some((k) => role.includes(k) || normalizeHeader(name).includes(k));
     const isEquipment = ["equipment", "equipo pesado", "machine", "maquinaria", "excavator", "crane", "grúa", "grua"].some((k) => role.includes(k));
+    const allocation = toPercentage(cell(row, col.allocation));
     ctx.result.resources.push({
       source_id: `res-${name.toLowerCase()}`,
       name,
@@ -676,6 +703,12 @@ function extractResourcesFromTable(table: ParsedTable, ctx: ExtractionContext): 
       cost_rate: toNumber(cell(row, col.unit_cost)),
       confidence_score: 0.8,
       source_reference: `${table.name} · row ${rowIdx + 2}`,
+      email: cell(row, col.email),
+      company: cell(row, col.company),
+      responsibility: cell(row, col.responsibility),
+      allocation_percentage: allocation != null ? Math.round(allocation) : null,
+      start_date: toIsoDate(cell(row, col.start)),
+      end_date: toIsoDate(cell(row, col.finish)),
     });
   }
 }
@@ -1217,11 +1250,37 @@ export function extractCanonicalImport(parsed: ParsedFile, fileName: string): Ca
     .filter((d): d is CanonicalDependency => d !== null)
     .filter((d) => d.predecessor_source_id !== d.successor_source_id);
 
-  // Deduplicate resources by name
+  // Deduplicate people by name — MERGING, not first-wins.
+  //
+  // The same person is met twice: as the owner of a task (a name and nothing
+  // else) and as a row of the team sheet (role, email, organization, share of
+  // their time, dates). Tasks are read first, so keeping the first occurrence
+  // kept the empty one and discarded the team sheet — the plan named 19
+  // colleagues and the product ended up knowing only their names.
   const seenResources = new Map<string, CanonicalResource>();
   for (const r of ctx.result.resources) {
     const key = r.name.toLowerCase();
-    if (!seenResources.has(key)) seenResources.set(key, r);
+    const existing = seenResources.get(key);
+    if (!existing) {
+      seenResources.set(key, r);
+      continue;
+    }
+    // Later occurrences only fill what the first left empty.
+    if (!existing.trade && r.trade) existing.trade = r.trade;
+    if (!existing.email && r.email) existing.email = r.email;
+    if (!existing.company && r.company) existing.company = r.company;
+    if (!existing.responsibility && r.responsibility) existing.responsibility = r.responsibility;
+    if (existing.cost_rate == null && r.cost_rate != null) existing.cost_rate = r.cost_rate;
+    if (existing.allocation_percentage == null && r.allocation_percentage != null) {
+      existing.allocation_percentage = r.allocation_percentage;
+    }
+    if (!existing.start_date && r.start_date) existing.start_date = r.start_date;
+    if (!existing.end_date && r.end_date) existing.end_date = r.end_date;
+    // A team sheet is a better source of identity than a task's owner column.
+    if (r.confidence_score > existing.confidence_score) {
+      existing.confidence_score = r.confidence_score;
+      existing.source_reference = r.source_reference;
+    }
   }
   ctx.result.resources = [...seenResources.values()];
 

@@ -122,7 +122,12 @@ describe("projectSlugCandidates", () => {
 
 // ── Real workbook: the exact shape that lost 73 of 274 tasks ────────────────
 
-const FIXTURE = "C:/Users/ADM/Downloads/ProjectOps360_Proyecto_Aurora_SAP_Completo.xlsx";
+// The file has been renamed at least once; accept either name rather than
+// silently skipping the only real-world case in the suite.
+const FIXTURE = [
+  "C:/Users/ADM/Downloads/Proyecto_Aurora_SAP_Completo.xlsx",
+  "C:/Users/ADM/Downloads/ProjectOps360_Proyecto_Aurora_SAP_Completo.xlsx",
+].find((f) => existsSync(f)) ?? "";
 
 describe.skipIf(!existsSync(FIXTURE))("SAP Activate workbook — zero-duration rows", () => {
   it("every extracted task is writable", async () => {

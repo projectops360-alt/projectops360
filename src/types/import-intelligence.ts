@@ -191,6 +191,17 @@ export interface CanonicalResource {
   cost_rate: number | null;
   confidence_score: number;
   source_reference: string;
+  // A team sheet ("Equipo y Roles RACI") describes PEOPLE, not just capacity:
+  // who they are, which organization they belong to, how much of their time the
+  // project has and for how long. Carried so they can be imported as project
+  // team members and assigned governance roles — not merely counted against a
+  // workload.
+  email?: string;
+  company?: string;
+  responsibility?: string;
+  allocation_percentage?: number | null;
+  start_date?: string;
+  end_date?: string;
 }
 
 export interface CanonicalMaterial {
