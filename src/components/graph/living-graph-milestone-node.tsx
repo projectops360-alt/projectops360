@@ -39,6 +39,14 @@ interface StatusTheme {
 }
 
 // Centralized color mapping — deferred and planned are now distinct
+/** Side name → React Flow position, for the four addressable handles. */
+const SIDE_POSITION = {
+  left: Position.Left,
+  right: Position.Right,
+  top: Position.Top,
+  bottom: Position.Bottom,
+} as const;
+
 const STATUS_THEMES: Record<string, StatusTheme> = {
   completed: { accent: MILESTONE_HEALTH_HEX.completed.color, chip: false },
   in_progress: { accent: MILESTONE_HEALTH_HEX.in_progress.color, chip: true },
@@ -150,6 +158,34 @@ function LivingGraphMilestoneNodeComponent({
             : `0 8px 28px ${hexToRgba(accent, isCompleted || theme.chip ? 0.18 : 0.06)}`,
       }}
     >
+      {/*
+        A handle on every side, each addressable by id.
+        A single source/target pair could only ever point one way, so a card
+        that was dragged kept its connector leaving by the side the layout
+        originally chose — looping back across itself instead of running to its
+        neighbour. With four, an edge picks the pair that matches where the two
+        cards actually are (see edgeHandleSides), and re-routing while dragging
+        costs nothing. The unqualified pair below stays for edges that do not
+        name a handle.
+      */}
+      {(["left", "right", "top", "bottom"] as const).map((side) => (
+        <Handle
+          key={`t-${side}`}
+          id={`t-${side}`}
+          type="target"
+          position={SIDE_POSITION[side]}
+          className={handleClass}
+        />
+      ))}
+      {(["left", "right", "top", "bottom"] as const).map((side) => (
+        <Handle
+          key={`s-${side}`}
+          id={`s-${side}`}
+          type="source"
+          position={SIDE_POSITION[side]}
+          className={handleClass}
+        />
+      ))}
       <Handle
         type="target"
         position={toPosition(targetPosition, Position.Left)}

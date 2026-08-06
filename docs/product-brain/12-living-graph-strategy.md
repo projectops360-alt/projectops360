@@ -193,6 +193,43 @@ writer of `project_event_log`/`process_nodes`/`process_edges`. Constitution:
 [living-graph-realtime-engine-constitution.md](living-graph-realtime-engine-constitution.md) ·
 contracts: `src/lib/living-graph/realtime/` · guard: **LGRE-FOUNDATION**.
 
+
+## 11d. Milestone snake — responsive columns and geometry-routed connectors
+
+**Added 2026-08-06. Guard: `LIVING-GRAPH-SNAKE-ROUTING`.**
+
+The serpentine reading order is the contract: left→right, drop a row,
+right→left, mirroring the Execution Map "Flow" view. **The column count is
+not part of that contract**, and neither is the assumption that cards stay
+where the layout put them.
+
+**Columns follow the viewport's shape, not a constant.** `MILESTONES_PER_ROW`
+was hard-coded to 3, so a 16-milestone roadmap on a wide screen showed three
+columns between two lawns of empty space while the flow ran off the bottom.
+React Flow zooms to fit, so what the viewer perceives is the layout's *shape*:
+a three-wide, many-deep block is scaled down into a narrow ribbon. So
+`milestonesPerRow(width, height, count)` chooses the column count that makes
+the block's aspect ratio resemble the viewport's — `√(ratio · count ·
+rowPitch / columnPitch)` — clamped to 2…6. Below two the snake degenerates
+into a column; above six the eye loses the row it was following. The constant
+remains as the pre-measurement fallback.
+
+**Connectors are routed from live positions, not from an index.** Handle sides
+came from `snakeHandleSides(index, …)`, which is correct only while a card sits
+where it was placed. Drag one and its connector kept leaving by the original
+side, looping back across the card instead of running to its neighbour. Each
+milestone card now exposes an addressable handle on all four sides, and every
+edge picks its pair with `edgeHandleSides(sourceBox, targetBox)`: the dominant
+axis wins, ties favour the horizontal (the direction the roadmap reads in).
+Re-routing while dragging therefore costs nothing — the edge recomputes from
+the same positions React Flow is already moving.
+
+**Binding rule:** anything derived from a node's *index* is only valid until
+the user moves that node. Presentation that must survive dragging reads
+positions. This does not touch UX-007 (saved layouts remain presentation-only
+and are still the user's manual positions winning over the computed ones), nor
+milestone counts, status, or blocker semantics.
+
 ## 12. Risks / Anti-patterns (GUARD — strengthened)
 **Any change that makes the Living Graph prettier without advancing its role as intelligence,
 navigation, evidence, execution understanding, or impact analysis MUST be rejected.** Decoration

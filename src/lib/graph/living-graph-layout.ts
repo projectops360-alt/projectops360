@@ -62,10 +62,61 @@ export function hierarchicalLayout(
 
 export const MILESTONE_NODE_WIDTH = 260;
 export const MILESTONE_NODE_HEIGHT = 168;
+/** Fallback when the canvas has not been measured yet (SSR, first paint). */
 export const MILESTONES_PER_ROW = 3;
 
 const SNAKE_GAP_X = 170;
 const SNAKE_GAP_Y = 130;
+const SNAKE_MARGIN_X = 40;
+
+/** Never fewer than this, or the snake degenerates into a column. */
+const MIN_PER_ROW = 2;
+/** Never more than this: past it the eye loses the row it was following. */
+const MAX_PER_ROW = 6;
+
+/**
+ * How many milestones to put across a row.
+ *
+ * NOT "how many fit at 1:1". React Flow zooms the canvas to fit, so what the
+ * viewer perceives is the layout's SHAPE, not its pixel width: a roadmap laid
+ * out three-wide and many-deep is scaled down until it is a narrow ribbon with
+ * empty space either side — which is exactly what a wide screen showed while
+ * the flow ran off the bottom.
+ *
+ * So the column count is chosen to make the layout's aspect ratio resemble the
+ * viewport's. With `count` cards in `c` columns the block is roughly
+ * `c · COLUMN_PITCH` wide by `(count / c) · ROW_PITCH` tall, and solving that
+ * against the target ratio gives `c = √(ratio · count · ROW_PITCH / COLUMN_PITCH)`.
+ *
+ * The serpentine reading order is the contract (doc 12 §11c); the number of
+ * columns is not.
+ */
+export function milestonesPerRow(
+  canvasWidth: number,
+  canvasHeight: number,
+  milestoneCount: number,
+): number {
+  const fallback = MILESTONES_PER_ROW;
+  if (
+    !Number.isFinite(canvasWidth) ||
+    !Number.isFinite(canvasHeight) ||
+    canvasWidth <= 0 ||
+    canvasHeight <= 0 ||
+    !Number.isFinite(milestoneCount) ||
+    milestoneCount <= 0
+  ) {
+    return fallback;
+  }
+
+  const columnPitch = MILESTONE_NODE_WIDTH + SNAKE_GAP_X;
+  const rowPitch = MILESTONE_NODE_HEIGHT + SNAKE_GAP_Y;
+  const ratio = canvasWidth / canvasHeight;
+
+  const ideal = Math.sqrt((ratio * milestoneCount * rowPitch) / columnPitch);
+  const columns = Math.round(ideal);
+
+  return Math.max(MIN_PER_ROW, Math.min(MAX_PER_ROW, Math.min(columns, milestoneCount)));
+}
 
 /**
  * Serpentine positions for milestone cards. `nodes` must already be in flow
@@ -73,14 +124,17 @@ const SNAKE_GAP_Y = 130;
  */
 export function milestoneFlowLayout(
   nodes: LivingGraphNode[],
+  perRow: number = MILESTONES_PER_ROW,
 ): Map<string, NodePosition> {
+  const columns = Math.max(1, Math.floor(perRow));
   const positions = new Map<string, NodePosition>();
   nodes.forEach((node, i) => {
-    const row = Math.floor(i / MILESTONES_PER_ROW);
-    const colInRow = i % MILESTONES_PER_ROW;
-    const col = row % 2 === 0 ? colInRow : MILESTONES_PER_ROW - 1 - colInRow;
+    const row = Math.floor(i / columns);
+    const colInRow = i % columns;
+    // Odd rows read right→left, so the line never jumps back across the canvas.
+    const col = row % 2 === 0 ? colInRow : columns - 1 - colInRow;
     positions.set(node.id, {
-      x: 40 + col * (MILESTONE_NODE_WIDTH + SNAKE_GAP_X),
+      x: SNAKE_MARGIN_X + col * (MILESTONE_NODE_WIDTH + SNAKE_GAP_X),
       y: 40 + row * (MILESTONE_NODE_HEIGHT + SNAKE_GAP_Y),
     });
   });
@@ -107,6 +161,51 @@ export function snakeHandleSides(
     source: isRowEnd ? "bottom" : rightward ? "right" : "left",
     target: isRowStart && row > 0 ? "top" : rightward ? "left" : "right",
   };
+}
+
+// ── Geometry-driven edge routing ──────────────────────────────────────────────
+
+export interface NodeBox {
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * Which sides a connector should leave and enter by, given where the two cards
+ * actually are.
+ *
+ * The snake sides above are derived from a card's INDEX, which is correct only
+ * while the cards sit where the layout put them. Drag one and the connector
+ * kept leaving by its original side, so it looped back across the card instead
+ * of running to its neighbour. Reading the real positions means the line
+ * re-routes as the card moves, with no recalculation step of its own.
+ *
+ * The dominant axis wins: mostly-sideways neighbours connect side to side,
+ * mostly-stacked ones connect bottom to top. Ties favour the horizontal, which
+ * is the direction the roadmap reads in.
+ */
+export function edgeHandleSides(
+  source: NodeBox,
+  target: NodeBox,
+): { source: SnakeSide; target: SnakeSide } {
+  const sourceCenterX = source.x + (source.width ?? MILESTONE_NODE_WIDTH) / 2;
+  const sourceCenterY = source.y + (source.height ?? MILESTONE_NODE_HEIGHT) / 2;
+  const targetCenterX = target.x + (target.width ?? MILESTONE_NODE_WIDTH) / 2;
+  const targetCenterY = target.y + (target.height ?? MILESTONE_NODE_HEIGHT) / 2;
+
+  const dx = targetCenterX - sourceCenterX;
+  const dy = targetCenterY - sourceCenterY;
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { source: "right", target: "left" }
+      : { source: "left", target: "right" };
+  }
+  return dy >= 0
+    ? { source: "bottom", target: "top" }
+    : { source: "top", target: "bottom" };
 }
 
 // ── 2. Timeline ────────────────────────────────────────────────────────────────
