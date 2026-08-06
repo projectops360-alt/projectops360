@@ -759,7 +759,8 @@
       "forUserLoading": "Cargando personas…",
       "forUserEmpty": "Todavía no hay más personas asignadas a este proyecto.",
       "forUserSearch": "Buscar personas…",
-      "forUserNoMatch": "Nadie coincide con esa búsqueda."
+      "forUserNoMatch": "Nadie coincide con esa búsqueda.",
+      "forUserNoLogin": "{count} persona(s) del proyecto no pueden recibir horas porque aún no tienen cuenta: {names}. Invítalas para poder registrar sus horas."
     }
   },
   "dashboard": {
