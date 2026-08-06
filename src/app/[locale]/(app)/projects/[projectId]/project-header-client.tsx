@@ -100,8 +100,16 @@ export function ProjectHeaderClient({
   const handlePermanentDelete = async (): Promise<string | undefined> => {
     const result = await deleteProjectPermanentlyAction(projectId);
     if (result.error) return result.error;
+    // Close first, THEN navigate. The dialog must not depend on the navigation
+    // to stop showing "Deleting…" — the page being left has just been deleted,
+    // so anything that delays the transition would leave the spinner lying.
+    //
+    // No router.refresh() either: the action already revalidated the project
+    // list on the server. refresh() invalidates the WHOLE router cache, so
+    // Next.js re-fetches every prefetched route — ~35 requests after one
+    // delete, including sub-pages of the project that no longer exists.
+    closeDeleteDialog();
     router.push(localizedHref(locale, `/projects`));
-    router.refresh();
     return undefined;
   };
 
@@ -114,8 +122,8 @@ export function ProjectHeaderClient({
       return;
     }
 
+    // Same reasoning as the permanent delete: the action revalidates.
     router.push(localizedHref(locale, `/projects`));
-    router.refresh();
   };
 
   return (

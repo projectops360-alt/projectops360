@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
@@ -416,6 +417,14 @@ export async function archiveProjectAction(
     metadata: { soft_delete: true },
   });
 
+  // Invalidate on the SERVER, precisely. Letting the client call
+  // router.refresh() instead invalidates the whole router cache, so Next.js
+  // re-fetches every prefetched route it holds — measured at ~35 requests
+  // after one delete, including every sub-page of the project that no longer
+  // exists. The delete itself takes 234 ms; the avalanche is what was felt.
+  revalidatePath("/(app)/projects", "page");
+  revalidatePath(`/(app)/projects/${projectId}`, "layout");
+
   return {};
 }
 
@@ -525,6 +534,14 @@ export async function deleteProjectPermanentlyAction(
     console.error("Failed to permanently delete project:", error);
     return { error: error.message.includes("project_not_found") ? "not_found" : "unexpected" };
   }
+
+  // Invalidate on the SERVER, precisely. Letting the client call
+  // router.refresh() instead invalidates the whole router cache, so Next.js
+  // re-fetches every prefetched route it holds — measured at ~35 requests
+  // after one delete, including every sub-page of the project that no longer
+  // exists. The delete itself takes 234 ms; the avalanche is what was felt.
+  revalidatePath("/(app)/projects", "page");
+  revalidatePath(`/(app)/projects/${projectId}`, "layout");
 
   return {};
 }
