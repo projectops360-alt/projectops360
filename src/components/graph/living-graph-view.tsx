@@ -66,6 +66,8 @@ import { computeMilestoneTaskCensus } from "@/lib/roadmap/milestone-task-census"
 import {
   computeLayout,
   milestoneFlowLayout,
+  milestonesPerRow,
+  edgeHandleSides,
   snakeHandleSides,
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -355,6 +357,8 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   const router = useRouter();
   const { fitView, setCenter, getIntersectingNodes, getViewport, setViewport } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
+  // Measured so the milestone snake can use the width it actually has.
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [recalculating, setRecalculating] = useState(false);
   // Floating "Insights" panel (executive KPIs + summary) over the canvas.
   // Sprint #2 — persisted so the user's graph workspace is remembered.
@@ -417,6 +421,24 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // Latest visible node IDs, read by context-scoped layout load without making
   // the load re-run on every filter change (it must only react to context).
   const filteredIdsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      // Ignore sub-pixel jitter: re-laying out the whole roadmap on every
+      // fractional resize would fight the user's own dragging.
+      setCanvasSize((prev) =>
+        Math.abs(prev.width - rect.width) > 24 || Math.abs(prev.height - rect.height) > 24
+          ? { width: rect.width, height: rect.height }
+          : prev,
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   // Node currently hovered while dragging another node (drop-to-connect)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   // Entity being edited via the roadmap dialogs (in-graph editing)
@@ -961,7 +983,13 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     if (viewLevel === "knowledge") return progressiveKnowledgeGraph.positions;
     if (viewLevel === "trust") return trustGraph.positions;
     if (viewLevel === "milestones") {
-      return milestoneFlowLayout(withSubtasks.nodes); // serpentine roadmap, layoutMode ignored
+      // Columns follow the canvas: three was hard-coded, so a wide screen showed
+      // three cards between two lawns of empty space while the roadmap ran off
+      // the bottom. The serpentine reading order is unchanged.
+      return milestoneFlowLayout(
+        withSubtasks.nodes,
+        milestonesPerRow(canvasSize.width, canvasSize.height, withSubtasks.nodes.length),
+      ); // layoutMode ignored
     }
     if (isMilestoneFocusMode && milestoneFocus) {
       const selectedMilestoneId = [...milestoneFocus][0];
@@ -973,7 +1001,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       });
     }
     return computeLayout(layoutMode, withSubtasks.nodes, withSubtasks.edges);
-  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode, progressiveKnowledgeGraph.positions, trustGraph.positions]);
+  }, [viewLevel, layoutMode, withSubtasks, isMilestoneFocusMode, milestoneFocus, focusRootNode, progressiveKnowledgeGraph.positions, trustGraph.positions, canvasSize]);
 
   // User drags win over the computed layout. In milestone focus mode the manual
   // positions come from a PER-MILESTONE saved layout (scoped by the focus layout
@@ -1548,11 +1576,26 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           new Date(
             analysis.adjacency.nodeById.get(edge.targetNodeId)?.occurredAt ?? 0,
           ).getTime() > currentTime);
+      // Route by where the cards ACTUALLY are, not by their index in the snake.
+      // Index-derived sides were only right until someone dragged a card, after
+      // which the connector kept leaving by its original side and looped back
+      // across the card instead of running to its neighbour. Reading positions
+      // means the line re-routes as the card moves, for free.
+      const sourceBox = positions.get(edge.sourceNodeId);
+      const targetBox = positions.get(edge.targetNodeId);
+      const routed =
+        isMilestoneLevel && sourceBox && targetBox
+          ? edgeHandleSides(sourceBox, targetBox)
+          : null;
+
       return {
         id: edge.id,
         type: "living" as const,
         source: edge.sourceNodeId,
         target: edge.targetNodeId,
+        ...(routed
+          ? { sourceHandle: `s-${routed.source}`, targetHandle: `t-${routed.target}` }
+          : {}),
         animated:
           style.animated ||
           edge.metadata.milestone_chain === true ||
@@ -1592,6 +1635,9 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     pathEdgeIds,
     timelineActive,
     currentTime,
+    // Edges re-route from live positions, so they must recompute when a card moves.
+    positions,
+    isMilestoneLevel,
   ]);
 
   // ── Selection helpers ──
