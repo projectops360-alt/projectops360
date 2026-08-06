@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { TraceableEntityType, Milestone, RoadmapTask, TaskStatus, TaskPriority, MilestoneStatus, TaskDependency, Locale } from "@/types/database";
 import type { RoadmapProgress, MilestoneProgress } from "@/lib/roadmap/progress";
+import { getComputedMilestoneStatus } from "@/lib/roadmap/progress";
 import { buildProjectBriefing } from "@/lib/project-briefing/briefing-engine";
 import type { BriefingScope, ProjectBriefing } from "@/lib/project-briefing/types";
 import { overallStatusLine, healthBandLabel, attentionLabel, allStableLine } from "@/lib/project-briefing/briefing-copy";
@@ -405,7 +406,14 @@ export function ProjectDashboard({
 
   // Milestone stats
   const totalMilestones = milestones.length;
-  const completedMilestones = milestones.filter((m) => m.status === "completed").length;
+  // Milestone completion is DERIVED from its tasks, like everywhere else that
+  // shows it. Reading the stored column made this card disagree with the
+  // roadmap and the Living Graph, which both compute it: a milestone whose 53
+  // tasks were all done showed a green 100% ring on the graph while this card
+  // still said 0/16, because nothing had written `status` back.
+  const completedMilestones = milestones.filter(
+    (m) => getComputedMilestoneStatus(m, tasks) === "completed",
+  ).length;
 
   // Activity feed: merge communications + decisions + meetings, sort by date desc
   type ActivityItem = {

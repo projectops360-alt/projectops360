@@ -7,6 +7,7 @@
 
 import type { Milestone, MilestoneStatus, MilestoneStatusDisplay, RoadmapTask, TaskStatus } from "@/types/database";
 import { TASK_COMPLETE_STATUSES, DEPENDENCY_COMPLETE_STATUSES } from "./status-mappings";
+import { hasActiveBlocker } from "@/lib/execution/task-activity";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -136,20 +137,39 @@ export function computeOverallProgress(tasks: RoadmapTask[]): number {
 // ── Blockers Count ────────────────────────────────────────────────────────────────
 
 /**
- * Count blockers across milestones and tasks.
- * Includes milestones with computed status "blocked" or "at_risk",
- * plus tasks with status "blocked".
+ * Count the work that is actually blocked.
+ *
+ * This used to return `blocked-or-at-risk milestones + blocked tasks`, adding
+ * two different kinds of thing into one number rendered as "BLOCKERS · P1 —
+ * Critical". On a real project that produced three different answers to the
+ * same question on one screen: the status summary said 0, the banner said 1
+ * and this card said 2. A milestone at risk is a schedule signal, not an
+ * impediment someone can go and clear, and it already has its own metric.
+ *
+ * It also tested `status === "blocked"` directly instead of the canonical
+ * rule, which ignores `is_blocked` and — worse — would count a stale flag left
+ * on a finished task (REG-008: a terminal task is NEVER blocked).
+ *
+ * Counts tasks only, through `hasActiveBlocker` (REG-010: one source for a
+ * metric). Milestones at risk are reported by `countAtRiskMilestones`.
  */
 export function countBlockers(
   milestones: Milestone[],
   tasks: RoadmapTask[],
 ): number {
-  const blockedOrAtRiskMilestones = milestones.filter((m) => {
+  void milestones; // kept for call-site compatibility; milestones are not blockers
+  return tasks.filter((t) => hasActiveBlocker(t)).length;
+}
+
+/** Milestones whose computed status is blocked or at risk — a schedule signal. */
+export function countAtRiskMilestones(
+  milestones: Milestone[],
+  tasks: RoadmapTask[],
+): number {
+  return milestones.filter((m) => {
     const status = getComputedMilestoneStatus(m, tasks);
     return status === "blocked" || status === "at_risk";
   }).length;
-  const blockedTasks = tasks.filter((t) => t.status === "blocked").length;
-  return blockedOrAtRiskMilestones + blockedTasks;
 }
 
 // ── Current & Next Milestone ─────────────────────────────────────────────────────
