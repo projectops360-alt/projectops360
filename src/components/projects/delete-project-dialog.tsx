@@ -63,11 +63,13 @@ export function DeleteProjectDialog({ impact, onConfirm, onClose, labels }: Dele
     setBusy(true);
     setError(null);
     const failure = await onConfirm();
-    // On success the caller navigates away; only a failure returns here.
-    if (failure) {
-      setError(labels.failed);
-      setBusy(false);
-    }
+    // Always leave the busy state. Relying on "the caller navigates away" to
+    // unmount the dialog meant that when navigation was slow — or the route
+    // being left no longer existed — the spinner kept claiming to be deleting
+    // work that had finished seconds earlier. Observed: 23 minutes of
+    // "Deleting…" over a project already purged.
+    setBusy(false);
+    if (failure) setError(labels.failed);
   };
 
   const counts = impact === null ? [] : deletionImpactLines(impact, {
