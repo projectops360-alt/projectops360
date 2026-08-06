@@ -231,7 +231,12 @@ describe("structured plan workbook", () => {
 
 // ── Real workbook smoke (runs only when the fixture is present) ─────────────
 
-const FIXTURE = "C:/Users/ADM/Downloads/ProjectOps360_Proyecto_Aurora_SAP_Completo.xlsx";
+// The file has been renamed at least once; accept either name rather than
+// silently skipping the only real-world case in the suite.
+const FIXTURE = [
+  "C:/Users/ADM/Downloads/Proyecto_Aurora_SAP_Completo.xlsx",
+  "C:/Users/ADM/Downloads/ProjectOps360_Proyecto_Aurora_SAP_Completo.xlsx",
+].find((f) => existsSync(f)) ?? "";
 
 describe.skipIf(!existsSync(FIXTURE))("SAP Activate workbook (real fixture)", () => {
   it("imports the full plan instead of nothing", async () => {

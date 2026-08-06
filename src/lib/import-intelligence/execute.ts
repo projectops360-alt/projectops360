@@ -445,6 +445,61 @@ export async function executeImport(params: {
     }
   }
 
+  // ── 3b. Project team ───────────────────────────────────────────────────────
+  // A team sheet describes PEOPLE, and people are not capacity rows. Importing
+  // them only into `resources` meant the 19 named colleagues in the plan showed
+  // up in Resources but were invisible everywhere the product asks "who is on
+  // this project" — the charter's role picker offered the organization's other
+  // users instead, so a governance role could not be given to the very people
+  // the file named.
+  //
+  // `project_team_members` is the canonical answer to that question (CAP-044),
+  // and `group_imported` is its member type for people who arrived from a file
+  // with no account and no contact record. They cost no billable seat: seats
+  // are counted from `organization_members`.
+  for (const res of canonical.resources) {
+    if (res.resource_type !== "person" || !res.name.trim()) continue;
+
+    const { data: existing } = await supabase
+      .from("project_team_members")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("organization_id", organizationId)
+      .ilike("display_name", res.name)
+      .maybeSingle();
+    if (existing) {
+      skippedDuplicates++;
+      continue;
+    }
+
+    const { data: row, error: memberError } = await supabase
+      .from("project_team_members")
+      .insert({
+        organization_id: organizationId,
+        project_id: projectId,
+        member_type: "group_imported",
+        display_name: res.name,
+        project_role: res.trade || null,
+        responsibility: res.responsibility || null,
+        allocation_percentage: res.allocation_percentage ?? null,
+        start_date: res.start_date || null,
+        end_date: res.end_date || null,
+        // Imported people are listed, not granted anything: an import must not
+        // hand out project permissions nobody approved.
+        permission_level: "read_only",
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (!row) recordFailure("team_member", res.source_id, res.name, memberError);
+    if (row) {
+      await track(supabase, organizationId, jobId, "project_team_members", row.id);
+      bump("team_members");
+      await report("resources", created["team_members"] ?? 0, canonical.resources.length);
+    }
+  }
+
   // ── 4. Budget items ────────────────────────────────────────────────────────
   const budgetIdBySourceId = new Map<string, string>();
   const validCategories = new Set(["labor", "material", "equipment", "subcontractor", "software", "cloud", "permit", "contingency", "other"]);
@@ -833,8 +888,15 @@ const ROLLBACK_ORDER = [
   "roadmap_tasks",
   "milestones",
   "resources",
+  "project_team_members",
   "project_charters",
 ];
+
+/** Tables whose rows are removed outright rather than soft-deleted. */
+const HARD_DELETE_ON_ROLLBACK = new Set(["task_dependencies"]);
+
+/** `project_team_members` has no `deleted_at`; withdrawal is a status. */
+const STATUS_REMOVED_ON_ROLLBACK = new Set(["project_team_members"]);
 
 /** Remove every record created by an import job. Hard-deletes link tables,
  *  soft-deletes business tables that follow the soft-delete convention. */
@@ -856,8 +918,16 @@ export async function rollbackImport(organizationId: string, jobId: string): Pro
   for (const table of ROLLBACK_ORDER) {
     const ids = byTable.get(table);
     if (!ids || ids.length === 0) continue;
-    if (table === "task_dependencies") {
+    if (HARD_DELETE_ON_ROLLBACK.has(table)) {
       const { count } = await supabase.from(table).delete({ count: "exact" }).in("id", ids);
+      removed += count ?? 0;
+    } else if (STATUS_REMOVED_ON_ROLLBACK.has(table)) {
+      // Rolling an import back must not leave its people on the project.
+      const { count } = await supabase
+        .from(table)
+        .update({ status: "removed" }, { count: "exact" })
+        .in("id", ids)
+        .neq("status", "removed");
       removed += count ?? 0;
     } else {
       const { count } = await supabase
