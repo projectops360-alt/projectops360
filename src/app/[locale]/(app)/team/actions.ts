@@ -301,6 +301,23 @@ export async function inviteResourceAsUserAction(input: {
     );
     await supabase.from("profiles").upsert({ id: invited.user.id, organization_id: org.organizationId, display_name: resource.name });
     await supabase.from("resources").update({ linked_user_id: invited.user.id }).eq("id", d.resourceId);
+
+    // Link the new account to this person's project memberships too.
+    //
+    // Inviting only linked `resources`, but "who is on this project" is
+    // answered by `project_team_members` — and time entries, capacity and
+    // governance roles all read from there. Without this, a person could be
+    // invited, accept, and still be unofferable when logging their hours,
+    // because their membership row had no user_id. Matched by display name,
+    // which is what an imported membership has; scoped to the organization so
+    // a namesake in another tenant is never touched.
+    await supabase
+      .from("project_team_members")
+      .update({ user_id: invited.user.id })
+      .eq("organization_id", org.organizationId)
+      .is("user_id", null)
+      .neq("status", "removed")
+      .ilike("display_name", resource.name);
     await logAudit({ org, action: "create", entityType: "organization_members", entityId: invited.user.id, metadata: { invited_email: d.email, from_resource: d.resourceId } });
     revalidatePath("/(app)/team", "page");
     return { status: "invited" };
