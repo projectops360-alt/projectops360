@@ -98,6 +98,21 @@ describe("money", () => {
     expect(r.budget).toBe(521000);
   });
 
+  it("prefers the foreign key over the name when a line is properly linked", () => {
+    // budget_items HAS a milestone_id; nothing populates it yet. The day
+    // something does, the name must stop being the deciding factor.
+    const lines = [
+      { name: "Preparación", estimated_cost: 210300, actual_cost: 0 },
+      { name: "Anything at all", estimated_cost: 999, actual_cost: 0, milestone_id: "m1" },
+    ];
+    expect(computeMilestoneCostRollup(milestone("Preparación", "m1"), [], lines).budget).toBe(999);
+  });
+
+  it("does not count a line twice when it is both linked and named alike", () => {
+    const lines = [{ name: "Preparación", estimated_cost: 210300, actual_cost: 0, milestone_id: "m1" }];
+    expect(computeMilestoneCostRollup(milestone("Preparación", "m1"), [], lines).budget).toBe(210300);
+  });
+
   it("says NOTHING rather than zero when no line names it", () => {
     // A gate has no budget of its own. "0" would read as "this cost nothing".
     const r = computeMilestoneCostRollup(milestone("Ejecución de Q-Gate"), [], budgetLines);

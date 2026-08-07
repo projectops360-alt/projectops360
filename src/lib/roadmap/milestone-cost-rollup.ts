@@ -17,6 +17,13 @@ export interface BudgetLineLike {
   name: string | null;
   estimated_cost: number | null;
   actual_cost: number | null;
+  /**
+   * The real link, when it exists. budget_items has this FK, but nothing
+   * populates it today — every imported plan leaves it null and expresses the
+   * relationship by sharing a name. Honoured first so that the day a budget
+   * line is properly linked, the name stops mattering.
+   */
+  milestone_id?: string | null;
 }
 
 export interface MaterialLike {
@@ -110,8 +117,15 @@ export function computeMilestoneCostRollup(
   const plannedDurationDays =
     starts.length > 0 && ends.length > 0 ? daysBetween(starts[0], ends[ends.length - 1]) : null;
 
+  // Prefer the foreign key; fall back to the shared name. Once ANY line names
+  // this milestone by id, name matches are ignored entirely — mixing the two
+  // would double-count a line that is both linked and identically named.
   const milestoneKey = normalize(milestone.title);
-  const matched = budgetLines.filter((b) => milestoneKey && normalize(b.name) === milestoneKey);
+  const linked = budgetLines.filter((b) => b.milestone_id === milestone.id);
+  const matched =
+    linked.length > 0
+      ? linked
+      : budgetLines.filter((b) => milestoneKey && normalize(b.name) === milestoneKey);
   const budget = matched.length > 0
     ? matched.reduce((sum, b) => sum + (Number(b.estimated_cost) || 0), 0)
     : null;

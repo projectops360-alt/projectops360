@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { GRAPH_SEMANTIC_COLORS, hexToRgba } from "@/lib/graph/living-graph-styles";
 import { MILESTONE_HEALTH_HEX } from "@/lib/roadmap/status-mappings";
-import type { MilestoneStatusDisplay } from "@/types/database";
+import type { MilestoneMetricTone } from "@/lib/graph/milestone-card-metrics";
 import type { LivingFlowNode } from "./living-graph-flow-types";
 
 interface StatusTheme {
@@ -70,6 +70,14 @@ const MILESTONE_ICONS: Record<string, LucideIcon> = {
   rocket: Rocket,
 };
 
+/** A KPI chip's colour is a judgement, not decoration: an overrun reads red. */
+const TONE_CLASS: Record<MilestoneMetricTone, string> = {
+  neutral: "text-foreground",
+  good: "text-emerald-600 dark:text-emerald-400",
+  warn: "text-amber-600 dark:text-amber-400",
+  danger: "text-rose-600 dark:text-rose-400",
+};
+
 function ProgressRing({ value, accent }: { value: number; accent: string }) {
   const radius = 17;
   const circumference = 2 * Math.PI * radius;
@@ -106,6 +114,7 @@ function LivingGraphMilestoneNodeComponent({
   const t = useTranslations("livingGraph");
   const locale = useLocale();
   const { node, emphasis, playback } = data;
+  const cardMetrics = data.cardMetrics ?? [];
 
   const theme = STATUS_THEMES[node.status ?? ""] ?? STATUS_THEMES.planned;
   const accent = node.isBlocked ? GRAPH_SEMANTIC_COLORS.blocked : theme.accent;
@@ -140,7 +149,11 @@ function LivingGraphMilestoneNodeComponent({
       role="group"
       aria-label={`${t("nodeTypes.milestone_gate")}: ${node.label}`}
       className={cn(
-        "relative h-[168px] w-[260px] rounded-2xl border bg-card p-4 transition-all",
+        // min-h, not h: the card grows downward when the user pins KPIs to it.
+        // Cards sit 130px apart vertically and the cap is four chips in a 2×2
+        // grid (~48px), so growth stays well inside the gap and the serpentine
+        // layout never needs recomputing. See MAX_MILESTONE_CARD_METRICS.
+        "relative flex min-h-[168px] w-[260px] flex-col rounded-2xl border bg-card p-4 transition-all",
         isDropTarget
           ? "scale-105 border-emerald-400 border-dashed"
           : selected || isPicked
@@ -239,7 +252,7 @@ function LivingGraphMilestoneNodeComponent({
       )}
 
       {/* Progress ring + task counter */}
-      <div className="absolute bottom-3.5 left-4 right-4 flex items-center gap-3">
+      <div className="mt-auto flex items-center gap-3 pt-2">
         <ProgressRing value={node.progress ?? 0} accent={accent} />
         <span
           className="rounded-md px-2 py-1 font-mono text-[10px] font-bold tabular-nums"
@@ -251,6 +264,36 @@ function LivingGraphMilestoneNodeComponent({
           </span>
         </span>
       </div>
+
+      {/*
+        The KPIs the user picked. Nothing renders when they picked none, so a
+        card is byte-for-byte what it was before this existed.
+
+        A metric with no data shows "—" rather than disappearing: a chip that
+        vanishes looks like a bug in the picker, while a dash is an answer —
+        "this phase has no budget line", "no resource here has a rate".
+      */}
+      {cardMetrics.length > 0 && (
+        <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 border-t border-border/60 pt-2">
+          {cardMetrics.map((m) => (
+            <div key={m.id} className="flex items-baseline gap-1 overflow-hidden">
+              <span
+                className={cn(
+                  "truncate font-mono text-[11px] font-bold tabular-nums",
+                  !m.hasValue && "text-muted-foreground/60",
+                  m.hasValue && TONE_CLASS[m.tone],
+                )}
+                title={m.text}
+              >
+                {m.text}
+              </span>
+              <span className="truncate text-[8px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {m.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
