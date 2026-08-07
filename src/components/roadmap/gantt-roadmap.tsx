@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import type { PinnableKpi, ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
+import { MilestoneKpiContextMenu } from "@/components/graph/milestone-kpi-context-menu";
+import { pinKpiToMilestone, unpinKpiFromMilestone } from "@/lib/kpi/milestone-pin-actions";
+import { useRouter } from "next/navigation";
 import {
   ganttTimelineWidth,
   defaultZoomFor,
@@ -43,6 +47,11 @@ interface GanttRoadmapProps {
   locale: Locale;
   translations: GanttTranslations;
   onTaskDatesChange?: (taskId: string, startDate: string, endDate: string) => void;
+  /** KPIs pinned to each milestone — the same pins the Living Graph shows. */
+  pinnedKpisByMilestone?: Record<string, ResolvedPinnedKpi[]>;
+  /** Everything pinnable, for the right-click menu on a milestone row. */
+  pinnableKpis?: PinnableKpi[];
+  projectId?: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -225,6 +234,87 @@ function TodayMarker({ range }: { range: { start: Date; end: Date; totalDays: nu
   );
 }
 
+// ── Milestone inspector ───────────────────────────────────────────────────────
+
+function MilestoneInspector({
+  milestone,
+  counts,
+  kpis,
+  locale,
+}: {
+  milestone: Milestone;
+  counts: TaskCount;
+  kpis: ResolvedPinnedKpi[];
+  locale: Locale;
+}) {
+  const isEs = locale === "es";
+  return (
+    <div className="space-y-1.5 text-xs">
+      <div className="text-sm font-semibold">{milestone.title}</div>
+      <div className="text-muted-foreground">
+        {counts.done}/{counts.total} {isEs ? "tareas" : "tasks"}
+      </div>
+      {milestone.start_date && milestone.target_date && (
+        <div className="text-muted-foreground">
+          {formatShortDate(parseDate(milestone.start_date)!, locale)} —{" "}
+          {formatShortDate(parseDate(milestone.target_date)!, locale)}
+        </div>
+      )}
+
+      {/* The SAME pins the Living Graph shows, evaluated in this milestone's
+          own scope. Not a second copy of the numbers — one source (REG-010). */}
+      {kpis.length > 0 ? (
+        <div className="space-y-1 border-t border-border/60 pt-1.5">
+          {kpis.map((kpi) => (
+            <div key={kpi.slug} className="flex items-baseline justify-between gap-2">
+              {kpi.status === "missing" ? (
+                <>
+                  <span className="truncate italic text-muted-foreground/70">{kpi.slug}</span>
+                  <span className="shrink-0 text-[9px] text-amber-600 dark:text-amber-400">
+                    {isEs ? "KPI eliminado" : "KPI deleted"}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate text-muted-foreground">
+                    {isEs ? kpi.nameEs : kpi.nameEn}
+                  </span>
+                  {kpi.status === "ok" ? (
+                    <span
+                      className={`shrink-0 font-mono font-bold tabular-nums ${kpi.offTarget ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
+                    >
+                      {kpi.formatted}
+                      {kpi.unit && kpi.unit !== "currency" && (
+                        <span className="ml-0.5 text-[9px] font-semibold text-muted-foreground">
+                          {kpi.unit}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    // "Not computable" is an answer, shown in full — hiding the
+                    // row would look like the KPI was never pinned.
+                    <span className="shrink-0 font-mono text-muted-foreground/70" title={kpi.reason}>
+                      {kpi.taskCount === 0
+                        ? isEs ? "sin tareas" : "no tasks"
+                        : isEs ? "sin datos" : "no data"}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="border-t border-border/60 pt-1.5 text-[10px] text-muted-foreground/80">
+          {isEs
+            ? "Clic derecho sobre el hito para añadirle un KPI."
+            : "Right-click the milestone to add a KPI."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Task Tooltip ──────────────────────────────────────────────────────────────
 
 function TaskTooltip({ task, milestone, locale }: { task: RoadmapTask; milestone: Milestone; locale: Locale }) {
@@ -235,7 +325,7 @@ function TaskTooltip({ task, milestone, locale }: { task: RoadmapTask; milestone
   const progressPct = task.progress ?? 0;
 
   return (
-    <div className="bg-popover text-popover-foreground border border-border rounded-lg shadow-lg p-3 text-xs space-y-1.5 min-w-[200px] z-50">
+    <div className="space-y-1.5 text-xs">
       <div className="font-semibold text-sm">{task.title}</div>
       <div className="text-muted-foreground">{milestone.title}</div>
       <div className="flex items-center gap-2">
@@ -294,6 +384,9 @@ export function GanttRoadmap({
   locale,
   translations: t,
   onTaskDatesChange,
+  pinnedKpisByMilestone,
+  pinnableKpis,
+  projectId,
 }: GanttRoadmapProps) {
   // null = the user has not chosen; the level is derived from how long the
   // plan is, so a two-week sprint opens at Day and a two-year programme at
@@ -324,6 +417,9 @@ export function GanttRoadmap({
     return expanded;
   });
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
+  const [hoveredMilestone, setHoveredMilestone] = useState<string | null>(null);
+  const [kpiMenu, setKpiMenu] = useState<{ milestoneId: string; title: string; x: number; y: number } | null>(null);
+  const router = useRouter();
 
   const range = computeDateRange(milestones, tasksByMilestone);
 
@@ -440,6 +536,28 @@ export function GanttRoadmap({
 
   timelineWidthRef.current = timelineWidth;
 
+  // What the fixed inspector shows. Hovering a task wins over hovering its
+  // milestone row: the pointer is on the more specific thing.
+  const inspector = (() => {
+    if (hoveredTask) {
+      for (const m of milestones) {
+        const found = (tasksByMilestone[m.id] ?? []).find((x) => x.id === hoveredTask);
+        if (found) return { kind: "task" as const, task: found, milestone: m };
+      }
+    }
+    if (hoveredMilestone) {
+      const m = milestones.find((x) => x.id === hoveredMilestone);
+      if (m) {
+        return {
+          kind: "milestone" as const,
+          milestone: m,
+          counts: taskCounts[m.id] ?? { total: 0, done: 0, inProgress: 0 },
+        };
+      }
+    }
+    return null;
+  })();
+
   // How much of the plan has moved since it was committed to. Counted here so
   // the toolbar can say "no drift" out loud instead of showing an empty legend
   // that the user has to interpret.
@@ -550,6 +668,36 @@ export function GanttRoadmap({
         )}
       </div>
 
+      {/*
+        The inspector, pinned to the top right.
+
+        It used to be a tooltip anchored to the hovered ROW (`top-full`), which
+        dropped it straight over the twelve rows underneath — the detail was
+        legible only by covering the chart it described. Fixed to one corner it
+        never occludes a bar, and the eye learns one place to look instead of
+        tracking a box that moves with the cursor.
+      */}
+      <div className="relative">
+      {inspector && (
+        <div
+          role="status"
+          // pointer-events-none: the panel sits over the canvas and must never
+          // swallow a drag that started on a bar beneath it.
+          className="pointer-events-none absolute right-3 top-3 z-40 w-[280px] rounded-xl border border-border bg-popover/95 p-3 text-popover-foreground shadow-xl backdrop-blur"
+        >
+          {inspector.kind === "task" ? (
+            <TaskTooltip task={inspector.task} milestone={inspector.milestone} locale={locale} />
+          ) : (
+            <MilestoneInspector
+              milestone={inspector.milestone}
+              counts={inspector.counts}
+              kpis={pinnedKpisByMilestone?.[inspector.milestone.id] ?? []}
+              locale={locale}
+            />
+          )}
+        </div>
+      )}
+
       {/* Gantt chart */}
       <div className="overflow-x-auto rounded-lg border border-border" ref={ganttRef}>
         <div style={{ width: LEFT_COL_WIDTH + timelineWidth }}>
@@ -600,10 +748,33 @@ export function GanttRoadmap({
                   <div
                     className="flex items-center cursor-pointer hover:bg-muted/30 transition-colors group/milestone"
                     onClick={() => toggleMilestone(milestone.id)}
+                    onMouseEnter={() => setHoveredMilestone(milestone.id)}
+                    onMouseLeave={() => setHoveredMilestone(null)}
+                    // Right-click a phase to decide how it is measured. The pin
+                    // is the same row the Living Graph writes, so a KPI added
+                    // here appears there and vice versa.
+                    onContextMenu={(e) => {
+                      if (!projectId || !pinnableKpis?.length) return;
+                      e.preventDefault();
+                      setKpiMenu({
+                        milestoneId: milestone.id,
+                        title: milestone.title,
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
+                    }}
                     style={{ height: MILESTONE_ROW_HEIGHT }}
                   >
                     {/* Label */}
                     <div className="shrink-0 border-b border-r border-border px-2 flex items-center gap-1.5" style={{ width: LEFT_COL_WIDTH }}>
+                      {(pinnedKpisByMilestone?.[milestone.id]?.length ?? 0) > 0 && (
+                        <span
+                          className="shrink-0 rounded bg-brand-500/15 px-1 font-mono text-[9px] font-bold text-brand-700 dark:text-brand-300"
+                          title={locale === "es" ? "KPIs de este hito" : "KPIs on this milestone"}
+                        >
+                          {pinnedKpisByMilestone![milestone.id].length}
+                        </span>
+                      )}
                       {isExpanded ? (
                         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       ) : (
@@ -749,12 +920,6 @@ export function GanttRoadmap({
                           )}
                         </div>
 
-                        {/* Tooltip on hover */}
-                        {isHovered && (
-                          <div className="absolute z-50 left-[220px] top-full mt-1">
-                            <TaskTooltip task={task} milestone={milestone} locale={locale} />
-                          </div>
-                        )}
                       </div>
                     );
                   })}
@@ -764,6 +929,24 @@ export function GanttRoadmap({
           </div>
         </div>
       </div>
+      </div>
+
+      {kpiMenu && projectId && (
+        <MilestoneKpiContextMenu
+          locale={locale}
+          x={kpiMenu.x}
+          y={kpiMenu.y}
+          milestoneTitle={kpiMenu.title}
+          available={pinnableKpis ?? []}
+          pinnedSlugs={(pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []).map((k) => k.slug)}
+          onTogglePin={async (slug, pinned) => {
+            const action = pinned ? unpinKpiFromMilestone : pinKpiToMilestone;
+            const result = await action({ projectId, milestoneId: kpiMenu.milestoneId, kpiSlug: slug });
+            if (result.ok) router.refresh();
+          }}
+          onClose={() => setKpiMenu(null)}
+        />
+      )}
     </div>
   );
 }
