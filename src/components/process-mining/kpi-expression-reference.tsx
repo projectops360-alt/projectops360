@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { KPI_FIELDS, KPI_FUNCTION_DOCS, KPI_EXAMPLES, type KpiFieldScope } from "@/lib/kpi/reference";
+import { KPI_FIELDS, KPI_FUNCTION_DOCS, KPI_EXAMPLES, EVM_EXPLAINERS, type KpiFieldScope } from "@/lib/kpi/reference";
 
 interface KpiExpressionReferenceProps {
   isEs: boolean;
@@ -95,6 +95,45 @@ export function KpiExpressionReference({ isEs, onInsert }: KpiExpressionReferenc
                     {fn.signature}
                   </span>
                   <span className="text-muted-foreground">{isEs ? fn.es : fn.en}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/*
+            SPI and CPI get prose, not just an expression. They are the KPIs
+            most often quoted and least often understood: "SPI 0.03" has to be
+            read as "three percent of the planned work is done", not "something
+            is 3% wrong". And each has a denominator that can legitimately be
+            zero, which is why the editor sometimes answers "not computable".
+          */}
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {isEs ? "Valor Ganado (EVM)" : "Earned Value (EVM)"}
+            </p>
+            <ul className="space-y-2">
+              {EVM_EXPLAINERS.map((evm) => (
+                <li key={evm.code} className="rounded-md border border-border bg-background p-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-[11px] font-bold text-brand-700 dark:text-brand-300">
+                      {evm.code}
+                    </span>
+                    <span className="text-[11px] font-medium text-foreground">
+                      {isEs ? evm.nameEs : evm.nameEn}
+                    </span>
+                  </div>
+                  <code className="mt-1 block font-mono text-[11px] font-semibold text-foreground">
+                    {evm.formula}
+                  </code>
+                  <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                    {isEs ? evm.meaningEs : evm.meaningEn}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-snug text-foreground/80">
+                    {isEs ? evm.readingEs : evm.readingEn}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-snug text-amber-600 dark:text-amber-400">
+                    {isEs ? evm.needsEs : evm.needsEn}
+                  </p>
                 </li>
               ))}
             </ul>

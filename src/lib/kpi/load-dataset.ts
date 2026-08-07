@@ -79,7 +79,7 @@ export async function loadKpiDataset(projectId: string, locale: Locale): Promise
     supabase
       .from("roadmap_tasks")
       .select(
-        "id, milestone_id, status, is_blocked, is_critical, assigned_to, assigned_resource_id, estimate_hours, actual_hours, progress, duration_days, end_date, completed_at",
+        "id, milestone_id, status, is_blocked, is_critical, assigned_to, assigned_resource_id, estimate_hours, actual_hours, progress, duration_days, end_date, completed_at, baseline_start_date, baseline_end_date, baseline_estimate_hours",
       )
       .eq("project_id", projectId)
       .eq("organization_id", org.organizationId)

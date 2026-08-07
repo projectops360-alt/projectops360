@@ -26,6 +26,14 @@ export const KPI_DATASET_VARIABLES = [
   // `priced_flag` says how much of the scope the figure actually covers.
   "task_cost",
   "priced_flag",
+  // Earned Value, precomputed per task (the sandbox has no element-wise math).
+  "planned_value_hours",
+  "earned_value_hours",
+  "planned_value_cost",
+  "earned_value_cost",
+  "actual_cost",
+  "baseline_hours",
+  "baseline_cost",
   // Per-milestone aligned arrays
   "milestone_completed_flag",
   "milestone_delay_days",
@@ -260,6 +268,87 @@ export const KPI_CATALOG: KpiCatalogDefinition[] = [
     expression: "SUM(actual_hours) - SUM(estimate_hours)",
     unit: "hours",
     precision: 0,
+    version: 1,
+  },
+  // ── Earned Value (EVM) ────────────────────────────────────────────────────
+  // The two indices every steering committee asks for. 1.00 = on plan.
+  //
+  // Each is a division whose denominator can legitimately be zero, and the
+  // engine turning that into "not computable" is the point: SPI would
+  // otherwise read 1.00 for a project that has not started, and CPI would read
+  // infinity for one that has spent nothing. Both are lies a committee acts on.
+  {
+    slug: "spi",
+    nameEs: "SPI — Índice de Desempeño del Cronograma",
+    nameEn: "SPI — Schedule Performance Index",
+    descriptionEs:
+      "Valor ganado sobre valor planificado, en horas. 1,00 = según el plan; 0,80 = se ha hecho el 80% de lo que debería estar hecho. No necesita tarifas. Requiere línea base.",
+    descriptionEn:
+      "Earned value over planned value, in hours. 1.00 = on plan; 0.80 = 80% of what should be done is done. Needs no cost rates. Requires a baseline.",
+    expression: "SUM(earned_value_hours) / SUM(planned_value_hours)",
+    unit: "ratio",
+    precision: 2,
+    version: 1,
+  },
+  {
+    slug: "cpi",
+    nameEs: "CPI — Índice de Desempeño del Costo",
+    nameEn: "CPI — Cost Performance Index",
+    descriptionEs:
+      "Valor ganado sobre costo real. 1,00 = cada peso gastado compró un peso de avance; 0,80 = compró 80 céntimos. Requiere tarifas y horas registradas.",
+    descriptionEn:
+      "Earned value over actual cost. 1.00 = every unit spent bought a unit of progress; 0.80 = it bought 80 cents. Requires rates and logged hours.",
+    expression: "SUM(earned_value_cost) / SUM(actual_cost)",
+    unit: "ratio",
+    precision: 2,
+    version: 1,
+  },
+  {
+    slug: "schedule_variance_hours",
+    nameEs: "SV — Desviación del cronograma",
+    nameEn: "SV — Schedule Variance",
+    descriptionEs: "Valor ganado menos planificado, en horas. Negativo = atrasado.",
+    descriptionEn: "Earned minus planned value, in hours. Negative = behind.",
+    expression: "SUM(earned_value_hours) - SUM(planned_value_hours)",
+    unit: "hours",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "cost_variance",
+    nameEs: "CV — Desviación del costo",
+    nameEn: "CV — Cost Variance",
+    descriptionEs: "Valor ganado menos costo real. Negativo = sobrecosto.",
+    descriptionEn: "Earned value minus actual cost. Negative = over budget.",
+    expression: "SUM(earned_value_cost) - SUM(actual_cost)",
+    unit: "currency",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "eac",
+    nameEs: "EAC — Estimación al terminar",
+    nameEn: "EAC — Estimate At Completion",
+    descriptionEs:
+      "Lo que costará el total si se mantiene la eficiencia mostrada hasta hoy: presupuesto entre CPI.",
+    descriptionEn:
+      "What the whole job will cost if today's efficiency holds: budget divided by CPI.",
+    expression: "SUM(baseline_cost) * SUM(actual_cost) / SUM(earned_value_cost)",
+    unit: "currency",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "percent_complete_evm",
+    nameEs: "% completado (por valor ganado)",
+    nameEn: "% complete (earned value)",
+    descriptionEs:
+      "Valor ganado sobre presupuesto total, en horas. Pondera por esfuerzo: cerrar tareas baratas no infla el avance.",
+    descriptionEn:
+      "Earned value over total budget, in hours. Weighted by effort, so closing cheap tasks cannot inflate progress.",
+    expression: "100 * SUM(earned_value_hours) / SUM(baseline_hours)",
+    unit: "%",
+    precision: 1,
     version: 1,
   },
 ];
