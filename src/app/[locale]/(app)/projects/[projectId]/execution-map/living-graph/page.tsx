@@ -17,6 +17,13 @@ import { resolveCanonicalNodeLabel } from "@/lib/graph/node-label";
 import { loadRealtimeGraphSignature } from "@/lib/living-graph-realtime-ui/load-snapshot";
 import { LivingGraphAutoRefresh } from "@/components/graph/living-graph-auto-refresh";
 import { getOrgContext } from "@/lib/auth";
+import { buildMilestoneDatasets, type KpiTaskRow } from "@/lib/kpi/build-dataset";
+import {
+  evaluatePinnedKpi,
+  pinnableKpis as listPinnableKpis,
+  type ResolvedPinnedKpi,
+} from "@/lib/kpi/milestone-pins";
+import type { CustomKpiDefinition } from "@/lib/kpi/custom";
 import type {
   ProcessNode,
   ProcessEdge,
@@ -351,7 +358,7 @@ export default async function LivingGraphPage({
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null),
     supabase
-      .from("project_resources")
+      .from("resources")
       .select("id, cost_rate, cost_unit")
       .eq("project_id", projectId)
       .eq("organization_id", org.organizationId)
@@ -373,6 +380,94 @@ export default async function LivingGraphPage({
   }[];
   // One project, one currency in practice; the first line that states one wins.
   const projectCurrency = budgetLines.find((b) => b.currency)?.currency ?? "USD";
+
+  // ── KPIs pinned to each milestone (CAP-046 milestone dimension) ─────────────
+  // The pin stores a slug; the VALUE is computed here, live, by the same engine
+  // the KPI screen uses — never cached, so there is no second source to drift
+  // (REG-010). Each milestone is evaluated against its OWN dataset, which is
+  // the same shape as the project's, so the expression is untouched.
+  const [pinsResult, customKpiResult] = await Promise.all([
+    supabase
+      .from("milestone_kpi_pins")
+      .select("milestone_id, kpi_slug, order_index")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .order("order_index", { ascending: true }),
+    supabase
+      .from("kpi_definitions")
+      .select("id, slug, name_en, name_es, description_en, description_es, expression, unit, precision, target, target_direction, version, project_id")
+      .eq("organization_id", org.organizationId)
+      .or(`project_id.eq.${projectId},project_id.is.null`)
+      .is("deleted_at", null),
+  ]);
+
+  const customKpis: CustomKpiDefinition[] = (customKpiResult.data ?? []).map((row) => ({
+    id: row.id as string,
+    slug: row.slug as string,
+    nameEn: row.name_en as string,
+    nameEs: row.name_es as string,
+    descriptionEn: (row.description_en as string | null) ?? null,
+    descriptionEs: (row.description_es as string | null) ?? null,
+    expression: row.expression as string,
+    unit: (row.unit as string | null) ?? null,
+    precision: (row.precision as number | null) ?? 2,
+    target: (row.target as number | null) ?? null,
+    targetDirection: (row.target_direction as CustomKpiDefinition["targetDirection"]) ?? null,
+    nlSource: null,
+    version: (row.version as number | null) ?? 1,
+    projectId: (row.project_id as string | null) ?? null,
+  }));
+
+  const pinnedKpisByMilestone: Record<string, ResolvedPinnedKpi[]> = {};
+  const pins = (pinsResult.data ?? []) as { milestone_id: string; kpi_slug: string }[];
+  if (pins.length > 0) {
+    const rateByResource = new Map<string, number>();
+    for (const r of resourceRates) {
+      if (r.cost_rate != null && r.cost_rate > 0 && (r.cost_unit ?? "hour") === "hour") {
+        rateByResource.set(r.id, Number(r.cost_rate));
+      }
+    }
+    const budgetByMilestone = new Map<string, number>();
+    const budgetByName = new Map<string, number>();
+    for (const line of budgetLines) {
+      const amount = Number(line.estimated_cost) || 0;
+      if (line.milestone_id) {
+        budgetByMilestone.set(line.milestone_id, (budgetByMilestone.get(line.milestone_id) ?? 0) + amount);
+      } else if (line.name) {
+        const key = line.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+        budgetByName.set(key, (budgetByName.get(key) ?? 0) + amount);
+      }
+    }
+    for (const m of fullMilestones) {
+      if (budgetByMilestone.has(m.id)) continue;
+      const key = (m.title ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+      const matched = budgetByName.get(key);
+      if (matched != null) budgetByMilestone.set(m.id, matched);
+    }
+
+    const scopes = buildMilestoneDatasets(
+      fullTasks as unknown as KpiTaskRow[],
+      fullMilestones.map((m) => ({
+        id: m.id,
+        status: m.status,
+        target_date: m.target_date,
+        completed_date: m.completed_date,
+      })),
+      new Date().toISOString(),
+      { rateByResource, budgetByMilestone },
+    );
+    const scopeById = new Map(scopes.map((s) => [s.milestoneId, s]));
+
+    for (const pin of pins) {
+      const scope = scopeById.get(pin.milestone_id);
+      if (!scope) continue;
+      const list = pinnedKpisByMilestone[pin.milestone_id] ?? [];
+      list.push(evaluatePinnedKpi(pin.kpi_slug, customKpis, scope.dataset, scope.taskCount));
+      pinnedKpisByMilestone[pin.milestone_id] = list;
+    }
+  }
+
+  const pinnableKpis = listPinnableKpis(customKpis);
 
   // ── Subtask visibility layer (Task Execution Map) ───────────────────────────
   // Fetch project subtasks for the NotebookLM-style progressive expansion.
@@ -713,6 +808,8 @@ export default async function LivingGraphPage({
         budgetLines={budgetLines}
         resourceRates={resourceRates}
         currency={projectCurrency}
+        pinnedKpisByMilestone={pinnedKpisByMilestone}
+        pinnableKpis={pinnableKpis}
       />
     </div>
   );

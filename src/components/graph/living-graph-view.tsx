@@ -75,6 +75,9 @@ import {
   DEFAULT_MILESTONE_CARD_METRIC_IDS,
 } from "@/lib/graph/milestone-card-metrics";
 import { MilestoneMetricsPicker } from "./milestone-metrics-picker";
+import { MilestoneKpiContextMenu } from "./milestone-kpi-context-menu";
+import { pinKpiToMilestone, unpinKpiFromMilestone } from "@/lib/kpi/milestone-pin-actions";
+import type { PinnableKpi, ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
 import {
   computeLayout,
   milestoneFlowLayout,
@@ -276,11 +279,16 @@ export interface LivingGraphViewProps {
   resourceRates?: ResourceRateLike[];
   /** Project currency (ISO 4217). Budget lines carry it; defaults to USD. */
   currency?: string;
+  /** KPIs pinned to each milestone, already evaluated in that milestone's own
+   *  scope server-side. milestoneId → results. */
+  pinnedKpisByMilestone?: Record<string, ResolvedPinnedKpi[]>;
+  /** Everything the user may pin: built-ins + this project's custom KPIs. */
+  pinnableKpis?: PinnableKpi[];
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency, pinnedKpisByMilestone, pinnableKpis }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -363,6 +371,8 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             budgetLines={budgetLines}
             resourceRates={resourceRates}
             currency={currency}
+            pinnedKpisByMilestone={pinnedKpisByMilestone}
+            pinnableKpis={pinnableKpis}
           />
         </ReactFlowProvider>
       </div>
@@ -372,7 +382,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency, pinnedKpisByMilestone, pinnableKpis }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -617,6 +627,46 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
     [setCardMetricIds],
   );
   const handleClearCardMetrics = useCallback(() => setCardMetricIds([]), [setCardMetricIds]);
+
+  // ── Right-click a milestone → measure it by a KPI ─────────────────────────
+  // The pin is project data, so it round-trips through a server action and the
+  // page re-renders with freshly evaluated values. Nothing is computed here.
+  const [kpiMenu, setKpiMenu] = useState<{
+    milestoneId: string;
+    title: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: LivingFlowNode) => {
+      const milestoneId = node.data.node.milestoneId;
+      if (node.type !== "milestoneCard" || !milestoneId) return;
+      // Only swallow the browser menu where we actually offer one.
+      event.preventDefault();
+      setKpiMenu({
+        milestoneId,
+        title: node.data.node.label,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [],
+  );
+
+  const handleTogglePin = useCallback(
+    async (slug: string, pinned: boolean) => {
+      if (!kpiMenu) return;
+      const action = pinned ? unpinKpiFromMilestone : pinKpiToMilestone;
+      const result = await action({
+        projectId,
+        milestoneId: kpiMenu.milestoneId,
+        kpiSlug: slug,
+      });
+      if (result.ok) router.refresh();
+    },
+    [kpiMenu, projectId, router],
+  );
 
   // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
   // Status contract (Part B): the page ALWAYS sets
@@ -1396,6 +1446,10 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           clusterSize,
           // KPI chips the user pinned. Undefined at every other level and
           // whenever nothing is pinned, so the card renders exactly as before.
+          pinnedKpis:
+            isMilestoneLevel && node.milestoneId
+              ? pinnedKpisByMilestone?.[node.milestoneId]
+              : undefined,
           cardMetrics:
             isMilestoneLevel && node.milestoneId && cardMetricIds.length > 0
               ? resolveMilestoneCardMetrics(
@@ -2622,6 +2676,19 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
       >
         {!caseExplorerActive && !processExplorerActive && <LivingGraphLegend />}
 
+        {kpiMenu && (
+          <MilestoneKpiContextMenu
+            locale={locale as Locale}
+            x={kpiMenu.x}
+            y={kpiMenu.y}
+            milestoneTitle={kpiMenu.title}
+            available={pinnableKpis ?? []}
+            pinnedSlugs={(pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []).map((k) => k.slug)}
+            onTogglePin={handleTogglePin}
+            onClose={() => setKpiMenu(null)}
+          />
+        )}
+
         {/* Pin your own KPIs to the milestone cards. Milestone level only —
             the rollup is per milestone, and there is nothing to pin elsewhere. */}
         {isMilestoneLevel && (
@@ -3031,6 +3098,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
                 nodeTypes={NODE_TYPES}
                 edgeTypes={EDGE_TYPES}
                 onNodeClick={onNodeClick}
+                onNodeContextMenu={onNodeContextMenu}
                 onNodeDoubleClick={onNodeDoubleClick}
                 onEdgeClick={onEdgeClick}
                 onPaneClick={onPaneClick}

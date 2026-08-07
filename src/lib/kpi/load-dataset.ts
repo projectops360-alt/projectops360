@@ -5,60 +5,53 @@
 // canonical tables (RLS-scoped, SELECT only, deny-by-default). Flags follow
 // REG-010 canonical helpers — this loader NEVER re-derives blocker/overdue
 // semantics its own way (one source of metrics, REG-010).
+//
+// It now also returns one dataset PER MILESTONE, so the same expression the
+// user wrote for the project can be asked of a single phase. The arithmetic
+// lives in build-dataset.ts (pure); this file only fetches rows.
 // ============================================================================
 
 import { createClient } from "@/lib/supabase/server";
 import { getOrgContext } from "@/lib/auth";
 import { getI18nValue } from "@/types/database";
 import type { Locale } from "@/types/database";
-import { hasActiveBlocker, isCompletedStatus, isTerminalStatus, isUnassigned } from "@/lib/execution/task-activity";
 import type { KpiDataset } from "./evaluate";
+import {
+  buildKpiDataset,
+  buildMilestoneDatasets,
+  type KpiCostInputs,
+  type KpiMilestoneRow,
+  type KpiTaskRow,
+  type MilestoneScopedDataset,
+} from "./build-dataset";
+
+export { weeklyCompletedSeries } from "./build-dataset";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Weeks of completion history for the weekly series. */
-const WEEKLY_SERIES_WEEKS = 12;
+
+/** A milestone's dataset plus what the UI needs to label it. */
+export interface KpiMilestoneScope extends MilestoneScopedDataset {
+  title: string;
+  orderIndex: number;
+}
 
 export type KpiDatasetLoadResult =
-  | { status: "ok"; dataset: KpiDataset; projectTitle: string; taskCount: number; milestoneCount: number }
+  | {
+      status: "ok";
+      dataset: KpiDataset;
+      /** Same shape, one per milestone — the milestone dimension. */
+      milestoneScopes: KpiMilestoneScope[];
+      projectTitle: string;
+      taskCount: number;
+      milestoneCount: number;
+      /** ISO 4217 of the project's budget lines; drives currency formatting. */
+      currency: string;
+    }
   | { status: "unauthorized" }
   | { status: "error" };
 
-interface TaskRow {
-  status: string;
-  is_blocked: boolean;
-  is_critical: boolean;
-  assigned_to: string | null;
-  assigned_resource_id: string | null;
-  estimate_hours: number | null;
-  actual_hours: number | null;
-  progress: number | null;
-  duration_days: number | null;
-  end_date: string | null;
-  completed_at: string | null;
-}
-
-const num = (value: number | null): number => (value === null ? NaN : value);
-
-/** Tasks completed per ISO-ish week (UTC Monday buckets), oldest → newest. */
-export function weeklyCompletedSeries(
-  completedAts: readonly (string | null)[],
-  nowIso: string,
-  weeks = WEEKLY_SERIES_WEEKS,
-): number[] {
-  const now = new Date(nowIso);
-  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const day = monday.getUTCDay();
-  monday.setUTCDate(monday.getUTCDate() - ((day + 6) % 7)); // back to Monday
-  const buckets = new Array<number>(weeks).fill(0);
-  const start = monday.getTime() - (weeks - 1) * 7 * 24 * 60 * 60 * 1000;
-  for (const completedAt of completedAts) {
-    if (!completedAt) continue;
-    const t = Date.parse(completedAt);
-    if (!Number.isFinite(t) || t < start) continue;
-    const index = Math.min(weeks - 1, Math.floor((t - start) / (7 * 24 * 60 * 60 * 1000)));
-    if (index >= 0) buckets[index] += 1;
-  }
-  return buckets;
+function normalizeName(s: string | null | undefined): string {
+  return (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
 
 export async function loadKpiDataset(projectId: string, locale: Locale): Promise<KpiDatasetLoadResult> {
@@ -82,72 +75,111 @@ export async function loadKpiDataset(projectId: string, locale: Locale): Promise
     .single();
   if (projectError || !project) return { status: "unauthorized" };
 
-  const [tasksResult, milestonesResult] = await Promise.all([
+  const [tasksResult, milestonesResult, budgetResult, rateResult] = await Promise.all([
     supabase
       .from("roadmap_tasks")
       .select(
-        "status, is_blocked, is_critical, assigned_to, assigned_resource_id, estimate_hours, actual_hours, progress, duration_days, end_date, completed_at",
+        "id, milestone_id, status, is_blocked, is_critical, assigned_to, assigned_resource_id, estimate_hours, actual_hours, progress, duration_days, end_date, completed_at",
       )
       .eq("project_id", projectId)
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null),
     supabase
       .from("milestones")
-      .select("status, target_date, completed_date")
+      .select("id, title, status, target_date, completed_date, order_index")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .order("order_index", { ascending: true }),
+    // Cost inputs. Both are optional: without them the cost KPIs answer "not
+    // computable", which is the honest result, so a failure here must never
+    // fail the whole dataset.
+    supabase
+      .from("budget_items")
+      .select("name, estimated_cost, milestone_id, currency")
       .eq("project_id", projectId)
       .eq("organization_id", org.organizationId)
       .is("deleted_at", null),
+    supabase
+      .from("resources")
+      .select("id, cost_rate, cost_unit")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .not("cost_rate", "is", null),
   ]);
   if (tasksResult.error || milestonesResult.error) return { status: "error" };
 
-  const tasks = (tasksResult.data ?? []) as TaskRow[];
-  const milestones = (milestonesResult.data ?? []) as Array<{
-    status: string;
-    target_date: string | null;
-    completed_date: string | null;
+  const tasks = (tasksResult.data ?? []) as KpiTaskRow[];
+  const milestoneRows = (milestonesResult.data ?? []) as Array<
+    KpiMilestoneRow & { title: string; order_index: number | null }
+  >;
+  const budgetLines = (budgetResult.data ?? []) as Array<{
+    name: string | null;
+    estimated_cost: number | null;
+    milestone_id: string | null;
+    currency: string | null;
   }>;
-  const nowIso = new Date().toISOString();
+  const rates = (rateResult.data ?? []) as Array<{
+    id: string;
+    cost_rate: number | null;
+    cost_unit: string | null;
+  }>;
 
-  const dataset: KpiDataset = {
-    estimate_hours: tasks.map((task) => num(task.estimate_hours)),
-    actual_hours: tasks.map((task) => num(task.actual_hours)),
-    progress: tasks.map((task) => num(task.progress)),
-    completed_flag: tasks.map((task) => (isCompletedStatus(task.status) ? 1 : 0)),
-    blocked_flag: tasks.map((task) =>
-      hasActiveBlocker({ status: task.status as never, is_blocked: task.is_blocked }) ? 1 : 0,
-    ),
-    open_overdue_flag: tasks.map((task) =>
-      !isTerminalStatus(task.status) && task.end_date !== null && task.end_date < nowIso ? 1 : 0,
-    ),
-    delayed_flag: tasks.map((task) => {
-      if (!task.end_date) return 0;
-      if (isCompletedStatus(task.status)) {
-        return task.completed_at !== null && task.completed_at > task.end_date ? 1 : 0;
-      }
-      if (isTerminalStatus(task.status)) return 0;
-      return task.end_date < nowIso ? 1 : 0;
-    }),
-    unassigned_flag: tasks.map((task) =>
-      isUnassigned({ assigned_to: task.assigned_to, assigned_resource_id: task.assigned_resource_id }) ? 1 : 0,
-    ),
-    critical_flag: tasks.map((task) => (task.is_critical ? 1 : 0)),
-    duration_days: tasks.map((task) => num(task.duration_days)),
-    milestone_completed_flag: milestones.map((m) => (m.completed_date ? 1 : 0)),
-    milestone_delay_days: milestones.map((m) => {
-      if (!m.completed_date || !m.target_date) return NaN;
-      return (Date.parse(m.completed_date) - Date.parse(m.target_date)) / (24 * 60 * 60 * 1000);
-    }),
-    weekly_completed: weeklyCompletedSeries(
-      tasks.filter((task) => isCompletedStatus(task.status)).map((task) => task.completed_at),
-      nowIso,
-    ),
-  };
+  // Only hourly rates: pricing hours from a daily rate would mean assuming the
+  // length of a working day, and inventing that assumption is how a cost
+  // figure stops being a fact.
+  const rateByResource = new Map<string, number>();
+  for (const r of rates) {
+    if (r.cost_rate != null && r.cost_rate > 0 && (r.cost_unit ?? "hour") === "hour") {
+      rateByResource.set(r.id, Number(r.cost_rate));
+    }
+  }
+
+  // budget_items HAS a milestone_id FK, but no importer populates it — plans
+  // express the link by sharing a name. Honour the FK first so the day
+  // something does populate it, the name stops mattering.
+  const budgetByMilestone = new Map<string, number>();
+  const byName = new Map<string, number>();
+  for (const line of budgetLines) {
+    const amount = Number(line.estimated_cost) || 0;
+    if (line.milestone_id) {
+      budgetByMilestone.set(line.milestone_id, (budgetByMilestone.get(line.milestone_id) ?? 0) + amount);
+    } else {
+      const key = normalizeName(line.name);
+      if (key) byName.set(key, (byName.get(key) ?? 0) + amount);
+    }
+  }
+  for (const m of milestoneRows) {
+    if (budgetByMilestone.has(m.id)) continue;
+    const matched = byName.get(normalizeName(m.title));
+    if (matched != null) budgetByMilestone.set(m.id, matched);
+  }
+
+  const cost: KpiCostInputs = { rateByResource, budgetByMilestone };
+  const nowIso = new Date().toISOString();
+  const milestones: KpiMilestoneRow[] = milestoneRows.map((m) => ({
+    id: m.id,
+    status: m.status,
+    target_date: m.target_date,
+    completed_date: m.completed_date,
+  }));
+
+  const scopes = buildMilestoneDatasets(tasks, milestones, nowIso, cost);
+  const titleById = new Map(milestoneRows.map((m) => [m.id, m.title]));
+  const orderById = new Map(milestoneRows.map((m, i) => [m.id, m.order_index ?? i]));
 
   return {
     status: "ok",
-    dataset,
+    dataset: buildKpiDataset(tasks, milestones, nowIso, cost),
+    milestoneScopes: scopes.map((s) => ({
+      ...s,
+      title: titleById.get(s.milestoneId) ?? "",
+      orderIndex: orderById.get(s.milestoneId) ?? 0,
+    })),
     projectTitle: getI18nValue(project.title_i18n, locale) || project.slug,
     taskCount: tasks.length,
     milestoneCount: milestones.length,
+    currency: budgetLines.find((b) => b.currency)?.currency ?? "USD",
   };
 }

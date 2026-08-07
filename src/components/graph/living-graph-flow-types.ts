@@ -18,6 +18,7 @@ import type {
   ProcessTransitionAggregate,
 } from "@/lib/graph/task-process-analysis";
 import type { ResolvedMilestoneMetric } from "@/lib/graph/milestone-card-metrics";
+import type { ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
 
 /** Visual state derived from timeline playback. */
 export type TimelinePlaybackState =
@@ -54,6 +55,9 @@ export type LivingNodeData = {
   /** KPI chips the USER chose to show on this milestone card, already resolved
    *  and formatted. Empty unless they picked some — the card never decides. */
   cardMetrics?: ResolvedMilestoneMetric[];
+  /** KPIs pinned to THIS milestone (project data), evaluated in its own scope.
+   *  Revealed on hover; the card only shows that they exist. */
+  pinnedKpis?: ResolvedPinnedKpi[];
 };
 
 export type LivingFlowNode = Node<LivingNodeData, "living" | "milestoneCard">;

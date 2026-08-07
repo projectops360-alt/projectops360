@@ -15,11 +15,22 @@
 import { describe, it, expect } from "vitest";
 import { KPI_FIELDS, KPI_FUNCTION_DOCS, KPI_EXAMPLES } from "../reference";
 import { KPI_FUNCTIONS as ENGINE_FUNCTIONS } from "../parser";
+import { KPI_DATASET_VARIABLES } from "../catalog";
 
 describe("KPI field reference", () => {
   it("documents every field, with no duplicates", () => {
     const names = KPI_FIELDS.map((f) => f.field);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("documents EVERY variable the engine accepts", () => {
+    // The type only stops us documenting a field that does not exist. This
+    // stops the opposite — a variable added to the engine and never surfaced,
+    // which is exactly how `open_overdue_flag` stayed invisible for months.
+    const documented = new Set(KPI_FIELDS.map((f) => f.field as string));
+    for (const variable of KPI_DATASET_VARIABLES) {
+      expect(documented.has(variable), `${variable} is accepted by the engine but undocumented`).toBe(true);
+    }
   });
 
   it("describes each field in both languages", () => {
