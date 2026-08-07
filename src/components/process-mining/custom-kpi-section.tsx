@@ -11,8 +11,9 @@
 // ============================================================================
 
 import { useState, useTransition } from "react";
+import { KpiExpressionReference } from "./kpi-expression-reference";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
 import { createCustomKpi, deleteCustomKpi } from "@/lib/kpi/custom-actions";
 
@@ -37,6 +38,7 @@ export function CustomKpiSection({
   canCreate: boolean;
 }) {
   const t = useTranslations("kpiEngine.custom");
+  const isEs = useLocale() === "es";
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showForm, setShowForm] = useState(false);
@@ -122,6 +124,19 @@ export function CustomKpiSection({
             placeholder={t("form.expression")}
             value={form.expression}
             onChange={(e) => setForm({ ...form, expression: e.target.value })}
+          />
+          <KpiExpressionReference
+            isEs={isEs}
+            onInsert={(text) =>
+              setForm((f) => ({
+                // A field is appended to what is already there; a whole example
+                // replaces an empty box but never overwrites work in progress.
+                ...f,
+                expression: f.expression.trim()
+                  ? `${f.expression.trimEnd()} ${text}`
+                  : text,
+              }))
+            }
           />
           <div className="grid grid-cols-3 gap-2">
             <input
