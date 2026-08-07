@@ -5,6 +5,7 @@ import type { PinnableKpi, ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
 import { MilestoneKpiContextMenu } from "@/components/graph/milestone-kpi-context-menu";
 import { pinKpiToMilestone, unpinKpiFromMilestone } from "@/lib/kpi/milestone-pin-actions";
 import { useRouter } from "next/navigation";
+import { placeHoverPanel } from "@/lib/roadmap/hover-panel-position";
 import {
   ganttTimelineWidth,
   defaultZoomFor,
@@ -98,6 +99,8 @@ const ZOOM_LABEL = {
 const ROW_HEIGHT = 32; // px per row
 const MILESTONE_ROW_HEIGHT = 36; // px per milestone row
 const LEFT_COL_WIDTH = 220; // px for the label column
+/** Must match the panel's Tailwind width below (w-[280px]). */
+const HOVER_PANEL_WIDTH = 280;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -418,6 +421,11 @@ export function GanttRoadmap({
   });
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
   const [hoveredMilestone, setHoveredMilestone] = useState<string | null>(null);
+  /** Where the pointer was when the row was ENTERED. Deliberately not tracked
+   *  on move: re-rendering 274 rows for every pixel of travel would make the
+   *  chart stutter, and the panel only needs to be near the row, not glued to
+   *  the cursor. */
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   const [kpiMenu, setKpiMenu] = useState<{ milestoneId: string; title: string; x: number; y: number } | null>(null);
   const router = useRouter();
 
@@ -558,6 +566,17 @@ export function GanttRoadmap({
     return null;
   })();
 
+  const placement =
+    inspector && pointer && typeof window !== "undefined"
+      ? placeHoverPanel({
+          pointerX: pointer.x,
+          pointerY: pointer.y,
+          panelWidth: HOVER_PANEL_WIDTH,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        })
+      : null;
+
   // How much of the plan has moved since it was committed to. Counted here so
   // the toolbar can say "no drift" out loud instead of showing an empty legend
   // that the user has to interpret.
@@ -678,12 +697,20 @@ export function GanttRoadmap({
         tracking a box that moves with the cursor.
       */}
       <div className="relative">
-      {inspector && (
+      {inspector && placement && (
         <div
           role="status"
-          // pointer-events-none: the panel sits over the canvas and must never
-          // swallow a drag that started on a bar beneath it.
-          className="pointer-events-none absolute right-3 top-3 z-40 w-[280px] rounded-xl border border-border bg-popover/95 p-3 text-popover-foreground shadow-xl backdrop-blur"
+          // Fixed to the viewport, not the row: anchored to the pointer so it
+          // belongs to what is being hovered, and hanging UPWARD so the rows
+          // below — the ones being compared against — stay readable.
+          // pointer-events-none so it can never swallow a drag that started on
+          // a bar beneath it.
+          style={{
+            left: placement.left,
+            top: placement.top,
+            transform: placement.above ? "translateY(-100%)" : undefined,
+          }}
+          className="pointer-events-none fixed z-50 w-[280px] rounded-xl border border-border bg-popover/95 p-3 text-popover-foreground shadow-xl backdrop-blur"
         >
           {inspector.kind === "task" ? (
             <TaskTooltip task={inspector.task} milestone={inspector.milestone} locale={locale} />
@@ -748,8 +775,14 @@ export function GanttRoadmap({
                   <div
                     className="flex items-center cursor-pointer hover:bg-muted/30 transition-colors group/milestone"
                     onClick={() => toggleMilestone(milestone.id)}
-                    onMouseEnter={() => setHoveredMilestone(milestone.id)}
-                    onMouseLeave={() => setHoveredMilestone(null)}
+                    onMouseEnter={(e) => {
+                      setHoveredMilestone(milestone.id);
+                      setPointer({ x: e.clientX, y: e.clientY });
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredMilestone(null);
+                      setPointer(null);
+                    }}
                     // Right-click a phase to decide how it is measured. The pin
                     // is the same row the Living Graph writes, so a KPI added
                     // here appears there and vice versa.
@@ -862,8 +895,14 @@ export function GanttRoadmap({
                         key={task.id}
                         className="flex items-center hover:bg-muted/20 transition-colors relative"
                         style={{ height: ROW_HEIGHT }}
-                        onMouseEnter={() => setHoveredTask(task.id)}
-                        onMouseLeave={() => setHoveredTask(null)}
+                        onMouseEnter={(e) => {
+                          setHoveredTask(task.id);
+                          setPointer({ x: e.clientX, y: e.clientY });
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredTask(null);
+                          setPointer(null);
+                        }}
                       >
                         {/* Label */}
                         <div className="shrink-0 border-b border-r border-border pl-8 pr-2 flex items-center gap-1.5" style={{ width: LEFT_COL_WIDTH }}>
