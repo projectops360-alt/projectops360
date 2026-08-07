@@ -13,6 +13,7 @@ import {
   AlertTriangle, ListChecks,
 } from "lucide-react";
 import { updateTaskStatusAction, reorderTasksAction, archiveTaskAction } from "@/app/[locale]/(app)/projects/[projectId]/roadmap/actions";
+import { milestoneFilterOptions, isEmptyByMilestoneFilter } from "@/lib/workboard/milestone-filter";
 import { applyBoardDrag } from "@/lib/workboard/reorder";
 import { resolveTaskOwner, type AssigneeInfo } from "@/lib/roadmap/task-owner";
 import { StatusChangeDialog } from "@/components/roadmap/status-change-dialog";
@@ -569,14 +570,17 @@ export function WorkboardClient({
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [tasks]);
 
-  // Milestones that actually have tasks, in milestone order
-  const milestoneOptions = useMemo(() => {
-    const used = new Set<string>();
-    for (const task of tasks) {
-      if (task.milestone_id) used.add(task.milestone_id);
-    }
-    return milestones.filter((m) => used.has(m.id)).map((m) => ({ id: m.id, title: m.title }));
-  }, [tasks, milestones]);
+  // EVERY milestone, in plan order, each with its task count.
+  //
+  // This used to list only milestones that already had tasks, which hid the
+  // gates and sign-offs — and hid them circularly: an empty milestone could not
+  // be selected, so no task could be added to it from the board, so it stayed
+  // empty and stayed hidden. A plan showing 5 of its 16 phases also reads as a
+  // plan that HAS 5 phases.
+  const milestoneOptions = useMemo(
+    () => milestoneFilterOptions(milestones, tasks),
+    [tasks, milestones],
+  );
 
   const hasUnsprinted = useMemo(() => tasks.some((t) => !t.sprint_name), [tasks]);
   const hasNoMilestone = useMemo(() => tasks.some((t) => !t.milestone_id), [tasks]);
@@ -611,6 +615,10 @@ export function WorkboardClient({
   );
 
   const filteredTasks = useMemo(() => tasks.filter(isTaskVisible), [tasks, isTaskVisible]);
+
+  // Distinguishes "the board is empty" from "the board is broken".
+  const emptyBecauseMilestoneHasNoTasks =
+    effectiveDimension === "milestone" && isEmptyByMilestoneFilter(milestoneOptions, filterValue);
 
   // Group filtered tasks by status
   const tasksByStatus: Record<TaskStatus, RoadmapTask[]> = {
@@ -936,9 +944,14 @@ export function WorkboardClient({
                 ))
               : milestoneOptions.map((m) => (
                   <button key={m.id} type="button" onClick={() => setFilterValue(filterValue === m.id ? null : m.id)}
-                    className={`max-w-[160px] truncate rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === m.id ? "bg-brand-600 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                    title={m.title}>
-                    {m.title}
+                    className={`inline-flex max-w-[190px] items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${filterValue === m.id ? "bg-brand-600 text-white" : m.taskCount === 0 ? "bg-muted/60 text-muted-foreground/70 hover:text-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                    title={`${m.title} · ${m.taskCount} ${isEs ? (m.taskCount === 1 ? "tarea" : "tareas") : (m.taskCount === 1 ? "task" : "tasks")}`}>
+                    <span className="truncate">{m.title}</span>
+                    {/* The count is the point: a zero here is what tells a PM
+                        the gate has nothing planned into it yet. */}
+                    <span className={`shrink-0 font-mono text-[9px] tabular-nums ${filterValue === m.id ? "text-white/80" : "opacity-60"}`}>
+                      {m.taskCount}
+                    </span>
                   </button>
                 ))}
 
@@ -1036,6 +1049,28 @@ export function WorkboardClient({
           {/* items-stretch equalizes column heights across ALL groups so a
               short/empty target column still offers a full-height drop zone
               (fixes cross-column drops into columns shorter than the source). */}
+          {/* A board with no cards looks broken. Saying WHY — this milestone
+              has nothing planned into it yet — turns the same screen into an
+              invitation to add the first task, which is the whole reason empty
+              milestones are now selectable at all. */}
+          {emptyBecauseMilestoneHasNoTasks && (
+            <div
+              role="status"
+              className="mb-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-center"
+            >
+              <p className="text-xs font-medium text-foreground">
+                {isEs
+                  ? "Este hito todavía no tiene tareas planificadas."
+                  : "This milestone has no tasks planned yet."}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {isEs
+                  ? "Crea la primera tarea o elige otro hito arriba."
+                  : "Create the first task, or pick another milestone above."}
+              </p>
+            </div>
+          )}
+
           <div ref={scrollRef} className={`workboard-scroll flex items-stretch max-h-[calc(100vh-22rem)] ${isCompact ? "gap-2" : "gap-4"} overflow-auto pb-3 scroll-smooth`} style={{ maxHeight: boardMaxH ? `${boardMaxH}px` : undefined }}>
             {COLUMN_GROUPS.map((group) => {
               const collapsed = isGroupCollapsed(group.label);
