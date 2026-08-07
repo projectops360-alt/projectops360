@@ -773,8 +773,6 @@ export function aggregateByMilestone(
       }
       anyBlocked = members.some((m) => m.isBlocked);
     }
-    const computedProgress =
-      tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : (representative.progress ?? 0);
     const computedStatus =
       tasksTotal === 0
         ? representative.status
@@ -785,6 +783,17 @@ export function aggregateByMilestone(
             : tasksDone > 0 || tasksStarted > 0
               ? "in_progress"
               : "planned";
+
+    // A completed milestone reads 100%, whatever its task count. Gates and
+    // sign-offs carry no tasks by design — a gate is passed, not worked
+    // through — so deriving the ring only from tasks left a card saying
+    // "completed" beside a 0% ring, contradicting itself.
+    const computedProgress =
+      computedStatus === "completed"
+        ? 100
+        : tasksTotal > 0
+          ? Math.round((tasksDone / tasksTotal) * 100)
+          : (representative.progress ?? 0);
 
     milestoneNodes.push({
       ...representative,
