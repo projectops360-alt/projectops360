@@ -14,8 +14,12 @@
 
 import { describe, it, expect } from "vitest";
 import { KPI_FIELDS, KPI_FUNCTION_DOCS, KPI_EXAMPLES } from "../reference";
-import { KPI_FUNCTIONS as ENGINE_FUNCTIONS } from "../parser";
-import { KPI_DATASET_VARIABLES } from "../catalog";
+import {
+  KPI_FUNCTIONS as ENGINE_FUNCTIONS,
+  validateKpiExpression,
+  evaluateKpiExpression,
+} from "../parser";
+import { KPI_DATASET_VARIABLES, KPI_CATALOG } from "../catalog";
 
 describe("KPI field reference", () => {
   it("documents every field, with no duplicates", () => {
@@ -79,6 +83,39 @@ describe("KPI function reference", () => {
 });
 
 describe("KPI examples", () => {
+  it("actually EVALUATES — not just parses", () => {
+    // The gap this closes: an example can name only real fields and still
+    // throw. `SUM(critical_flag * estimate_hours)` shipped in the editor as a
+    // clickable suggestion and blew up on click, because the sandbox has no
+    // element-wise arithmetic — you aggregate first, then do arithmetic on the
+    // numbers. Checking identifiers was never enough; the expression has to run.
+    const dataset = Object.fromEntries(
+      KPI_DATASET_VARIABLES.map((v) => [v, [1, 2, 3]]),
+    ) as Record<string, number[]>;
+
+    for (const example of KPI_EXAMPLES) {
+      const validation = validateKpiExpression(example.expression, KPI_DATASET_VARIABLES);
+      expect(validation.valid, `${example.expression} failed validation`).toBe(true);
+      expect(
+        () => evaluateKpiExpression(example.expression, dataset),
+        `example "${example.expression}" throws when a user clicks it`,
+      ).not.toThrow();
+    }
+  });
+
+  it("every built-in KPI evaluates too", () => {
+    const dataset = Object.fromEntries(
+      KPI_DATASET_VARIABLES.map((v) => [v, [1, 2, 3]]),
+    ) as Record<string, number[]>;
+
+    for (const definition of KPI_CATALOG) {
+      expect(
+        () => evaluateKpiExpression(definition.expression, dataset),
+        `built-in "${definition.slug}" throws`,
+      ).not.toThrow();
+    }
+  });
+
   it("only uses documented fields and allowed functions", () => {
     const fields = new Set(KPI_FIELDS.map((f) => f.field as string));
     const functions = new Set(KPI_FUNCTION_DOCS.map((f) => f.name));

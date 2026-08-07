@@ -83,9 +83,13 @@ export const KPI_EXAMPLES: { es: string; en: string; expression: string }[] = [
     expression: "100 * SUM(open_overdue_flag) / COUNT(completed_flag)",
   },
   {
-    es: "Horas medias por tarea de ruta crítica",
-    en: "Average hours per critical-path task",
-    expression: "SUM(critical_flag * estimate_hours) / SUM(critical_flag)",
+    // NOT `SUM(critical_flag * estimate_hours)`: the sandbox has no element-wise
+    // arithmetic, so multiplying two columns inside an aggregate throws
+    // "Array values require an aggregate function". Aggregate first, then do
+    // arithmetic on the numbers.
+    es: "Qué parte del plan está en la ruta crítica",
+    en: "How much of the plan is on the critical path",
+    expression: "100 * SUM(critical_flag) / COUNT(critical_flag)",
   },
   {
     es: "Sobreesfuerzo: reales sobre estimadas",
