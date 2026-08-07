@@ -38,9 +38,12 @@ export const KPI_FIELDS: KpiFieldDoc[] = [
   { field: "delayed_flag", scope: "task", es: "1 si se entregó tarde, o va tarde si aún está abierta.", en: "1 when delivered late, or running late while still open." },
   { field: "unassigned_flag", scope: "task", es: "1 si no tiene persona ni recurso asignado.", en: "1 when no person or resource is assigned." },
   { field: "critical_flag", scope: "task", es: "1 si está en la ruta crítica.", en: "1 when on the critical path." },
+  { field: "task_cost", scope: "task", es: "Coste de la tarea: sus horas a la tarifa del recurso asignado. Sin dato si el recurso no tiene tarifa.", en: "Task cost: its hours at the assigned resource's rate. No value when the resource has no rate." },
+  { field: "priced_flag", scope: "task", es: "1 si la tarea sí se puede valorar. Úsalo para saber qué parte del coste mostrado es real.", en: "1 when the task can be priced. Use it to know how much of a cost figure is real." },
   // ── Per milestone ─────────────────────────────────────────────────────────
   { field: "milestone_completed_flag", scope: "milestone", es: "1 si el hito tiene fecha de finalización.", en: "1 when the milestone has a completion date." },
   { field: "milestone_delay_days", scope: "milestone", es: "Días de retraso al cerrar el hito (negativo = adelantado). Sólo hitos ya cerrados con fecha objetivo.", en: "Days late when the milestone closed (negative = early). Only closed milestones with a target date." },
+  { field: "milestone_budget", scope: "milestone", es: "Presupuesto asignado al hito, de la línea de presupuesto que le corresponde. Sin dato si ninguna le corresponde.", en: "Budget assigned to the milestone, from its matching budget line. No value when none matches." },
   // ── Series over time ──────────────────────────────────────────────────────
   { field: "weekly_completed", scope: "series", es: "Serie semanal de tareas completadas. Es la entrada de TREND, MOVING_AVERAGE y FORECAST.", en: "Weekly series of completed tasks. This is what TREND, MOVING_AVERAGE and FORECAST read." },
 ];
@@ -88,5 +91,24 @@ export const KPI_EXAMPLES: { es: string; en: string; expression: string }[] = [
     es: "Sobreesfuerzo: reales sobre estimadas",
     en: "Overrun: actual over estimated",
     expression: "100 * SUM(actual_hours) / SUM(estimate_hours)",
+  },
+  {
+    // The MIN(1, COUNT(...)) guard is not decoration: SUM over an empty set is
+    // 0, so without it a project where nothing has a rate would report a
+    // confident "$0". Dividing by 0 instead makes the engine say "not
+    // computable", which is the truth.
+    es: "Coste de mano de obra (0 si nada tiene tarifa → no calculable)",
+    en: "Labour cost (nothing priced → not computable, not zero)",
+    expression: "SUM(task_cost) / MIN(1, COUNT(task_cost))",
+  },
+  {
+    es: "Qué parte del coste mostrado es real",
+    en: "How much of the shown cost is real",
+    expression: "100 * SUM(priced_flag) / COUNT(priced_flag)",
+  },
+  {
+    es: "Presupuesto consumido por el trabajo hecho",
+    en: "Budget consumed by the work done",
+    expression: "100 * SUM(task_cost) / SUM(milestone_budget)",
   },
 ];

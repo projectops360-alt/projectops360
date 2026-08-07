@@ -21,9 +21,15 @@ export const KPI_DATASET_VARIABLES = [
   "unassigned_flag",
   "critical_flag",
   "duration_days",
+  // What a task cost: its hours priced at the rate of the resource assigned to
+  // it. NaN when it cannot be priced, so a partial answer stays partial —
+  // `priced_flag` says how much of the scope the figure actually covers.
+  "task_cost",
+  "priced_flag",
   // Per-milestone aligned arrays
   "milestone_completed_flag",
   "milestone_delay_days",
+  "milestone_budget",
   // Ordered weekly series (completions per ISO week, oldest → newest)
   "weekly_completed",
 ] as const;
@@ -38,7 +44,7 @@ export interface KpiCatalogDefinition {
   descriptionEs: string;
   descriptionEn: string;
   expression: string;
-  unit: "%" | "tasks" | "days" | "hours" | "ratio" | "tasks/week";
+  unit: "%" | "tasks" | "days" | "hours" | "ratio" | "tasks/week" | "currency";
   /** Decimal places for display. */
   precision: number;
   version: number;
@@ -175,6 +181,85 @@ export const KPI_CATALOG: KpiCatalogDefinition[] = [
     expression: "MAX(0, FORECAST(weekly_completed, 1))",
     unit: "tasks/week",
     precision: 1,
+    version: 1,
+  },
+  // ── Cost ──────────────────────────────────────────────────────────────────
+  // These read the same whether the scope is the whole project or one
+  // milestone — that is the entire point of the milestone dimension.
+  //
+  // The `/ MIN(1, COUNT(...))` guard is load-bearing, not noise: SUM over an
+  // empty set is 0, so an unguarded cost KPI would report "$0" for a project
+  // where NOTHING has a rate — the confident zero that reads as "this was
+  // free". With the guard, zero priced tasks divides 0 by 0 and the engine
+  // answers "not computable", which is the truth.
+  {
+    slug: "labour_cost",
+    nameEs: "Coste de mano de obra",
+    nameEn: "Labour cost",
+    descriptionEs:
+      "Horas de cada tarea valoradas a la tarifa del recurso asignado. No calculable si ningún recurso tiene tarifa.",
+    descriptionEn:
+      "Each task's hours priced at the rate of its assigned resource. Not computable when no resource has a rate.",
+    expression: "SUM(task_cost) / MIN(1, COUNT(task_cost))",
+    unit: "currency",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "budget_amount",
+    nameEs: "Presupuesto asignado",
+    nameEn: "Assigned budget",
+    descriptionEs: "Presupuesto de la línea que corresponde a este alcance.",
+    descriptionEn: "Budget of the line matching this scope.",
+    expression: "SUM(milestone_budget) / MIN(1, COUNT(milestone_budget))",
+    unit: "currency",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "budget_consumed_pct",
+    nameEs: "Presupuesto consumido",
+    nameEn: "Budget consumed",
+    descriptionEs: "Coste de mano de obra sobre el presupuesto asignado.",
+    descriptionEn: "Labour cost over the assigned budget.",
+    expression: "100 * SUM(task_cost) / SUM(milestone_budget)",
+    unit: "%",
+    precision: 1,
+    version: 1,
+  },
+  {
+    slug: "cost_coverage_pct",
+    nameEs: "Cobertura de costes",
+    nameEn: "Cost coverage",
+    descriptionEs:
+      "Porcentaje de tareas que sí se pueden valorar. Dice cuánto del coste mostrado es el coste real.",
+    descriptionEn:
+      "Percentage of tasks that can actually be priced. Says how much of the shown cost is the real cost.",
+    expression: "100 * SUM(priced_flag) / COUNT(priced_flag)",
+    unit: "%",
+    precision: 0,
+    version: 1,
+  },
+  {
+    slug: "effort_consumed_pct",
+    nameEs: "Esfuerzo consumido",
+    nameEn: "Effort consumed",
+    descriptionEs: "Horas reales sobre horas estimadas.",
+    descriptionEn: "Actual hours over estimated hours.",
+    expression: "100 * SUM(actual_hours) / SUM(estimate_hours)",
+    unit: "%",
+    precision: 1,
+    version: 1,
+  },
+  {
+    slug: "hours_variance",
+    nameEs: "Desviación de horas",
+    nameEn: "Hours variance",
+    descriptionEs: "Horas reales menos estimadas. Positivo = tardó más de lo previsto.",
+    descriptionEn: "Actual minus estimated hours. Positive means it took longer than planned.",
+    expression: "SUM(actual_hours) - SUM(estimate_hours)",
+    unit: "hours",
+    precision: 0,
     version: 1,
   },
 ];

@@ -115,6 +115,8 @@ function LivingGraphMilestoneNodeComponent({
   const locale = useLocale();
   const { node, emphasis, playback } = data;
   const cardMetrics = data.cardMetrics ?? [];
+  const pinnedKpis = data.pinnedKpis ?? [];
+  const isEs = locale === "es";
 
   const theme = STATUS_THEMES[node.status ?? ""] ?? STATUS_THEMES.planned;
   const accent = node.isBlocked ? GRAPH_SEMANTIC_COLORS.blocked : theme.accent;
@@ -153,7 +155,7 @@ function LivingGraphMilestoneNodeComponent({
         // Cards sit 130px apart vertically and the cap is four chips in a 2×2
         // grid (~48px), so growth stays well inside the gap and the serpentine
         // layout never needs recomputing. See MAX_MILESTONE_CARD_METRICS.
-        "relative flex min-h-[168px] w-[260px] flex-col rounded-2xl border bg-card p-4 transition-all",
+        "group relative flex min-h-[168px] w-[260px] flex-col rounded-2xl border bg-card p-4 transition-all",
         isDropTarget
           ? "scale-105 border-emerald-400 border-dashed"
           : selected || isPicked
@@ -209,6 +211,87 @@ function LivingGraphMilestoneNodeComponent({
         position={toPosition(sourcePosition, Position.Right)}
         className={handleClass}
       />
+
+      {/*
+        KPIs pinned to THIS milestone. The card shows only that they exist —
+        a count, not the numbers — because a 260px card cannot hold eight
+        figures and stay readable at the zoom the graph actually uses. Hover
+        reveals them.
+      */}
+      {pinnedKpis.length > 0 && (
+        <span
+          data-testid="milestone-kpi-badge"
+          className="absolute -top-2 right-3 inline-flex items-center gap-1 rounded-full border border-brand-500/40 bg-card px-1.5 py-0.5 text-[9px] font-bold text-brand-700 shadow-sm dark:text-brand-300"
+          title={isEs ? "KPIs de este hito" : "KPIs for this milestone"}
+        >
+          <BarChart3 className="h-2.5 w-2.5" aria-hidden />
+          {pinnedKpis.length}
+        </span>
+      )}
+
+      {pinnedKpis.length > 0 && (
+        <div
+          role="tooltip"
+          data-testid="milestone-kpi-hover"
+          // pointer-events-none so the panel can never swallow a drag that
+          // started on the card underneath it.
+          className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-[280px] -translate-x-1/2 rounded-xl border border-border bg-card p-3 opacity-0 shadow-2xl transition-opacity duration-150 group-hover:opacity-100"
+        >
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {isEs ? "KPIs de este hito" : "KPIs for this milestone"}
+          </p>
+          <ul className="space-y-1.5">
+            {pinnedKpis.map((kpi) => (
+              <li key={kpi.slug} className="text-[11px]">
+                {kpi.status === "ok" && (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-foreground">{isEs ? kpi.nameEs : kpi.nameEn}</span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-mono font-bold tabular-nums",
+                        kpi.offTarget ? "text-rose-600 dark:text-rose-400" : "text-foreground",
+                      )}
+                    >
+                      {kpi.formatted}
+                      {kpi.unit && kpi.unit !== "currency" && (
+                        <span className="ml-0.5 text-[9px] font-semibold text-muted-foreground">
+                          {kpi.unit}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                {/*
+                  "Not computable" is an ANSWER, shown in full. Hiding the row
+                  would look like the KPI was never pinned; showing 0 would say
+                  the phase scored zero. The reason is what the user needs: no
+                  rate, no budget line, no tasks in scope.
+                */}
+                {kpi.status === "not_computable" && (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-muted-foreground">
+                      {isEs ? kpi.nameEs : kpi.nameEn}
+                    </span>
+                    <span className="shrink-0 font-mono text-muted-foreground/70" title={kpi.reason}>
+                      {kpi.taskCount === 0
+                        ? isEs ? "sin tareas" : "no tasks"
+                        : isEs ? "sin datos" : "no data"}
+                    </span>
+                  </div>
+                )}
+                {kpi.status === "missing" && (
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate italic text-muted-foreground/70">{kpi.slug}</span>
+                    <span className="shrink-0 text-[9px] text-amber-600 dark:text-amber-400">
+                      {isEs ? "KPI eliminado" : "KPI deleted"}
+                    </span>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Current phase chip */}
       {theme.chip && (
