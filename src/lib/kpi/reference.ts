@@ -39,6 +39,13 @@ export const KPI_FIELDS: KpiFieldDoc[] = [
   { field: "unassigned_flag", scope: "task", es: "1 si no tiene persona ni recurso asignado.", en: "1 when no person or resource is assigned." },
   { field: "critical_flag", scope: "task", es: "1 si está en la ruta crítica.", en: "1 when on the critical path." },
   { field: "task_cost", scope: "task", es: "Coste de la tarea: sus horas a la tarifa del recurso asignado. Sin dato si el recurso no tiene tarifa.", en: "Task cost: its hours at the assigned resource's rate. No value when the resource has no rate." },
+  { field: "planned_value_hours", scope: "task", es: "PV — horas que la LÍNEA BASE decía que estarían hechas hoy. Sin dato si la tarea no tiene línea base.", en: "PV — hours the BASELINE said would be done by today. No value when the task has no baseline." },
+  { field: "earned_value_hours", scope: "task", es: "EV — horas de presupuesto realmente ganadas (presupuesto × % completado).", en: "EV — budget hours actually earned (budget × % complete)." },
+  { field: "actual_cost", scope: "task", es: "AC — dinero realmente gastado: horas registradas × tarifa. Nunca usa el estimado.", en: "AC — money actually spent: logged hours × rate. Never falls back to the estimate." },
+  { field: "planned_value_cost", scope: "task", es: "PV en dinero.", en: "PV in money." },
+  { field: "earned_value_cost", scope: "task", es: "EV en dinero.", en: "EV in money." },
+  { field: "baseline_hours", scope: "task", es: "BAC — presupuesto de la tarea en horas, según la línea base.", en: "BAC — the task's budget in hours, per the baseline." },
+  { field: "baseline_cost", scope: "task", es: "BAC en dinero.", en: "BAC in money." },
   { field: "priced_flag", scope: "task", es: "1 si la tarea sí se puede valorar. Úsalo para saber qué parte del coste mostrado es real.", en: "1 when the task can be priced. Use it to know how much of a cost figure is real." },
   // ── Per milestone ─────────────────────────────────────────────────────────
   { field: "milestone_completed_flag", scope: "milestone", es: "1 si el hito tiene fecha de finalización.", en: "1 when the milestone has a completion date." },
@@ -114,5 +121,84 @@ export const KPI_EXAMPLES: { es: string; en: string; expression: string }[] = [
     es: "Presupuesto consumido por el trabajo hecho",
     en: "Budget consumed by the work done",
     expression: "100 * SUM(task_cost) / SUM(milestone_budget)",
+  },
+  // ── Valor Ganado (EVM) ────────────────────────────────────────────────────
+  // Las dos preguntas de todo comité: ¿vamos a tiempo? ¿vamos en presupuesto?
+  {
+    es: "SPI · ¿vamos a tiempo? (1,00 = según plan)",
+    en: "SPI · are we on schedule? (1.00 = on plan)",
+    expression: "SUM(earned_value_hours) / SUM(planned_value_hours)",
+  },
+  {
+    es: "CPI · ¿vamos en presupuesto? (1,00 = según plan)",
+    en: "CPI · are we on budget? (1.00 = on plan)",
+    expression: "SUM(earned_value_cost) / SUM(actual_cost)",
+  },
+  {
+    es: "Horas de atraso frente al plan comprometido",
+    en: "Hours behind the committed plan",
+    expression: "SUM(earned_value_hours) - SUM(planned_value_hours)",
+  },
+  {
+    es: "% completado ponderado por esfuerzo",
+    en: "% complete weighted by effort",
+    expression: "100 * SUM(earned_value_hours) / SUM(baseline_hours)",
+  },
+];
+
+/**
+ * The formulas behind the two indices, in prose.
+ *
+ * Shown beside the expression editor because SPI and CPI are the KPIs most
+ * often quoted and least often understood: a committee told "SPI 0.03" needs to
+ * know it means three percent of the planned work is done, not that something
+ * is 3% wrong. And each has a denominator that can legitimately be zero, which
+ * is why the editor sometimes answers "not computable" instead of a number.
+ */
+export interface EvmExplainer {
+  code: string;
+  nameEs: string;
+  nameEn: string;
+  formula: string;
+  meaningEs: string;
+  meaningEn: string;
+  readingEs: string;
+  readingEn: string;
+  needsEs: string;
+  needsEn: string;
+}
+
+export const EVM_EXPLAINERS: EvmExplainer[] = [
+  {
+    code: "SPI",
+    nameEs: "Índice de Desempeño del Cronograma",
+    nameEn: "Schedule Performance Index",
+    formula: "SPI = EV / PV",
+    meaningEs:
+      "Valor Ganado entre Valor Planificado. EV son las horas de presupuesto que ya se han ganado (presupuesto × % completado); PV son las horas que la línea base decía que estarían hechas hoy.",
+    meaningEn:
+      "Earned Value over Planned Value. EV is the budget hours already earned (budget × % complete); PV is the hours the baseline said would be done by today.",
+    readingEs:
+      "1,00 = exactamente según el plan. 0,80 = se ha hecho el 80% de lo que debería estar hecho. 1,20 = adelantado. Se mide en horas, así que no necesita tarifas.",
+    readingEn:
+      "1.00 = exactly on plan. 0.80 = 80% of what should be done is done. 1.20 = ahead. Measured in hours, so it needs no cost rates.",
+    needsEs: "Requiere línea base. Sin PV (antes de que empiece el plan) no hay respuesta, no es 1,00.",
+    needsEn: "Requires a baseline. With no PV (before the plan starts) there is no answer — it is not 1.00.",
+  },
+  {
+    code: "CPI",
+    nameEs: "Índice de Desempeño del Costo",
+    nameEn: "Cost Performance Index",
+    formula: "CPI = EV / AC",
+    meaningEs:
+      "Valor Ganado entre Costo Real. AC es lo realmente gastado: horas REGISTRADAS × tarifa del recurso. Nunca usa el estimado — el dinero no gastado no es un costo.",
+    meaningEn:
+      "Earned Value over Actual Cost. AC is what was really spent: LOGGED hours × the resource's rate. Never the estimate — money not spent is not a cost.",
+    readingEs:
+      "1,00 = cada unidad gastada compró una unidad de avance. 0,80 = compró 80 céntimos: sobrecosto. Un CPI muy alto suele significar que no se están registrando horas, no eficiencia.",
+    readingEn:
+      "1.00 = every unit spent bought a unit of progress. 0.80 = it bought 80 cents: overspend. A very high CPI usually means hours are not being logged, not efficiency.",
+    needsEs: "Requiere tarifas y horas registradas. Sin AC no hay división posible: no es infinito, es «sin respuesta».",
+    needsEn: "Requires rates and logged hours. With no AC there is nothing to divide: not infinity — no answer.",
   },
 ];

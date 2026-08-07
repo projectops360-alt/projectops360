@@ -15,6 +15,7 @@ import { NextStepPanel } from "@/components/roadmap/next-step-panel";
 import { ExecutionDashboard } from "@/components/roadmap/execution-dashboard";
 import { VisualRoadmapTimeline } from "@/components/roadmap/visual-roadmap-timeline";
 import { GanttRoadmap } from "@/components/roadmap/gantt-roadmap";
+import { CashFlowPanel } from "@/components/roadmap/cash-flow-panel";
 import { DependenciesView } from "@/components/roadmap/dependencies-view";
 import { updateTaskDatesAction } from "./dependency-actions";
 import { MilestoneBoard } from "@/components/roadmap/milestone-board";
@@ -298,6 +299,9 @@ interface ExecutionMapClientProps {
   locale: Locale;
   translations: Translations;
   onboard?: boolean;
+  /** resource id → hourly rate, for the cash-flow curve under the schedule. */
+  rateByResource?: Record<string, number>;
+  currency?: string;
 }
 
 // ── Tab Configuration ──────────────────────────────────────────────────────────
@@ -327,6 +331,8 @@ export function ExecutionMapClient({
   locale,
   translations: t,
   onboard,
+  rateByResource,
+  currency,
 }: ExecutionMapClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ExecutionTab>("overview");
@@ -689,6 +695,7 @@ export function ExecutionMapClient({
       )}
 
       {activeTab === "gantt" && (
+        <div className="space-y-4">
         <GanttRoadmap
           milestones={milestones}
           progress={progress}
@@ -711,6 +718,16 @@ export function ExecutionMapClient({
             }
           }}
         />
+        {/* The schedule and the cash are the same fact seen twice: move a task
+            and the money moves with it. Placed here so that consequence is
+            visible rather than worked out later in a spreadsheet. */}
+        <CashFlowPanel
+          tasks={tasks}
+          rateByResource={rateByResource ?? {}}
+          currency={currency ?? "USD"}
+          locale={locale}
+        />
+        </div>
       )}
 
       {activeTab === "critical-path" && (

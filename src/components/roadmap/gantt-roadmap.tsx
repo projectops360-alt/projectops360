@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  ganttTimelineWidth,
+  defaultZoomFor,
+  fitsLabel,
+  monthLabelStep,
+  GANTT_ZOOM_LEVELS,
+  type GanttZoom,
+} from "@/lib/roadmap/gantt-zoom";
 import type { Milestone, RoadmapTask, TaskStatus, TaskPriority, Locale } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
 import {
   CheckCircle2, Loader2, Circle, Ban, Pause,
   FileText, Send, Code, ShieldCheck, Calendar,
-  ChevronRight, ChevronDown, ZoomIn, ZoomOut, AlertCircle,
+  ChevronRight, ChevronDown, ZoomIn, ZoomOut, Maximize2, AlertCircle,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -36,8 +44,6 @@ interface GanttRoadmapProps {
   translations: GanttTranslations;
   onTaskDatesChange?: (taskId: string, startDate: string, endDate: string) => void;
 }
-
-type ZoomLevel = "day" | "week" | "month";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -72,6 +78,12 @@ const TASK_STATUS_ICON: Record<TaskStatus, { icon: React.ReactNode; color: strin
   blocked: { icon: <Ban className="h-3.5 w-3.5" />, color: "text-red-600 dark:text-red-400" },
   deferred: { icon: <Pause className="h-3.5 w-3.5" />, color: "text-amber-600 dark:text-amber-400" },
 };
+
+/** Bilingual labels for the zoom levels (UX-012: never one language only). */
+const ZOOM_LABEL = {
+  en: { fit: "Fit", quarter: "Quarter", month: "Month", week: "Week", day: "Day" },
+  es: { fit: "Todo", quarter: "Trimestre", month: "Mes", week: "Semana", day: "Día" },
+} as const;
 
 // Row height constants
 const ROW_HEIGHT = 32; // px per row
@@ -143,24 +155,23 @@ function getPos(date: Date, range: { start: Date; totalDays: number }): number {
 
 // ── Zoom Configuration ──────────────────────────────────────────────────────────
 
-const ZOOM_CONFIG: Record<ZoomLevel, { dayWidth: number; label: string }> = {
-  day: { dayWidth: 32, label: "Day" },
-  week: { dayWidth: 12, label: "Week" },
-  month: { dayWidth: 4, label: "Month" },
-};
-
 // ── Month Headers ─────────────────────────────────────────────────────────────
 
 function MonthHeaders({
   range,
   locale,
-  zoom,
+  timelineWidth,
 }: {
   range: { start: Date; end: Date; totalDays: number };
   locale: Locale;
-  zoom: ZoomLevel;
+  /** Drives how many month labels fit before they collide. */
+  timelineWidth: number;
 }) {
-  const months: { label: string; left: number; width: number }[] = [];
+  const months: { label: string; left: number; width: number; show: boolean }[] = [];
+  // On a fourteen-month plan at Fit zoom every month label would overlap the
+  // next. Thin them to quarters/half-years rather than letting them collide.
+  const step = monthLabelStep(range.totalDays, timelineWidth);
+  let index = 0;
   const startMonth = new Date(range.start.getFullYear(), range.start.getMonth(), 1);
   let current = new Date(startMonth);
 
@@ -171,10 +182,15 @@ function MonthHeaders({
     const leftPx = (daysBetween(range.start, monthStart) / range.totalDays) * 100;
     const widthPx = (daysBetween(monthStart, monthEnd) / range.totalDays) * 100;
     months.push({
-      label: current.toLocaleDateString(locale === "es" ? "es-ES" : "en-US", { month: zoom === "day" ? "short" : "short", year: "numeric" }),
+      label: current.toLocaleDateString(locale === "es" ? "es-ES" : "en-US", {
+        month: "short",
+        year: "numeric",
+      }),
       left: leftPx,
       width: widthPx,
+      show: index % step === 0,
     });
+    index++;
     current = nextMonth;
   }
 
@@ -183,10 +199,10 @@ function MonthHeaders({
       {months.map((m, i) => (
         <div
           key={i}
-          className="absolute top-0 text-[10px] font-medium text-muted-foreground border-l border-border pl-1"
+          className="absolute top-0 overflow-hidden whitespace-nowrap border-l border-border pl-1 text-[10px] font-medium text-muted-foreground"
           style={{ left: `${m.left}%`, width: `${m.width}%` }}
         >
-          {m.label}
+          {m.show ? m.label : ""}
         </div>
       ))}
     </div>
@@ -279,7 +295,14 @@ export function GanttRoadmap({
   translations: t,
   onTaskDatesChange,
 }: GanttRoadmapProps) {
-  const [zoom, setZoom] = useState<ZoomLevel>("week");
+  // null = the user has not chosen; the level is derived from how long the
+  // plan is, so a two-week sprint opens at Day and a two-year programme at
+  // Quarter without anyone hunting for the right button.
+  const [zoomChoice, setZoomChoice] = useState<GanttZoom | null>(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [showBaseline, setShowBaseline] = useState(true);
+  /** Live canvas width for the drag handler, which closes over its own scope. */
+  const timelineWidthRef = useRef(0);
   const [dragState, setDragState] = useState<{
     taskId: string;
     startDate: Date;
@@ -307,6 +330,19 @@ export function GanttRoadmap({
   // ── Drag-and-drop for task bars ──────────────────────────────────────────────
   const ganttRef = useRef<HTMLDivElement | null>(null);
 
+  // The timeline needs a real pixel width, and that starts with knowing how
+  // much room it has. Measured rather than assumed so the chart reflows when
+  // the window resizes or a side panel opens.
+  useEffect(() => {
+    const el = ganttRef.current;
+    if (!el) return;
+    const measure = () => setAvailableWidth(Math.max(0, el.clientWidth - LEFT_COL_WIDTH));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const handleBarMouseDown = useCallback((
     e: React.MouseEvent,
     taskId: string,
@@ -333,8 +369,10 @@ export function GanttRoadmap({
     });
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!ganttRef.current) return;
-      const chartWidth = ganttRef.current.offsetWidth - LEFT_COL_WIDTH;
+      // The width the percentages are relative to is the CANVAS, which is now
+      // wider than the viewport at most zoom levels. Measuring the scroller
+      // instead would make a bar jump further than the cursor moved.
+      const chartWidth = timelineWidthRef.current;
       if (chartWidth <= 0) return;
 
       const dx = moveEvent.clientX - e.clientX;
@@ -390,6 +428,39 @@ export function GanttRoadmap({
     );
   }
 
+  const zoom: GanttZoom =
+    zoomChoice ?? (availableWidth > 0 ? defaultZoomFor(range.totalDays, availableWidth) : "fit");
+  // THE fix: bars are still positioned in percentages, but the canvas those
+  // percentages are of now has a width that the zoom level actually decides.
+  const timelineWidth = ganttTimelineWidth({
+    totalDays: range.totalDays,
+    zoom,
+    availableWidth,
+  });
+
+  timelineWidthRef.current = timelineWidth;
+
+  // How much of the plan has moved since it was committed to. Counted here so
+  // the toolbar can say "no drift" out loud instead of showing an empty legend
+  // that the user has to interpret.
+  const baselineStats = (() => {
+    let total = 0;
+    let drifted = 0;
+    for (const list of Object.values(tasksByMilestone)) {
+      for (const task of list) {
+        if (!task.baseline_start_date || !task.baseline_end_date) continue;
+        total++;
+        if (
+          task.baseline_start_date !== task.start_date ||
+          task.baseline_end_date !== task.end_date
+        ) {
+          drifted++;
+        }
+      }
+    }
+    return { total, drifted };
+  })();
+
   // Calculate total rows for scroll height
   let totalRows = 0;
   for (const m of milestones) {
@@ -402,38 +473,86 @@ export function GanttRoadmap({
   return (
     <div className="space-y-3">
       {/* Zoom controls */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground font-medium">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">
           {locale === "es" ? "Zoom" : "Zoom"}:
         </span>
-        <button
-          type="button"
-          onClick={() => setZoom("day")}
-          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${zoom === "day" ? "bg-card text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          <ZoomIn className="h-3 w-3" />
-          {locale === "es" ? "Día" : "Day"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoom("week")}
-          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${zoom === "week" ? "bg-card text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          {locale === "es" ? "Semana" : "Week"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoom("month")}
-          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${zoom === "month" ? "bg-card text-foreground shadow-sm border border-border" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          <ZoomOut className="h-3 w-3" />
-          {locale === "es" ? "Mes" : "Month"}
-        </button>
+        {GANTT_ZOOM_LEVELS.map((level) => {
+          const label = ZOOM_LABEL[locale === "es" ? "es" : "en"][level];
+          const active = zoom === level;
+          return (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setZoomChoice(level)}
+              aria-pressed={active}
+              title={
+                level === "fit"
+                  ? locale === "es"
+                    ? "Ajustar todo el cronograma a la pantalla"
+                    : "Fit the whole schedule on screen"
+                  : undefined
+              }
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? "border border-border bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {level === "fit" && <Maximize2 className="h-3 w-3" />}
+              {level === "quarter" && <ZoomOut className="h-3 w-3" />}
+              {level === "day" && <ZoomIn className="h-3 w-3" />}
+              {label}
+            </button>
+          );
+        })}
+        {zoomChoice != null && (
+          <button
+            type="button"
+            onClick={() => setZoomChoice(null)}
+            className="ml-1 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {locale === "es" ? "Automático" : "Auto"}
+          </button>
+        )}
+
+        {/*
+          Plan inicial vs plan actual. Offered only when a baseline exists —
+          a toggle that reveals nothing would suggest the project has no drift
+          when the truth is that it has nothing to compare against.
+        */}
+        {baselineStats.total > 0 && (
+          <>
+            <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+            <button
+              type="button"
+              onClick={() => setShowBaseline((v) => !v)}
+              aria-pressed={showBaseline}
+              className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                showBaseline
+                  ? "border border-border bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="h-[5px] w-4 rounded-full border border-dashed border-slate-400 bg-slate-300/60" aria-hidden />
+              {locale === "es" ? "Plan inicial" : "Original plan"}
+            </button>
+            <span className="text-[10px] text-muted-foreground">
+              {baselineStats.drifted === 0
+                ? locale === "es"
+                  ? "Sin desviación respecto al plan inicial"
+                  : "No drift from the original plan"
+                : locale === "es"
+                  ? `${baselineStats.drifted} de ${baselineStats.total} tareas reprogramadas`
+                  : `${baselineStats.drifted} of ${baselineStats.total} tasks rescheduled`}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Gantt chart */}
       <div className="overflow-x-auto rounded-lg border border-border" ref={ganttRef}>
-        <div className="min-w-[800px]">
+        <div style={{ width: LEFT_COL_WIDTH + timelineWidth }}>
           {/* Header row */}
           <div className="sticky top-0 z-30 bg-muted/50 backdrop-blur-sm">
             <div className="flex">
@@ -442,8 +561,8 @@ export function GanttRoadmap({
                   {t.milestone} / {t.tasks}
                 </div>
               </div>
-              <div className="flex-1 relative border-b border-border">
-                <MonthHeaders range={range} locale={locale} zoom={zoom} />
+              <div className="relative border-b border-border" style={{ width: timelineWidth }}>
+                <MonthHeaders range={range} locale={locale} timelineWidth={timelineWidth} />
                 <TodayMarker range={range} />
               </div>
             </div>
@@ -502,7 +621,7 @@ export function GanttRoadmap({
                     </div>
 
                     {/* Bar area */}
-                    <div className="flex-1 relative border-b border-border" style={{ height: MILESTONE_ROW_HEIGHT }}>
+                    <div className="relative border-b border-border" style={{ height: MILESTONE_ROW_HEIGHT, width: timelineWidth }}>
                       {msWidth > 0 && (
                         <div
                           className={`absolute top-2 h-5 rounded ${milestoneBar.bg} border ${milestoneBar.border} transition-all group-hover/milestone:shadow-sm overflow-hidden`}
@@ -514,7 +633,7 @@ export function GanttRoadmap({
                           )}
                         </div>
                       )}
-                      {milestoneStart && msWidth > 0 && zoom !== "month" && (
+                      {milestoneStart && msWidth > 0 && fitsLabel((msWidth / 100) * timelineWidth) && (
                         <div
                           className="absolute top-0 text-[9px] text-muted-foreground/60 leading-none"
                           style={{ left: `${msLeft}%` }}
@@ -547,6 +666,23 @@ export function GanttRoadmap({
                       hasOwnDates = true;
                     }
 
+                    // The plan this work was COMMITTED to, drawn underneath as
+                    // a thin ghost. Only when it differs from today's dates —
+                    // a ghost sitting exactly under every bar is noise that
+                    // teaches the eye to ignore the one that has moved.
+                    const baseStart = parseDate(task.baseline_start_date ?? null);
+                    const baseEnd = parseDate(task.baseline_end_date ?? null);
+                    const hasDrift =
+                      showBaseline &&
+                      baseStart != null && baseEnd != null &&
+                      (task.baseline_start_date !== task.start_date ||
+                        task.baseline_end_date !== task.end_date);
+                    const bLeft = hasDrift ? getPos(baseStart!, range) : 0;
+                    const bWidth = hasDrift ? Math.max(0.5, getPos(baseEnd!, range) - bLeft) : 0;
+                    const slipDays = hasDrift && taskEndDate
+                      ? Math.round((taskEndDate.getTime() - baseEnd!.getTime()) / 86400000)
+                      : 0;
+
                     const isHovered = hoveredTask === task.id;
                     const progressPct = task.progress ?? 0;
 
@@ -568,7 +704,20 @@ export function GanttRoadmap({
                         </div>
 
                         {/* Bar area */}
-                        <div className="flex-1 relative border-b border-border" style={{ height: ROW_HEIGHT }}>
+                        <div className="relative border-b border-border" style={{ height: ROW_HEIGHT, width: timelineWidth }}>
+                          {hasDrift && (
+                            <div
+                              className="absolute bottom-0.5 h-[5px] rounded-full border border-dashed border-slate-400/70 bg-slate-300/50 dark:border-slate-500/70 dark:bg-slate-600/40"
+                              style={{ left: `${bLeft}%`, width: `${bWidth}%` }}
+                              title={
+                                locale === "es"
+                                  ? `Plan inicial: ${task.baseline_start_date} → ${task.baseline_end_date}` +
+                                    (slipDays !== 0 ? ` · ${slipDays > 0 ? "+" : ""}${slipDays} d` : "")
+                                  : `Original plan: ${task.baseline_start_date} → ${task.baseline_end_date}` +
+                                    (slipDays !== 0 ? ` · ${slipDays > 0 ? "+" : ""}${slipDays} d` : "")
+                              }
+                            />
+                          )}
                           {hasOwnDates && tWidth > 0 ? (
                             <div
                               className={`absolute top-1.5 h-[22px] rounded-sm ${taskBar.bg} border ${taskBar.border} overflow-hidden transition-all ${isHovered ? "shadow-md z-10" : ""} ${onTaskDatesChange ? "cursor-grab active:cursor-grabbing" : ""} ${dragState?.taskId === task.id ? "opacity-40" : ""}`}
@@ -585,7 +734,7 @@ export function GanttRoadmap({
                               {progressPct > 0 && (
                                 <div className={`h-full ${taskBar.fill} rounded-sm opacity-70`} style={{ width: `${progressPct}%` }} />
                               )}
-                              {zoom !== "month" && tWidth > 4 && (
+                              {fitsLabel((tWidth / 100) * timelineWidth) && (
                                 <span className={`absolute inset-0 flex items-center justify-center text-[9px] font-medium ${taskBar.text} truncate px-1`}>
                                   {task.status === "done" ? "✓" : ""}
                                 </span>

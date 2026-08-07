@@ -24,6 +24,7 @@ import {
   isUnassigned,
 } from "@/lib/execution/task-activity";
 import type { KpiDataset } from "./evaluate";
+import { taskEarnedValue } from "./earned-value";
 
 /** Weeks of completion history for the weekly series. */
 export const WEEKLY_SERIES_WEEKS = 12;
@@ -31,6 +32,10 @@ export const WEEKLY_SERIES_WEEKS = 12;
 export interface KpiTaskRow {
   id?: string;
   milestone_id?: string | null;
+  /** Dates and hours the work was COMMITTED to — the basis of Planned Value. */
+  baseline_start_date?: string | null;
+  baseline_end_date?: string | null;
+  baseline_estimate_hours?: number | null;
   status: string;
   is_blocked: boolean;
   is_critical: boolean;
@@ -52,6 +57,8 @@ export interface KpiMilestoneRow {
 }
 
 export interface KpiCostInputs {
+  /** Reference date for Planned Value. Defaults to the dataset's `nowIso`. */
+  asOf?: Date;
   /** resource id → hourly rate. Only hourly rates: pricing hours from a daily
    *  rate would mean assuming the length of a working day. */
   rateByResource?: Map<string, number>;
@@ -116,6 +123,8 @@ export function buildKpiDataset(
 ): KpiDataset {
   const rateByResource = cost.rateByResource ?? new Map<string, number>();
   const budgetByMilestone = cost.budgetByMilestone ?? new Map<string, number>();
+  const asOf = cost.asOf ?? new Date(nowIso);
+  const evm = tasks.map((task) => taskEarnedValue(task, asOf, rateByResource));
 
   return {
     estimate_hours: tasks.map((task) => num(task.estimate_hours)),
@@ -144,6 +153,19 @@ export function buildKpiDataset(
     critical_flag: tasks.map((task) => (task.is_critical ? 1 : 0)),
     duration_days: tasks.map((task) => num(task.duration_days)),
     task_cost: tasks.map((task) => taskCost(task, rateByResource)),
+    // ── Earned Value ────────────────────────────────────────────────────────
+    // Precomputed per task because the sandbox has no element-wise arithmetic:
+    // SUM(a * b) is rejected, so the multiplication has to happen here. NaN
+    // wherever the data cannot support the figure, which is what lets
+    // SUM(earned_value_hours) / SUM(planned_value_hours) come out "not
+    // computable" instead of 1.00 for a project that never started.
+    planned_value_hours: evm.map((v) => v.plannedValueHours),
+    earned_value_hours: evm.map((v) => v.earnedValueHours),
+    planned_value_cost: evm.map((v) => v.plannedValueCost),
+    earned_value_cost: evm.map((v) => v.earnedValueCost),
+    actual_cost: evm.map((v) => v.actualCost),
+    baseline_hours: evm.map((v) => (v.bacHours > 0 ? v.bacHours : NaN)),
+    baseline_cost: evm.map((v) => v.bacCost),
     // 1 when the task's cost is known. Lets an expression state its own
     // coverage — "priced 12 of 53 tasks" — instead of presenting a partial
     // sum as if it were the total.

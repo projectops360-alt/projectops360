@@ -423,6 +423,9 @@ export interface Milestone extends OrganizationScoped {
   start_date: string | null;
   target_date: string | null;
   completed_date: string | null;
+  /** The committed schedule for this milestone (see RoadmapTask). */
+  baseline_start_date?: string | null;
+  baseline_target_date?: string | null;
   progress_percent: number;
   order_index: number;
   icon_key: string | null;
@@ -452,6 +455,11 @@ export interface RoadmapTask extends OrganizationScoped {
   id: string;
   project_id: string;
   milestone_id: string | null;
+  /** The dates the work was COMMITTED to. Never moved by rescheduling — that
+   *  is what makes slippage and Planned Value measurable. Null = no baseline. */
+  baseline_start_date?: string | null;
+  baseline_end_date?: string | null;
+  baseline_estimate_hours?: number | null;
   title: string;
   description: string | null;
   status: TaskStatus;

@@ -40,6 +40,36 @@ export default async function ExecutionMapPage({
     notFound();
   }
 
+  // Rates + currency for the cash-flow curve. Optional by design: without them
+  // the panel says which piece is missing rather than drawing a flat line, so a
+  // failure here must never fail the page.
+  const [rateResult, currencyResult] = await Promise.all([
+    supabase
+      .from("resources")
+      .select("id, cost_rate, cost_unit")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .not("cost_rate", "is", null),
+    supabase
+      .from("budget_items")
+      .select("currency")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .limit(1),
+  ]);
+  const rateByResource: Record<string, number> = {};
+  for (const r of (rateResult.data ?? []) as { id: string; cost_rate: number | null; cost_unit: string | null }[]) {
+    // Only hourly rates: pricing hours from a daily rate would mean assuming
+    // the length of a working day.
+    if (r.cost_rate != null && r.cost_rate > 0 && (r.cost_unit ?? "hour") === "hour") {
+      rateByResource[r.id] = Number(r.cost_rate);
+    }
+  }
+  const currency =
+    ((currencyResult.data ?? [])[0] as { currency?: string | null } | undefined)?.currency ?? "USD";
+
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   const milestones = milestonesResult.data;
   const tasks = tasksResult.data;
@@ -91,6 +121,8 @@ export default async function ExecutionMapPage({
       progress={progress}
       nextStep={nextStep}
       dependencies={(dependencies ?? []) as TaskDependency[]}
+      rateByResource={rateByResource}
+      currency={currency}
       locale={locale as Locale}
       translations={{
         title: t("title"),
