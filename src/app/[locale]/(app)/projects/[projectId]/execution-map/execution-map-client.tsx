@@ -16,6 +16,7 @@ import { ExecutionDashboard } from "@/components/roadmap/execution-dashboard";
 import { VisualRoadmapTimeline } from "@/components/roadmap/visual-roadmap-timeline";
 import { GanttRoadmap } from "@/components/roadmap/gantt-roadmap";
 import { CashFlowPanel } from "@/components/roadmap/cash-flow-panel";
+import type { PinnableKpi, ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
 import { DependenciesView } from "@/components/roadmap/dependencies-view";
 import { updateTaskDatesAction } from "./dependency-actions";
 import { MilestoneBoard } from "@/components/roadmap/milestone-board";
@@ -302,6 +303,9 @@ interface ExecutionMapClientProps {
   /** resource id → hourly rate, for the cash-flow curve under the schedule. */
   rateByResource?: Record<string, number>;
   currency?: string;
+  /** KPIs pinned to each milestone — the SAME pins as the Living Graph. */
+  pinnedKpisByMilestone?: Record<string, ResolvedPinnedKpi[]>;
+  pinnableKpis?: PinnableKpi[];
 }
 
 // ── Tab Configuration ──────────────────────────────────────────────────────────
@@ -333,6 +337,8 @@ export function ExecutionMapClient({
   onboard,
   rateByResource,
   currency,
+  pinnedKpisByMilestone,
+  pinnableKpis,
 }: ExecutionMapClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ExecutionTab>("overview");
@@ -711,6 +717,9 @@ export function ExecutionMapClient({
             schedule: locale === "es" ? "Cronograma" : "Schedule",
             milestone: locale === "es" ? "Hito" : "Milestone",
           }}
+          pinnedKpisByMilestone={pinnedKpisByMilestone}
+          pinnableKpis={pinnableKpis}
+          projectId={projectId}
           onTaskDatesChange={async (taskId, startDate, endDate) => {
             const res = await updateTaskDatesAction({ taskId, start_date: startDate, end_date: endDate, projectId });
             if (!res.error) {

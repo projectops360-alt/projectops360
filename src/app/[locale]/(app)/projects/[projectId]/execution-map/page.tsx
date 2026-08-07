@@ -8,6 +8,8 @@ import { computeRoadmapProgress } from "@/lib/roadmap/progress";
 import { computeNextStep } from "@/lib/roadmap/recommendation";
 import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
 import { ExecutionMapClient } from "./execution-map-client";
+import { loadMilestoneKpis } from "@/lib/kpi/load-milestone-kpis";
+import type { KpiTaskRow } from "@/lib/kpi/build-dataset";
 
 export default async function ExecutionMapPage({
   params,
@@ -40,35 +42,22 @@ export default async function ExecutionMapPage({
     notFound();
   }
 
-  // Rates + currency for the cash-flow curve. Optional by design: without them
-  // the panel says which piece is missing rather than drawing a flat line, so a
-  // failure here must never fail the page.
-  const [rateResult, currencyResult] = await Promise.all([
-    supabase
-      .from("resources")
-      .select("id, cost_rate, cost_unit")
-      .eq("project_id", projectId)
-      .eq("organization_id", org.organizationId)
-      .is("deleted_at", null)
-      .not("cost_rate", "is", null),
-    supabase
-      .from("budget_items")
-      .select("currency")
-      .eq("project_id", projectId)
-      .eq("organization_id", org.organizationId)
-      .is("deleted_at", null)
-      .limit(1),
-  ]);
-  const rateByResource: Record<string, number> = {};
-  for (const r of (rateResult.data ?? []) as { id: string; cost_rate: number | null; cost_unit: string | null }[]) {
-    // Only hourly rates: pricing hours from a daily rate would mean assuming
-    // the length of a working day.
-    if (r.cost_rate != null && r.cost_rate > 0 && (r.cost_unit ?? "hour") === "hour") {
-      rateByResource[r.id] = Number(r.cost_rate);
-    }
-  }
-  const currency =
-    ((currencyResult.data ?? [])[0] as { currency?: string | null } | undefined)?.currency ?? "USD";
+  // Rates, currency and the KPIs pinned to each milestone — the same helper the
+  // Living Graph uses, so a pin reads identically on both screens.
+  const milestoneList = ((milestonesResult.data ?? []) as Milestone[]).map((m) => ({
+    id: m.id,
+    title: m.title,
+    status: m.status,
+    target_date: m.target_date,
+    completed_date: m.completed_date,
+  }));
+  const { pinnedKpisByMilestone, pinnableKpis, currency, rateByResource } = await loadMilestoneKpis(
+    supabase,
+    org.organizationId,
+    projectId,
+    (tasksResult.data ?? []) as unknown as KpiTaskRow[],
+    milestoneList,
+  );
 
   const projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
   const milestones = milestonesResult.data;
@@ -123,6 +112,8 @@ export default async function ExecutionMapPage({
       dependencies={(dependencies ?? []) as TaskDependency[]}
       rateByResource={rateByResource}
       currency={currency}
+      pinnedKpisByMilestone={pinnedKpisByMilestone}
+      pinnableKpis={pinnableKpis}
       locale={locale as Locale}
       translations={{
         title: t("title"),
