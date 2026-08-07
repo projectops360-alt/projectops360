@@ -93,7 +93,12 @@ export function getComputedMilestoneStatus(
 /**
  * Compute a single milestone's progress from its tasks.
  * Rule: done tasks / total tasks * 100.
- * If the milestone has no tasks, fall back to the stored progress_percent.
+ *
+ * A milestone with NO tasks falls back to its stored percentage — except when
+ * it is complete, which is always 100%. Gates and sign-offs carry no tasks by
+ * design (a gate is passed, not worked through), so marking one complete left
+ * it reading "completed" beside a 0% ring: the two halves of the same card
+ * contradicting each other.
  */
 export function computeMilestoneProgress(
   milestone: Milestone,
@@ -107,17 +112,21 @@ export function computeMilestoneProgress(
     TASK_COMPLETE_STATUSES.includes(t.status),
   ).length;
 
+  const computedStatus = getComputedMilestoneStatus(milestone, tasks);
+
   const progressPercent =
-    totalTasks > 0
-      ? Math.round((doneTasks / totalTasks) * 100)
-      : milestone.progress_percent;
+    computedStatus === "completed"
+      ? 100
+      : totalTasks > 0
+        ? Math.round((doneTasks / totalTasks) * 100)
+        : milestone.progress_percent;
 
   return {
     milestoneId: milestone.id,
     progressPercent,
     totalTasks,
     doneTasks,
-    computedStatus: getComputedMilestoneStatus(milestone, tasks),
+    computedStatus,
   };
 }
 

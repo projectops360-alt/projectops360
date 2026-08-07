@@ -23,7 +23,12 @@
 // ============================================================================
 
 import { describe, it, expect } from "vitest";
-import { countBlockers, countAtRiskMilestones, getComputedMilestoneStatus } from "../progress";
+import {
+  countBlockers,
+  countAtRiskMilestones,
+  getComputedMilestoneStatus,
+  computeMilestoneProgress,
+} from "../progress";
 import type { Milestone, RoadmapTask } from "@/types/database";
 
 const PROJECT = "11111111-1111-4111-8111-111111111111";
@@ -104,5 +109,41 @@ describe("milestone completion is derived, not stored", () => {
       task({ status: "not_started", milestone_id: "m1" }),
     ];
     expect(getComputedMilestoneStatus(milestone({ id: "m1" }), tasks)).not.toBe("completed");
+  });
+});
+
+describe("a completed milestone reads 100%", () => {
+  it("shows 100% for a gate that has no tasks at all", () => {
+    // Gates and sign-offs carry no tasks by design: a gate is PASSED, not
+    // worked through. Marking one complete used to leave "completed" beside a
+    // 0% ring — the same card contradicting itself.
+    const gate = milestone({
+      id: "gate",
+      status: "completed",
+      status_override_enabled: true,
+      status_override_value: "completed",
+      progress_percent: 0,
+    } as Partial<Milestone>);
+
+    const progress = computeMilestoneProgress(gate, []);
+    expect(progress.computedStatus).toBe("completed");
+    expect(progress.progressPercent).toBe(100);
+  });
+
+  it("still reports real progress while the milestone is not complete", () => {
+    const tasks = [
+      task({ status: "done", milestone_id: "m1" }),
+      task({ status: "not_started", milestone_id: "m1" }),
+      task({ status: "not_started", milestone_id: "m1" }),
+      task({ status: "not_started", milestone_id: "m1" }),
+    ];
+    const progress = computeMilestoneProgress(milestone({ id: "m1" }), tasks);
+    expect(progress.progressPercent).toBe(25);
+    expect(progress.computedStatus).not.toBe("completed");
+  });
+
+  it("reaches 100% when every task is done", () => {
+    const tasks = Array.from({ length: 53 }, () => task({ status: "done", milestone_id: "m1" }));
+    expect(computeMilestoneProgress(milestone({ id: "m1" }), tasks).progressPercent).toBe(100);
   });
 });
