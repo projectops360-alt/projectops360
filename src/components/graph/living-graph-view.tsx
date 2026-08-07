@@ -64,6 +64,18 @@ import {
 import { buildDemoGraphData } from "@/lib/graph/living-graph-demo-data";
 import { computeMilestoneTaskCensus } from "@/lib/roadmap/milestone-task-census";
 import {
+  computeMilestoneCostRollups,
+  type BudgetLineLike,
+  type ResourceRateLike,
+} from "@/lib/roadmap/milestone-cost-rollup";
+import {
+  resolveMilestoneCardMetrics,
+  sanitizeMetricSelection,
+  toggleMetricSelection,
+  DEFAULT_MILESTONE_CARD_METRIC_IDS,
+} from "@/lib/graph/milestone-card-metrics";
+import { MilestoneMetricsPicker } from "./milestone-metrics-picker";
+import {
   computeLayout,
   milestoneFlowLayout,
   milestonesPerRow,
@@ -258,11 +270,17 @@ export interface LivingGraphViewProps {
   subtaskOwnerNames?: Record<string, string>;
   /** Safe attachment display metadata for task-case evidence context. */
   taskAttachments?: TaskAttachmentRef[];
+  /** Budget lines, for the money side of the per-milestone cost rollup. */
+  budgetLines?: BudgetLineLike[];
+  /** Resource hourly rates — what turns a task's hours into money. */
+  resourceRates?: ResourceRateLike[];
+  /** Project currency (ISO 4217). Budget lines carry it; defaults to USD. */
+  currency?: string;
 }
 
 // ── Public wrapper: provider + empty / mobile states ──────────────────────────
 
-export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments }: LivingGraphViewProps) {
+export function LivingGraphView({ projectId, data, milestones, tasks, laborCapacity, laborResources, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   // Demo mode: opt-in sample graph, only offered when the project is empty
   const [demoMode, setDemoMode] = useState(false);
@@ -342,6 +360,9 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
             subtasks={subtasks}
             subtaskOwnerNames={subtaskOwnerNames}
             taskAttachments={taskAttachments}
+            budgetLines={budgetLines}
+            resourceRates={resourceRates}
+            currency={currency}
           />
         </ReactFlowProvider>
       </div>
@@ -351,7 +372,7 @@ export function LivingGraphView({ projectId, data, milestones, tasks, laborCapac
 
 // ── Inner canvas (needs ReactFlowProvider context) ─────────────────────────────
 
-function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments }: LivingGraphViewProps) {
+function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, laborActivities, tradeTaxonomy, lookaheadActivities, laborVariance, varianceResult, varianceCauses, resourceCapacity, subtasks, subtaskOwnerNames, taskAttachments, budgetLines, resourceRates, currency }: LivingGraphViewProps) {
   const t = useTranslations("livingGraph");
   const locale = useLocale() as Locale;
   const router = useRouter();
@@ -564,6 +585,38 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   // the canonical owner (roadmap_tasks), NOT from process_nodes — so they match
   // the Workboard ("different views, same truth").
   const milestoneCensus = useMemo(() => computeMilestoneTaskCensus(tasks), [tasks]);
+
+  // ── Per-milestone cost rollup + the KPIs the USER pinned to the cards ─────
+  // What a phase cost in effort, time and money. The rollup is computed for
+  // every milestone regardless of what is pinned — it is cheap, pure, and the
+  // detail panel can use it too. WHICH figures reach a card is the user's
+  // choice alone (see milestone-card-metrics): the default is none, so a card
+  // is unchanged until someone asks for more.
+  const milestoneCostRollups = useMemo(
+    () =>
+      computeMilestoneCostRollups(
+        milestones,
+        tasks,
+        budgetLines ?? [],
+        [],
+        null,
+        resourceRates ?? [],
+      ),
+    [milestones, tasks, budgetLines, resourceRates],
+  );
+
+  const [rawCardMetricIds, setCardMetricIds] = useGraphUiPref<string[]>(
+    `cardMetrics.${projectId}`,
+    DEFAULT_MILESTONE_CARD_METRIC_IDS,
+  );
+  // Storage is not trusted: a preference saved before a metric was renamed
+  // must not be able to crash a card.
+  const cardMetricIds = useMemo(() => sanitizeMetricSelection(rawCardMetricIds), [rawCardMetricIds]);
+  const handleToggleCardMetric = useCallback(
+    (id: string) => setCardMetricIds((prev) => toggleMetricSelection(sanitizeMetricSelection(prev), id)),
+    [setCardMetricIds],
+  );
+  const handleClearCardMetrics = useCallback(() => setCardMetricIds([]), [setCardMetricIds]);
 
   // ── Canonical-event Relationships view (CAP-045 extension) ───────────────
   // Status contract (Part B): the page ALWAYS sets
@@ -1341,6 +1394,16 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
           isFocusNode: focusIds != null && node.id === selectedNodeId,
           isDropTarget: node.id === dropTargetId,
           clusterSize,
+          // KPI chips the user pinned. Undefined at every other level and
+          // whenever nothing is pinned, so the card renders exactly as before.
+          cardMetrics:
+            isMilestoneLevel && node.milestoneId && cardMetricIds.length > 0
+              ? resolveMilestoneCardMetrics(
+                  cardMetricIds,
+                  milestoneCostRollups.get(node.milestoneId),
+                  { locale, currency: currency ?? "USD", isEs: locale === "es" },
+                )
+              : undefined,
           // Between-analysis highlighting (read-only presentation signals).
           isBetweenStart: node.id === betweenStartNodeId || undefined,
           isBetweenEnd: node.id === betweenEndNodeId || undefined,
@@ -2558,6 +2621,17 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
         }}
       >
         {!caseExplorerActive && !processExplorerActive && <LivingGraphLegend />}
+
+        {/* Pin your own KPIs to the milestone cards. Milestone level only —
+            the rollup is per milestone, and there is nothing to pin elsewhere. */}
+        {isMilestoneLevel && (
+          <MilestoneMetricsPicker
+            locale={locale as Locale}
+            selected={cardMetricIds}
+            onToggle={handleToggleCardMetric}
+            onClear={handleClearCardMetrics}
+          />
+        )}
 
         {/* UX-007 — Saved Layouts: compact floating controls (works in normal,
             fullscreen and Focus Mode). Save node positions + reset/clear. */}

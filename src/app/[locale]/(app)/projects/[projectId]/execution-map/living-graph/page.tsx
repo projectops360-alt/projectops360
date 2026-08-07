@@ -337,6 +337,43 @@ export default async function LivingGraphPage({
   const fullTasks = (tasksResult.data ?? []) as RoadmapTask[];
   const fullMilestones = (milestonesResult.data ?? []) as Milestone[];
 
+  // ── Cost inputs for the per-milestone rollup ────────────────────────────────
+  // Budget lines carry the money; resources carry the rate that turns a task's
+  // hours into money. Both are optional: without them the cost KPIs simply read
+  // "—" on the cards, which is the honest answer, so a failure here degrades the
+  // card rather than the page. Only the columns the rollup reads are selected —
+  // rates are cost data and have no business crossing to the client wholesale.
+  const [budgetResult, rateResult] = await Promise.all([
+    supabase
+      .from("budget_items")
+      .select("name, estimated_cost, actual_cost, milestone_id, currency")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null),
+    supabase
+      .from("project_resources")
+      .select("id, cost_rate, cost_unit")
+      .eq("project_id", projectId)
+      .eq("organization_id", org.organizationId)
+      .is("deleted_at", null)
+      .not("cost_rate", "is", null),
+  ]);
+
+  const budgetLines = (budgetResult.data ?? []) as {
+    name: string | null;
+    estimated_cost: number | null;
+    actual_cost: number | null;
+    milestone_id: string | null;
+    currency: string | null;
+  }[];
+  const resourceRates = (rateResult.data ?? []) as {
+    id: string;
+    cost_rate: number | null;
+    cost_unit: string | null;
+  }[];
+  // One project, one currency in practice; the first line that states one wins.
+  const projectCurrency = budgetLines.find((b) => b.currency)?.currency ?? "USD";
+
   // ── Subtask visibility layer (Task Execution Map) ───────────────────────────
   // Fetch project subtasks for the NotebookLM-style progressive expansion.
   // RBAC is already enforced above (org-scoped project ownership check + RLS on
@@ -673,6 +710,9 @@ export default async function LivingGraphPage({
         subtasks={subtasks}
         subtaskOwnerNames={subtaskOwnerNames}
         taskAttachments={taskAttachments}
+        budgetLines={budgetLines}
+        resourceRates={resourceRates}
+        currency={projectCurrency}
       />
     </div>
   );

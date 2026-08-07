@@ -17,6 +17,7 @@ import type {
   ProcessActivityAggregate,
   ProcessTransitionAggregate,
 } from "@/lib/graph/task-process-analysis";
+import type { ResolvedMilestoneMetric } from "@/lib/graph/milestone-card-metrics";
 
 /** Visual state derived from timeline playback. */
 export type TimelinePlaybackState =
@@ -50,6 +51,9 @@ export type LivingNodeData = {
   isBetweenEnd?: boolean;
   isBetweenPathMember?: boolean;
   isBetweenEventMember?: boolean;
+  /** KPI chips the USER chose to show on this milestone card, already resolved
+   *  and formatted. Empty unless they picked some — the card never decides. */
+  cardMetrics?: ResolvedMilestoneMetric[];
 };
 
 export type LivingFlowNode = Node<LivingNodeData, "living" | "milestoneCard">;
