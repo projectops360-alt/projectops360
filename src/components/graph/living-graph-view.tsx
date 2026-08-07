@@ -76,7 +76,7 @@ import {
 } from "@/lib/graph/milestone-card-metrics";
 import { MilestoneMetricsPicker } from "./milestone-metrics-picker";
 import { MilestoneKpiContextMenu } from "./milestone-kpi-context-menu";
-import { pinKpiToMilestone, unpinKpiFromMilestone } from "@/lib/kpi/milestone-pin-actions";
+import { pinKpiToMilestone, unpinKpiFromMilestone, type MilestoneKpiPinError } from "@/lib/kpi/milestone-pin-actions";
 import type { PinnableKpi, ResolvedPinnedKpi } from "@/lib/kpi/milestone-pins";
 import {
   computeLayout,
@@ -655,15 +655,21 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
   );
 
   const handleTogglePin = useCallback(
-    async (slug: string, pinned: boolean) => {
-      if (!kpiMenu) return;
+    async (slug: string, pinned: boolean): Promise<MilestoneKpiPinError | null> => {
+      if (!kpiMenu) return null;
       const action = pinned ? unpinKpiFromMilestone : pinKpiToMilestone;
       const result = await action({
         projectId,
         milestoneId: kpiMenu.milestoneId,
         kpiSlug: slug,
       });
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        router.refresh();
+        return null;
+      }
+      // Returned so the menu can SHOW it. Swallowing it is what made a click
+      // at the cap look like a dead button.
+      return result.error ?? "write_failed";
     },
     [kpiMenu, projectId, router],
   );
@@ -2683,7 +2689,7 @@ function LivingGraphCanvas({ projectId, data, milestones, tasks, laborCapacity, 
             y={kpiMenu.y}
             milestoneTitle={kpiMenu.title}
             available={pinnableKpis ?? []}
-            pinnedSlugs={(pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []).map((k) => k.slug)}
+            pinned={pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []}
             onTogglePin={handleTogglePin}
             onClose={() => setKpiMenu(null)}
           />

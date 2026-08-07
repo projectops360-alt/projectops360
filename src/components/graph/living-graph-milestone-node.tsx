@@ -235,7 +235,12 @@ function LivingGraphMilestoneNodeComponent({
           data-testid="milestone-kpi-hover"
           // pointer-events-none so the panel can never swallow a drag that
           // started on the card underneath it.
-          className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-[280px] -translate-x-1/2 rounded-xl border border-border bg-card p-3 opacity-0 shadow-2xl transition-opacity duration-150 group-hover:opacity-100"
+          // ABOVE the card, not below. Dropping it below covered the card in
+          // the next row — the same mistake the Gantt made, and just as
+          // annoying: you cannot read a phase's KPIs and see the phase that
+          // follows it at the same time. The row above is usually the one
+          // already read and moved past.
+          className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-[280px] -translate-x-1/2 rounded-xl border border-border bg-card p-3 opacity-0 shadow-2xl transition-opacity duration-150 group-hover:opacity-100"
         >
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {isEs ? "KPIs de este hito" : "KPIs for this milestone"}

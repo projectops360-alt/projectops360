@@ -977,11 +977,15 @@ export function GanttRoadmap({
           y={kpiMenu.y}
           milestoneTitle={kpiMenu.title}
           available={pinnableKpis ?? []}
-          pinnedSlugs={(pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []).map((k) => k.slug)}
-          onTogglePin={async (slug, pinned) => {
-            const action = pinned ? unpinKpiFromMilestone : pinKpiToMilestone;
+          pinned={pinnedKpisByMilestone?.[kpiMenu.milestoneId] ?? []}
+          onTogglePin={async (slug, isPinned) => {
+            const action = isPinned ? unpinKpiFromMilestone : pinKpiToMilestone;
             const result = await action({ projectId, milestoneId: kpiMenu.milestoneId, kpiSlug: slug });
-            if (result.ok) router.refresh();
+            if (result.ok) {
+              router.refresh();
+              return null;
+            }
+            return result.error ?? "write_failed";
           }}
           onClose={() => setKpiMenu(null)}
         />

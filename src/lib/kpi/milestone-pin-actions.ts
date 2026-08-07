@@ -21,9 +21,24 @@ import { getOrgContext } from "@/lib/auth";
 import { findKpiDefinition } from "./catalog";
 import { MAX_PINS_PER_MILESTONE } from "./milestone-pins";
 
+/**
+ * A CODE, not a sentence.
+ *
+ * The caller renders the message, because the caller knows the user's
+ * language. Returning "A milestone can carry at most 8 KPIs." from a server
+ * action would put an English string in a Spanish menu (UX-012).
+ */
+export type MilestoneKpiPinError =
+  | "unauthorized"
+  | "viewer_cannot_write"
+  | "invalid_input"
+  | "unknown_kpi"
+  | "cap_reached"
+  | "write_failed";
+
 export interface MilestoneKpiPinResult {
   ok: boolean;
-  error?: string;
+  error?: MilestoneKpiPinError;
 }
 
 const pinSchema = z.object({
@@ -37,9 +52,9 @@ async function authorize(projectId: string, milestoneId: string) {
   try {
     org = await getOrgContext();
   } catch {
-    return { error: "Unauthorized." as const };
+    return { error: "unauthorized" as const };
   }
-  if (org.role === "viewer") return { error: "Viewers cannot change KPIs." as const };
+  if (org.role === "viewer") return { error: "viewer_cannot_write" as const };
 
   const supabase = await createClient();
 
@@ -54,7 +69,7 @@ async function authorize(projectId: string, milestoneId: string) {
     .eq("organization_id", org.organizationId)
     .is("deleted_at", null)
     .maybeSingle();
-  if (!milestone) return { error: "Unauthorized." as const };
+  if (!milestone) return { error: "unauthorized" as const };
 
   return { org, supabase };
 }
@@ -63,7 +78,7 @@ export async function pinKpiToMilestone(
   input: z.infer<typeof pinSchema>,
 ): Promise<MilestoneKpiPinResult> {
   const parsed = pinSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Invalid input." };
+  if (!parsed.success) return { ok: false, error: "invalid_input" };
   const { projectId, milestoneId, kpiSlug } = parsed.data;
 
   const auth = await authorize(projectId, milestoneId);
@@ -81,16 +96,14 @@ export async function pinKpiToMilestone(
       .eq("organization_id", org.organizationId)
       .or(`project_id.eq.${projectId},project_id.is.null`)
       .maybeSingle();
-    if (!custom) return { ok: false, error: "Unknown KPI." };
+    if (!custom) return { ok: false, error: "unknown_kpi" };
   }
 
   const { count } = await supabase
     .from("milestone_kpi_pins")
     .select("id", { count: "exact", head: true })
     .eq("milestone_id", milestoneId);
-  if ((count ?? 0) >= MAX_PINS_PER_MILESTONE) {
-    return { ok: false, error: `A milestone can carry at most ${MAX_PINS_PER_MILESTONE} KPIs.` };
-  }
+  if ((count ?? 0) >= MAX_PINS_PER_MILESTONE) return { ok: false, error: "cap_reached" };
 
   // Pinning twice is idempotent, not an error: the user's intent ("I want this
   // measured here") is already satisfied, and the unique constraint says so.
@@ -105,7 +118,7 @@ export async function pinKpiToMilestone(
     },
     { onConflict: "milestone_id,kpi_slug", ignoreDuplicates: true },
   );
-  if (error) return { ok: false, error: "Could not pin the KPI." };
+  if (error) return { ok: false, error: "write_failed" };
 
   revalidatePath(`/projects/${projectId}/execution-map/living-graph`);
   return { ok: true };
@@ -115,7 +128,7 @@ export async function unpinKpiFromMilestone(
   input: z.infer<typeof pinSchema>,
 ): Promise<MilestoneKpiPinResult> {
   const parsed = pinSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Invalid input." };
+  if (!parsed.success) return { ok: false, error: "invalid_input" };
   const { projectId, milestoneId, kpiSlug } = parsed.data;
 
   const auth = await authorize(projectId, milestoneId);
@@ -128,7 +141,7 @@ export async function unpinKpiFromMilestone(
     .eq("milestone_id", milestoneId)
     .eq("kpi_slug", kpiSlug)
     .eq("organization_id", org.organizationId);
-  if (error) return { ok: false, error: "Could not remove the KPI." };
+  if (error) return { ok: false, error: "write_failed" };
 
   revalidatePath(`/projects/${projectId}/execution-map/living-graph`);
   return { ok: true };

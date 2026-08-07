@@ -16,7 +16,7 @@
 // ============================================================================
 
 import { describe, it, expect } from "vitest";
-import { evaluatePinnedKpi, pinnableKpis, resolvePinnedKpi } from "../milestone-pins";
+import { evaluatePinnedKpi, pinnableKpis, resolvePinnedKpi, MAX_PINS_PER_MILESTONE } from "../milestone-pins";
 import { buildKpiDataset, type KpiTaskRow } from "../build-dataset";
 import type { CustomKpiDefinition } from "../custom";
 
@@ -168,5 +168,41 @@ describe("the same pin on different milestones", () => {
     const b = evaluatePinnedKpi("hours", [kpi], explore, 1);
     expect(a.status === "ok" && a.value).toBe(332);
     expect(b.status === "ok" && b.value).toBe(0);
+  });
+});
+
+// ============================================================================
+// The cap, and pins whose KPI was deleted
+// ============================================================================
+// Both were reported together, and they compound: a milestone at the 8-pin cap
+// could not accept a new KPI, the click failed SILENTLY, and one of the eight
+// slots was held by a pin whose custom KPI had been deleted — which the menu
+// showed on the card but offered no way to remove, because it only listed KPIs
+// that still existed.
+// ============================================================================
+
+describe("a pin whose KPI was deleted", () => {
+  it("is still reported, so the card does not quietly lose a measure", () => {
+    const r = evaluatePinnedKpi("budget_cost", [], buildKpiDataset([task()], [MILESTONE], NOW), 1);
+    expect(r).toEqual({ status: "missing", slug: "budget_cost" });
+  });
+
+  it("is NOT offered as pinnable — which is why it needs its own removal path", () => {
+    // The menu builds its checkbox list from this. An orphan can never appear
+    // in it, so removing one has to be handled separately or it is permanent.
+    expect(pinnableKpis([]).some((k) => k.slug === "budget_cost")).toBe(false);
+  });
+
+  it("keeps its slug, the only handle available to unpin it", () => {
+    const r = evaluatePinnedKpi("budget_cost", [], buildKpiDataset([], [MILESTONE], NOW), 0);
+    expect(r.status === "missing" && r.slug).toBe("budget_cost");
+  });
+});
+
+describe("the cap", () => {
+  it("is a real number the UI can show before it bites", () => {
+    // Silent enforcement is what made the click look like a dead button.
+    expect(MAX_PINS_PER_MILESTONE).toBeGreaterThan(0);
+    expect(Number.isInteger(MAX_PINS_PER_MILESTONE)).toBe(true);
   });
 });
