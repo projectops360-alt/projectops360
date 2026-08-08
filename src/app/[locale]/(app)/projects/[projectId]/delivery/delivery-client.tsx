@@ -14,6 +14,7 @@ import {
 import {
   PROJECT_TYPES, UNCERTAINTY, GOVERNANCE, CADENCE, FEEDBACK_FREQ, DOCUMENTATION, CHANGE_CONTROL,
   VENDOR_DEP, DELIVERY_METHODS, FRAMEWORK_STATUS_META, MEETING_RHYTHM, workboardColumnLabels,
+  PLATFORMS, PLATFORM_RELEVANT_TYPES, SAP_ACTIVATE_PHASES,
   label, type DeliveryMethod, type Opt,
 } from "@/lib/delivery/config";
 import {
@@ -111,6 +112,7 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
   const init = <T,>(k: string, d: T) => (fw?.[k] as T) ?? d;
   const [f, setF] = useState({
     projectType: init("project_type", p.defaultProjectType) as string,
+    platform: init("platform", "") as string,
     uncertainty: init("uncertainty_level", "medium") as string,
     governance: init("governance_level", "moderate") as string,
     documentation: init("documentation_level", "moderate") as string,
@@ -126,7 +128,7 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
   const [aiUsed, setAiUsed] = useState(false);
 
   const recommend = () => start(async () => {
-    const r = await recommendFrameworkAction({ projectId: p.projectId, inputs: { projectType: f.projectType, uncertainty: f.uncertainty, governance: f.governance, documentation: f.documentation, changeControl: f.changeControl, feedbackFreq: f.feedbackFreq, vendorDep: f.vendorDep } });
+    const r = await recommendFrameworkAction({ projectId: p.projectId, inputs: { projectType: f.projectType, platform: f.platform, uncertainty: f.uncertainty, governance: f.governance, documentation: f.documentation, changeControl: f.changeControl, feedbackFreq: f.feedbackFreq, vendorDep: f.vendorDep } });
     if ("rec" in r && r.rec) {
       setRec(r.rec); setAiUsed(false);
       setF((s) => ({ ...s, deliveryMethod: r.rec.method, executionCadence: r.rec.cadence, reviewCadence: r.rec.reviewCadence, regulatory: f.governance === "regulatory" || f.documentation === "regulatory" }));
@@ -135,7 +137,7 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
 
   const save = () => start(async () => {
     const config: FrameworkConfig = {
-      projectType: f.projectType, deliveryMethod: f.deliveryMethod, governance: f.governance, uncertainty: f.uncertainty,
+      projectType: f.projectType, platform: f.platform || null, deliveryMethod: f.deliveryMethod, governance: f.governance, uncertainty: f.uncertainty,
       executionCadence: f.executionCadence, reviewCadence: f.reviewCadence, feedbackFreq: f.feedbackFreq,
       documentation: f.documentation, changeControl: f.changeControl, vendorDep: f.vendorDep, regulatory: f.regulatory,
       aiRecommended: aiUsed, recommendationConfidence: rec?.confidence, recommendationReason: rec ? (isEs ? rec.reasonEs : rec.reasonEn) : undefined,
@@ -160,7 +162,23 @@ function Wizard({ p, isEs, pending, start, router, onDone }: { p: Props; isEs: b
         <div className="rounded-xl border border-border bg-card p-5">
           <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground"><Settings2 className="h-4 w-4 text-brand-500" />{isEs ? "Diagnóstico del proyecto" : "Project diagnostic"}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            <WizardField isEs={isEs} label={isEs ? "Tipo de proyecto" : "Project type"} opts={PROJECT_TYPES} value={f.projectType} onChange={(v) => setF({ ...f, projectType: v })} />
+            <WizardField isEs={isEs} label={isEs ? "Tipo de proyecto" : "Project type"} opts={PROJECT_TYPES} value={f.projectType} onChange={(v) => setF({ ...f, projectType: v, platform: PLATFORM_RELEVANT_TYPES.includes(v) ? f.platform : "" })} />
+            {/*
+              Asked only for implementation work, and only because a methodology
+              can belong to a vendor: SAP Activate is SAP's. Inferring the vendor
+              from "ERP / System Implementation" is how an Oracle customer gets
+              told to follow SAP's process. Left blank it recommends nothing
+              vendor-specific — not knowing is not the same as knowing.
+            */}
+            {PLATFORM_RELEVANT_TYPES.includes(f.projectType) && (
+              <WizardField
+                isEs={isEs}
+                label={isEs ? "Plataforma (opcional)" : "Platform (optional)"}
+                opts={[{ value: "", es: "No aplica / no lo sé", en: "Not applicable / unknown" }, ...PLATFORMS]}
+                value={f.platform}
+                onChange={(v) => setF({ ...f, platform: v })}
+              />
+            )}
             <WizardField isEs={isEs} label={isEs ? "Nivel de incertidumbre" : "Uncertainty level"} opts={UNCERTAINTY} value={f.uncertainty} onChange={(v) => setF({ ...f, uncertainty: v })} />
             <WizardField isEs={isEs} label={isEs ? "Nivel de gobernanza" : "Governance level"} opts={GOVERNANCE} value={f.governance} onChange={(v) => setF({ ...f, governance: v })} />
             <WizardField isEs={isEs} label={isEs ? "Nivel de documentación" : "Documentation level"} opts={DOCUMENTATION} value={f.documentation} onChange={(v) => setF({ ...f, documentation: v })} />
@@ -239,6 +257,15 @@ function OverviewBody({ p, isEs }: { p: Props; isEs: boolean }) {
 
   return (
     <div className="space-y-5">
+      {/*
+        The methodology's own phases and gates. Until now SAP_ACTIVATE_PHASES
+        was defined and read by nothing, so choosing SAP Activate changed a
+        label and nothing else. The gates ARE the method — a phase that cannot
+        close until Q2 passes is the difference between this and "predictive
+        with SAP words".
+      */}
+      {method === "sap_activate" && <SapActivatePhases isEs={isEs} />}
+
       {/* Method headline */}
       <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-5 dark:border-brand-900 dark:bg-brand-950/20">
         <p className="text-xs font-medium uppercase tracking-wide text-brand-700 dark:text-brand-400">{isEs ? "Método de entrega" : "Delivery method"}</p>
@@ -405,6 +432,43 @@ function WizardField({ label, opts, value, onChange, isEs }: { label: string; op
       <select className={sel} value={value} onChange={(e) => onChange(e.target.value)}>
         {opts.map((o) => <option key={o.value} value={o.value}>{isEs ? o.es : o.en}</option>)}
       </select>
+    </div>
+  );
+}
+
+function SapActivatePhases({ isEs }: { isEs: boolean }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {isEs ? "Fases y quality gates" : "Phases and quality gates"}
+      </p>
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {isEs
+          ? "Cada fase se ejecuta por ciclos y no cierra hasta que su gate se aprueba."
+          : "Each phase runs iteratively and cannot close until its gate is approved."}
+      </p>
+      <ol className="mt-3 space-y-2">
+        {SAP_ACTIVATE_PHASES.map((phase, i) => (
+          <li key={phase.key} className="flex gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-[11px] font-bold text-brand-700 dark:text-brand-300">
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-sm font-semibold text-foreground">{isEs ? phase.es : phase.en}</span>
+                <span className="rounded bg-foreground/85 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-background">
+                  {isEs ? phase.gate.es : phase.gate.en}
+                </span>
+              </div>
+              {/* What the phase must produce before the gate can even be
+                  assessed. Without it a gate is a date, not a decision. */}
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                {isEs ? phase.exitCriteriaEs : phase.exitCriteriaEn}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

@@ -16,6 +16,12 @@ export interface FrameworkInputs {
   changeControl: string;      // none | recommended | major | all
   feedbackFreq: string;       // continuous | weekly | every_cycle | monthly | milestones | close
   vendorDep: string;          // none | low | medium | high
+  /**
+   * The product being implemented, when known. Empty/undefined means NOT ASKED
+   * — which must never be read as "not SAP" or as "SAP". It is what keeps a
+   * vendor-specific methodology from being recommended on a guess.
+   */
+  platform?: string;
 }
 
 export interface FrameworkRecommendation {
@@ -47,7 +53,25 @@ export function recommendFramework(i: FrameworkInputs): FrameworkRecommendation 
   let es = "", en = "";
 
   // Rule precedence (most specific first).
-  if (regulatory) {
+  //
+  // SAP Activate goes first, and it is keyed on the PLATFORM, never on the
+  // project type. `erp` means "ERP / System Implementation" — Oracle, Dynamics
+  // and Workday all live under it, and SAP Activate is SAP's own methodology.
+  // Recommending it from the type alone would confidently tell an Oracle
+  // customer to follow SAP's process. An unanswered platform recommends
+  // nothing vendor-specific: not knowing is not the same as knowing it is SAP.
+  //
+  // It also outranks `regulatory`, because SAP Activate IS the formal,
+  // gate-governed answer — a regulated SAP programme is its strongest case, and
+  // with `regulatory` first that case could never reach it.
+  if (i.platform === "sap" && i.projectType === "erp") {
+    method = "sap_activate";
+    // Gate ceremony is the point of the methodology, so governance raises the
+    // confidence rather than deciding the answer.
+    confidence = heavyGov || regulatory ? 92 : 84;
+    es = "Una implantación SAP se ejecuta con SAP Activate: fases cerradas por quality gates formales (Q0–Q5) y ejecución iterativa dentro de cada fase.";
+    en = "A SAP implementation runs on SAP Activate: phases closed by formal quality gates (Q0–Q5), with iterative execution inside each phase.";
+  } else if (regulatory) {
     method = heavyGov || strongChange ? "hybrid" : "predictive";
     confidence = 82;
     es = "El proyecto tiene requisitos regulatorios/de cumplimiento, por lo que necesita fases formales, documentación y control de cambios.";
@@ -57,10 +81,6 @@ export function recommendFramework(i: FrameworkInputs): FrameworkRecommendation 
     confidence = 80;
     es = "En construcción/campo conviene fuerte control de hitos, inspecciones y cambios, con ejecución adaptativa donde aporte.";
     en = "Construction/field work benefits from strong milestone, inspection and change control, with adaptive execution where it helps.";
-  } else if (i.projectType === "erp" && heavyGov) {
-    method = "hybrid"; confidence = 84;
-    es = "Un ERP con alta gobernanza requiere control ejecutivo por hitos y a la vez ejecución por ciclos adaptativos.";
-    en = "An ERP with high governance needs executive milestone control plus adaptive cycle-based execution.";
   } else if (continuous && (i.projectType === "operations" || i.projectType === "procurement" || i.governance === "light")) {
     method = "kanban"; confidence = 78;
     es = "El trabajo es continuo y basado en solicitudes, ideal para un flujo Kanban con control de WIP.";
