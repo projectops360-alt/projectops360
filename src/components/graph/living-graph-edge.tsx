@@ -102,7 +102,11 @@ function MilestoneChainEdge({
             <button
               type="button"
               aria-describedby={open ? tipId : undefined}
-              aria-label={`${tasks} ${t("milestoneCard.tasks")}`}
+              aria-label={
+                sourceTitle
+                  ? `${tasks} ${t("milestoneCard.tasks")} — ${sourceTitle}`
+                  : `${tasks} ${t("milestoneCard.tasks")}`
+              }
               className="pointer-events-auto block rounded-lg border border-border/70 bg-card px-2.5 py-1.5 text-center shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
               style={{ boxShadow: `0 4px 16px ${hexToRgba(accent, 0.12)}` }}
               onMouseEnter={() => setHoverTip(true)}
@@ -114,6 +118,18 @@ function MilestoneChainEdge({
               <p className="text-[10px] font-bold leading-none" style={{ color: accent }}>
                 {tasks} {t("milestoneCard.tasks")}
               </p>
+              {/*
+                WHOSE tasks. The count is the SOURCE phase's own work — what is
+                left to finish before advancing (UX-008 / CAP-001) — but a bare
+                "53 tareas" floating between two cards reads as belonging to the
+                one the arrow points at. Naming the phase removes the ambiguity;
+                a reader concluded from it that every task sat in one milestone.
+              */}
+              {sourceTitle && (
+                <p className="mt-0.5 max-w-[110px] truncate text-[8px] font-medium leading-none text-muted-foreground">
+                  {sourceTitle}
+                </p>
+              )}
               {durationDays != null && (
                 <p className="mt-0.5 text-[9px] leading-none text-muted-foreground">{durationDays}d</p>
               )}
