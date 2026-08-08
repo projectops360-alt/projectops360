@@ -5,7 +5,21 @@
 // software project type. Shared by server (recommendation) and client (wizard).
 // ============================================================================
 
-export type DeliveryMethod = "predictive" | "agile" | "scrum" | "kanban" | "hybrid" | "xp";
+export type DeliveryMethod =
+  | "predictive"
+  | "agile"
+  | "scrum"
+  | "kanban"
+  | "hybrid"
+  | "xp"
+  /**
+   * SAP Activate. Not "predictive with SAP words": it is phase-gated like a
+   * predictive plan, but each phase runs iteratively (fit-to-standard
+   * workshops, build sprints, test cycles) and cannot close until its quality
+   * gate is passed. Neither `predictive` nor `hybrid` carries the gates, so a
+   * plan imported from a real SAP programme had nowhere to say what governs it.
+   */
+  | "sap_activate";
 
 export interface Opt { value: string; es: string; en: string; }
 export interface BiText { es: string; en: string; }
@@ -22,6 +36,29 @@ export const PROJECT_TYPES: Opt[] = [
   { value: "compliance", es: "Cumplimiento / Regulatorio", en: "Compliance / Regulatory" },
   { value: "general", es: "Proyecto de negocio general", en: "General Business Project" },
 ];
+
+/**
+ * The product an implementation runs on.
+ *
+ * Asked ONLY for implementation-type projects, and only because a methodology
+ * can belong to a vendor: SAP Activate is SAP's. Without this the engine would
+ * have to infer the vendor from "ERP / System Implementation", which is exactly
+ * how an Oracle customer gets told to follow SAP's methodology.
+ *
+ * "" (unanswered) is a first-class value: not knowing must stay distinguishable
+ * from knowing it is not SAP.
+ */
+export const PLATFORMS: Opt[] = [
+  { value: "sap", es: "SAP", en: "SAP" },
+  { value: "oracle", es: "Oracle", en: "Oracle" },
+  { value: "dynamics", es: "Microsoft Dynamics", en: "Microsoft Dynamics" },
+  { value: "salesforce", es: "Salesforce", en: "Salesforce" },
+  { value: "workday", es: "Workday", en: "Workday" },
+  { value: "other", es: "Otra / A medida", en: "Other / Custom" },
+];
+
+/** Project types where asking which platform is meaningful. */
+export const PLATFORM_RELEVANT_TYPES = ["erp", "data_bi"];
 
 export const UNCERTAINTY: Opt[] = [
   { value: "low", es: "Baja: alcance claro y estable", en: "Low: scope is clear and stable" },
@@ -84,7 +121,74 @@ export const DELIVERY_METHODS: Record<DeliveryMethod, { es: string; en: string; 
   kanban: { es: "Flujo Kanban", en: "Kanban Flow", descEs: "Trabajo continuo, colas de solicitudes, control de WIP y priorización continua.", descEn: "Continuous work, request queues, WIP control and continuous prioritization." },
   hybrid: { es: "Híbrido Adaptativo", en: "Hybrid Adaptive", descEs: "Gobernanza y control formal con ejecución adaptativa por ciclos. Ideal para proyectos complejos.", descEn: "Formal governance and control with adaptive cycle-based execution. Ideal for complex projects." },
   xp: { es: "Prácticas técnicas (XP)", en: "XP-inspired Practices", descEs: "Prácticas técnicas para software/datos: pruebas primero, integración continua, refactorización.", descEn: "Technical practices for software/data: test-first, continuous integration, refactoring." },
+  sap_activate: { es: "SAP Activate", en: "SAP Activate", descEs: "Implementación SAP por fases con quality gates: preparación, exploración (fit-to-standard), realización por ciclos, despliegue, salida en vivo y soporte. Cada fase cierra con un gate formal.", descEn: "Phase-gated SAP implementation: prepare, explore (fit-to-standard), iterative realize, deploy, go-live and run. Each phase closes with a formal quality gate." },
 };
+
+// ── SAP Activate phases and quality gates ───────────────────────────────────
+// The methodology's own structure, kept as pure data so the engine, the UI and
+// the importer all read the same definition rather than three near-copies.
+
+export interface SapActivatePhase {
+  key: string;
+  es: string;
+  en: string;
+  /** What the phase must produce before its gate can be assessed. */
+  exitCriteriaEs: string;
+  exitCriteriaEn: string;
+  /** The gate that closes the phase. Q-Gates are SAP's own naming. */
+  gate: { key: string; es: string; en: string };
+}
+
+export const SAP_ACTIVATE_PHASES: SapActivatePhase[] = [
+  {
+    key: "discover",
+    es: "Descubrimiento",
+    en: "Discover",
+    exitCriteriaEs: "Caso de negocio, alcance preliminar y estrategia de adopción acordados.",
+    exitCriteriaEn: "Business case, preliminary scope and adoption strategy agreed.",
+    gate: { key: "q0", es: "Q0 — Decisión de inversión", en: "Q0 — Investment decision" },
+  },
+  {
+    key: "prepare",
+    es: "Preparación",
+    en: "Prepare",
+    exitCriteriaEs: "Gobierno, equipo, plan base, entornos y estándares de entregables aprobados.",
+    exitCriteriaEn: "Governance, team, baseline plan, environments and deliverable standards approved.",
+    gate: { key: "q1", es: "Q1 — Cierre de preparación", en: "Q1 — Prepare gate" },
+  },
+  {
+    key: "explore",
+    es: "Exploración",
+    en: "Explore",
+    exitCriteriaEs: "Fit-to-standard completado; brechas identificadas, valoradas y decididas; backlog de configuración aprobado.",
+    exitCriteriaEn: "Fit-to-standard complete; gaps identified, sized and decided; configuration backlog approved.",
+    gate: { key: "q2", es: "Q2 — Cierre de exploración", en: "Q2 — Explore gate" },
+  },
+  {
+    key: "realize",
+    es: "Realización",
+    en: "Realize",
+    exitCriteriaEs: "Configuración y desarrollos construidos y probados; migración de datos ensayada; pruebas integrales firmadas.",
+    exitCriteriaEn: "Configuration and developments built and tested; data migration rehearsed; integration testing signed off.",
+    gate: { key: "q3", es: "Q3 — Cierre de realización", en: "Q3 — Realize gate" },
+  },
+  {
+    key: "deploy",
+    es: "Despliegue",
+    en: "Deploy",
+    exitCriteriaEs: "Cutover ensayado, criterios de salida en vivo verificados, soporte y plan de reversión listos.",
+    exitCriteriaEn: "Cutover rehearsed, go-live criteria verified, support and rollback plan ready.",
+    gate: { key: "q4", es: "Q4 — Autorización de salida en vivo", en: "Q4 — Go-live authorisation" },
+  },
+  {
+    key: "run",
+    es: "Soporte a la operación",
+    en: "Run",
+    exitCriteriaEs: "Hypercare cerrado, incidencias estabilizadas y operación transferida.",
+    exitCriteriaEn: "Hypercare closed, incidents stabilised and operations handed over.",
+    gate: { key: "q5", es: "Q5 — Transición a operación", en: "Q5 — Transition to operations" },
+  },
+];
 
 // ── Board templates by framework / project type ─────────────────────────────
 
@@ -144,6 +248,18 @@ export const MEETING_RHYTHM: Record<DeliveryMethod, BiText[]> = {
   kanban: [{ es: "Reunión de reabastecimiento", en: "Replenishment meeting" }, { es: "Revisión de flujo", en: "Flow review" }, { es: "Revisión de bloqueos", en: "Blocker review" }, { es: "Revisión de entrega de servicio", en: "Service delivery review" }],
   hybrid: [{ es: "Planificación de ciclo", en: "Cycle planning" }, { es: "Estado semanal", en: "Weekly status update" }, { es: "Revisión mensual con stakeholders", en: "Monthly stakeholder review" }, { es: "Revisión de cambios", en: "Change review" }, { es: "Revisión de riesgos", en: "Risk review" }, { es: "Lecciones aprendidas", en: "Lessons learned review" }],
   xp: [{ es: "Planificación de ciclo", en: "Cycle planning" }, { es: "Check-in diario", en: "Daily check-in" }, { es: "Revisión técnica", en: "Technical review" }, { es: "Pequeñas entregas", en: "Small releases review" }],
+  // Gate reviews and cutover checkpoints are the ceremonies that distinguish
+  // SAP Activate from a generic hybrid; the rest of the rhythm is shared.
+  sap_activate: [
+    { es: "Revisión de quality gate (Q-Gate)", en: "Quality gate review (Q-Gate)" },
+    { es: "Taller fit-to-standard", en: "Fit-to-standard workshop" },
+    { es: "Comité directivo", en: "Steering committee" },
+    { es: "Estado semanal del proyecto", en: "Weekly project status" },
+    { es: "Revisión de defectos y ciclos de prueba", en: "Defect and test cycle review" },
+    { es: "Punto de control de cutover", en: "Cutover checkpoint" },
+    { es: "Comité de control de cambios", en: "Change control board" },
+    { es: "Lecciones aprendidas", en: "Lessons learned review" },
+  ],
 };
 
 export const label = (opts: Opt[], value: string | null | undefined, isEs: boolean): string => {

@@ -45,6 +45,9 @@ export async function recommendFrameworkAction(input: { projectId: string; input
 
 export interface FrameworkConfig {
   projectType: string;
+  /** The product being implemented, when it decides the methodology. null =
+   *  not asked / not applicable — never read as a vendor. */
+  platform?: string | null;
   deliveryMethod: DeliveryMethod;
   governance: string;
   uncertainty: string;
@@ -77,6 +80,7 @@ export async function saveFrameworkAction(input: { projectId: string; config: Fr
 
   const { error } = await supabase.from("project_delivery_frameworks").update({
     project_type: c.projectType,
+    platform: c.platform ?? null,
     delivery_method: c.deliveryMethod,
     governance_level: c.governance,
     uncertainty_level: c.uncertainty,
