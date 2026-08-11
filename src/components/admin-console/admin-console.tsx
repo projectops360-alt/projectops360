@@ -13,6 +13,7 @@
 
 import { useMemo, useState, useTransition, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import { KnowledgeIndexPanel } from "./knowledge-index-panel";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -60,6 +61,7 @@ const inp = "rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm
 
 export function AdminConsole({
   locale, metrics, companies, projectsByUser, projectTasks, admins, planCatalog, fallbackEmail,
+  pendingKnowledgeChunks = 0,
 }: {
   locale: Locale;
   metrics: AdminMetrics;
@@ -69,6 +71,8 @@ export function AdminConsole({
   admins: AuthorizedAdminRow[];
   planCatalog: PlanCatalogRow[];
   fallbackEmail: string;
+  /** Knowledge chunks with no embedding — Isabella's retraining backlog. */
+  pendingKnowledgeChunks?: number;
 }) {
   const t = useTranslations("adminConsole");
   const [tab, setTab] = useState<Tab>("overview");
@@ -186,7 +190,13 @@ export function AdminConsole({
       </div>
 
       {tab === "overview" && (
-        <OverviewTab t={t} companies={companies} projectTasks={projectTasks} />
+        <div className="space-y-4">
+          {/* Seeding writes the text; embedding is what turns semantic search
+              on. The action existed with no trigger, so this was the step of
+              retraining Isabella that nobody could actually perform. */}
+          <KnowledgeIndexPanel pendingChunks={pendingKnowledgeChunks} />
+          <OverviewTab t={t} companies={companies} projectTasks={projectTasks} />
+        </div>
       )}
 
       {tab === "companies" && (

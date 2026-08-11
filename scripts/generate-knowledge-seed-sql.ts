@@ -14,20 +14,54 @@ import { dirname, join } from "node:path";
 import { PRODUCT_BRAIN_PACKAGES } from "../src/lib/knowledge-os/seeds/product-brain-knowledge.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const OUT = join(HERE, "..", "supabase", "migrations", "20260817000000_knowledge_product_brain.sql");
+
+// The seed grows one wave at a time, and the earlier migration is already
+// APPLIED in production. Rewriting it would put a file in history that no
+// longer matches what was run — so a new wave is emitted as its own delta
+// migration and the applied one is left untouched.
+//
+// Both are needed because the corpus is idempotent (ON CONFLICT DO NOTHING)
+// but migrations are not re-run: a package that exists only in a rewritten
+// old file would never reach the database.
+//
+//   --out <path>     where to write (default: the original full seed)
+//   --only a,b,c     emit ONLY these slugs — how a delta migration is made
+const argv = process.argv.slice(2);
+const argOf = (flag: string): string | null => {
+  const i = argv.indexOf(flag);
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
+};
+
+const only = argOf("--only")?.split(",").map((x) => x.trim()).filter(Boolean) ?? null;
+const OUT = argOf("--out")
+  ? join(HERE, "..", argOf("--out")!)
+  : join(HERE, "..", "supabase", "migrations", "20260817010000_knowledge_product_brain.sql");
+
+const SELECTED = only
+  ? PRODUCT_BRAIN_PACKAGES.filter((p) => only.includes(p.slug))
+  : PRODUCT_BRAIN_PACKAGES;
+
+if (only) {
+  const missing = only.filter((slug) => !SELECTED.some((p) => p.slug === slug));
+  if (missing.length > 0) {
+    // Silently emitting fewer packages than asked for would ship a migration
+    // that looks complete and is not.
+    throw new Error(`--only names slugs that are not in the manifest: ${missing.join(", ")}`);
+  }
+}
 
 /** SQL single-quote escape. */
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
 
-const pkgRows = PRODUCT_BRAIN_PACKAGES.map(
+const pkgRows = SELECTED.map(
   (p) => `    (NULL, ${q(p.slug)}, ${q(p.domain)}, 'published', 'en')`,
 ).join(",\n");
 
-const verRows = PRODUCT_BRAIN_PACKAGES.map((p) => `    (${q(p.slug)}, ${q(p.tier)}, ${q(p.sourceRef)})`).join(
+const verRows = SELECTED.map((p) => `    (${q(p.slug)}, ${q(p.tier)}, ${q(p.sourceRef)})`).join(
   ",\n",
 );
 
-const locRows = PRODUCT_BRAIN_PACKAGES.flatMap((p) => [
+const locRows = SELECTED.flatMap((p) => [
   `    (${q(p.slug)}, 'en', ${q(p.en.title)}, ${q(p.en.body)})`,
   `    (${q(p.slug)}, 'es', ${q(p.es.title)}, ${q(p.es.body)})`,
 ]).join(",\n");
@@ -85,4 +119,4 @@ FROM loc l;
 `;
 
 writeFileSync(OUT, sql, "utf8");
-console.log(`[knowledge-seed] wrote ${PRODUCT_BRAIN_PACKAGES.length} packages → ${OUT}`);
+console.log(`[knowledge-seed] wrote ${SELECTED.length} package(s) → ${OUT}`);
