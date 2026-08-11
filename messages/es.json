@@ -3341,7 +3341,15 @@
     "colPriceYearly": "Anual",
     "colSubscribers": "Empresas",
     "enterprise": "Enterprise",
-    "noPlans": "No hay planes definidos."
+    "noPlans": "No hay planes definidos.",
+    "knowledgeTitle": "Conocimiento de Isabella",
+    "knowledgeDesc": "Las fichas de pantalla y el conocimiento de producto se cargan como texto y ya se pueden buscar. La búsqueda semántica solo se activa cuando los fragmentos nuevos tienen embedding.",
+    "knowledgePending": "{count} fragmentos pendientes de embedding",
+    "knowledgeUpToDate": "Todo tiene embedding",
+    "knowledgeIndex": "Indexar ahora",
+    "knowledgeIndexing": "Indexando…",
+    "knowledgeDone": "{embedded} de {processed} con embedding",
+    "knowledgeFailed": "No se pudo indexar: {message}"
   },
   "pwa": {
     "title": "Instala ProjectOps360°",

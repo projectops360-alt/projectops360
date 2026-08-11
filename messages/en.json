@@ -3341,7 +3341,15 @@
     "colPriceYearly": "Yearly",
     "colSubscribers": "Companies",
     "enterprise": "Enterprise",
-    "noPlans": "No plans defined."
+    "noPlans": "No plans defined.",
+    "knowledgeTitle": "Isabella's knowledge",
+    "knowledgeDesc": "Screen sheets and product knowledge are seeded as text and searchable immediately. Semantic search only switches on once the new chunks are embedded.",
+    "knowledgePending": "{count} chunks awaiting embedding",
+    "knowledgeUpToDate": "Everything is embedded",
+    "knowledgeIndex": "Index now",
+    "knowledgeIndexing": "Indexing…",
+    "knowledgeDone": "Embedded {embedded} of {processed}",
+    "knowledgeFailed": "Could not index: {message}"
   },
   "pwa": {
     "title": "Install ProjectOps360°",

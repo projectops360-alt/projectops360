@@ -34,6 +34,8 @@ export interface ProductBrainPackage {
   es: { title: string; body: string };
 }
 
+import { EXECUTION_INTELLIGENCE_PACKAGES } from "./execution-intelligence-knowledge";
+
 export const DOMAIN = "product_intelligence" as const;
 
 export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
@@ -704,6 +706,10 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
         "Verifica: Command Center → Exportar Proyecto → Plantilla → revisa la lista de incluido/excluido antes de exportar.",
     },
   },
+  // The August 2026 execution-intelligence wave (Earned Value, per-milestone
+  // cost, the schedule baseline, SAP Activate) lives in its own module so that
+  // body of knowledge can be reviewed and re-indexed as a unit.
+  ...EXECUTION_INTELLIGENCE_PACKAGES,
 ];
 
 /** Slugs every curated Product Brain package must include (used by tests). */

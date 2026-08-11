@@ -5,21 +5,25 @@ domain: app_screens
 tier: learned_pattern
 sources:
   - src/app/landing/page.tsx
+  - src/app/landing/layout.tsx
   - src/components/landing/hero.tsx
+  - src/components/landing/nav.tsx
   - src/components/landing/pricing.tsx
   - src/components/landing/capabilities.tsx
+  - src/components/landing/auth-links.ts
+  - src/lib/billing/public-plans.ts
+  - src/lib/billing/config.ts
+  - src/middleware.ts
 ---
 
 # EN: Landing screen
 
-The public marketing page of ProjectOps360°, served at `/landing` outside the authenticated app shell and outside the `[locale]` route group. It is a static composition of eleven landing components rendered in order: Hero (with the landing navigation bar, an animated hero graph, and a logos strip), Capabilities, Methodology, Industries, Comms, AiSection, Quote, About, Pricing, FinalCta, and Footer. The Pricing section presents four plans defined in code — Personal (per month), Team and Business (per user/month, Business is the featured plan), and Enterprise (no listed price) — with feature checklists. Copy is translated with react-i18next (unlike the app, which uses next-intl), and call-to-action buttons resolve their destinations through the `useAuthPaths` helper, pointing visitors to the login and signup screens. The page reads and writes no Supabase data and calls no server actions; it is purely presentational marketing content with decorative animated backgrounds. Related screens: Login (`/login`) and Signup (`/signup`), which the hero, pricing, and final CTA link into.
-
-Source: src/app/landing/page.tsx, src/components/landing/*.tsx.
-Verify: open /landing while logged out and scroll through the sections; the CTAs lead to /login and /signup.
+The public marketing page of ProjectOps360°, served at `/landing` outside the authenticated app shell and outside the `[locale]` route group. You reach it by clicking the URL directly, or automatically: the middleware redirects any anonymous visitor hitting the site root (`/` or `/es`) to `/landing` rather than to the login form. It is a server component that awaits `connection()` and then composes Hero (landing nav bar, background image, animated hero graph, logos strip), Capabilities, Methodology, Industries, Comms, AiSection, Quote, About, Pricing, FinalCta and Footer; the layout wraps everything in `LandingI18nProvider` and mounts `LandingPwaInstallPrompt`, the app-install banner. Pricing is no longer hardcoded: `getPublicPricingPlans()` reads the active rows of the `plans` table (`plan_code`, `name`, `price_monthly`, `price_yearly`, `currency`, `is_enterprise`, `sort_order`) with the admin client, joins the plan capability catalog, and the client renders each card, formats the price with `Intl.NumberFormat`, marks `business` as most popular and points every CTA at `signup?plan=<planCode>`. This is the only Supabase read on the page; nothing is written and no server action runs. Copy uses react-i18next deliberately, not next-intl, and `useAuthPaths` mirrors that choice onto the app routes, so a Spanish visitor is sent to `/es/login` and `/es/signup`. Related: screen-login, screen-signup, screen-org-plans.
+Source: src/app/landing/{page,layout}.tsx, src/components/landing/*, src/lib/billing/public-plans.ts, src/middleware.ts.
+Verify: open the site root while logged out — you land on /landing; scroll to Pricing and check the plans match the `plans` table.
 
 # ES: Pantalla Landing
 
-La página pública de marketing de ProjectOps360°, servida en `/landing` fuera del shell autenticado de la aplicación y fuera del grupo de rutas `[locale]`. Es una composición estática de once componentes de landing renderizados en orden: Hero (con la barra de navegación, un grafo animado y una franja de logotipos), Capabilities, Methodology, Industries, Comms, AiSection, Quote, About, Pricing, FinalCta y Footer. La sección de precios presenta cuatro planes definidos en el código — Personal (por mes), Team y Business (por usuario/mes; Business es el plan destacado) y Enterprise (sin precio listado) — con listas de características. Los textos se traducen con react-i18next (a diferencia de la aplicación, que usa next-intl), y los botones de llamada a la acción resuelven su destino mediante el helper `useAuthPaths`, dirigiendo a los visitantes a las pantallas de inicio de sesión y registro. La página no lee ni escribe datos en Supabase y no llama server actions; es contenido de marketing puramente presentacional. Pantallas relacionadas: Login (`/login`) y Signup (`/signup`).
-
-Fuente: src/app/landing/page.tsx, src/components/landing/*.tsx.
-Verifica: abre /landing sin sesión iniciada y recorre las secciones; los CTA llevan a /login y /signup.
+La página pública de marketing de ProjectOps360°, servida en `/landing` fuera del shell autenticado y fuera del grupo de rutas `[locale]`. Se llega escribiendo la URL o de forma automática: el middleware redirige a `/landing` a cualquier visitante anónimo que entre a la raíz del sitio (`/` o `/es`), en lugar de mandarlo al formulario de inicio de sesión. Es un componente de servidor que espera `connection()` y luego compone Hero (barra de navegación, imagen de fondo, grafo animado y franja de logotipos), Capabilities, Methodology, Industries, Comms, AiSection, Quote, About, Pricing, FinalCta y Footer; el layout envuelve todo en `LandingI18nProvider` y monta `LandingPwaInstallPrompt`, el banner de instalación de la aplicación. Los precios ya no están escritos en el código: `getPublicPricingPlans()` lee con el cliente admin las filas activas de la tabla `plans` (`plan_code`, `name`, `price_monthly`, `price_yearly`, `currency`, `is_enterprise`, `sort_order`), las cruza con el catálogo de capacidades por plan, y el cliente dibuja cada tarjeta, formatea el importe con `Intl.NumberFormat`, marca `business` como el más popular y dirige cada CTA a `signup?plan=<planCode>`. Esa es la única lectura de Supabase de la página; no escribe nada ni ejecuta server actions. Los textos usan react-i18next a propósito, no next-intl, y `useAuthPaths` traslada esa elección a las rutas de la aplicación, de modo que un visitante en español va a `/es/login` y `/es/signup`. Relacionadas: screen-login, screen-signup, screen-org-plans.
+Fuente: src/app/landing/{page,layout}.tsx, src/components/landing/*, src/lib/billing/public-plans.ts, src/middleware.ts.
+Verifica: abre la raíz del sitio sin sesión iniciada — caes en /landing; baja hasta Precios y comprueba que los planes coinciden con la tabla `plans`.

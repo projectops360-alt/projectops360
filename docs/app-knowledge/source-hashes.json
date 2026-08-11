@@ -4,7 +4,16 @@
     "src/app/[locale]/(app)/admin/backfill/backfill-console.tsx": "c3340630f0a04f570a20b75058e2e604d7b412ab7ecae3e32c5c8456c465fc76",
     "src/app/[locale]/(app)/admin/backfill/actions.ts": "2a87cf1fa262a0db86a916bf97dc47ab4a6420b5f9d31c6d51aa3985dc1a4395",
     "src/lib/events/backfill-access.ts": "d55dfdbece72ad473b8613b5deb77b89082d920f0c575dc5d94a61f1afb6e46c",
-    "src/lib/events/backfill.ts": "83f4e3f01b4c16c0086db956eda95d47178a0ae948cb50273e7e9cc9f6066065"
+    "src/lib/events/backfill.ts": "bb2753cce9549af62f062d5dda1b2ee9e65703527c3bd4e94eb8db630ed6b51b",
+    "src/lib/events/backfill-reports.ts": "60295a5b2e4a42dbb3524e2014694be8286c14e604ec4407b5244418dace9750"
+  },
+  "screen-admin-console": {
+    "src/app/[locale]/(app)/admin/page.tsx": "44ffd2ac9ef125c6095cb738a3f9ab5b43505c8708ace6d18e3f9bb1dab82a62",
+    "src/app/[locale]/(app)/admin/actions.ts": "86f33bf50b376dd1ffa9015075d9d300a79e33377aa740addccde23b5633d2db",
+    "src/components/admin-console/admin-console.tsx": "102eb4ffcb747546e3001fb0576e626544c6f24b1e134c00419edc02a9460f48",
+    "src/lib/admin-console/access.server.ts": "5877e44f3979dde31de8dae093384d84421e04a8eb70e69fb12fe5de1994a54a",
+    "src/lib/admin-console/queries.ts": "d2a18ecb93ae94faf925248d35f6ac0786ea18e3f0ad9575dbc1f7e5dbdd8c45",
+    "src/lib/admin-console/audit.ts": "7ef6af5ba6f1ff06bf03baa752a2c7df78e07eebf4c3e54188a9170d9f6af897"
   },
   "screen-admin-living-graph-observability": {
     "src/app/[locale]/(app)/admin/living-graph-observability/page.tsx": "e6f4d4df0db8b3127369d201aa6862ecd81e7c340da44721ab8c0205fa00d5fb",
@@ -15,32 +24,70 @@
     "src/app/[locale]/(app)/ai-operator/page.tsx": "82bdaf6f807348eb4ef922ec5c6d50f221b0c7f4746233fbb2a84105a7b80f1e"
   },
   "screen-change-password": {
-    "src/app/[locale]/change-password/page.tsx": "f386eebcebf015a424496cbada220de35108a8ed768a5d16d21c61040f0476be",
-    "src/app/[locale]/change-password/change-password-form.tsx": "e4b1e3b8417486ead8524ca8f74da73bf61f0fd89cd379523bbff8d27352e4ff",
-    "src/app/[locale]/change-password/actions.ts": "c97d215129e2c3349ed4e46838064e7e80aa1214d0496c90978fa1ca7023a67b"
+    "src/app/[locale]/change-password/page.tsx": "1ac6dc4e00ef0040e70e187b35c508d9d15b54c1e7850eedc784f0819071de6d",
+    "src/app/[locale]/change-password/change-password-form.tsx": "2e385cff84f9d64c2bb7437d8c8fca54c286cd957f4622d493f7e1ca59dd171f",
+    "src/app/[locale]/change-password/actions.ts": "eafdaa0b36b2a2ce4506a91a5f2ef310bf28842c44634467bfec4be7a06e8690",
+    "src/app/[locale]/(app)/layout.tsx": "80f631d90d7a3acd0ad206be062df80c7c3ef40fd2e39ca4972e2739fe001b06",
+    "src/app/[locale]/(auth)/actions.ts": "62fd0fbf6002b1be7d531b50b8ffc0bbb2105a81ae852e5276a26e402d2ef44d"
   },
   "screen-drawing-intelligence-global": {
     "src/app/[locale]/(app)/drawing-intelligence/page.tsx": "624802cf73f7dfa5bb7fffa3e7af41bbdb9715cc8855bdce0622cb791f87f203"
   },
+  "screen-execution-map-kpis": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/kpis/page.tsx": "ab21af5033c059750b6af0076cc7e6a562e71b8d1e15370c1038c9782d10a53f",
+    "src/lib/kpi/load-dataset.ts": "17841a7b79223be29f9f05a6f260073fde88d6b5fc409b4dd93f875e2609715d",
+    "src/lib/kpi/build-dataset.ts": "e65bd8112aaf9991d49f23fb6a1df0f8f4816de9cdb6d3f355860461a7a227a8",
+    "src/lib/kpi/catalog.ts": "6eea3bad737ba39f82269244237f885e9502f453aa49a0944c4bdcaa5e1fe8dc",
+    "src/lib/kpi/earned-value.ts": "f97ef7c2e32c88a308bf4c7dd5a90d1c70ef6a1d638b3758769455f2489e6ce3",
+    "src/lib/kpi/custom-actions.ts": "c470f21b91e2b2e2b9f52bd829bdc17d0819f3f0c3c085789e4439e299b49842",
+    "src/components/process-mining/custom-kpi-section.tsx": "59be6634922ab1fdbea7e2c9c3e5de670bce89cb062b2e5a671426833f06815a"
+  },
+  "screen-execution-map-root-causes": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/root-causes/page.tsx": "7b72d0cbf1a0c56557b98ee5365edfd47002820b64d8c655a2b1a56909f41d5d",
+    "src/components/process-mining/root-cause-view.tsx": "6af4c7d3d2382b19c48e38ef125406825fb5859d7c7874aa058f988505fbf0e0",
+    "src/lib/process-mining/root-cause/load-analysis.ts": "fddadcf4a744d3a99c0cbf71ed12d5ea77708b02464b708b5a98adf8f497dc8f",
+    "src/lib/process-mining/root-cause/engine.ts": "a74e25adeab56df3c53c19b7bdf04e4aa06a986507f166f99a882b72a7e57341",
+    "src/lib/execution/task-activity.ts": "53e1afe7add4fbd453259cf71ae53a28b6f3f4aa9e24e1a0bb4cad3bd9ad6938"
+  },
+  "screen-execution-map-variants": {
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/variants/page.tsx": "549faf57037ed6bff6cc1b81d24e5bec02375aa28327a332bdd845d349b908fd",
+    "src/components/process-mining/variant-analysis-view.tsx": "d60ea5997e22405d8aaa019af943d29122936335e25b7b57480c84742a68cb1a",
+    "src/lib/process-mining/variants/load-analysis.ts": "0c3c0a1e8384b20f3cacb240a1a8b643865dcbac2388cec9c571b3c4d7782eba",
+    "src/lib/process-mining/variants/engine.ts": "9b69091b6fd8f390bf879389cab11a2bcb36073891c9373fa6bfa721770a4f8f",
+    "src/lib/events/process-mining-capture-flag.ts": "c5f8d65abab780706259ab91def73a1d7941dd19610a2b042b5588281b52f322"
+  },
   "screen-execution-map": {
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/page.tsx": "5bad97a5c0211195a7b3f2852d3decc9b14e8a8c4dc0478e8b3456a1be4ad831",
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/execution-map-client.tsx": "1b77fbe55f29426b3dc138d19bb289a010df8f82cd9b124ffbf4a021407e291a",
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/dependency-actions.ts": "2dc5ccd0fe8e059aa2680b3c4b392b2f2434e144ba42bee164bfefa308b7f605",
-    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "56d4a3da658c73e5cefa4e40e4393c265ad95374de7649a8f85cbc6e9b26947d"
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/page.tsx": "6928f761e0ce3bff405fa7a5b1682fdfeec0c0ea5440ff78b9bdea65c4994659",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/execution-map-client.tsx": "65edb15e201ed76120faf9a239425897e2671aac7af560af2f49da7bd6e01d61",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/dependency-actions.ts": "13cc468de513aa250779ac284443fd2142363b463f07944cb2904768c2d54fdb",
+    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "e2381158103a691af946efaf6b1c16944825a431ab9f78be72719760f4141ccd",
+    "src/components/roadmap/gantt-roadmap.tsx": "cebe8f2e635dd174c11a5ae71d589545cc881889637b999bd98325d8e9ecab1c",
+    "src/components/roadmap/cash-flow-panel.tsx": "fae648f2d552b8bb8ff9521740d119dbd385d8b5b7aa6d16d7aeab71b8355953",
+    "src/lib/kpi/load-milestone-kpis.ts": "45d13117f7c2c6f419a1a2362cb76c84d898bd9144462e8394b5d634ef8efb53",
+    "src/lib/kpi/milestone-pin-actions.ts": "b67920a4616f4ad6fde936b54b40ad2f031ba740e82eed455d904923b3c224f5",
+    "src/lib/roadmap/gantt-zoom.ts": "cd954fa3d30a02413cd58d0b926495fa67fe0aa6a115aa2a05a170527187a9fa"
   },
   "screen-home-dashboard": {
-    "src/app/[locale]/(app)/page.tsx": "b957008c7719fbcc2330510273225bab86b5b13997a0901c84c052c26e1ad05e",
-    "src/lib/command-center/service.ts": "17809dfccdfac017f1783ca1f3b9d66239e6af7c253cbc2a8f99d1efe52a0199"
+    "src/app/[locale]/(app)/page.tsx": "8205670f7be83731e27031fcc55c478109e585a5ff2850c901378e310061e174",
+    "src/lib/command-center/service.ts": "17809dfccdfac017f1783ca1f3b9d66239e6af7c253cbc2a8f99d1efe52a0199",
+    "src/lib/pmo-living-graph/single-dashboard.ts": "b2bd5576bc81f116d0d2cfdcc0da8a1157dcb031da138c81bd86b8f232c0234d",
+    "src/lib/pmo-living-graph/flags.ts": "4d342ed2e78f80dc9a78f79616aa53068608141cc525b4e28a039cea1f11d3b0",
+    "src/lib/pmo-process-intelligence/flags.ts": "c65527a4256d2f00eaa0536e94728a24d4711c05e4bac4fbfc60dc9863296d8c"
   },
   "screen-import": {
-    "src/app/[locale]/(app)/import/page.tsx": "6f8712cfaeced611370b756e595e495ee522ac44cf408691f7883a12354ca7b7",
-    "src/app/[locale]/(app)/import/import-client.tsx": "5a98d6487138ea93d717424b737a7af4647e9207265743dfad4b70a3d7c7e9f3",
-    "src/app/[locale]/(app)/import/actions.ts": "80e8758e383e896fe5d0178a25eb84b710491583410fa4cf0e6fee52723ff6b1",
+    "src/app/[locale]/(app)/import/page.tsx": "abae46a941eb5529cd51987269934357607619c908e6d359ea94f3605ae49efe",
+    "src/app/[locale]/(app)/import/import-client.tsx": "40f6bcb49063c49579f35a1bfa049acb3ebf0e96ec8979fb66ef9c07eeacacf4",
+    "src/app/[locale]/(app)/import/actions.ts": "62644b8a9b4080e9bcd1c77ef4aba7713d1863eac4a149646951ceb3fc0e5ef0",
+    "src/app/api/import/progress/route.ts": "739ea01dfe17b2bce7e55f9b2d25886375e97c26ed21c9964cabe3050b48d0a6",
+    "src/lib/import-intelligence/parse.ts": "66760cdef232168de73dfa9390079b8ad6518be350f6fb4c66b29256f305e72d",
+    "src/lib/import-intelligence/extract.ts": "64c5c8782d3c3bcde7ce675a333857fa4e61a39b4761365691a1c9a9a6ee2bc2",
     "src/lib/import-intelligence/ai-extract.ts": "a432b13f8a8efc22d784e07517031501797f59037d84347c1ff6f9fa2800433d",
-    "src/lib/import-intelligence/execute.ts": "b0cca91baf84007eae1efeab2688ad02982806be63c38cc20ca4255e0bc1cf11",
-    "src/lib/import-intelligence/extract.ts": "541850688f5b4e1108c56da969184e687f64ae92a0dba7c49fcdf1c8b47d4f1d",
-    "src/lib/import-intelligence/parse.ts": "e619443df9f5c910ee22c7d141603a6e967060a26067f770da7bd5ee4726e4fb",
-    "src/lib/import-intelligence/validate.ts": "27e4d6992b9ed8ce6fb272f999c412467ea45bcc1df8aed4fe278f2b11b9c5b3"
+    "src/lib/import-intelligence/validate.ts": "7259332d6123b793c99d2931ced9095cb91c170bcde0530acfe0afaf517a19b9",
+    "src/lib/import-intelligence/execute.ts": "826e83a15c4333956a7649a66a6531b35585276aee4ccf7ef530519d53401fcb",
+    "src/lib/import-intelligence/progress.ts": "e6de823c378c572ba9e8a8e74b23fa7aa3b9acecf28883fcb3ff2b2cb6c94f1e",
+    "src/lib/import-intelligence/mpp-convert.server.ts": "e4872c44e20b7f86e89f9e85971512614281c37827e80d1cbccbed43fd124b4e",
+    "src/lib/import-intelligence/mpp-model.ts": "5c8487db50073e1e3f2145391538e1a2cd0edf524df6e13dbc97903ed8438505",
+    "src/components/import/import-progress-panel.tsx": "a07605fa767e0f60eff0dfd4419917eb9f3be94d2b5e330856560499be0587f6"
   },
   "screen-labor-capacity-lookahead": {
     "src/app/[locale]/(app)/projects/[projectId]/labor-capacity/lookahead/page.tsx": "fb0d48a094b4a4db9c185baa6b5866932c643890b13b4d00acddcf86a96ce4e2",
@@ -63,10 +110,16 @@
     "src/lib/labor/explanation.ts": "f7a1f159d5fe45f209aa533fca0255625611da9feb72a981ec416cc5cdf18d43"
   },
   "screen-landing": {
-    "src/app/landing/page.tsx": "8784741a84c3d2984adc3bdc5bbcfb9d5c963c2f91201eb8fa4cac6e990e64c3",
-    "src/components/landing/hero.tsx": "b0b9a67fa91a02c5eaddc4d79a6c2104573a1dcd510f7c6606d1773093309f77",
-    "src/components/landing/pricing.tsx": "f7079d092dd4326a8e97f064b4ec57e7360cdd19dfa5ff71156e7b71cb829616",
-    "src/components/landing/capabilities.tsx": "aa1837daff5769b4db8c2470e0f7c3897907d2696da1ff058834af95bd6f873c"
+    "src/app/landing/page.tsx": "0e9f5fc9035f70dde872052c8aa366760f3b04982f797fbd3538c5cd276be3a5",
+    "src/app/landing/layout.tsx": "0ed34cf1ab9b4b61527ec293f740f6d171b04e74348d80daa1e138dd8dd21cd4",
+    "src/components/landing/hero.tsx": "63cf9e8e1550e64f41c67df6f5ee9d7fd5c1264161b70aca6e614ab950059a91",
+    "src/components/landing/nav.tsx": "77599425518c1c96146fc7a6aec07566a3d763f413af89d650de51b8d461bd36",
+    "src/components/landing/pricing.tsx": "47bffb8fd98c167596fbb24eb975abafa1b6dd99497fb0a4520eb9b6836215f5",
+    "src/components/landing/capabilities.tsx": "aa1837daff5769b4db8c2470e0f7c3897907d2696da1ff058834af95bd6f873c",
+    "src/components/landing/auth-links.ts": "c81a75f335c3775f7f730c6796c34185fdb8ad49e5ad78b1aae6c8b7b0b796a2",
+    "src/lib/billing/public-plans.ts": "c59f196cc98357cd745fe87aa2eb6245be21ec4648ab4192d48ab245afc7433e",
+    "src/lib/billing/config.ts": "dee5b35ec137c66c15f8f4ce8d7c077ffedbf77b718707e19b43109339d925cc",
+    "src/middleware.ts": "d36ca7b9bc1f68507bdc8c9edead7ede94ea9390a693236981f20ee1d4b02c09"
   },
   "screen-living-graph-realtime": {
     "src/app/[locale]/(app)/projects/[projectId]/execution-map/realtime/page.tsx": "849bba40d7324eb51bb3ca242475c313f66379c8aedd405e9a556082966b492c",
@@ -75,20 +128,28 @@
     "src/components/living-graph-realtime/realtime-living-graph.tsx": "d226524aaad7e25a4c3b314ed4dc27caecf33ac4f49eb64b02caf415e66aaba8"
   },
   "screen-living-graph": {
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/page.tsx": "4e44e67f5c441a895ce607a05e0b600c4574a3a8e110d052fdd68231483c4e29",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/page.tsx": "02388c436db73b274775c068c6cba19b107522cefdcfdf7abd5ce384f7820e12",
     "src/app/[locale]/(app)/projects/[projectId]/execution-map/living-graph/actions.ts": "0d8211a283ce4179415649b9cd126c26c5a4bbf1b2970325d4e29951b1232b66",
-    "src/components/graph/living-graph-view.tsx": "754d69fe0785b6f8e3d79dcb9f69f90470d446c239e1a4128203665f65ec3ceb",
-    "src/components/graph/living-graph-toolbar.tsx": "805492fa744584cfb22f73437ff697a7476bf5bc63841137578df8e5b9b768a7",
-    "src/lib/roadmap/living-graph-sync.ts": "a8be6dc9d8e067a55beca8b556b8bffdab532d2dc2dffc0cd0e09c0ce45194b9"
+    "src/components/graph/living-graph-view.tsx": "164e81f0fd9b336aa29a4d67a6506886d3f81d71d8daffb9511f7fae3eb6bc5a",
+    "src/components/graph/living-graph-toolbar.tsx": "0607dfd8b481e9a9faa45eede0f0012073d40e42a0a71d72711a7745157fec2a",
+    "src/components/graph/milestone-kpi-context-menu.tsx": "8b361bc40caa3d758d97c5200bec4bac3d9cc936705eb1085e8514ffafa092d6",
+    "src/components/graph/milestone-metrics-picker.tsx": "d76554f6818e0849e9b89661d67b478c0790a002ec4f603d2c366c2b756d9ae4",
+    "src/lib/roadmap/living-graph-sync.ts": "a8be6dc9d8e067a55beca8b556b8bffdab532d2dc2dffc0cd0e09c0ce45194b9",
+    "src/lib/roadmap/milestone-cost-rollup.ts": "dcf70f9bafcc19cdc065a5c0097529e29cd743e4d9ec29d1b0ea0a229f3ac4bc",
+    "src/lib/kpi/load-milestone-kpis.ts": "45d13117f7c2c6f419a1a2362cb76c84d898bd9144462e8394b5d634ef8efb53",
+    "src/lib/kpi/milestone-pin-actions.ts": "b67920a4616f4ad6fde936b54b40ad2f031ba740e82eed455d904923b3c224f5"
   },
   "screen-login": {
-    "src/app/[locale]/(auth)/login/page.tsx": "bc052e5ff4e08d75f97412d8299ec9f8850d9f0e581a65cfff9a3ec55d5d3c8d",
-    "src/components/auth/login-form.tsx": "a206e2d1ff8f6fd900af708691f8acc66634f2d40b4290e873f8034e9dd01b36",
-    "src/app/[locale]/(auth)/actions.ts": "b1aa213b3b96906ee82b564d7407cc75e46842995c9b9f874f614b4b3eb94486"
+    "src/app/[locale]/(auth)/login/page.tsx": "851e2c7a66f480efcf68d7a013b0a5861aedb61c174e6a4607422ec71e75d8db",
+    "src/app/[locale]/(auth)/layout.tsx": "3c77c45bc45a8d634f337734c520a91e85bb8a3985f27acc8cee50c3dddd393c",
+    "src/components/auth/login-form.tsx": "0b1a884f6f3563eb74e5f0380f885e012b6623e15ac30af39112deb52fc50a6a",
+    "src/app/[locale]/(auth)/actions.ts": "62fd0fbf6002b1be7d531b50b8ffc0bbb2105a81ae852e5276a26e402d2ef44d",
+    "src/app/auth/callback/route.ts": "fc97bfc57a166122ca94496b2ef69cdaab25adc6d02eb1f22c714055bec5fc5d"
   },
   "screen-milestone-flow": {
     "src/app/[locale]/(app)/projects/[projectId]/execution-map/milestone-flow/page.tsx": "8c425c1068159e854da3c3da9a76f9e4aca2b6cfb53696c5bc440d4f81d2ec7f",
-    "src/lib/milestone-flow-ui/load-projection.ts": "1b488b7faddceb9ca95ae8a794f6d3a5a9013e14e955cb7cf5513e0db7546215",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/milestone-flow/loading.tsx": "adc68648c763e480a0216c9cf273529063cacbdc88569900e60e467b25021390",
+    "src/lib/milestone-flow-ui/load-projection.ts": "585ad3cb4af7bea1c2575c972581aca255f611a671acad825f02cc76e51da605",
     "src/lib/milestone-flow-ui/selectors.ts": "24f4f4b5f3850c5f88994aa25d94b005a916af1acece1d1d4e2163a0c3f8eb81",
     "src/components/milestone-flow/milestone-flow-view.tsx": "379cd238d5ebc866194a7e07f197cfd443c9092b35dbde0c0129013c406ccf5c",
     "src/components/milestone-flow/transition-detail-panel.tsx": "56fb19986879d4513e930f7563a15c35bbb63fe9910378bd097d85c05a7f6923"
@@ -99,10 +160,11 @@
     "src/components/navigator/ProjectOpsNavigatorDrawer.tsx": "a884fa9550467d40d279648ee02a44fb77a06829e86c615f4d8dfcf565e1bbeb"
   },
   "screen-org-billing": {
-    "src/app/[locale]/(app)/organization/billing/page.tsx": "f38162b86add5d34afaf06b23e7dcbbb23f23c43b0479c840c2e1debc03342b2",
-    "src/lib/billing/service.ts": "3f2dd0aefb6e5e6e09cdafe99295102caa405cc1a1891caa9874f950e29c8634",
-    "src/lib/billing/config.ts": "495977b17c9206eff339e65aa23244dcaabd6df9d7ba0782a2a059f29d979616",
-    "src/config/navigation.ts": "dd0ce403e93d151b96f4b78d4e2810ec6c452051ab34f16de31b97446406aaff"
+    "src/app/[locale]/(app)/organization/billing/page.tsx": "fbb505c33d4c544acd161bacb77db90eec6b22dc4063b51f01b5718308c63903",
+    "src/lib/billing/service.ts": "ee73c15fa3792bf154b3778bd2a35ae3b67234418f753dd5d9586b15316d9b58",
+    "src/lib/billing/config.ts": "dee5b35ec137c66c15f8f4ce8d7c077ffedbf77b718707e19b43109339d925cc",
+    "src/lib/admin-console/access.server.ts": "5877e44f3979dde31de8dae093384d84421e04a8eb70e69fb12fe5de1994a54a",
+    "src/config/navigation.ts": "51afc8ccbcb13c03fcf9f3aeebefd0ca03cbdb0a47f8fee06ace3ca455aedb09"
   },
   "screen-org-external-contacts": {
     "src/app/[locale]/(app)/organization/external-contacts/page.tsx": "c339ec8c60fc1e9fd92327a5fffb22835c462231819f91ef8b6fa91fdca2c5f7",
@@ -111,17 +173,20 @@
     "src/lib/team-roles/service.ts": "135fc6648d8a07bacdbb2d447d4ead92c20168bb3cb0d6c7b9b2f4823de79916"
   },
   "screen-org-members": {
-    "src/app/[locale]/(app)/organization/members/page.tsx": "db5e18976ed51366ef162f085115c04c44cd23312a3021001e2ae17467ed89a7",
-    "src/app/[locale]/(app)/organization/members/members-client.tsx": "433c577228c3814f763323d2727f0ac7a39f758737ec820f8fa1928ae455d76a",
-    "src/app/[locale]/(app)/organization/members/actions.ts": "3d250078bc395ba834e8f890b6da42bb89f371802cb5f4069513a7c93de41db0",
-    "src/lib/billing/config.ts": "495977b17c9206eff339e65aa23244dcaabd6df9d7ba0782a2a059f29d979616"
+    "src/app/[locale]/(app)/organization/members/page.tsx": "a4882e62734b043941e8ee994dbc6bb1144bb5e974640fbfe80e34a46ef46502",
+    "src/app/[locale]/(app)/organization/members/members-client.tsx": "d5540f08a5677eee7b9c4f8c5c42b73938aa25e1ca24c8849002bd5e8427d8c2",
+    "src/app/[locale]/(app)/organization/members/actions.ts": "a05b2da86b2a5b84903979574873f21b15dc530bfd5e302d9a65a0f6a2a739aa",
+    "src/lib/billing/config.ts": "dee5b35ec137c66c15f8f4ce8d7c077ffedbf77b718707e19b43109339d925cc",
+    "src/lib/auth/email-redirects.server.ts": "de9c167cfdd6ac253e1342a80bc379cc498dc17f276090bb7ba026f9dd8990e5"
   },
   "screen-org-plans": {
-    "src/app/[locale]/(app)/organization/plans/page.tsx": "81791c5b95a7b3f3d0d95a511309f235b5e0b98818baa1b4612408070b143f6a",
-    "src/app/[locale]/(app)/organization/plans/plans-admin-client.tsx": "2816d559e8a5afde453d89e613c1e9e2fa7ea932b9e945ba1870e14f2a6d04d1",
-    "src/app/[locale]/(app)/organization/plans/actions.ts": "60d5c1af6ff2220932f474ae611f52c53bcf7f95b31dff586b4017037721bb2e",
-    "src/lib/billing/service.ts": "3f2dd0aefb6e5e6e09cdafe99295102caa405cc1a1891caa9874f950e29c8634",
-    "src/lib/billing/config.ts": "495977b17c9206eff339e65aa23244dcaabd6df9d7ba0782a2a059f29d979616"
+    "src/app/[locale]/(app)/organization/plans/page.tsx": "a13668db569a4928ae5cf15d9aa40d4cefb622adee40486a2df48f18faee87a0",
+    "src/app/[locale]/(app)/organization/plans/plans-admin-client.tsx": "3a327adebf9f81e01cfa0073f4523d4026e025ac05ab25607f76ab284718df3b",
+    "src/app/[locale]/(app)/organization/plans/actions.ts": "24827c4135aa390d7e7e12df1d731b6b005fdf7a6573d7c9a1d260ca6f3dcb86",
+    "src/lib/billing/service.ts": "ee73c15fa3792bf154b3778bd2a35ae3b67234418f753dd5d9586b15316d9b58",
+    "src/lib/billing/plan-capabilities.server.ts": "7234d6c5e9f7e4c9227fb4fe0234ef37ddc38dd116da1091e0f4fc7f997e96dc",
+    "src/lib/billing/config.ts": "dee5b35ec137c66c15f8f4ce8d7c077ffedbf77b718707e19b43109339d925cc",
+    "src/lib/admin-console/access.server.ts": "5877e44f3979dde31de8dae093384d84421e04a8eb70e69fb12fe5de1994a54a"
   },
   "screen-org-teams": {
     "src/app/[locale]/(app)/organization/teams/page.tsx": "72e98b05a59c21910977bc2701e8ea1653f2ee68fad4b3120cac84edc1bf947c",
@@ -136,10 +201,32 @@
     "src/data/phase0-tasks.ts": "73abe9b1985ee87809527bc8270cefdf25a64f1118bda4b1dc224385ab3b6fa4",
     "src/hooks/use-phase0-progress.ts": "d297ad0d3850efd657e0d8e49e43eff0b31658219ee6000b423533b71f690da2"
   },
+  "screen-pmo-living-graph": {
+    "src/app/[locale]/(app)/pmo-living-graph/page.tsx": "f1d2ad69e15b6ffc8368e6b447a63b561aa79a00c1eaf645c1d803cb6a8caea5",
+    "src/components/pmo-living-graph/intelligence-center-view.tsx": "cbab17fde5ff78301d916f5d1a19e5d741c4f2cd22f3ef5f2a0d1ebe9eb919fb",
+    "src/components/pmo-living-graph/portfolio-graph-shell.tsx": "3c56b90698b314364c876c479529d73769e67c55fbb2858138917226caa4b584",
+    "src/components/pmo-living-graph/graph-toolbar.tsx": "5f3fcbff0ea918527ee28028f563c4575815e78bff7a201a5c84f1de1ea3a936",
+    "src/lib/pmo-living-graph/flags.ts": "4d342ed2e78f80dc9a78f79616aa53068608141cc525b4e28a039cea1f11d3b0",
+    "src/lib/pmo-living-graph/single-dashboard.ts": "b2bd5576bc81f116d0d2cfdcc0da8a1157dcb031da138c81bd86b8f232c0234d",
+    "src/lib/pmo-living-graph/read-model.server.ts": "bf0f425fd44e6c854b80688b18fa07eff8e2e4ebda229fc745428b49787f684c",
+    "src/lib/pmo-intelligence/read-model.server.ts": "6d1fa5ab3c2f1146fbd65de328af67d725d67932ebccea78362320e35dc66520",
+    "src/lib/pmo-intelligence/dashboard-model.ts": "74578ca3be1cbdeec642dcf48d9a7408635cc4ef575ee66f057bec27bc28af74"
+  },
+  "screen-process-intelligence": {
+    "src/app/[locale]/(app)/process-intelligence/page.tsx": "c1d6c58c58575bba7f152005153365caf0a574ffcda1b309dc2f77ba16c494ec",
+    "src/app/[locale]/(app)/process-intelligence/actions.ts": "f38da455765b451c5f8a2b99c4cf17a245bd735521f689a27932edcf64c4c75b",
+    "src/components/pmo-process-intelligence/command-center-shell.tsx": "e87fc6d5af4f18bdd2b318f8c7432054c2a026776c5b3ef2501204da0c0b099e",
+    "src/lib/pmo-process-intelligence/flags.ts": "c65527a4256d2f00eaa0536e94728a24d4711c05e4bac4fbfc60dc9863296d8c",
+    "src/lib/pmo-process-intelligence/read-model.server.ts": "92e3a72c994b2b1e38a254a9b070747b750b25a09b3b9b94dc99169a4cf9d547",
+    "src/lib/pmo-process-intelligence/overlays-read.server.ts": "6cfdbb76e4d1bbe92ae8274880f67c28c01387e1895ef19710aa4c83de9fe278",
+    "src/lib/pmo-process-intelligence/hierarchy-read.server.ts": "59f279f38a8270cfaa9e96fd94f1e6c64c68b4f792b63859f6ccb2e938dbf70e",
+    "src/lib/pmo-process-intelligence/insights.ts": "93fc57187713618a6615170594c0721197e700197a680064e9745f656cb48073",
+    "src/lib/pmo-living-graph/single-dashboard.ts": "b2bd5576bc81f116d0d2cfdcc0da8a1157dcb031da138c81bd86b8f232c0234d"
+  },
   "screen-product-intelligence": {
     "src/app/[locale]/(app)/product-intelligence/page.tsx": "b2cc902df6274122b1ae20b8a1476c72da0109e09179c89103aa92ee0437c7f2",
-    "src/components/product-brain/control-center.tsx": "c0ee935499759f75cabcf86031f550ba7f6e99bc098b89df0a73d032be99e463",
-    "src/lib/product-brain/loader.ts": "1b061b0517bddf3b3c6ac38ffd81712bd71bd11b8216e6c2b412729ee5ac9073",
+    "src/components/product-brain/control-center.tsx": "b4c44fb22bf5fd62aeed2d0614d21e8e09a2723782e44de5d5d691f2188195b5",
+    "src/lib/product-brain/loader.ts": "51b97f7df1ca5c2e9b1413ba6cd088191f0ce5c0217a6016c49f345ea7c9dd1d",
     "src/lib/product-brain/access.server.ts": "90642df24fede8a4ec4ef2c9edb5850424b35365f476625a048a752bcf509f52",
     "src/lib/product-brain-center/registry.ts": "1cca75b4709adbc0055c50c83c36d731e74cd59127a4cd9fc0d7b479a4c628da"
   },
@@ -148,9 +235,15 @@
     "src/lib/audit/index.ts": "de183c677f0ab835166633ee7d2484818e185dac6eb44c7725da5c8273a0800b"
   },
   "screen-project-budget": {
-    "src/app/[locale]/(app)/projects/[projectId]/budget/page.tsx": "7a795d84d21dedd7d1b69b08c93d25f45c44b530ab36a00bda2f6c8c722dfb3d",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/page.tsx": "d59c52575c8446fae0eeee6cda48e50c7558893b4d65b9c078083009f213b94a",
     "src/app/[locale]/(app)/projects/[projectId]/budget/budget-client.tsx": "94edbad8807a79fd779d28888015ef223a32923f7560014aa312759e6aedaa4a",
-    "src/app/[locale]/(app)/projects/[projectId]/budget/actions.ts": "77236e0d0857d9f8708549308a9f58ca769515e4af6f22f7fc4f66117ad3946c"
+    "src/app/[locale]/(app)/projects/[projectId]/budget/actions.ts": "77236e0d0857d9f8708549308a9f58ca769515e4af6f22f7fc4f66117ad3946c",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/financial-setup.tsx": "1cabfa6bb456c83ca9fb5c4388768b1ad4f1405bf4da98fed5d4d7ac00efe380",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/financial-cockpit.tsx": "873b20b5390ff4324509a2c739ac7062ccd0ae3e5e384d71655addd4846524ad",
+    "src/app/[locale]/(app)/projects/[projectId]/budget/setup-actions.ts": "16d950cb50e6cb8290e5f0b74feedc61c7c0a8c43fe0c3a7a7173cdd5c8852bd",
+    "src/lib/financial/flags.ts": "3683b0a2a9a9411b7fa3066c96476a9ae2facf3640fba6938005bc9175b8359c",
+    "src/lib/financial/read-model.server.ts": "2e30169d901ffaa9c405316cc0ea1d674eeaa6cd5ba82ac35ecbe2ce68ba0294",
+    "src/lib/financial/setup-read-model.server.ts": "7756501b9196022c0266d83e4b45abd9f1c11f5b1895314eee45529a6be60168"
   },
   "screen-project-charter-print": {
     "src/app/[locale]/(app)/projects/[projectId]/charter/print/page.tsx": "281ae11f668c8bbe1ed914c44a6bdcdffde0e3878fdd2bc63ccc851c6aa7dc2d",
@@ -171,10 +264,11 @@
     "src/lib/charter/fields.ts": "aec9b517800dc3d332bf7d0dd296235876be44be5b90f96470e667665879e326"
   },
   "screen-project-closeout": {
-    "src/app/[locale]/(app)/projects/[projectId]/closeout/page.tsx": "a1a977bc08bdcdc2b5850b5908cb812dd733f43fa2f736a09217fd1654ef0c73",
-    "src/app/[locale]/(app)/projects/[projectId]/closeout/closeout-client.tsx": "c56f248cbf8e81fcb8807ff73edb527dcc6fcaf4faffbf155c1af345194e6575",
-    "src/app/[locale]/(app)/projects/[projectId]/closeout/actions.ts": "bf30595c75b872fe8d5aae56d88868f63df71b0403136f4ae6d013abe2fd527f",
-    "src/lib/rhythm/closeout.ts": "104fb29920ce2020e374c249a9b4fad0cb4f8803b1d8799f0cc287aa772f0603"
+    "src/app/[locale]/(app)/projects/[projectId]/closeout/page.tsx": "1521c2d1915a551eccd622802d3e267e4dc804ff1cece53bd34c4bd636290ba5",
+    "src/app/[locale]/(app)/projects/[projectId]/closeout/closeout-client.tsx": "d7fa4901feddd270bc602f85eaa1c3da2d68453b6a505caa12c6d328cff25351",
+    "src/app/[locale]/(app)/projects/[projectId]/closeout/actions.ts": "19302222200a16da68951310307164df2870199e912cca8ce6946d127c896532",
+    "src/lib/rhythm/closeout.ts": "104fb29920ce2020e374c249a9b4fad0cb4f8803b1d8799f0cc287aa772f0603",
+    "src/lib/events/risk-capture-flag.ts": "9d98628e74b3cbf167508afb86d5548da6c114b7d84ff0194ccc1a3da22e27ee"
   },
   "screen-project-communications": {
     "src/app/[locale]/(app)/projects/[projectId]/communications/page.tsx": "43b2054f80d6491df0e775a4c162af435506319d8c85e49c068331b37d34028e",
@@ -203,10 +297,14 @@
   },
   "screen-project-delivery": {
     "src/app/[locale]/(app)/projects/[projectId]/delivery/page.tsx": "00d583393ba60b8cda526264ca606f95faa0436172ea38043c16e5cec944ce89",
-    "src/app/[locale]/(app)/projects/[projectId]/delivery/delivery-client.tsx": "a19238be30b579202045c6653f74d04a229867d3230f625a435af85928c29b45",
+    "src/app/[locale]/(app)/projects/[projectId]/delivery/delivery-client.tsx": "3d50c78199e9d4f32e93fc83649f9874bb44bafea5971d293a7b8f6dc32eaf3a",
     "src/app/[locale]/(app)/projects/[projectId]/delivery/delivery-tabs.tsx": "618d4970f9c0175f064ad6924755bbad2e3858e965b398b0a7b6d695dd2bf75d",
-    "src/app/[locale]/(app)/projects/[projectId]/delivery/actions.ts": "dcbf49575bbaee81fb92e5280454a70b715f23b2879c31a13f1c15b162b49a9f",
-    "src/lib/delivery/service.ts": "66fec331c2d0c0e3f6eac5b76e7b059aab5e1af32eb83d13268cda4c521ad9c6"
+    "src/app/[locale]/(app)/projects/[projectId]/delivery/actions.ts": "6142f9bfa1001e55d976cf74ee461a071f8b685000d60ab3d3fcc496a5d55a60",
+    "src/lib/delivery/config.ts": "a3e50fa4eaa832a595d2a61071c4e15b90ed535700514b8641452c83307b9da0",
+    "src/lib/delivery/recommend.ts": "ae17af19f5af4539ce07ab4e4196038ae2f9c96c17786145492af0e43435eac3",
+    "src/lib/delivery/service.ts": "66fec331c2d0c0e3f6eac5b76e7b059aab5e1af32eb83d13268cda4c521ad9c6",
+    "supabase/migrations/20260904000000_sap_activate_delivery_method.sql": "cdb51a923fc08e0fff4a346f24e0fc47bf16159857b2ced7f12696573c5a8952",
+    "supabase/migrations/20260908000000_delivery_platform.sql": "61c7cb975da63288108b84c39548e2f572d9497ae92fdac5c506ee4a4f61ddcb"
   },
   "screen-project-document-detail": {
     "src/app/[locale]/(app)/projects/[projectId]/documents/[documentId]/page.tsx": "22f86ae857a65a8c3cbb66f059817963ee771fa1ba6b131fa483a9445472858c",
@@ -265,17 +363,20 @@
     "src/app/[locale]/(app)/projects/[projectId]/memory/page.tsx": "8f7641e6984435b19525d823cc9f80131a910ce2d059fe6a34b1af5a58ff6b6f",
     "src/app/[locale]/(app)/projects/[projectId]/memory/memory-client.tsx": "cb13190c00071c71f05f73787e7c5dc83b4f675fd3888c9d9445e87ed8ade4c9",
     "src/app/[locale]/(app)/projects/[projectId]/memory/actions.ts": "6888b37406c52ba3f00028588296f62fc6cf2d5ab1686e82ca11351f9f150583",
-    "src/app/[locale]/(app)/projects/[projectId]/memory/scribe-actions.ts": "04730953bb3177f8d7eec0c957e70ab02c8b70049de70b9308ff81ed1c03d2dd",
+    "src/app/[locale]/(app)/projects/[projectId]/memory/scribe-actions.ts": "c94a0091e22a0ba857bd5622c722757b4bb4d226f7f428c8aac98e1ad6c6d9f3",
     "src/app/[locale]/(app)/projects/[projectId]/memory/search-action.ts": "6ec50889691507ed4ec36684de85630409f3791231966e876f3217b81c5e567c",
-    "src/components/memory/scribe-modal.tsx": "53eb3d62ce1ea9f7348566ed28be937c3b04b20a8576dfc7a5afd1b585e72b93"
+    "src/components/memory/scribe-modal.tsx": "aaaae87b11d8aae0fd5a5773d45c1c7531339be454bd3df6b5fb159d4d3f78f3",
+    "src/components/memory/memory-detail-panel.tsx": "3a67f454d1b705240357f5a61f1cfbe53c8c762563182a47e2bd89fa01fa7a0a"
   },
   "screen-project-overview": {
-    "src/app/[locale]/(app)/projects/[projectId]/page.tsx": "0b9641e336419eec10c2646569d464ac15d7736b6e336c5bf99ddec50b565c35",
-    "src/app/[locale]/(app)/projects/[projectId]/dashboard-client.tsx": "193f584a60dc2a69c4e6c15262a7ca58985be3167c575d1505b9c8c8470e6705",
-    "src/app/[locale]/(app)/projects/[projectId]/project-header-client.tsx": "f1cbfdcbc60040a7e27bf33c8dbbc8d6f7e0deb70fd7377b2a2a538d6fe2c43f",
+    "src/app/[locale]/(app)/projects/[projectId]/page.tsx": "b1f6337a8849b10b8b37d18a9e9b40f595cd5f9e0cbb7bc0c2171de882471599",
+    "src/app/[locale]/(app)/projects/[projectId]/dashboard-client.tsx": "78f747d3d9ff08c863406ef78ef330b4b18057ccd53b32ba3db17b372191a600",
+    "src/app/[locale]/(app)/projects/[projectId]/project-header-client.tsx": "b7391769309164fddd7715dee867d19c8b8ffe8ca47194705acb1d54952a7da0",
     "src/app/[locale]/(app)/projects/[projectId]/project-detail-client.tsx": "fce1ed858aa8b10191a3418274bc9a9ebc7eaa05fc8e297c54697b54d4f1292e",
+    "src/app/[locale]/(app)/projects/actions.ts": "9c511c654a67049ed028f392d34b6490a368e8f669ac2a97790d0687494a0999",
+    "src/lib/time-tracking/project-effort.ts": "2f7afd2cd756ad73f9a02ec3b069c07abebc124bb09027a7aadbb7a4a32f86dd",
     "src/lib/project-briefing/briefing-engine.ts": "63f0550aee6ac4881767ef27c263a349e5eceab82be49fe48e663c0f4412caba",
-    "src/lib/roadmap/progress.ts": "075a18acfb089139d4e33c6c0a3bfaa4cdca31a992115e4743fc63d930522454"
+    "src/lib/roadmap/progress.ts": "58c4a71370d348a99c48b1e8345c4847f37e35e885601599a6416133e8f18561"
   },
   "screen-project-rhythm-center": {
     "src/app/[locale]/(app)/projects/[projectId]/rhythm/page.tsx": "0fb9e0a40e9e62ef6af5b5a2088f9eb1594f4d411349bb9aca56bd4cf620e43d",
@@ -287,8 +388,8 @@
   },
   "screen-project-roadmap": {
     "src/app/[locale]/(app)/projects/[projectId]/roadmap/page.tsx": "cd0e5836a5929c720804785e67dd28da5d943eb8c66cb81238e535e5378f9c08",
-    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "56d4a3da658c73e5cefa4e40e4393c265ad95374de7649a8f85cbc6e9b26947d",
-    "src/app/[locale]/(app)/projects/[projectId]/execution-map/page.tsx": "5bad97a5c0211195a7b3f2852d3decc9b14e8a8c4dc0478e8b3456a1be4ad831"
+    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "e2381158103a691af946efaf6b1c16944825a431ab9f78be72719760f4141ccd",
+    "src/app/[locale]/(app)/projects/[projectId]/execution-map/page.tsx": "6928f761e0ce3bff405fa7a5b1682fdfeec0c0ea5440ff78b9bdea65c4994659"
   },
   "screen-project-rythm-intelligence": {
     "src/app/[locale]/(app)/projects/[projectId]/rythm/page.tsx": "47434576e6cccd1a58dc39013177ed11ff6d16ab815e9dfeef082d9753d353f5",
@@ -312,7 +413,7 @@
   },
   "screen-project-settings": {
     "src/app/[locale]/(app)/projects/[projectId]/settings/page.tsx": "4f0e4607c8951f52e4cdef53807edb87edbf24692f61bb6e03483f0b2498dbed",
-    "src/lib/env.ts": "311acc982844f1a8eb2e526c383be8e822b459052314f5ffb2a03a3af1521e77"
+    "src/lib/env.ts": "f9b41560f852f76e4ebf3e282ade92f32a73f59898311e53cbe2224491420a2d"
   },
   "screen-project-stakeholders": {
     "src/app/[locale]/(app)/projects/[projectId]/stakeholders/page.tsx": "069b74edabdbcb1231265cb09fc2fcbc02054b3b74d058a50c61cc757a07acff",
@@ -328,7 +429,7 @@
   "screen-project-task-detail": {
     "src/app/[locale]/(app)/projects/[projectId]/tasks/[taskId]/page.tsx": "4322ed5db47e865d07143e8835a3ca07275db6d358949c26cbf43f06c08c45bd",
     "src/components/task-execution-map/execution-map-client.tsx": "361b37c732e9fce08ff739e6a6e84a9772cf7e96753b68d762bca5708c70a4a9",
-    "src/lib/subtasks/actions.ts": "e6bf305dcddf8f864893c04deec1e5f016236fe926dd78ef191076405d2c98de",
+    "src/lib/subtasks/actions.ts": "1aac4f951693d3bd247966b61eab1771215583fa5046b883d0f66e12332acf0d",
     "src/lib/subtasks/map-model.ts": "83c175fdc0a3acebf0b50290f27c814c8dab34b3f74fb62079f58df1834d6b87",
     "src/lib/people/service.ts": "4c1443e0d5c07eb148bbe37b6e9287899d50e418ae547ade99083e3c076bb0e7"
   },
@@ -343,24 +444,29 @@
   },
   "screen-project-workboard": {
     "src/app/[locale]/(app)/projects/[projectId]/workboard/page.tsx": "d6e0ee0a39a2667d268fdb2aa58058269efe28d14ed4f737cf8a9c6c091696a6",
-    "src/app/[locale]/(app)/projects/[projectId]/workboard/workboard-client.tsx": "a244f8fb18adacfa9d40eb52707a1c8e473eb66527f91b2da5094000eb260b36",
-    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "56d4a3da658c73e5cefa4e40e4393c265ad95374de7649a8f85cbc6e9b26947d",
+    "src/app/[locale]/(app)/projects/[projectId]/workboard/workboard-client.tsx": "f6dbb353ce6718f0254ed2a4cd06edd3c606848d6524975616b9c2c0a28cfcd5",
+    "src/app/[locale]/(app)/projects/[projectId]/roadmap/actions.ts": "e2381158103a691af946efaf6b1c16944825a431ab9f78be72719760f4141ccd",
+    "src/lib/workboard/milestone-filter.ts": "a8a16763be3a05d570b7e5921a9c8ccd88f80816148a3cb361e1a12d01cb4f06",
+    "src/lib/workboard/density.ts": "046323ad7aed610c8accb0ad1aff5e1703aec144978c6ea1ea6776751e3e109b",
+    "src/lib/workboard/task-schemas.ts": "80ccefaf6cd387b76636c7e6e551c1ad7c287fa2fc27ca6283c1ba79b8db10bb",
     "src/lib/roadmap/topological-sort.ts": "c8d1e1ee75bc333df133dcdb1f41b9a0fc7ef45eeeee06b885192e02226e2f8f",
     "src/lib/subtasks/map-model.ts": "83c175fdc0a3acebf0b50290f27c814c8dab34b3f74fb62079f58df1834d6b87",
-    "src/lib/delivery/config.ts": "23e5731b5c6f72d20cbaaad04b5776584b71827244fb9e1ef2c86b53e42a35c4"
+    "src/lib/delivery/config.ts": "a3e50fa4eaa832a595d2a61071c4e15b90ed535700514b8641452c83307b9da0"
   },
   "screen-projects-list": {
     "src/app/[locale]/(app)/projects/page.tsx": "012bb8b2456cc7a35cb33128d2cd07f9d253fdf1a95db0d43e449a76e3c46878",
     "src/app/[locale]/(app)/projects/project-list-client.tsx": "710ae45386bf356fd39ab143a9d9e68e3d362ed272796463965e82a25ae53031",
-    "src/app/[locale]/(app)/projects/actions.ts": "4557d68dfbe15503c79465e7520957c9caeb5c0a698b52b9e694772545e59144",
+    "src/app/[locale]/(app)/projects/actions.ts": "9c511c654a67049ed028f392d34b6490a368e8f669ac2a97790d0687494a0999",
     "src/components/projects/project-card.tsx": "acd7044741905c48d09f44e2667284908a450b407c0569fb4459380b943dc6ac",
-    "src/components/projects/create-project-dialog.tsx": "5fd9d52b2c8840708661c2cef2c02c119a9516e82f635714c859433e2e3c66a5"
+    "src/components/projects/create-project-dialog.tsx": "80e00d654ccd4d29cce18a579245aefb8b09ce080ec674267dfab3edb579d419"
   },
   "screen-reports": {
     "src/app/[locale]/(app)/reports/page.tsx": "8d6dee7121c475991dfa3024dd417ab479fec2a562568056466d9353a9bbf42d",
-    "src/app/[locale]/(app)/reports/reports-client.tsx": "c247efa16ee9def9af1d27e1df3d9e0b6abe09b2680e0df97f309f499e2d0a35",
-    "src/app/[locale]/(app)/reports/actions.ts": "cd0b272f99f08175259605d640788e57877915df35bd1e6e290eef8a52dc3f01",
-    "src/lib/reports/registry.ts": "2a7f341e0147bbbf8de941e5513f3a709438122347d15f316a77c59ee74b4b6e"
+    "src/app/[locale]/(app)/reports/reports-client.tsx": "21b087ae849a4c4a61fe11e1bb9f29adb189de639f9faec3319fbecb175a4cbe",
+    "src/app/[locale]/(app)/reports/actions.ts": "8bc9004dbd53faed2e8ad0341a3abb8222fa65f736102f882d37acb791e54a7d",
+    "src/lib/reports/registry.ts": "b61cf7d549e6b0ca8648d0a2b92ebfff3c49a660a8f593d2dfe9162ee89fad0a",
+    "src/lib/reports/query-service.ts": "dc301de00f8cb5e39e6d7fbfeceb1f12e6c8e7cc311103b5b069c6bff18c3dc5",
+    "src/lib/reports/filter-engine.ts": "3ab37e8c1c6622455bc790b432fe3e805d64d3dda324b0c0a5c6aa860e65c1a6"
   },
   "screen-resource-capacity": {
     "src/app/[locale]/(app)/projects/[projectId]/resource-capacity/page.tsx": "bb3c474723282edec0e436bfa1eaf98011acee20cf7b0022bde6a07cac459594",
@@ -370,19 +476,25 @@
     "src/lib/capacity/insight.ts": "8218193ce12f54a22f24c6b0b79b33825181d1d874e8f682cb913f03bc5a3a56"
   },
   "screen-settings": {
-    "src/app/[locale]/(app)/settings/page.tsx": "5c5ef0374ab50c7a042504cc4a1d59b266586ad4da766d638352988e31f8213a",
+    "src/app/[locale]/(app)/settings/page.tsx": "e4699f2f64b578aec22856e377c00dd871e750ac8d8e8096e8f892d9624c1cc1",
+    "src/app/[locale]/(app)/settings/actions.ts": "5804b93c36189632713d63a1f3dfe47ec60053fedbba7e980a1e31c1270f35d7",
+    "src/components/settings/organization-name-form.tsx": "17a52262747511fe9c36aeda24728cbc90e3899d137efda30f5b56fd4b5098cb",
     "src/components/settings/theme-control.tsx": "4440e342bed986c9b1e13643e9ed8f4d2f1c10b5333fd0d9eeda0a12ff09689a",
     "src/components/settings/language-control.tsx": "a374a47bb6e9ea10ba0b33e1fb7def4bd1e30bae93f99d9c805c491dfe17a4ab"
   },
   "screen-signup": {
     "src/app/[locale]/(auth)/signup/page.tsx": "240df474c9bd5794c65b7098a973fe4fa96a0b56ac1691c955a3861462971a5d",
-    "src/components/auth/signup-form.tsx": "da7e7aa324be8ef8600a70e2c3c74b42fd8cfbec2dd2bca943aab992c8cd3699",
-    "src/app/[locale]/(auth)/actions.ts": "b1aa213b3b96906ee82b564d7407cc75e46842995c9b9f874f614b4b3eb94486"
+    "src/components/auth/signup-form.tsx": "f7fa0b15d3ec4cc6b388366f0f75925e8ccd9cc96a6cf674c7b2808c9a02cde5",
+    "src/app/[locale]/(auth)/actions.ts": "62fd0fbf6002b1be7d531b50b8ffc0bbb2105a81ae852e5276a26e402d2ef44d",
+    "src/lib/auth/email-redirects.ts": "c8927a6dc64c5e97942d9dec780adfa304b36371d07d4fe27055ddbfb8b64cfd",
+    "src/lib/auth/email-redirects.server.ts": "de9c167cfdd6ac253e1342a80bc379cc498dc17f276090bb7ba026f9dd8990e5",
+    "src/app/auth/callback/route.ts": "fc97bfc57a166122ca94496b2ef69cdaab25adc6d02eb1f22c714055bec5fc5d"
   },
   "screen-team": {
-    "src/app/[locale]/(app)/team/page.tsx": "020d20e1be70624106e33e706f38e74bf895b63073bf3d166e9fdeb2b33673db",
-    "src/app/[locale]/(app)/team/team-client.tsx": "cbc8989fee5e7b77a94b57fb122e04c9777e4bebe39f1ded94c53843c71a8250",
-    "src/app/[locale]/(app)/team/actions.ts": "d0db148fb0421a642ea1f92e10c635ed0dd26805cb057a8742d55bab769f598f",
-    "src/app/[locale]/(app)/organization/members/actions.ts": "3d250078bc395ba834e8f890b6da42bb89f371802cb5f4069513a7c93de41db0"
+    "src/app/[locale]/(app)/team/page.tsx": "7e2eaf1e4b84bb7b764143cbed00c4ebc325524a4508d0fdec87217abc0531a1",
+    "src/app/[locale]/(app)/team/team-client.tsx": "eec4971cbbc9e04a9309cd09a6a5bba58651474ebb926859af3ab2656d0f3f01",
+    "src/app/[locale]/(app)/team/actions.ts": "373bf9e4d6c4a796699ee8a6cd2bcba35aa112459812b777655df1858d82ac7d",
+    "src/app/[locale]/(app)/organization/members/actions.ts": "a05b2da86b2a5b84903979574873f21b15dc530bfd5e302d9a65a0f6a2a739aa",
+    "src/lib/billing/config.ts": "dee5b35ec137c66c15f8f4ce8d7c077ffedbf77b718707e19b43109339d925cc"
   }
 }

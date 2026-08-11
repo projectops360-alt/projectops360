@@ -12,6 +12,7 @@
 // single business-table read.
 // ============================================================================
 
+import { createClient } from "@/lib/supabase/server";
 import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { getOrgContext } from "@/lib/auth";
@@ -80,8 +81,26 @@ export default async function AdminConsolePage({
     },
   });
 
+  // Isabella's retraining backlog. Read with the same client the rest of the
+  // page uses; a failure here must not take the console down, so it degrades
+  // to 0 (the panel then reads "everything is embedded", which is why the
+  // count is also re-derived from the action's own result after it runs).
+  let pendingKnowledgeChunks = 0;
+  try {
+    const client = await createClient();
+    const { count } = await client
+      .from("knowledge_chunks")
+      .select("id", { count: "exact", head: true })
+      .is("embedding", null)
+      .is("deleted_at", null);
+    pendingKnowledgeChunks = count ?? 0;
+  } catch {
+    pendingKnowledgeChunks = 0;
+  }
+
   return (
     <AdminConsole
+      pendingKnowledgeChunks={pendingKnowledgeChunks}
       locale={locale as Locale}
       metrics={metrics}
       companies={companies}

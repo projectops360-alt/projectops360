@@ -21,6 +21,7 @@
 //   node scripts/generate-app-screens-seed.mjs --out seed.sql  # SQL → file
 //   node scripts/generate-app-screens-seed.mjs --check         # stale sheets (CI)
 //   node scripts/generate-app-screens-seed.mjs --update-hashes # record source hashes
+//   node scripts/generate-app-screens-seed.mjs --only a,b --out x.sql  # subset
 //
 // --check compares sha256 of each sheet's `sources:` files against
 // docs/app-knowledge/source-hashes.json. Exit 1 if any sheet is stale →
@@ -223,11 +224,29 @@ if (args.includes("--update-hashes")) {
   process.exit(0);
 }
 
-const sql = buildSql(sheets);
+// --only a,b,c → emit just these sheets. The full corpus is ~260KB of one
+// VALUES statement, which is more than some clients will accept in a single
+// round trip; batching by slug is how a large regeneration gets applied
+// without splitting a statement by hand and corrupting it.
+const onlyIdx = args.indexOf("--only");
+let selected = sheets;
+if (onlyIdx >= 0 && args[onlyIdx + 1]) {
+  const wanted = args[onlyIdx + 1].split(",").map((x) => x.trim()).filter(Boolean);
+  selected = sheets.filter((sheet) => wanted.includes(sheet.slug));
+  const missing = wanted.filter((slug) => !selected.some((sheet) => sheet.slug === slug));
+  if (missing.length > 0) {
+    // Emitting fewer sheets than asked for would produce a seed that looks
+    // complete and silently is not.
+    console.error(`[app-knowledge] --only names unknown sheets: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+}
+
+const sql = buildSql(selected);
 const outIdx = args.indexOf("--out");
 if (outIdx >= 0 && args[outIdx + 1]) {
   writeFileSync(args[outIdx + 1], sql, "utf8");
-  console.error(`[app-knowledge] wrote ${args[outIdx + 1]} (${sheets.length} packages)`);
+  console.error(`[app-knowledge] wrote ${args[outIdx + 1]} (${selected.length} packages)`);
 } else {
   process.stdout.write(sql);
 }
