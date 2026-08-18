@@ -8,7 +8,7 @@
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 
 export type FrictionEvidenceConfidence = "high" | "medium" | "low" | "unknown";
-export type EvidenceAssessmentStatus = "confirmed" | "candidate" | "unknown";
+export type EvidenceAssessmentStatus = "not_detected" | "candidate" | "unknown";
 
 export interface QualifiedBusinessTime {
   timestamp: string | null;
@@ -112,7 +112,7 @@ export function qualifyEventBusinessTime(
       timestamp: event.occurredAt,
       confidence: "medium",
       durationEligible: false,
-      reason: "late_recorded_event_requires_corrobating_business_time",
+      reason: "late_recorded_event_requires_corroborating_business_time",
     };
   }
 
@@ -226,7 +226,7 @@ export function assessQueueFriction(input: {
   );
   const isCandidate = queueTimeMs >= threshold;
   return {
-    status: isCandidate ? "candidate" : "confirmed",
+    status: isCandidate ? "candidate" : "not_detected",
     queueTimeMs,
     severityScore: Math.min(100, Math.round((queueTimeMs / threshold) * 25)),
     confidence: "high",
