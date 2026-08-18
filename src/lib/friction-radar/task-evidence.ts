@@ -86,10 +86,13 @@ function validIso(value: unknown): value is string {
 }
 
 function validDateOnly(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
   return (
-    typeof value === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    Number.isFinite(Date.parse(`${value}T00:00:00.000Z`))
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
   );
 }
 
@@ -425,10 +428,18 @@ export function assessTaskProjectionConsistency(input: {
     };
   }
 
-  const eventState = latestStateEvent.toState.trim().toLowerCase();
-  const snapshotState = input.currentStatus?.trim().toLowerCase() ?? null;
+  const normalizeState = (value: string): string => {
+    const normalized = value.trim().toLowerCase().replaceAll("-", "_");
+    if (normalized === "completed") return "done";
+    if (normalized === "canceled") return "cancelled";
+    return normalized;
+  };
+  const eventState = normalizeState(latestStateEvent.toState);
+  const snapshotState = input.currentStatus
+    ? normalizeState(input.currentStatus)
+    : null;
   const blockedMismatch =
-    eventState === "blocked" && input.isBlocked === false;
+    input.isBlocked != null && (eventState === "blocked") !== input.isBlocked;
   const statusMismatch = snapshotState != null && snapshotState !== eventState;
 
   return {
