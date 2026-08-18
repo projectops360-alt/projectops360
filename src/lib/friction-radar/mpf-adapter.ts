@@ -24,7 +24,11 @@ function confidence(value: string): FrictionConfidence {
 }
 
 function evidenceRefs(refs: Array<{ kind: string; eventId?: string | null; metricRef?: string | null }>, fallback: string) {
-  return refs.map((e, index) => ({ kind: e.kind, id: e.eventId ?? e.metricRef ?? `${fallback}:${index}` }));
+  return refs.map((e, index) => ({
+    kind: e.eventId ? "project_event_log" : e.kind,
+    id: e.eventId ?? e.metricRef ?? `${fallback}:${index}`,
+    ...(e.eventId ? { label: e.kind } : {}),
+  }));
 }
 
 export function frictionSignalFromMpfFinding(finding: MilestoneFlowDetectionFinding): FrictionSignal {

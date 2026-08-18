@@ -6,6 +6,7 @@
 // ============================================================================
 
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
+import { frictionEventSemantics } from "./event-taxonomy";
 
 export type FrictionEvidenceConfidence = "high" | "medium" | "low" | "unknown";
 export type EvidenceAssessmentStatus = "not_detected" | "candidate" | "unknown";
@@ -72,16 +73,43 @@ export interface QualifiedElapsedDuration {
   reason: string;
 }
 
-const MEANINGFUL_WORK_EVENTS = new Set([
-  "TaskStarted",
-  "TaskImplemented",
-  "TaskTested",
-  "TaskResumed",
-  "TimeLogged",
-  "SubtaskStarted",
-  "SubtaskCompleted",
-  "SubtaskProgressChanged",
-]);
+export interface ExplicitBackwardTransition {
+  eventId: string;
+  eventType: string;
+  occurredAt: string | null;
+  fromState: string;
+  toState: string;
+  confidence: FrictionEvidenceConfidence;
+}
+
+export interface TaskLifecycleAssessment {
+  implementedAt: string | null;
+  testedAt: string | null;
+  lastCompletedAt: string | null;
+  completionCount: number;
+  reopenedCount: number;
+  reworkCycles: number;
+  repeatedCompletionStatus: "confirmed" | "not_detected";
+  regressionStatus: "confirmed" | "not_detected";
+  backwardTransitions: ExplicitBackwardTransition[];
+  skippedExpectedStatesStatus: "unknown";
+  skippedExpectedStatesReason: "workflow_expectation_not_configured";
+  lastMeaningfulActivityAt: string | null;
+  lastMeaningfulActivityEventIds: string[];
+  lastMeaningfulActivityRecords: EvidenceRecordRef[];
+  evidenceEventIds: string[];
+}
+
+export interface StagnationAssessment {
+  status: EvidenceAssessmentStatus;
+  observedAt: string | null;
+  inactiveForMs: number | null;
+  severityScore: number | null;
+  confidence: FrictionEvidenceConfidence;
+  evidenceEventIds: string[];
+  evidenceRecords: EvidenceRecordRef[];
+  reason: string;
+}
 
 const ACTIVE_TASK_STATES = new Set([
   "active",
@@ -93,6 +121,26 @@ const ACTIVE_TASK_STATES = new Set([
   "review",
   "prompt_ready",
 ]);
+
+const STAGNATION_ELIGIBLE_STATES = new Set([
+  ...ACTIVE_TASK_STATES,
+  "blocked",
+]);
+
+const TASK_STATE_RANK: Record<string, number> = {
+  not_started: 0,
+  prompt_ready: 1,
+  sent_to_ai: 2,
+  active: 3,
+  doing: 3,
+  in_progress: 3,
+  implemented: 4,
+  testing: 5,
+  review: 5,
+  tested: 5,
+  done: 6,
+  completed: 6,
+};
 
 const UNTRUSTED_CAPTURE_METHODS = new Set([
   "import",
@@ -133,6 +181,12 @@ function validDateOnly(value: unknown): value is string {
 
 function dateOnlyTimestamp(value: string): string {
   return `${value}T00:00:00.000Z`;
+}
+
+function normalizeTaskState(value: string): string {
+  const normalized = value.trim().toLowerCase().replaceAll("-", "_");
+  if (normalized === "complete") return "completed";
+  return normalized;
 }
 
 function normalizedCaptureMethod(event: LivingGraphCanonicalEvent): string {
@@ -246,9 +300,11 @@ export function qualifyEventBusinessTime(
 export function isMeaningfulTaskWorkEvent(
   event: LivingGraphCanonicalEvent,
 ): boolean {
-  if (MEANINGFUL_WORK_EVENTS.has(event.eventType)) return true;
+  const semantics = frictionEventSemantics(event.eventType);
+  if (semantics?.observedStart === true) return true;
+  if (semantics?.observedStart === "current_entry_required") return true;
   return (
-    event.eventType === "TaskStatusChanged" &&
+    semantics?.observedStart === "active_state_only" &&
     event.toState != null &&
     ACTIVE_TASK_STATES.has(event.toState.trim().toLowerCase())
   );
@@ -442,9 +498,15 @@ export function assessQueueFriction(input: {
     };
   }
 
+  // Task baselines are dates, not timestamps. When the plan has day
+  // granularity, work anywhere on that UTC date is on time. Measuring from
+  // midnight would manufacture 8+ hours of queue for a same-day start.
+  const plannedBoundaryMs = validDateOnly(input.plannedStart)
+    ? Date.parse(dateOnlyTimestamp(input.plannedStart)) + 24 * 60 * 60 * 1000
+    : Date.parse(input.plannedStart);
   const queueTimeMs = Math.max(
     0,
-    Date.parse(input.observedStart.timestamp) - Date.parse(input.plannedStart),
+    Date.parse(input.observedStart.timestamp) - plannedBoundaryMs,
   );
   const isCandidate = queueTimeMs >= threshold;
   return {
@@ -559,7 +621,189 @@ export function assessTaskTemporalConsistency(input: {
 export function isEffortContributionEvent(
   event: LivingGraphCanonicalEvent,
 ): boolean {
-  return event.eventType === "TimeLogged";
+  return frictionEventSemantics(event.eventType)?.effort === "contribution";
+}
+
+/**
+ * Derives only lifecycle facts that are explicit in the event sequence.
+ * Missing Implemented/Tested events are never treated as skipped workflow
+ * states because ProjectOps360 has no project-level mandatory workflow policy.
+ */
+export function assessTaskLifecycle(
+  events: readonly LivingGraphCanonicalEvent[],
+  timeEntries: readonly TaskWorkDateEvidence[] = [],
+): TaskLifecycleAssessment {
+  const ordered = orderedEvents(events);
+  const completions = ordered.filter((event) => event.eventType === "TaskCompleted");
+  const reopenings = ordered.filter((event) => event.eventType === "TaskReopened");
+  const implemented = ordered.find((event) => event.eventType === "TaskImplemented");
+  const tested = ordered.find((event) => event.eventType === "TaskTested");
+  const lastCompletion = completions.at(-1) ?? null;
+
+  const backwardTransitions = ordered.flatMap((event) => {
+    if (!event.fromState || !event.toState) return [];
+    const fromState = normalizeTaskState(event.fromState);
+    const toState = normalizeTaskState(event.toState);
+    const fromRank = TASK_STATE_RANK[fromState];
+    const toRank = TASK_STATE_RANK[toState];
+    if (fromRank == null || toRank == null || toRank >= fromRank) return [];
+    return [{
+      eventId: event.eventId,
+      eventType: event.eventType,
+      occurredAt: event.occurredAt,
+      fromState,
+      toState,
+      confidence: hasDataQualityFlag(event, /mapping_low_confidence/i)
+        ? ("low" as const)
+        : qualifyEventBusinessTime(event).confidence,
+    }];
+  });
+
+  let reworkCycles = 0;
+  let completedSeen = false;
+  for (const event of ordered) {
+    if (event.eventType === "TaskCompleted") completedSeen = true;
+    if (event.eventType === "TaskReopened" && completedSeen) {
+      reworkCycles += 1;
+      completedSeen = false;
+    }
+  }
+
+  const currentEntryDates = timeEntries
+    .filter((entry) => entry.deletedAt == null && validDateOnly(entry.workDate))
+    .map((entry) => dateOnlyTimestamp(entry.workDate))
+    .sort();
+  const eventActivity = ordered
+    .filter(isMeaningfulTaskWorkEvent)
+    // Current rows supersede TimeLogged audit payload/timestamps for work date.
+    .filter((event) => currentEntryDates.length === 0 || event.eventType !== "TimeLogged")
+    .map((event) => ({ event, time: qualifyEventBusinessTime(event) }))
+    .filter((candidate) => candidate.time.timestamp != null)
+    .sort((a, b) => Date.parse(a.time.timestamp!) - Date.parse(b.time.timestamp!));
+  const lastEventActivity = eventActivity.at(-1)?.time.timestamp ?? null;
+  const lastEntryActivity = currentEntryDates.at(-1) ?? null;
+  const lastMeaningfulActivityAt = [lastEventActivity, lastEntryActivity]
+    .filter((value): value is string => value != null)
+    .sort()
+    .at(-1) ?? null;
+  const lastMeaningfulActivityEventIds = lastMeaningfulActivityAt == null
+    ? []
+    : eventActivity
+        .filter(({ time }) => time.timestamp === lastMeaningfulActivityAt)
+        .map(({ event }) => event.eventId);
+  const lastMeaningfulActivityRecords = lastMeaningfulActivityAt == null
+    ? []
+    : timeEntries
+        .filter(
+          (entry) =>
+            entry.deletedAt == null &&
+            validDateOnly(entry.workDate) &&
+            dateOnlyTimestamp(entry.workDate) === lastMeaningfulActivityAt,
+        )
+        .map((entry) => ({
+          table: "subtask_time_entries" as const,
+          id: entry.id,
+        }));
+
+  return {
+    implementedAt: implemented?.occurredAt ?? null,
+    testedAt: tested?.occurredAt ?? null,
+    lastCompletedAt: lastCompletion?.occurredAt ?? null,
+    completionCount: completions.length,
+    reopenedCount: reopenings.length,
+    reworkCycles,
+    repeatedCompletionStatus:
+      completions.length > 1 ? "confirmed" : "not_detected",
+    regressionStatus:
+      tested && ordered.some((event) =>
+        event.sequenceNumber > tested.sequenceNumber &&
+        (event.eventType === "TaskReopened" ||
+          (event.toState != null &&
+            ["implemented", "in_progress"].includes(normalizeTaskState(event.toState))))
+      )
+        ? "confirmed"
+        : "not_detected",
+    backwardTransitions,
+    skippedExpectedStatesStatus: "unknown",
+    skippedExpectedStatesReason: "workflow_expectation_not_configured",
+    lastMeaningfulActivityAt,
+    lastMeaningfulActivityEventIds,
+    lastMeaningfulActivityRecords,
+    evidenceEventIds: [
+      ...completions.map((event) => event.eventId),
+      ...reopenings.map((event) => event.eventId),
+      ...backwardTransitions.map((transition) => transition.eventId),
+    ].filter((id, index, all) => all.indexOf(id) === index),
+  };
+}
+
+/**
+ * Stagnation requires an active/interrupted current state plus positive evidence
+ * of prior work. A task with no TaskStarted and no work evidence stays UNKNOWN.
+ */
+export function assessTaskStagnation(input: {
+  currentStatus: string | null;
+  lifecycle: TaskLifecycleAssessment;
+  observedAt: string | null;
+  candidateThresholdMs?: number;
+}): StagnationAssessment {
+  const threshold = input.candidateThresholdMs ?? 7 * 24 * 60 * 60 * 1000;
+  const status = input.currentStatus
+    ? normalizeTaskState(input.currentStatus)
+    : null;
+  if (!status || !STAGNATION_ELIGIBLE_STATES.has(status)) {
+    return {
+      status: "not_detected",
+      observedAt: validIso(input.observedAt) ? input.observedAt : null,
+      inactiveForMs: 0,
+      severityScore: 0,
+      confidence: "high",
+      evidenceEventIds: [],
+      evidenceRecords: [],
+      reason: "task_not_in_stagnation_eligible_state",
+    };
+  }
+  if (!validIso(input.observedAt) || !validIso(input.lifecycle.lastMeaningfulActivityAt)) {
+    return {
+      status: "unknown",
+      observedAt: validIso(input.observedAt) ? input.observedAt : null,
+      inactiveForMs: null,
+      severityScore: null,
+      confidence: "unknown",
+      evidenceEventIds: input.lifecycle.lastMeaningfulActivityEventIds,
+      evidenceRecords: input.lifecycle.lastMeaningfulActivityRecords,
+      reason: "last_meaningful_activity_unavailable",
+    };
+  }
+  const inactiveForMs = Date.parse(input.observedAt) -
+    Date.parse(input.lifecycle.lastMeaningfulActivityAt);
+  if (inactiveForMs < 0) {
+    return {
+      status: "unknown",
+      observedAt: input.observedAt,
+      inactiveForMs: null,
+      severityScore: null,
+      confidence: "low",
+      evidenceEventIds: input.lifecycle.lastMeaningfulActivityEventIds,
+      evidenceRecords: input.lifecycle.lastMeaningfulActivityRecords,
+      reason: "analysis_time_precedes_activity",
+    };
+  }
+  const candidate = inactiveForMs >= threshold;
+  return {
+    status: candidate ? "candidate" : "not_detected",
+    observedAt: input.observedAt,
+    inactiveForMs,
+    severityScore: candidate
+      ? Math.min(100, Math.round((inactiveForMs / threshold) * 35))
+      : 0,
+    confidence: "high",
+    evidenceEventIds: input.lifecycle.lastMeaningfulActivityEventIds,
+    evidenceRecords: input.lifecycle.lastMeaningfulActivityRecords,
+    reason: candidate
+      ? "active_task_without_recent_meaningful_activity"
+      : "recent_meaningful_activity_observed",
+  };
 }
 
 /** Duration is valid only when both endpoints have qualified business time. */

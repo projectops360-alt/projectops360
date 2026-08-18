@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import {
   assessQueueFriction,
+  assessTaskLifecycle,
   assessTaskProjectionConsistency,
+  assessTaskStagnation,
   assessTaskTemporalConsistency,
   deriveObservedTaskStart,
   detectCompletedThenReopened,
@@ -127,6 +129,20 @@ describe("Friction Radar task evidence", () => {
     ).toMatchObject({
       status: "candidate",
       queueTimeMs: 24 * 60 * 60 * 1000,
+      confidence: "high",
+    });
+  });
+
+  it("does not manufacture queue time inside a date-only planned day", () => {
+    const started = event("TaskStarted", "2026-08-06T23:59:59.000Z");
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-08-06",
+        observedStart: deriveObservedTaskStart([started]),
+      }),
+    ).toMatchObject({
+      status: "not_detected",
+      queueTimeMs: 0,
       confidence: "high",
     });
   });
@@ -454,6 +470,87 @@ describe("Friction Radar task evidence", () => {
     ]);
 
     expect(observed.status).toBe("insufficient_evidence");
+  });
+
+  it("detects explicit backward transitions and repeated completion", () => {
+    const completed1 = event("TaskCompleted", "2026-02-26T10:00:00.000Z", {
+      eventId: "completed-1",
+      sequenceNumber: 1,
+      fromState: "tested",
+      toState: "done",
+    });
+    const reopened = event("TaskReopened", "2026-02-27T10:00:00.000Z", {
+      eventId: "reopened",
+      sequenceNumber: 2,
+      fromState: "done",
+      toState: "in_progress",
+    });
+    const completed2 = event("TaskCompleted", "2026-02-28T10:00:00.000Z", {
+      eventId: "completed-2",
+      sequenceNumber: 3,
+      fromState: "in_progress",
+      toState: "done",
+    });
+
+    expect(assessTaskLifecycle([completed1, reopened, completed2])).toMatchObject({
+      completionCount: 2,
+      reopenedCount: 1,
+      reworkCycles: 1,
+      repeatedCompletionStatus: "confirmed",
+      backwardTransitions: [
+        { eventId: "reopened", fromState: "done", toState: "in_progress" },
+      ],
+      skippedExpectedStatesStatus: "unknown",
+      skippedExpectedStatesReason: "workflow_expectation_not_configured",
+    });
+  });
+
+  it("keeps stagnation UNKNOWN when no meaningful activity exists", () => {
+    const lifecycle = assessTaskLifecycle([
+      event("TaskCreated", "2026-02-01T10:00:00.000Z"),
+    ]);
+    expect(assessTaskStagnation({
+      currentStatus: "in_progress",
+      lifecycle,
+      observedAt: "2026-02-20T00:00:00.000Z",
+    })).toMatchObject({
+      status: "unknown",
+      inactiveForMs: null,
+      reason: "last_meaningful_activity_unavailable",
+    });
+  });
+
+  it("detects stagnation only from positive prior-work evidence", () => {
+    const lifecycle = assessTaskLifecycle([], [
+      { id: "entry", workDate: "2026-02-01" },
+    ]);
+    expect(assessTaskStagnation({
+      currentStatus: "in_progress",
+      lifecycle,
+      observedAt: "2026-02-15T00:00:00.000Z",
+    })).toMatchObject({
+      status: "candidate",
+      inactiveForMs: 14 * 24 * 60 * 60 * 1000,
+      confidence: "high",
+      evidenceRecords: [{ table: "subtask_time_entries", id: "entry" }],
+    });
+  });
+
+  it("keeps the exact last activity event as stagnation evidence", () => {
+    const started = event("TaskStarted", "2026-08-07T14:41:56.120Z", {
+      eventId: "started-997",
+    });
+    const lifecycle = assessTaskLifecycle([started]);
+    expect(assessTaskStagnation({
+      currentStatus: "in_progress",
+      lifecycle,
+      observedAt: "2026-08-17T14:41:56.120Z",
+    })).toMatchObject({
+      status: "candidate",
+      observedAt: "2026-08-17T14:41:56.120Z",
+      evidenceEventIds: ["started-997"],
+      evidenceRecords: [],
+    });
   });
 
 });

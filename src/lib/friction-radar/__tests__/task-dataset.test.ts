@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { RoadmapTask } from "@/types/database";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import type { TimeEntry } from "@/lib/time-tracking/types";
+import type { Resource } from "@/types/execution";
 import { buildTaskFrictionEvidenceDataset } from "../task-dataset";
 
 const PROJECT = "a40a7436-c63f-4e3b-94cd-041447ee54d4";
@@ -257,6 +258,108 @@ describe("Friction Radar task dataset", () => {
     });
   });
 
+  it.each([
+    {
+      id: "dd29a954-0d12-4ee0-a750-b4a73c0cdb75",
+      plannedStart: "2026-01-12",
+      workDate: "2026-01-12",
+      plannedHours: 228,
+      loggedHours: 200,
+      startedAt: "2026-08-06T20:03:38.007Z",
+      completedAt: "2026-08-06T20:24:21.854Z",
+    },
+    {
+      id: "8f0f1e7e-a629-4be0-8abc-24bd1b6b2c2f",
+      plannedStart: "2026-02-25",
+      workDate: "2026-02-25",
+      plannedHours: 32,
+      loggedHours: 32,
+      startedAt: "2026-08-06T21:07:14.152Z",
+      completedAt: "2026-08-06T21:09:35.503Z",
+    },
+    {
+      id: "aa28bbb1-5e90-4210-adc1-eb6c05ad7957",
+      plannedStart: "2026-01-13",
+      workDate: "2026-01-13",
+      plannedHours: 28,
+      loggedHours: 28,
+      startedAt: "2026-08-06T20:02:40.090Z",
+      completedAt: "2026-08-06T21:09:18.596Z",
+    },
+  ])("rejects capture-time durations that conflict with operational dates: $id", (sample) => {
+    const currentTask = task({
+      id: sample.id,
+      baseline_start_date: sample.plannedStart,
+      start_date: sample.plannedStart,
+      baseline_estimate_hours: sample.plannedHours,
+      estimate_hours: sample.plannedHours,
+    });
+    const row = buildTaskFrictionEvidenceDataset({
+      tasks: [currentTask],
+      events: [
+        event(sample.id, "TaskStarted", 10, {
+          eventId: `${sample.id}-started`,
+          occurredAt: sample.startedAt,
+          fromState: "not_started",
+          toState: "in_progress",
+        }),
+        event(sample.id, "TaskCompleted", 11, {
+          eventId: `${sample.id}-completed`,
+          occurredAt: sample.completedAt,
+          fromState: "in_progress",
+          toState: "done",
+        }),
+      ],
+      timeEntries: [
+        timeEntry(sample.id, `${sample.id}-entry`, sample.workDate, sample.loggedHours),
+      ],
+    })[0];
+
+    expect(row.observedStart.source).toBe("time_entry_work_date");
+    expect(row.queueFriction.status).toBe("not_detected");
+    expect(row.temporalConsistency.status).toBe("conflict");
+    expect(row.activeCycleTimeStatus).toBe("insufficient_evidence");
+    expect(row.activeCycleTimeMs).toBeNull();
+  });
+
+  it("treats Aurora task 997c as started and stagnant, not waiting or completed", () => {
+    const currentTask = task({
+      id: "997c8d29-04de-4add-9620-764f6e71246a",
+      status: "in_progress",
+      baseline_start_date: "2026-03-13",
+      start_date: "2026-03-13",
+      baseline_estimate_hours: 48,
+      estimate_hours: 48,
+      actual_hours: null,
+    });
+    const row = buildTaskFrictionEvidenceDataset({
+      tasks: [currentTask],
+      events: [
+        event(currentTask.id, "TaskStarted", 860, {
+          eventId: "4cffa807-36fa-4d8c-971e-c08b48e3d40d",
+          occurredAt: "2026-08-07T14:41:56.120Z",
+          fromState: "not_started",
+          toState: "in_progress",
+        }),
+      ],
+      timeEntries: [],
+      analysisTimestamp: "2026-08-17T14:41:56.120Z",
+    })[0];
+
+    expect(row.observedStart).toMatchObject({
+      status: "observed",
+      eventId: "4cffa807-36fa-4d8c-971e-c08b48e3d40d",
+      eventType: "TaskStarted",
+    });
+    expect(row.queueFriction.status).toBe("candidate");
+    expect(row.stagnation).toMatchObject({
+      status: "candidate",
+      evidenceEventIds: ["4cffa807-36fa-4d8c-971e-c08b48e3d40d"],
+    });
+    expect(row.activeCycleTimeStatus).toBe("insufficient_evidence");
+    expect(row.lifecycle.lastCompletedAt).toBeNull();
+  });
+
   it("associates subtask activity to its verified payload task_id", () => {
     const currentTask = task({ status: "in_progress" });
     const subtaskCompleted = event("subtask-id", "SubtaskCompleted", 10, {
@@ -284,6 +387,55 @@ describe("Friction Radar task dataset", () => {
       eventId: "f4883eda-40bd-4a0d-978f-1f802adb6f2a",
       eventType: "SubtaskCompleted",
       source: "event_business_time",
+    });
+  });
+
+  it("derives dependency topology and resource evidence from canonical owners", () => {
+    const predecessor = task({ id: "predecessor", status: "in_progress" });
+    const successor = task({
+      id: "successor",
+      status: "not_started",
+      assigned_resource_id: "resource",
+    });
+    const rows = buildTaskFrictionEvidenceDataset({
+      tasks: [predecessor, successor],
+      events: [],
+      timeEntries: [],
+      dependencies: [{
+        id: "dependency",
+        organization_id: "org",
+        project_id: PROJECT,
+        predecessor_id: predecessor.id,
+        successor_id: successor.id,
+        dependency_type: "finish_to_start",
+        lag_days: 2,
+        created_at: "2026-01-01T00:00:00.000Z",
+      }],
+      resources: [{
+        id: "resource",
+        organization_id: "org",
+        project_id: PROJECT,
+        name: "SAP Functional Lead",
+        status: "active",
+        capacity_per_day: null,
+        availability: [],
+      } as unknown as Resource],
+    });
+
+    expect(rows.find((row) => row.taskId === successor.id)).toMatchObject({
+      predecessorCount: 1,
+      fanIn: 1,
+      upstreamIncompleteCount: 1,
+      dependencyTypes: ["finish_to_start"],
+      maxDependencyLagDays: 2,
+      assignedResourceName: "SAP Functional Lead",
+      assignedResourceStatus: "active",
+      resourceCapacityEvidence: "insufficient_evidence",
+    });
+    expect(rows.find((row) => row.taskId === predecessor.id)).toMatchObject({
+      successorCount: 1,
+      fanOut: 1,
+      downstreamImpactCount: 1,
     });
   });
 });

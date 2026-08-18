@@ -118,8 +118,145 @@ export function frictionSignalsFromTaskEvidence(
       );
     }
 
-    if (row.rework.status !== "confirmed") continue;
+    if (
+      row.stagnation.status === "candidate" &&
+      row.stagnation.inactiveForMs != null &&
+      row.stagnation.severityScore != null
+    ) {
+      signals.push(
+        signal({
+          row,
+          organizationId,
+          suffix: "stagnation",
+          signalType: "stagnation",
+          category: "process",
+          score: row.stagnation.severityScore,
+          confidence: confidence(row.stagnation.confidence),
+          observedValue: row.stagnation.inactiveForMs,
+          expectedOrBaseline: 7 * 24 * 60 * 60 * 1000,
+          evidenceRefs: evidenceRefs({
+            eventIds: row.stagnation.evidenceEventIds,
+            records: row.stagnation.evidenceRecords,
+          }),
+          evidenceTimestampStart: row.lifecycle.lastMeaningfulActivityAt,
+          evidenceTimestampEnd: row.stagnation.observedAt,
+          evidenceDescription:
+            "An active or blocked task has no recent meaningful work evidence.",
+          evidenceStatus: "candidate",
+        }),
+      );
+    }
+
+    const confirmedBackwardTransitions = row.lifecycle.backwardTransitions
+      .filter((transition) => transition.confidence !== "low");
+    if (confirmedBackwardTransitions.length > 0) {
+      const score = Math.min(100, 45 + (confirmedBackwardTransitions.length - 1) * 20);
+      signals.push(
+        signal({
+          row,
+          organizationId,
+          suffix: "backward-transition",
+          signalType: "backward_transition",
+          category: "process",
+          score,
+          confidence: confirmedBackwardTransitions.every(
+            (transition) => transition.confidence === "high",
+          ) ? "high" : "medium",
+          observedValue: confirmedBackwardTransitions.length,
+          expectedOrBaseline: 0,
+          evidenceRefs: evidenceRefs({
+            eventIds: confirmedBackwardTransitions.map(
+              (transition) => transition.eventId,
+            ),
+          }),
+          evidenceTimestampStart: confirmedBackwardTransitions[0].occurredAt,
+          evidenceTimestampEnd: confirmedBackwardTransitions.at(-1)?.occurredAt,
+          evidenceDescription:
+            "Explicit task state transitions moved backward in the lifecycle.",
+          evidenceStatus: "confirmed",
+        }),
+      );
+    }
+
+    if (row.lifecycle.repeatedCompletionStatus === "confirmed") {
+      signals.push(
+        signal({
+          row,
+          organizationId,
+          suffix: "repeated-completion",
+          signalType: "repeated_completion",
+          category: "quality",
+          score: Math.min(100, 60 + (row.lifecycle.completionCount - 2) * 20),
+          confidence: "high",
+          observedValue: row.lifecycle.completionCount,
+          expectedOrBaseline: 1,
+          evidenceRefs: evidenceRefs({
+            eventIds: row.lifecycle.evidenceEventIds,
+          }),
+          evidenceTimestampEnd: row.lifecycle.lastCompletedAt,
+          evidenceDescription:
+            "The task has more than one explicit TaskCompleted event.",
+          evidenceStatus: "confirmed",
+        }),
+      );
+    }
+
+    if (row.lifecycle.regressionStatus === "confirmed") {
+      signals.push(
+        signal({
+          row,
+          organizationId,
+          suffix: "tested-regression",
+          signalType: "tested_to_rework",
+          category: "quality",
+          score: 80,
+          confidence: "high",
+          observedValue: "tested_then_regressed",
+          expectedOrBaseline: "tested_state_remains_forward_only",
+          evidenceRefs: evidenceRefs({
+            eventIds: row.lifecycle.evidenceEventIds,
+          }),
+          evidenceTimestampStart: row.lifecycle.testedAt,
+          evidenceTimestampEnd:
+            row.lifecycle.lastCompletedAt ?? row.lifecycle.lastMeaningfulActivityAt,
+          evidenceDescription:
+            "A tested task later explicitly reopened or moved to an earlier work state.",
+          evidenceStatus: "confirmed",
+        }),
+      );
+    }
+
     const reworkRefs = evidenceRefs({ eventIds: row.rework.evidenceEventIds });
+    if (
+      row.isBlocked &&
+      row.blockerReason != null &&
+      RESOURCE_INTERRUPTION_PATTERN.test(row.blockerReason)
+    ) {
+      signals.push(
+        signal({
+          row,
+          organizationId,
+          suffix: "resource-interruption",
+          signalType: "resource_interruption",
+          category: "resource",
+          score: 100,
+          confidence: "high",
+          observedValue: "resource_availability_interruption",
+          expectedOrBaseline: "assigned_resource_available",
+          evidenceRefs: [
+            ...reworkRefs,
+            { kind: "roadmap_tasks", id: row.taskId, label: "blocker_reason" },
+          ],
+          evidenceTimestampStart: row.rework.completedAt,
+          evidenceTimestampEnd: row.rework.reopenedAt,
+          evidenceDescription:
+            "The explicit blocker reason identifies a resource-availability interruption.",
+          evidenceStatus: "confirmed",
+        }),
+      );
+    }
+
+    if (row.rework.status !== "confirmed") continue;
     signals.push(
       signal({
         row,
@@ -162,34 +299,6 @@ export function frictionSignalsFromTaskEvidence(
       );
     }
 
-    if (
-      row.isBlocked &&
-      row.blockerReason != null &&
-      RESOURCE_INTERRUPTION_PATTERN.test(row.blockerReason)
-    ) {
-      signals.push(
-        signal({
-          row,
-          organizationId,
-          suffix: "resource-interruption",
-          signalType: "resource_interruption",
-          category: "resource",
-          score: 100,
-          confidence: "high",
-          observedValue: row.blockerReason,
-          expectedOrBaseline: "assigned_resource_available",
-          evidenceRefs: [
-            ...reworkRefs,
-            { kind: "roadmap_tasks", id: row.taskId, label: "blocker_reason" },
-          ],
-          evidenceTimestampStart: row.rework.completedAt,
-          evidenceTimestampEnd: row.rework.reopenedAt,
-          evidenceDescription:
-            "The explicit blocker reason identifies a resource-availability interruption.",
-          evidenceStatus: "confirmed",
-        }),
-      );
-    }
   }
 
   return signals;

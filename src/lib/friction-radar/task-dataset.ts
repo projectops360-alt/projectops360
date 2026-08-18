@@ -2,22 +2,34 @@
 // ProjectOps360° — Friction Radar task-level evidence dataset (read-only)
 // ============================================================================
 
-import type { RoadmapTask } from "@/types/database";
+import type { RoadmapTask, TaskDependency } from "@/types/database";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import type { TimeEntry } from "@/lib/time-tracking/types";
+import type { Resource, ResourceAssignment } from "@/types/execution";
 import { taskIdForCanonicalEvent } from "@/lib/graph/task-case-analysis";
 import {
   assessQueueFriction,
+  assessTaskLifecycle,
   assessTaskProjectionConsistency,
+  assessTaskStagnation,
   assessTaskTemporalConsistency,
   deriveObservedTaskStart,
   detectCompletedThenReopened,
+  qualifyElapsedDuration,
   type ObservedTaskStart,
   type ProjectionConsistencyAssessment,
   type QueueFrictionAssessment,
+  type StagnationAssessment,
+  type TaskLifecycleAssessment,
   type TaskReworkAssessment,
   type TaskTemporalConsistencyAssessment,
 } from "./task-evidence";
+
+export interface ResourceCapacityProfile {
+  user_id: string | null;
+  default_weekly_capacity_hours: number | null;
+  default_availability_percent: number | null;
+}
 
 export interface TaskFrictionEvidenceRow {
   projectId: string;
@@ -30,13 +42,40 @@ export interface TaskFrictionEvidenceRow {
   blockerReason: string | null;
   plannedStart: string | null;
   plannedFinish: string | null;
+  plannedDurationDays: number | null;
   plannedHours: number | null;
+  currentStart: string | null;
+  currentFinish: string | null;
+  currentDurationDays: number | null;
+  assignedTo: string | null;
+  assignedResourceId: string | null;
+  assignedResourceName: string | null;
+  assignedResourceStatus: string | null;
+  resourceAssignmentCount: number;
+  resourceCapacityEvidence: "available" | "insufficient_evidence";
+  isCritical: boolean;
+  slackDays: number | null;
   firstTaskStartedAt: string | null;
   observedStart: ObservedTaskStart;
   queueFriction: QueueFrictionAssessment;
+  activeCycleTimeMs: number | null;
+  activeCycleTimeStatus:
+    | "qualified"
+    | "temporal_conflict"
+    | "insufficient_evidence";
   timeEntryCount: number;
   loggedHours: number;
   effortVarianceHours: number | null;
+  predecessorCount: number;
+  successorCount: number;
+  fanIn: number;
+  fanOut: number;
+  dependencyTypes: string[];
+  maxDependencyLagDays: number | null;
+  upstreamIncompleteCount: number;
+  downstreamImpactCount: number;
+  lifecycle: TaskLifecycleAssessment;
+  stagnation: StagnationAssessment;
   rework: TaskReworkAssessment;
   temporalConsistency: TaskTemporalConsistencyAssessment;
   projectionConsistency: ProjectionConsistencyAssessment;
@@ -51,6 +90,11 @@ export function buildTaskFrictionEvidenceDataset(input: {
   tasks: readonly RoadmapTask[];
   events: readonly LivingGraphCanonicalEvent[];
   timeEntries: readonly TimeEntry[];
+  dependencies?: readonly TaskDependency[];
+  resources?: readonly Resource[];
+  resourceAssignments?: readonly ResourceAssignment[];
+  resourceProfiles?: readonly ResourceCapacityProfile[];
+  analysisTimestamp?: string | null;
 }): TaskFrictionEvidenceRow[] {
   const knownTaskIds = new Set(input.tasks.map((task) => task.id));
   const eventsByTask = new Map<string, LivingGraphCanonicalEvent[]>();
@@ -68,6 +112,40 @@ export function buildTaskFrictionEvidenceDataset(input: {
     const rows = entriesByTask.get(entry.task_id) ?? [];
     rows.push(entry);
     entriesByTask.set(entry.task_id, rows);
+  }
+
+  const taskById = new Map(input.tasks.map((task) => [task.id, task]));
+  const resourceById = new Map(
+    (input.resources ?? []).map((resource) => [resource.id, resource]),
+  );
+  const capacityProfileByUserId = new Map(
+    (input.resourceProfiles ?? [])
+      .filter((profile) => profile.user_id != null)
+      .map((profile) => [profile.user_id!, profile]),
+  );
+  const resourceAssignmentsByTask = new Map<string, ResourceAssignment[]>();
+  for (const assignment of input.resourceAssignments ?? []) {
+    if (!knownTaskIds.has(assignment.task_id)) continue;
+    const assignments = resourceAssignmentsByTask.get(assignment.task_id) ?? [];
+    assignments.push(assignment);
+    resourceAssignmentsByTask.set(assignment.task_id, assignments);
+  }
+  const predecessorsByTask = new Map<string, TaskDependency[]>();
+  const successorsByTask = new Map<string, TaskDependency[]>();
+  for (const dependency of input.dependencies ?? []) {
+    if (
+      dependency.project_id !== input.tasks[0]?.project_id ||
+      !knownTaskIds.has(dependency.predecessor_id) ||
+      !knownTaskIds.has(dependency.successor_id)
+    ) {
+      continue;
+    }
+    const predecessors = predecessorsByTask.get(dependency.successor_id) ?? [];
+    predecessors.push(dependency);
+    predecessorsByTask.set(dependency.successor_id, predecessors);
+    const successors = successorsByTask.get(dependency.predecessor_id) ?? [];
+    successors.push(dependency);
+    successorsByTask.set(dependency.predecessor_id, successors);
   }
 
   return input.tasks.map((task) => {
@@ -96,6 +174,52 @@ export function buildTaskFrictionEvidenceDataset(input: {
         .map((event) => event.occurredAt)
         .filter((value): value is string => value != null)
         .sort()[0] ?? null;
+    const temporalConsistency = assessTaskTemporalConsistency({
+      events,
+      timeEntries: workDateEvidence,
+    });
+    const lifecycle = assessTaskLifecycle(events, workDateEvidence);
+    const observedStartEvent = observedStart.eventId
+      ? events.find((event) => event.eventId === observedStart.eventId) ?? null
+      : null;
+    const completedEvent = lifecycle.lastCompletedAt
+      ? [...events]
+          .reverse()
+          .find((event) => event.eventType === "TaskCompleted") ?? null
+      : null;
+    const activeCycleTime =
+      observedStartEvent && completedEvent
+        ? qualifyElapsedDuration(
+            observedStartEvent,
+            completedEvent,
+            workDateEvidence,
+          )
+        : {
+            durationMs: null,
+            status: "insufficient_evidence" as const,
+            reason: "qualified_start_and_completion_events_required",
+          };
+    const predecessors = predecessorsByTask.get(task.id) ?? [];
+    const successors = successorsByTask.get(task.id) ?? [];
+    const dependencyTypes = [...new Set(
+      [...predecessors, ...successors].map((dependency) =>
+        dependency.dependency_type,
+      ),
+    )].sort();
+    const lags = [...predecessors, ...successors].map(
+      (dependency) => dependency.lag_days,
+    );
+    const upstreamIncompleteCount = predecessors.filter((dependency) => {
+      const predecessor = taskById.get(dependency.predecessor_id);
+      return predecessor != null && !["done", "completed"].includes(predecessor.status);
+    }).length;
+    const assignedResource = task.assigned_resource_id
+      ? resourceById.get(task.assigned_resource_id) ?? null
+      : null;
+    const capacityProfile = assignedResource?.linked_user_id
+      ? capacityProfileByUserId.get(assignedResource.linked_user_id) ?? null
+      : null;
+    const resourceAssignments = resourceAssignmentsByTask.get(task.id) ?? [];
 
     return {
       projectId: task.project_id,
@@ -108,7 +232,34 @@ export function buildTaskFrictionEvidenceDataset(input: {
       blockerReason: task.blocker_reason,
       plannedStart,
       plannedFinish: task.baseline_end_date ?? task.end_date,
+      plannedDurationDays:
+        task.baseline_start_date != null &&
+        task.baseline_end_date != null &&
+        task.start_date === task.baseline_start_date &&
+        task.end_date === task.baseline_end_date
+          ? task.duration_days
+          : null,
       plannedHours,
+      currentStart: task.start_date,
+      currentFinish: task.end_date,
+      currentDurationDays: task.duration_days,
+      assignedTo: task.assigned_to,
+      assignedResourceId: task.assigned_resource_id,
+      assignedResourceName: assignedResource?.name ?? null,
+      assignedResourceStatus: assignedResource?.status ?? null,
+      resourceAssignmentCount: resourceAssignments.length,
+      resourceCapacityEvidence:
+        assignedResource?.capacity_per_day != null ||
+        (assignedResource?.availability.length ?? 0) > 0 ||
+        capacityProfile?.default_weekly_capacity_hours != null ||
+        capacityProfile?.default_availability_percent != null ||
+        resourceAssignments.some((assignment) =>
+          assignment.allocation_pct != null || assignment.planned_hours != null,
+        )
+          ? "available"
+          : "insufficient_evidence",
+      isCritical: task.is_critical,
+      slackDays: task.slack_days,
       firstTaskStartedAt,
       observedStart,
       queueFriction: assessQueueFriction({
@@ -116,15 +267,28 @@ export function buildTaskFrictionEvidenceDataset(input: {
         observedStart,
         events,
       }),
+      activeCycleTimeMs: activeCycleTime.durationMs,
+      activeCycleTimeStatus: activeCycleTime.status,
       timeEntryCount: entries.length,
       loggedHours,
       effortVarianceHours:
         plannedHours == null ? null : loggedHours - Number(plannedHours),
-      rework: detectCompletedThenReopened(events),
-      temporalConsistency: assessTaskTemporalConsistency({
-        events,
-        timeEntries: workDateEvidence,
+      predecessorCount: predecessors.length,
+      successorCount: successors.length,
+      fanIn: predecessors.length,
+      fanOut: successors.length,
+      dependencyTypes,
+      maxDependencyLagDays: lags.length > 0 ? Math.max(...lags) : null,
+      upstreamIncompleteCount,
+      downstreamImpactCount: successors.length,
+      lifecycle,
+      stagnation: assessTaskStagnation({
+        currentStatus: task.status,
+        lifecycle,
+        observedAt: input.analysisTimestamp ?? null,
       }),
+      rework: detectCompletedThenReopened(events),
+      temporalConsistency,
       projectionConsistency: assessTaskProjectionConsistency({
         currentStatus: task.status,
         isBlocked: task.is_blocked,

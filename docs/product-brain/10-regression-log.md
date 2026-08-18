@@ -1736,3 +1736,36 @@ crosses the boundary (`t.raw`), not a function that would produce it.
 that Server Components render and fails on any function-typed prop. The
 detector is itself checked against the exact broken shape, so a later refactor
 cannot quietly turn it into a no-op.
+
+## REG-050 — Friction Radar confused missing/captured events with missing work
+
+**Date:** 2026-08-17
+
+**Surface:** Friction Radar · task evidence and process-mining durations
+
+**Symptom:** completed Aurora tasks with no `TaskStarted` were labelled as
+waiting, while `TaskCreated → TaskStarted` capture intervals of roughly 19–38
+hours were presented as operational queue/execution time.
+
+**Root cause.** The preliminary dataset treated one optional event type as the
+only possible start of work and compared audit capture timestamps without first
+checking the current time-entry work dates or the granularity of the planned
+date. In Aurora, current entries prove work on the planned Jan–Mar dates while
+several direct lifecycle events were captured in August. The event sequence is
+real; the mixed-clock elapsed duration is not.
+
+**Protection rule (binding):** missing `TaskStarted` never means waiting.
+`observedStart` is the earliest qualified work-bearing fact in the registered
+event taxonomy or a current non-deleted time entry. Current time entries
+supersede historical `TimeLogged` payloads. Date-only plans treat all activity
+on that calendar date as on time. Imported/backfilled timestamps and material
+event/work-date conflicts preserve order but cannot qualify elapsed duration.
+Unknown workflow expectations and missing sources remain `UNKNOWN` /
+`INSUFFICIENT_EVIDENCE`.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/task-evidence.test.ts` and
+`src/lib/friction-radar/__tests__/task-dataset.test.ts` cover the exact Aurora
+tasks `93dff1de…`, `dd29a954…`, `8f0f1e7e…`, `aa28bbb1…`, and `997c8d29…`,
+including the same-day date-granularity boundary and evidence-bearing
+stagnation behavior.

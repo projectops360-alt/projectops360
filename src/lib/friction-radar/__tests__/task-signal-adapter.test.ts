@@ -16,7 +16,19 @@ function row(
     blockerReason: "La persona se encuentra de reposo medico",
     plannedStart: "2026-01-21",
     plannedFinish: "2026-01-21",
+    plannedDurationDays: 1,
     plannedHours: 8,
+    currentStart: "2026-01-21",
+    currentFinish: "2026-01-21",
+    currentDurationDays: 1,
+    assignedTo: null,
+    assignedResourceId: "resource",
+    assignedResourceName: "Consultor",
+    assignedResourceStatus: "active",
+    resourceAssignmentCount: 0,
+    resourceCapacityEvidence: "insufficient_evidence",
+    isCritical: false,
+    slackDays: null,
     firstTaskStartedAt: null,
     observedStart: {
       status: "observed",
@@ -37,9 +49,51 @@ function row(
       evidenceRecords: [{ table: "subtask_time_entries", id: "entry" }],
       reason: "no_material_queue_variance",
     },
+    activeCycleTimeMs: null,
+    activeCycleTimeStatus: "temporal_conflict",
     timeEntryCount: 1,
     loggedHours: 8,
     effortVarianceHours: 0,
+    predecessorCount: 0,
+    successorCount: 0,
+    fanIn: 0,
+    fanOut: 0,
+    dependencyTypes: [],
+    maxDependencyLagDays: null,
+    upstreamIncompleteCount: 0,
+    downstreamImpactCount: 0,
+    lifecycle: {
+      implementedAt: null,
+      testedAt: null,
+      lastCompletedAt: "2026-08-06T21:08:07.000Z",
+      completionCount: 1,
+      reopenedCount: 1,
+      reworkCycles: 1,
+      repeatedCompletionStatus: "not_detected",
+      regressionStatus: "not_detected",
+      backwardTransitions: [],
+      skippedExpectedStatesStatus: "unknown",
+      skippedExpectedStatesReason: "workflow_expectation_not_configured",
+      lastMeaningfulActivityAt: "2026-01-21T00:00:00.000Z",
+      lastMeaningfulActivityEventIds: [],
+      lastMeaningfulActivityRecords: [
+        { table: "subtask_time_entries", id: "entry" },
+      ],
+      evidenceEventIds: [
+        "5c172027-1ca5-429b-b752-637cdee317e7",
+        "44909854-4a9a-44a3-b23a-45668abbcb91",
+      ],
+    },
+    stagnation: {
+      status: "not_detected",
+      observedAt: "2026-08-17T00:00:00.000Z",
+      inactiveForMs: 0,
+      severityScore: 0,
+      confidence: "high",
+      evidenceEventIds: [],
+      evidenceRecords: [],
+      reason: "task_not_in_stagnation_eligible_state",
+    },
     rework: {
       status: "confirmed",
       confidence: "high",
@@ -128,5 +182,33 @@ describe("task evidence signal adapter", () => {
     );
 
     expect(signals).toEqual([]);
+  });
+
+  it("can identify an explicit resource interruption without requiring rework", () => {
+    const signals = frictionSignalsFromTaskEvidence(
+      [
+        row({
+          rework: {
+            status: "not_detected",
+            confidence: "high",
+            completedEventId: null,
+            reopenedEventId: null,
+            completedAt: null,
+            reopenedAt: null,
+            reopenedToState: null,
+            evidenceEventIds: [],
+            reason: "no_completed_then_reopened_sequence",
+          },
+        }),
+      ],
+      "org",
+    );
+
+    expect(signals).toHaveLength(1);
+    expect(signals[0]).toMatchObject({
+      signalType: "resource_interruption",
+      observedValue: "resource_availability_interruption",
+    });
+    expect(JSON.stringify(signals[0])).not.toContain("reposo medico");
   });
 });

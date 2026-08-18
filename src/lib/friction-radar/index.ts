@@ -7,3 +7,6 @@ export * from "./load-production";
 export * from "./task-evidence";
 export * from "./task-dataset";
 export * from "./task-signal-adapter";
+export * from "./load-task-production";
+export * from "./merge-signals";
+export * from "./event-taxonomy";
