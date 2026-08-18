@@ -278,7 +278,7 @@ export function aggregateTaskProcess(
   const activityIds = new Set(activities.map((activity) => activity.id));
 
   const allTransitions: ProcessTransitionAggregate[] = [...transitionMap.values()]
-    .map((transition) => ({
+    .map((transition): ProcessTransitionAggregate => ({
       id: transitionId(transition.sourceEventType, transition.targetEventType),
       sourceActivityId: activityId(transition.sourceEventType),
       targetActivityId: activityId(transition.targetEventType),
