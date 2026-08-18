@@ -100,7 +100,7 @@ export const MILESTONE_FLOW_EVENT_SEMANTICS: Record<string, MilestoneFlowEventSe
   TaskCancelled: sem("TaskCancelled", "work", { notes: "Task cancelled." }),
   TaskDeleted: sem("TaskDeleted", "work", { notes: "Task deleted (audit)." }),
   TaskMoved: sem("TaskMoved", "work", { notes: "Task moved (board/position)." }),
-  TaskStatusChanged: sem("TaskStatusChanged", "work", { transitionSignal: "progresses_transition", flowSegmentType: "active_work", notes: "Task status changed; direction depends on to_state." }),
+  TaskStatusChanged: sem("TaskStatusChanged", "work", { notes: "Generic status change; instance-level to_state must be qualified before inferring active work, waiting, or regression." }),
   TaskEstimateChanged: sem("TaskEstimateChanged", "work", { notes: "Task estimate changed." }),
   TaskStartDateChanged: sem("TaskStartDateChanged", "work", { notes: "Task planned start date changed (schedule)." }),
   TaskDueDateChanged: sem("TaskDueDateChanged", "work", { notes: "Task due date changed (schedule)." }),
