@@ -64,10 +64,16 @@ export interface TaskFrictionEvidenceRow {
     | "temporal_conflict"
     | "insufficient_evidence";
   timeEntryCount: number;
+  timeEntryIds: string[];
+  effortByUser: Array<{ userId: string; hours: number; entryIds: string[] }>;
   loggedHours: number;
+  taskActualHours: number | null;
   effortVarianceHours: number | null;
   predecessorCount: number;
+  predecessorIds: string[];
   successorCount: number;
+  successorIds: string[];
+  dependencyIds: string[];
   fanIn: number;
   fanOut: number;
   dependencyTypes: string[];
@@ -168,6 +174,20 @@ export function buildTaskFrictionEvidenceDataset(input: {
       (sum, entry) => sum + (Number(entry.duration_hours) || 0),
       0,
     );
+    const effortByUserMap = new Map<
+      string,
+      { userId: string; hours: number; entryIds: string[] }
+    >();
+    for (const entry of entries) {
+      const effort = effortByUserMap.get(entry.user_id) ?? {
+        userId: entry.user_id,
+        hours: 0,
+        entryIds: [],
+      };
+      effort.hours += Number(entry.duration_hours) || 0;
+      effort.entryIds.push(entry.id);
+      effortByUserMap.set(entry.user_id, effort);
+    }
     const firstTaskStartedAt =
       events
         .filter((event) => event.eventType === "TaskStarted")
@@ -270,11 +290,22 @@ export function buildTaskFrictionEvidenceDataset(input: {
       activeCycleTimeMs: activeCycleTime.durationMs,
       activeCycleTimeStatus: activeCycleTime.status,
       timeEntryCount: entries.length,
+      timeEntryIds: entries.map((entry) => entry.id),
+      effortByUser: [...effortByUserMap.values()].sort((a, b) =>
+        a.userId.localeCompare(b.userId),
+      ),
       loggedHours,
+      taskActualHours:
+        task.actual_hours == null ? null : Number(task.actual_hours),
       effortVarianceHours:
         plannedHours == null ? null : loggedHours - Number(plannedHours),
       predecessorCount: predecessors.length,
+      predecessorIds: predecessors.map((dependency) => dependency.predecessor_id),
       successorCount: successors.length,
+      successorIds: successors.map((dependency) => dependency.successor_id),
+      dependencyIds: [...predecessors, ...successors].map(
+        (dependency) => dependency.id,
+      ),
       fanIn: predecessors.length,
       fanOut: successors.length,
       dependencyTypes,

@@ -13,13 +13,6 @@ const SEVERITY_WEIGHT: Record<FrictionSeverity, number> = {
   critical: 100,
 };
 
-const CONFIDENCE_FACTOR: Record<FrictionConfidence, number> = {
-  unknown: 0.55,
-  low: 0.7,
-  medium: 0.85,
-  high: 1,
-};
-
 const CONFIDENCE_RANK: Record<FrictionConfidence, number> = {
   unknown: 0,
   low: 1,
@@ -32,10 +25,11 @@ export function clampScore(value: number): number {
 }
 
 export function scoreFrictionSignal(signal: FrictionSignal): number {
+  if (Number.isFinite(signal.score)) return clampScore(signal.score);
   const base = signal.magnitude == null
     ? SEVERITY_WEIGHT[signal.severity]
     : Math.max(0, Math.min(1, signal.magnitude)) * 100;
-  return clampScore(base * CONFIDENCE_FACTOR[signal.confidence]);
+  return clampScore(base);
 }
 
 export function aggregateConfidence(signals: readonly FrictionSignal[]): FrictionConfidence {
@@ -68,4 +62,51 @@ export function severityFromScore(score: number): FrictionSeverity {
   if (score >= 60) return "high";
   if (score >= 35) return "medium";
   return "low";
+}
+
+export interface FrictionCategoryAggregationProposal {
+  category: (typeof FRICTION_CATEGORIES)[number];
+  proposedScore: number | null;
+  method: "top3_confidence_weighted_mean";
+  inputSignalIds: string[];
+  status: "proposal_only";
+}
+
+/**
+ * Research-only FR-15 proposal. It is deliberately not consumed by the radar
+ * read model. The top-three cap limits volume bias; confidence remains a
+ * reliability weight instead of being hidden inside each independent score.
+ */
+export function proposeCategoryAggregation(
+  signals: readonly FrictionSignal[],
+): FrictionCategoryAggregationProposal[] {
+  const confidenceWeight: Record<FrictionConfidence, number> = {
+    high: 1,
+    medium: 0.8,
+    low: 0.6,
+    unknown: 0.4,
+  };
+  return FRICTION_CATEGORIES.map((category) => {
+    const top = signals
+      .filter((signal) => signal.category === category)
+      .sort((a, b) => scoreFrictionSignal(b) - scoreFrictionSignal(a) || a.signalId.localeCompare(b.signalId))
+      .slice(0, 3);
+    const denominator = top.reduce(
+      (sum, signal) => sum + confidenceWeight[signal.confidence],
+      0,
+    );
+    return {
+      category,
+      proposedScore: denominator === 0
+        ? null
+        : clampScore(top.reduce(
+            (sum, signal) =>
+              sum + scoreFrictionSignal(signal) * confidenceWeight[signal.confidence],
+            0,
+          ) / denominator),
+      method: "top3_confidence_weighted_mean",
+      inputSignalIds: top.map((signal) => signal.signalId),
+      status: "proposal_only",
+    };
+  });
 }

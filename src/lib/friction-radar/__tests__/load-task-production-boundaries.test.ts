@@ -20,6 +20,7 @@ describe("Friction Radar production source boundary", () => {
   it("loads the documented operational sources without process-node fallbacks", () => {
     for (const table of [
       "roadmap_tasks",
+      "milestones",
       "project_event_log",
       "project_event_objects",
       "subtask_time_entries",
@@ -50,6 +51,7 @@ describe("Friction Radar production source boundary", () => {
   it("scopes every project-owned operational query by tenant and project", () => {
     const projectOwnedTables = [
       "roadmap_tasks",
+      "milestones",
       "subtask_time_entries",
       "task_dependencies",
       "task_subtasks",

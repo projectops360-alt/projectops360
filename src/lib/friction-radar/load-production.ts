@@ -6,7 +6,9 @@ import { buildTaskFrictionEvidenceDataset, type TaskFrictionEvidenceRow } from "
 import { frictionSignalsFromTaskEvidence } from "./task-signal-adapter";
 import { loadTaskFrictionSourcesFromProduction, type FrictionSourceAudit } from "./load-task-production";
 import { mergeFrictionSignals } from "./merge-signals";
-import type { FrictionRadarReadModel, FrictionSignal } from "./types";
+import { frictionSignalsFromOperationalEvidence } from "./operational-signal-adapter";
+import { partitionEvidenceCompleteSignals } from "./evidence-contract";
+import type { FrictionRadarReadModel, FrictionSignal, FrictionSignalGap } from "./types";
 
 export type FrictionRadarLoadResult =
   | {
@@ -19,6 +21,8 @@ export type FrictionRadarLoadResult =
       timeEntryCount: number;
       signalCount: number;
       signals: FrictionSignal[];
+      signalGaps: FrictionSignalGap[];
+      rejectedEvidenceCount: number;
       taskEvidence: TaskFrictionEvidenceRow[];
       sourceAudit: FrictionSourceAudit[];
       limitations: string[];
@@ -53,6 +57,7 @@ export async function loadFrictionRadarFromProduction(
   const mpfSignals = mpf.status === "ok"
     ? frictionSignalsFromMpfProjection(mpf.projection)
     : [];
+  const analysisTimestamp = new Date().toISOString();
   const taskEvidence = taskSources.status === "ok"
     ? buildTaskFrictionEvidenceDataset({
         tasks: taskSources.sources.tasks,
@@ -62,7 +67,7 @@ export async function loadFrictionRadarFromProduction(
         resources: taskSources.sources.resources,
         resourceAssignments: taskSources.sources.resourceAssignments,
         resourceProfiles: taskSources.sources.resourceProfiles,
-        analysisTimestamp: new Date().toISOString(),
+        analysisTimestamp,
       })
     : [];
   const taskSignals = taskSources.status === "ok"
@@ -71,7 +76,31 @@ export async function loadFrictionRadarFromProduction(
         taskSources.sources.organizationId,
       )
     : [];
-  const signals = mergeFrictionSignals(mpfSignals, taskSignals);
+  const operational = taskSources.status === "ok"
+    ? frictionSignalsFromOperationalEvidence({
+        organizationId: taskSources.sources.organizationId,
+        projectId,
+        tasks: taskEvidence,
+        milestones: taskSources.sources.milestones,
+        resourceAssignments: taskSources.sources.resourceAssignments,
+        resourceWorkloadSnapshots: taskSources.sources.resourceWorkloadSnapshots,
+        risks: taskSources.sources.risks,
+        decisions: taskSources.sources.decisions,
+        budgetItems: taskSources.sources.budgetItems,
+        costActuals: taskSources.sources.costActuals,
+        financialMeasurements: taskSources.sources.financialMeasurements,
+        financialCockpit: taskSources.sources.financialCockpit,
+        criticalPathSnapshots: taskSources.sources.criticalPathSnapshots,
+        analysisTimestamp,
+      })
+    : { signals: [], gaps: [] };
+  const mergedSignals = mergeFrictionSignals(
+    mpfSignals,
+    taskSignals,
+    operational.signals,
+  );
+  const evidencePartition = partitionEvidenceCompleteSignals(mergedSignals);
+  const signals = evidencePartition.complete;
   const organizationId = taskSources.status === "ok"
     ? taskSources.sources.organizationId
     : mpf.status === "ok"
@@ -105,11 +134,16 @@ export async function loadFrictionRadarFromProduction(
       : 0,
     signalCount: signals.length,
     signals,
+    signalGaps: operational.gaps,
+    rejectedEvidenceCount: evidencePartition.rejected.length,
     taskEvidence,
     sourceAudit: taskSources.status === "ok" ? taskSources.sources.sourceAudit : [],
     limitations: [
       ...(mpf.status === "error" ? ["mpf:read_error"] : []),
       ...(taskSources.status === "ok" ? taskSources.sources.limitations : ["task_sources:read_error"]),
+      ...evidencePartition.rejected.map(
+        (assessment) => `signal:${assessment.signalId}:incomplete_evidence_contract`,
+      ),
     ],
     radar,
   };

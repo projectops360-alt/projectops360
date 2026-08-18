@@ -28,7 +28,7 @@ export function buildFrictionRadarReadModel(
     confidence: aggregateConfidence(scoped),
     categories,
     clusters: correlateFrictionSignals(scoped),
-    topSignalIds: rankedSignals.slice(0, 10).map((s) => s.signalId),
+    topSignalIds: rankedSignals.slice(0, 20).map((s) => s.signalId),
     generatedFromSignalCount: scoped.length,
     version: "friction-radar-v1",
   };

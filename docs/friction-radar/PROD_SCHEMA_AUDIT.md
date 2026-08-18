@@ -1,6 +1,6 @@
 # Friction Radar v1 — Production schema audit
 
-Audit date: 2026-08-17
+Audit date: 2026-08-18
 
 Supabase project: `ocopmlnkvidvmxgiwvxw`
 

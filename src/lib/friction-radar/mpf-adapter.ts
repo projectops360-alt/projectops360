@@ -23,6 +23,14 @@ function confidence(value: string): FrictionConfidence {
   return value === "high" || value === "medium" || value === "low" || value === "unknown" ? value : "unknown";
 }
 
+function signalScore(value: string): number {
+  return value === "critical" ? 100 : value === "high" ? 72 : value === "medium" ? 45 : 20;
+}
+
+function evidenceStatus(value: FrictionConfidence): "confirmed" | "candidate" | "unknown" {
+  return value === "high" ? "confirmed" : value === "unknown" ? "unknown" : "candidate";
+}
+
 function evidenceRefs(refs: Array<{ kind: string; eventId?: string | null; metricRef?: string | null }>, fallback: string) {
   return refs.map((e, index) => ({
     kind: e.eventId ? "project_event_log" : e.kind,
@@ -32,6 +40,7 @@ function evidenceRefs(refs: Array<{ kind: string; eventId?: string | null; metri
 }
 
 export function frictionSignalFromMpfFinding(finding: MilestoneFlowDetectionFinding): FrictionSignal {
+  const resolvedConfidence = confidence(finding.confidence);
   return {
     signalId: `mpf:${finding.findingId}`,
     organizationId: finding.organizationId,
@@ -42,8 +51,15 @@ export function frictionSignalFromMpfFinding(finding: MilestoneFlowDetectionFind
     entityType: "milestone_transition",
     entityId: finding.transitionId,
     severity: severity(finding.severity),
-    confidence: confidence(finding.confidence),
+    confidence: resolvedConfidence,
+    score: signalScore(finding.severity),
+    observedValue: finding.durationMs,
+    expectedOrBaseline: null,
+    evidenceStatus: evidenceStatus(resolvedConfidence),
     occurredAt: finding.startedAt,
+    evidenceTimestampStart: finding.startedAt,
+    evidenceTimestampEnd: finding.endedAt,
+    evidenceDescription: `MPF detected ${finding.findingType} from the recorded milestone-transition sequence.`,
     evidenceRefs: evidenceRefs(finding.evidenceRefs, finding.findingId),
     relatedEntityIds: finding.sourceSegmentIds,
     metadata: { status: finding.status, durationMs: finding.durationMs, isOpen: finding.isOpen },
@@ -51,6 +67,7 @@ export function frictionSignalFromMpfFinding(finding: MilestoneFlowDetectionFind
 }
 
 function fromRework(f: MilestoneFlowReworkFinding): FrictionSignal {
+  const resolvedConfidence = confidence(f.confidence);
   return {
     signalId: `mpf:${f.findingId}`,
     organizationId: f.organizationId,
@@ -61,8 +78,15 @@ function fromRework(f: MilestoneFlowReworkFinding): FrictionSignal {
     entityType: "milestone_transition",
     entityId: f.transitionId,
     severity: severity(f.severity),
-    confidence: confidence(f.confidence),
+    confidence: resolvedConfidence,
+    score: signalScore(f.severity),
+    observedValue: f.reworkType,
+    expectedOrBaseline: "forward_only_transition",
+    evidenceStatus: evidenceStatus(resolvedConfidence),
     occurredAt: f.startedAt,
+    evidenceTimestampStart: f.startedAt,
+    evidenceTimestampEnd: f.endedAt,
+    evidenceDescription: `MPF detected explicit ${f.reworkType} sequence evidence.`,
     evidenceRefs: evidenceRefs(f.evidenceRefs, f.findingId),
     relatedEntityIds: [...f.sourceSegmentIds, ...f.affectedEntityRefs],
     metadata: { status: f.status, durationMs: f.durationMs, isOpen: f.isOpen, triggerType: f.triggerType },
@@ -70,6 +94,7 @@ function fromRework(f: MilestoneFlowReworkFinding): FrictionSignal {
 }
 
 function fromBottleneck(f: MilestoneFlowBottleneckFinding): FrictionSignal {
+  const resolvedConfidence = confidence(f.confidence);
   return {
     signalId: `mpf:${f.findingId}`,
     organizationId: f.organizationId,
@@ -80,7 +105,14 @@ function fromBottleneck(f: MilestoneFlowBottleneckFinding): FrictionSignal {
     entityType: "milestone_transition",
     entityId: f.transitionId,
     severity: severity(f.severity),
-    confidence: confidence(f.confidence),
+    confidence: resolvedConfidence,
+    score: signalScore(f.severity),
+    observedValue: f.durationMs ?? f.occurrenceCount,
+    expectedOrBaseline: null,
+    evidenceStatus: evidenceStatus(resolvedConfidence),
+    evidenceTimestampStart: null,
+    evidenceTimestampEnd: null,
+    evidenceDescription: f.candidateReason,
     evidenceRefs: evidenceRefs(f.evidenceRefs, f.findingId),
     relatedEntityIds: f.affectedSegmentIds,
     metadata: { status: f.status, durationMs: f.durationMs, occurrenceCount: f.occurrenceCount, structural: f.isStructuralCandidate },
@@ -88,6 +120,7 @@ function fromBottleneck(f: MilestoneFlowBottleneckFinding): FrictionSignal {
 }
 
 function fromPropagation(f: MilestoneConstraintPropagationFinding): FrictionSignal {
+  const resolvedConfidence = confidence(f.confidence);
   return {
     signalId: `mpf:${f.findingId}`,
     organizationId: f.organizationId,
@@ -98,7 +131,14 @@ function fromPropagation(f: MilestoneConstraintPropagationFinding): FrictionSign
     entityType: "milestone_transition",
     entityId: f.originTransitionId,
     severity: severity(f.severity),
-    confidence: confidence(f.confidence),
+    confidence: resolvedConfidence,
+    score: signalScore(f.severity),
+    observedValue: f.delayImpactMs ?? f.riskImpact,
+    expectedOrBaseline: 0,
+    evidenceStatus: evidenceStatus(resolvedConfidence),
+    evidenceTimestampStart: null,
+    evidenceTimestampEnd: null,
+    evidenceDescription: f.propagationReason,
     evidenceRefs: evidenceRefs(f.evidenceRefs, f.findingId),
     relatedEntityIds: [f.affectedTransitionId, ...f.propagationPath],
     metadata: { status: f.status, delayImpactMs: f.delayImpactMs, riskImpact: f.riskImpact },
@@ -112,6 +152,9 @@ function fromHealth(projection: MilestoneFlowProjection, transitionId: string, h
   };
   const s = severityByHealth[h.status];
   if (!s) return null;
+  const refs = h.reasons.flatMap((r, i) => evidenceRefs(r.evidence, `health:${transitionId}:${i}`));
+  if (refs.length === 0) return null;
+  const resolvedConfidence = confidence(h.confidence);
   return {
     signalId: `mpf:health:${transitionId}`,
     organizationId: projection.scope.organizationId,
@@ -122,8 +165,15 @@ function fromHealth(projection: MilestoneFlowProjection, transitionId: string, h
     entityType: "milestone_transition",
     entityId: transitionId,
     severity: s,
-    confidence: confidence(h.confidence),
-    evidenceRefs: h.reasons.flatMap((r, i) => evidenceRefs(r.evidence, `health:${transitionId}:${i}`)),
+    confidence: resolvedConfidence,
+    score: signalScore(s),
+    observedValue: h.score,
+    expectedOrBaseline: 100,
+    evidenceStatus: evidenceStatus(resolvedConfidence),
+    evidenceTimestampStart: null,
+    evidenceTimestampEnd: null,
+    evidenceDescription: `MPF transition health is ${h.status} from evidence-backed reasons.`,
+    evidenceRefs: refs,
     metadata: { healthStatus: h.status, healthScore: h.score },
   };
 }

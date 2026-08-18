@@ -13,6 +13,7 @@ import { loadCanonicalEventProjection } from "@/lib/graph/event-relationship-loa
 import type { TimeEntry } from "@/lib/time-tracking/types";
 import type {
   Decision,
+  Milestone,
   RoadmapTask,
   TaskDependency,
 } from "@/types/database";
@@ -149,6 +150,7 @@ export interface TaskFrictionOperationalSources {
   projectId: string;
   projectTitle: string;
   tasks: RoadmapTask[];
+  milestones: Milestone[];
   events: LivingGraphCanonicalEvent[];
   timeEntries: TimeEntry[];
   dependencies: TaskDependency[];
@@ -231,6 +233,7 @@ export async function loadTaskFrictionOperationalSources(
   );
   const [
     tasksResult,
+    milestonesResult,
     entriesResult,
     dependenciesResult,
     subtasksResult,
@@ -250,6 +253,9 @@ export async function loadTaskFrictionOperationalSources(
     canonical,
   ] = await Promise.all([
     client.from("roadmap_tasks").select("*")
+      .eq("organization_id", organizationId).eq("project_id", projectId)
+      .is("deleted_at", null).order("order_index", { ascending: true }),
+    client.from("milestones").select("*")
       .eq("organization_id", organizationId).eq("project_id", projectId)
       .is("deleted_at", null).order("order_index", { ascending: true }),
     client.from("subtask_time_entries").select("*")
@@ -334,6 +340,7 @@ export async function loadTaskFrictionOperationalSources(
 
   const sourceAudit = [
     audit("roadmap_tasks", tasksResult),
+    audit("milestones", milestonesResult),
     audit("project_event_log", {
       data: canonical.canonicalEvents,
       error: canonical.status === "error" ? canonical.errorCode : null,
@@ -395,6 +402,7 @@ export async function loadTaskFrictionOperationalSources(
     projectId,
     projectTitle,
     tasks,
+    milestones: rows<Milestone>(milestonesResult),
     events: canonical.canonicalEvents,
     timeEntries: rows<TimeEntry>(entriesResult),
     dependencies: rows<TaskDependency>(dependenciesResult),

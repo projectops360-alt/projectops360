@@ -14,6 +14,13 @@ function signal(overrides: Partial<FrictionSignal> = {}): FrictionSignal {
     entityId: "transition",
     severity: "high",
     confidence: "medium",
+    score: 72,
+    observedValue: true,
+    expectedOrBaseline: false,
+    evidenceStatus: "candidate",
+    evidenceTimestampStart: null,
+    evidenceTimestampEnd: null,
+    evidenceDescription: "test evidence",
     evidenceRefs: [
       { kind: "project_event_log", id: "completed" },
       { kind: "project_event_log", id: "reopened" },

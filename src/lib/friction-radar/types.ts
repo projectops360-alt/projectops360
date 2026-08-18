@@ -46,14 +46,16 @@ export interface FrictionSignal {
   milestoneId?: string | null;
   severity: FrictionSeverity;
   confidence: FrictionConfidence;
+  /** Independent transparent 0..100 rule score. Never a global/category score. */
+  score: number;
   magnitude?: number | null; // optional normalized 0..1; severity is used when absent
-  observedValue?: string | number | boolean | null;
-  expectedOrBaseline?: string | number | boolean | null;
-  evidenceStatus?: "confirmed" | "candidate" | "unknown" | "insufficient_evidence";
+  observedValue: string | number | boolean | null;
+  expectedOrBaseline: string | number | boolean | null;
+  evidenceStatus: "confirmed" | "candidate" | "unknown" | "insufficient_evidence";
   occurredAt?: string | null;
-  evidenceTimestampStart?: string | null;
-  evidenceTimestampEnd?: string | null;
-  evidenceDescription?: string | null;
+  evidenceTimestampStart: string | null;
+  evidenceTimestampEnd: string | null;
+  evidenceDescription: string;
   evidenceRefs: FrictionEvidenceRef[];
   relatedEntityIds?: string[];
   metadata?: Record<string, string | number | boolean | null>;
@@ -92,4 +94,12 @@ export interface FrictionRadarReadModel {
   topSignalIds: string[];
   generatedFromSignalCount: number;
   version: "friction-radar-v1";
+}
+
+export interface FrictionSignalGap {
+  signalType: string;
+  category: FrictionCategory;
+  status: "unknown" | "insufficient_evidence";
+  reason: string;
+  sourceTables: string[];
 }

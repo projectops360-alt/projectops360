@@ -1769,3 +1769,40 @@ Unknown workflow expectations and missing sources remain `UNKNOWN` /
 tasks `93dff1de…`, `dd29a954…`, `8f0f1e7e…`, `aa28bbb1…`, and `997c8d29…`,
 including the same-day date-granularity boundary and evidence-bearing
 stagnation behavior.
+
+## REG-051 — Friction Radar could rank unsupported or stale-state operational signals
+
+**Date:** 2026-08-18
+
+**Surface:** Friction Radar · operational detectors, evidence contract and Top 20
+
+**Risk:** topology alone (an incomplete predecessor or critical-path membership)
+could be promoted as friction; a terminal task carrying a stale blocker flag
+could be counted as actively blocked; missing cost/capacity rows could look like
+zero friction; and a signal missing a source reference could still enter ranking.
+Linear aging also saturated old schedule items at 100, making the Top 20 an
+arbitrary tie.
+
+**Root cause.** The first block intentionally loaded the source fields without
+defining their cross-domain promotion contract. A count or flag was available,
+but availability is not evidence that a specific friction occurred. The signal
+type also did not require the full evidence/scoring fields at compile time.
+
+**Protection rule (binding):** operational signals are fail-closed. Dependency
+friction requires an active explicit blocker plus the recorded dependency;
+critical exposure requires a blocker or overdue state in addition to path
+membership; task terminal/blocker semantics reuse `task-activity.ts`; absent
+actual/capacity/decision sources become `INSUFFICIENT_EVIDENCE`. Every promoted
+signal carries an independent 0–100 score and the complete evidence contract,
+including at least one source reference. Incomplete signals are rejected before
+the read model. Duration scores use a diminishing transparent scale so old
+items remain ordered instead of becoming an undifferentiated 100-point tie.
+Category and global scores remain null; the category formula is `proposal_only`.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/operational-signal-adapter.test.ts`,
+`src/lib/friction-radar/__tests__/evidence-contract.test.ts` and
+`src/lib/friction-radar/__tests__/friction-radar.test.ts` cover dependency
+non-causality, terminal blockers, date-only schedule boundaries, missing actuals,
+capacity gaps, risk/decision evidence, evidence rejection, Top 20 and aggregation
+isolation.

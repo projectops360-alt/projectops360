@@ -1,6 +1,6 @@
 # Friction Radar v1 — Aurora validation
 
-Validation date: 2026-08-17
+Validation date: 2026-08-18
 
 Project: `a40a7436-c63f-4e3b-94cd-041447ee54d4`
 
@@ -97,3 +97,11 @@ time is wall-clock time. Comparing them would create an unsupported score.
 | FR-06 | observed-start, temporal consistency, dependency/resource and lifecycle evidence implemented |
 | FR-07 | deterministic cross-engine merge/deduplication implemented |
 | FR-08 | initial queue, stagnation, rework, interruption, regression and backward-transition detectors implemented |
+
+## FR-09–FR-16 continuation
+
+The dependency, schedule, effort/cost, resource, risk and decision detectors,
+the blocking evidence contract, independent score field, deterministic Top 20
+and non-binding category aggregation proposal are implemented and validated.
+See [`FR-09-16_IMPLEMENTATION.md`](FR-09-16_IMPLEMENTATION.md) for the frozen
+task contract, rules, actual Aurora outputs, Top 20 and remaining gaps.

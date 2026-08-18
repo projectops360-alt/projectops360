@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFrictionRadarReadModel,
   correlateFrictionSignals,
+  proposeCategoryAggregation,
   scoreFrictionSignal,
   type FrictionSignal,
 } from "@/lib/friction-radar";
@@ -11,6 +12,13 @@ const base = {
   projectId: "project-1",
   confidence: "high" as const,
   evidenceRefs: [{ kind: "event", id: "e1" }],
+  score: 50,
+  observedValue: true,
+  expectedOrBaseline: false,
+  evidenceStatus: "confirmed" as const,
+  evidenceTimestampStart: null,
+  evidenceTimestampEnd: null,
+  evidenceDescription: "test evidence",
 };
 
 function signal(partial: Partial<FrictionSignal> & Pick<FrictionSignal, "signalId" | "category" | "severity">): FrictionSignal {
@@ -19,6 +27,7 @@ function signal(partial: Partial<FrictionSignal> & Pick<FrictionSignal, "signalI
     source: "mpf",
     signalType: partial.signalId,
     ...partial,
+    score: partial.score ?? (partial.severity === "critical" ? 100 : partial.severity === "high" ? 72 : partial.severity === "medium" ? 45 : 20),
   };
 }
 
@@ -64,5 +73,24 @@ describe("Friction Radar v1", () => {
     expect(model.generatedFromSignalCount).toBe(0);
     expect(model.trend).toBe("unknown");
     expect(model.clusters).toEqual([]);
+  });
+
+  it("keeps the category aggregation formula proposal outside the read model", () => {
+    const inputs = [
+      signal({ signalId: "one", category: "process", severity: "critical", score: 100 }),
+      signal({ signalId: "two", category: "process", severity: "high", score: 70, confidence: "medium" }),
+      signal({ signalId: "three", category: "process", severity: "medium", score: 40 }),
+      signal({ signalId: "four", category: "process", severity: "low", score: 10 }),
+    ];
+    const proposal = proposeCategoryAggregation(inputs).find(
+      (item) => item.category === "process",
+    );
+    expect(proposal).toMatchObject({
+      method: "top3_confidence_weighted_mean",
+      status: "proposal_only",
+      inputSignalIds: ["one", "two", "three"],
+    });
+    expect(buildFrictionRadarReadModel("org-1", "project-1", inputs)
+      .categories.find((item) => item.category === "process")?.score).toBeNull();
   });
 });

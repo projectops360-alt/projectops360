@@ -61,6 +61,7 @@ function signal(input: {
     milestoneId: input.row.milestoneId,
     severity: severityFromScore(input.score),
     confidence: input.confidence,
+    score: input.score,
     magnitude: input.score / 100,
     observedValue: input.observedValue,
     expectedOrBaseline: input.expectedOrBaseline,
