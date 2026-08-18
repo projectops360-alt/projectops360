@@ -186,4 +186,30 @@ describe("task lifecycle process analysis", () => {
       directFollowCount: 1,
     });
   });
+  it("keeps imported events in the process path but excludes capture latency", () => {
+    const created = {
+      ...event("t1", 1, "TaskCreated"),
+      captureMethod: "import",
+    };
+    const started = {
+      ...event("t1", 2, "TaskStarted"),
+      captureMethod: "import",
+    };
+    const aggregate = aggregateTaskProcess(
+      buildTaskProcessModel({ tasks: [task("t1")], events: [created, started] }),
+      { activityCoveragePct: 100, connectionCoveragePct: 100 },
+    );
+    const transition = aggregate.transitions.find(
+      (row) =>
+        row.sourceEventType === "TaskCreated" &&
+        row.targetEventType === "TaskStarted",
+    );
+
+    expect(aggregate.visibleEventCount).toBe(2);
+    expect(transition).toMatchObject({
+      occurrenceCount: 1,
+      medianDurationMs: null,
+    });
+  });
+
 });
