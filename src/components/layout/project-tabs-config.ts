@@ -38,6 +38,7 @@ import {
   Sparkles,
   Wrench,
   GitGraph,
+  Radar,
   MoreHorizontal,
 } from "lucide-react";
 
@@ -54,6 +55,8 @@ export interface TabItem {
    *  but disabled (with an explanatory tooltip) instead of hiding it. Used for
    *  strategic modules like BIM that must never silently disappear. */
   keepDisabledWhenModuleMissing?: boolean;
+  /** Server-evaluated UI flag; never expose the environment value itself. */
+  featureFlag?: "frictionRadar";
 }
 
 export interface TabGroup {
@@ -183,6 +186,13 @@ export const TAB_GROUPS: TabGroup[] = [
     groupKey: "intelligence",
     icon: Sparkles,
     items: [
+      {
+        titleKey: "frictionRadar",
+        href: "/projects/[projectId]/friction-radar",
+        icon: Radar,
+        matchPattern: "/projects/[projectId]/friction-radar",
+        featureFlag: "frictionRadar",
+      },
       {
         titleKey: "projectMemory",
         href: "/projects/[projectId]/memory",

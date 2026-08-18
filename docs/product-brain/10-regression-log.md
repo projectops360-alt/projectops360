@@ -1736,3 +1736,106 @@ crosses the boundary (`t.raw`), not a function that would produce it.
 that Server Components render and fails on any function-typed prop. The
 detector is itself checked against the exact broken shape, so a later refactor
 cannot quietly turn it into a no-op.
+
+## REG-050 — Friction Radar confused missing/captured events with missing work
+
+**Date:** 2026-08-17
+
+**Surface:** Friction Radar · task evidence and process-mining durations
+
+**Symptom:** completed Aurora tasks with no `TaskStarted` were labelled as
+waiting, while `TaskCreated → TaskStarted` capture intervals of roughly 19–38
+hours were presented as operational queue/execution time.
+
+**Root cause.** The preliminary dataset treated one optional event type as the
+only possible start of work and compared audit capture timestamps without first
+checking the current time-entry work dates or the granularity of the planned
+date. In Aurora, current entries prove work on the planned Jan–Mar dates while
+several direct lifecycle events were captured in August. The event sequence is
+real; the mixed-clock elapsed duration is not.
+
+**Protection rule (binding):** missing `TaskStarted` never means waiting.
+`observedStart` is the earliest qualified work-bearing fact in the registered
+event taxonomy or a current non-deleted time entry. Current time entries
+supersede historical `TimeLogged` payloads. Date-only plans treat all activity
+on that calendar date as on time. Imported/backfilled timestamps and material
+event/work-date conflicts preserve order but cannot qualify elapsed duration.
+Unknown workflow expectations and missing sources remain `UNKNOWN` /
+`INSUFFICIENT_EVIDENCE`.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/task-evidence.test.ts` and
+`src/lib/friction-radar/__tests__/task-dataset.test.ts` cover the exact Aurora
+tasks `93dff1de…`, `dd29a954…`, `8f0f1e7e…`, `aa28bbb1…`, and `997c8d29…`,
+including the same-day date-granularity boundary and evidence-bearing
+stagnation behavior.
+
+## REG-051 — Friction Radar could rank unsupported or stale-state operational signals
+
+**Date:** 2026-08-18
+
+**Surface:** Friction Radar · operational detectors, evidence contract and Top 20
+
+**Risk:** topology alone (an incomplete predecessor or critical-path membership)
+could be promoted as friction; a terminal task carrying a stale blocker flag
+could be counted as actively blocked; missing cost/capacity rows could look like
+zero friction; and a signal missing a source reference could still enter ranking.
+Linear aging also saturated old schedule items at 100, making the Top 20 an
+arbitrary tie.
+
+**Root cause.** The first block intentionally loaded the source fields without
+defining their cross-domain promotion contract. A count or flag was available,
+but availability is not evidence that a specific friction occurred. The signal
+type also did not require the full evidence/scoring fields at compile time.
+
+**Protection rule (binding):** operational signals are fail-closed. Dependency
+friction requires an active explicit blocker plus the recorded dependency;
+critical exposure requires a blocker or overdue state in addition to path
+membership; task terminal/blocker semantics reuse `task-activity.ts`; absent
+actual/capacity/decision sources become `INSUFFICIENT_EVIDENCE`. Every promoted
+signal carries an independent 0–100 score and the complete evidence contract,
+including at least one source reference. Incomplete signals are rejected before
+the read model. Duration scores use a diminishing transparent scale so old
+items remain ordered instead of becoming an undifferentiated 100-point tie.
+Category and global scores remain null; the category formula is `proposal_only`.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/operational-signal-adapter.test.ts`,
+`src/lib/friction-radar/__tests__/evidence-contract.test.ts` and
+`src/lib/friction-radar/__tests__/friction-radar.test.ts` cover dependency
+non-causality, terminal blockers, date-only schedule boundaries, missing actuals,
+capacity gaps, risk/decision evidence, evidence rejection, Top 20 and aggregation
+isolation.
+
+## REG-052 — Friction Radar UI could overstate certainty or expose a foreign project
+
+**Date:** 2026-08-18
+
+**Surface:** Friction Radar · project dashboard, evidence panel and protected GET API
+
+**Risk:** a polished radar could make category counts look like approved scores,
+hide `UNKNOWN` inputs, construct a synthetic event story, expose a foreign
+project through a direct URL/API request, or become visible before the pilot is
+approved.
+
+**Root cause.** FR-01–FR-16 deliberately stopped at a server-side read model. A
+user surface did not yet have a binding contract for uncertainty, RLS denial,
+rollout, trace presentation or the client/server boundary.
+
+**Protection rule (binding):** page, API and navigation are default-OFF and
+project allowlisted. The flag is checked before any read. Authenticated/RLS
+loaders conceal unauthorized and cross-organization projects as 404. The API is
+GET-only, private/no-store and returns no raw task-evidence dataset or event
+payload. Category/global scores remain visibly uncalculated. Unknown and
+insufficient evidence remain visible gaps. The timeline includes only canonical
+events explicitly referenced by a signal and orders them by project sequence.
+The surface is bilingual, keyboard-operable and read-only.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/flag.test.ts`, `ui-model.test.ts`,
+`surface-boundaries.test.ts`,
+`src/components/friction-radar/__tests__/friction-radar-client.render.test.tsx`,
+`src/app/api/projects/[projectId]/friction-radar/__tests__/route.test.ts`,
+`src/components/layout/__tests__/project-tabs-nav.test.ts` and
+`e2e/friction-radar.spec.ts` protect rollout, projection, uncertainty, page/API
+security, navigation and browser behavior.

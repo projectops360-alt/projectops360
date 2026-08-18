@@ -119,6 +119,13 @@ export const env = {
     "",
   PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED:
     process.env.PMO_PORTFOLIO_ROLLUP_ENGINE_V1_ENABLED ?? "",
+  /**
+   * Friction Radar user surface. Server-only, default OFF and project-scoped.
+   * Both values are required; use explicit UUIDs in production. `all` is
+   * accepted only outside Vercel production for local/preview acceptance.
+   */
+  FRICTION_RADAR_ENABLED: process.env.FRICTION_RADAR_ENABLED ?? "",
+  FRICTION_RADAR_PROJECT_IDS: process.env.FRICTION_RADAR_PROJECT_IDS ?? "",
 
   // ── GitHub App (Platform install flow — Mode A). All server-side only.
   // Absent in dev/tests; the config layer reports a safe "not configured"

@@ -81,6 +81,16 @@ export function taskIdForCanonicalEvent(
     const object = taskEntityCandidate(ref.object_type, ref.object_id, knownTaskIds);
     if (object) return object;
   }
+
+  // Subtask lifecycle events use task_subtasks as their subject/source and do
+  // not necessarily carry a task object ref. Their canonical payload records
+  // the verified parent roadmap task instead. Only accept an id that belongs
+  // to the already loaded project task set; arbitrary payload values can never
+  // attach an event to another project or fabricate a task case.
+  const payloadTaskId = event.payload?.task_id ?? event.payload?.taskId;
+  if (typeof payloadTaskId === "string" && knownTaskIds.has(payloadTaskId)) {
+    return payloadTaskId;
+  }
   return null;
 }
 

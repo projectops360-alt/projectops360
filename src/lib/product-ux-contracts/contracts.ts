@@ -237,6 +237,22 @@ export const UX_017_ACRONYMS_ARE_REACHABLE: ProductUxContract = {
   ],
 };
 
+export const UX_018_FRICTION_EVIDENCE_FIRST: ProductUxContract = {
+  id: "UX-018",
+  title: "Friction Radar Is Evidence-First and Honest About Unknowns",
+  status: "APPROVED",
+  regression: "REG-052",
+  rules: [
+    "Every ranked Friction Radar signal exposes an independent score, severity, confidence, evidence status, observed value, expected/baseline value and source references.",
+    "The UI never calculates or implies a global/category aggregate while the aggregation policy is unapproved.",
+    "UNKNOWN and INSUFFICIENT_EVIDENCE are visible data states and never rendered as zero friction.",
+    "A canonical-event timeline contains only events explicitly referenced by the signal and follows authoritative project sequence; no synthetic event is inserted.",
+    "Unauthorized and cross-organization project IDs are concealed as not found on page and API.",
+    "The page, API and project navigation are server-gated, default OFF and project-allowlisted.",
+    "The surface is read-only and offers navigation to source entities/Living Graph, never an apply or mutate action.",
+  ],
+};
+
 export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_001_ISABELLA_WELCOME_HERO,
   UX_012_LANGUAGE_CONSISTENCY,
@@ -245,4 +261,5 @@ export const PRODUCT_UX_CONTRACTS: ProductUxContract[] = [
   UX_015_KNOWLEDGE_PROGRESSIVE_DISCLOSURE,
   UX_016_SIMULATION_IS_A_QUESTION,
   UX_017_ACRONYMS_ARE_REACHABLE,
+  UX_018_FRICTION_EVIDENCE_FIRST,
 ];

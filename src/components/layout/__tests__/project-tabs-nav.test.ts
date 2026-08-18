@@ -114,6 +114,19 @@ describe("Financial control discoverability", () => {
   });
 });
 
+describe("REG-052 — Friction Radar controlled navigation", () => {
+  const radar = TAB_ITEMS.find((item) => item.titleKey === "frictionRadar");
+
+  it("lives in Intelligence and routes to the project-scoped surface", () => {
+    expect(itemKeys("intelligence")).toContain("frictionRadar");
+    expect(radar?.href).toBe("/projects/[projectId]/friction-radar");
+  });
+
+  it("is protected by the server-evaluated Friction Radar feature gate", () => {
+    expect(radar?.featureFlag).toBe("frictionRadar");
+  });
+});
+
 describe("Settings boundary — Settings is not the home for operational modules", () => {
   const operational = [
     "drawingIntelligence",

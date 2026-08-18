@@ -1,0 +1,112 @@
+import {
+  FRICTION_CATEGORIES,
+  type FrictionCategoryScore,
+  type FrictionConfidence,
+  type FrictionSeverity,
+  type FrictionSignal,
+} from "./types";
+
+const SEVERITY_WEIGHT: Record<FrictionSeverity, number> = {
+  low: 20,
+  medium: 45,
+  high: 72,
+  critical: 100,
+};
+
+const CONFIDENCE_RANK: Record<FrictionConfidence, number> = {
+  unknown: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+export function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function scoreFrictionSignal(signal: FrictionSignal): number {
+  if (Number.isFinite(signal.score)) return clampScore(signal.score);
+  const base = signal.magnitude == null
+    ? SEVERITY_WEIGHT[signal.severity]
+    : Math.max(0, Math.min(1, signal.magnitude)) * 100;
+  return clampScore(base);
+}
+
+export function aggregateConfidence(signals: readonly FrictionSignal[]): FrictionConfidence {
+  if (signals.length === 0) return "unknown";
+  const average = signals.reduce((sum, s) => sum + CONFIDENCE_RANK[s.confidence], 0) / signals.length;
+  if (average >= 2.5) return "high";
+  if (average >= 1.5) return "medium";
+  if (average >= 0.5) return "low";
+  return "unknown";
+}
+
+export function scoreCategories(signals: readonly FrictionSignal[]): FrictionCategoryScore[] {
+  return FRICTION_CATEGORIES.map((category) => {
+    const categorySignals = signals.filter((s) => s.category === category);
+    const ranked = [...categorySignals].sort((a, b) => scoreFrictionSignal(b) - scoreFrictionSignal(a));
+    return {
+      category,
+      // V1 intentionally does not aggregate heterogeneous signal scores. The
+      // signal-level scores remain available for transparent ranking.
+      score: null,
+      signalCount: categorySignals.length,
+      confidence: aggregateConfidence(categorySignals),
+      topSignalIds: ranked.slice(0, 5).map((s) => s.signalId),
+    };
+  });
+}
+
+export function severityFromScore(score: number): FrictionSeverity {
+  if (score >= 80) return "critical";
+  if (score >= 60) return "high";
+  if (score >= 35) return "medium";
+  return "low";
+}
+
+export interface FrictionCategoryAggregationProposal {
+  category: (typeof FRICTION_CATEGORIES)[number];
+  proposedScore: number | null;
+  method: "top3_confidence_weighted_mean";
+  inputSignalIds: string[];
+  status: "proposal_only";
+}
+
+/**
+ * Research-only FR-15 proposal. It is deliberately not consumed by the radar
+ * read model. The top-three cap limits volume bias; confidence remains a
+ * reliability weight instead of being hidden inside each independent score.
+ */
+export function proposeCategoryAggregation(
+  signals: readonly FrictionSignal[],
+): FrictionCategoryAggregationProposal[] {
+  const confidenceWeight: Record<FrictionConfidence, number> = {
+    high: 1,
+    medium: 0.8,
+    low: 0.6,
+    unknown: 0.4,
+  };
+  return FRICTION_CATEGORIES.map((category) => {
+    const top = signals
+      .filter((signal) => signal.category === category)
+      .sort((a, b) => scoreFrictionSignal(b) - scoreFrictionSignal(a) || a.signalId.localeCompare(b.signalId))
+      .slice(0, 3);
+    const denominator = top.reduce(
+      (sum, signal) => sum + confidenceWeight[signal.confidence],
+      0,
+    );
+    return {
+      category,
+      proposedScore: denominator === 0
+        ? null
+        : clampScore(top.reduce(
+            (sum, signal) =>
+              sum + scoreFrictionSignal(signal) * confidenceWeight[signal.confidence],
+            0,
+          ) / denominator),
+      method: "top3_confidence_weighted_mean",
+      inputSignalIds: top.map((signal) => signal.signalId),
+      status: "proposal_only",
+    };
+  });
+}

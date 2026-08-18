@@ -21,6 +21,7 @@
 | UX-012 | Language Consistency / No Spanglish | **APPROVED** | — (usability/quality) | `contracts.ts` · `src/lib/i18n/glossary.ts` · `src/i18n/__tests__/message-parity.test.ts` · `glossary-consistency.test.ts` |
 | UX-013 | Workboard operable without browser zoom | **APPROVED** | — (usability) | `contracts.ts` · `src/lib/workboard/density.ts` · `src/lib/workboard/__tests__/density.test.ts` |
 | UX-014 | Internal AI prompt metadata must not be user-facing (task editor) | **APPROVED** | [PD-013](30-product-decision-log.md#pd-013) | `contracts.ts` · `src/components/roadmap/__tests__/task-editor-ai-prompt-visibility.test.ts` |
+| UX-018 | Friction Radar is evidence-first and honest about unknowns | **APPROVED** | [REG-052](10-regression-log.md#reg-052) | `contracts.ts` · `src/lib/friction-radar/__tests__/surface-boundaries.test.ts` · `src/components/friction-radar/__tests__/friction-radar-client.render.test.tsx` |
 
 > **Placeholders (UX-002/003/004)** already have executable tests guarding the behavior; they are
 > listed here so the contract registry is the single index. Promote each to a full `contracts.ts`
@@ -284,3 +285,35 @@ not resemble a task-flow diagram or expose the full evidence mesh by default.
 
 **The regression to never reintroduce:** rendering every evidence node and relationship at once so
 the Knowledge view becomes an unreadable evidence spaghetti graph.
+
+---
+
+## UX-018 — Friction Radar Is Evidence-First and Honest About Unknowns
+
+**Status:** APPROVED · **Guards:** REG-052.
+
+**Principle:** Friction Radar helps a PM/PMO investigate a measured signal; it
+must not turn missing data, topology or an unapproved aggregation into an
+authoritative project diagnosis.
+
+**Contract (binding):**
+
+- Every ranked signal shows its independent score, severity, confidence,
+  evidence status, observed value, expected/baseline value and source rows.
+- Global/category aggregate scores remain visibly uncalculated until their
+  policy is approved.
+- `UNKNOWN` and `INSUFFICIENT_EVIDENCE` are visible and never displayed as zero.
+- An event timeline contains only explicitly referenced canonical events in
+  authoritative project sequence; no synthetic event or inferred causality.
+- Page, GET API and navigation are server-gated, default OFF and project
+  allowlisted. Unauthorized/cross-tenant IDs are concealed as 404.
+- The surface is read-only. Links may open the affected entity or Living Graph;
+  there is no apply-to-project action.
+
+**Implementation:** `src/components/friction-radar/friction-radar-client.tsx`,
+`src/lib/friction-radar/ui-model.ts`, `src/lib/friction-radar/flag.ts`, protected
+page/API routes and `docs/friction-radar/FR-17-24_IMPLEMENTATION.md`.
+
+**The regression to never reintroduce:** a polished dashboard that hides
+insufficient evidence, exposes another tenant, or presents an invented aggregate
+as project truth.
