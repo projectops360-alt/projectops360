@@ -17,11 +17,25 @@ export interface QualifiedBusinessTime {
   reason: string;
 }
 
+export type ObservedStartSource =
+  | "time_entry_work_date"
+  | "event_work_date"
+  | "event_business_time"
+  | "unknown";
+
+export interface TaskWorkDateEvidence {
+  id: string;
+  workDate: string;
+  deletedAt?: string | null;
+}
+
 export interface ObservedTaskStart {
   status: "observed" | "insufficient_evidence";
   timestamp: string | null;
   eventId: string | null;
   eventType: string | null;
+  sourceRecordId: string | null;
+  source: ObservedStartSource;
   confidence: FrictionEvidenceConfidence;
   reason: string;
 }
@@ -59,12 +73,28 @@ const ACTIVE_TASK_STATES = new Set([
 
 const UNTRUSTED_CAPTURE_METHODS = new Set([
   "import",
+  "imported",
   "backfill",
+  "backfilled",
   "ai_extracted",
 ]);
 
+const TRUSTED_CAPTURE_METHODS = new Set(["direct", "system"]);
+
 function validIso(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
+function validDateOnly(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Number.isFinite(Date.parse(`${value}T00:00:00.000Z`))
+  );
+}
+
+function dateOnlyTimestamp(value: string): string {
+  return `${value}T00:00:00.000Z`;
 }
 
 function normalizedCaptureMethod(event: LivingGraphCanonicalEvent): string {
@@ -81,6 +111,16 @@ function normalizedCaptureMethod(event: LivingGraphCanonicalEvent): string {
 export function qualifyEventBusinessTime(
   event: LivingGraphCanonicalEvent,
 ): QualifiedBusinessTime {
+  const payloadWorkDate = event.payload?.work_date ?? event.payload?.workDate;
+  if (event.eventType === "TimeLogged" && validDateOnly(payloadWorkDate)) {
+    return {
+      timestamp: dateOnlyTimestamp(payloadWorkDate),
+      confidence: "medium",
+      durationEligible: false,
+      reason: "event_work_date_requires_current_entry_verification",
+    };
+  }
+
   if (!validIso(event.occurredAt)) {
     return {
       timestamp: null,
@@ -104,6 +144,15 @@ export function qualifyEventBusinessTime(
       confidence: "low",
       durationEligible: false,
       reason: "capture_time_not_proven_as_business_time",
+    };
+  }
+
+  if (!TRUSTED_CAPTURE_METHODS.has(captureMethod)) {
+    return {
+      timestamp: event.occurredAt,
+      confidence: "low",
+      durationEligible: false,
+      reason: "capture_method_missing_or_unqualified",
     };
   }
 
@@ -141,7 +190,30 @@ export function isMeaningfulTaskWorkEvent(
  */
 export function deriveObservedTaskStart(
   events: readonly LivingGraphCanonicalEvent[],
+  timeEntries: readonly TaskWorkDateEvidence[] = [],
 ): ObservedTaskStart {
+  const currentEntries = timeEntries
+    .filter((entry) => entry.deletedAt == null && validDateOnly(entry.workDate))
+    .sort(
+      (a, b) =>
+        Date.parse(dateOnlyTimestamp(a.workDate)) -
+          Date.parse(dateOnlyTimestamp(b.workDate)) ||
+        a.id.localeCompare(b.id),
+    );
+  const firstEntry = currentEntries[0];
+  if (firstEntry) {
+    return {
+      status: "observed",
+      timestamp: dateOnlyTimestamp(firstEntry.workDate),
+      eventId: null,
+      eventType: "TimeLogged",
+      sourceRecordId: firstEntry.id,
+      source: "time_entry_work_date",
+      confidence: "high",
+      reason: "current_time_entry_work_date",
+    };
+  }
+
   const candidates = events
     .filter(isMeaningfulTaskWorkEvent)
     .map((event) => ({ event, time: qualifyEventBusinessTime(event) }))
@@ -159,6 +231,8 @@ export function deriveObservedTaskStart(
       timestamp: null,
       eventId: null,
       eventType: null,
+      sourceRecordId: null,
+      source: "unknown",
       confidence: "unknown",
       reason: "no_meaningful_work_event",
     };
@@ -169,6 +243,11 @@ export function deriveObservedTaskStart(
     timestamp: first.time.timestamp,
     eventId: first.event.eventId,
     eventType: first.event.eventType,
+    sourceRecordId: first.event.eventId,
+    source:
+      first.time.reason === "event_work_date_requires_current_entry_verification"
+        ? "event_work_date"
+        : "event_business_time",
     confidence: first.time.confidence,
     reason: first.time.reason,
   };
@@ -215,7 +294,9 @@ export function assessQueueFriction(input: {
       queueTimeMs: null,
       severityScore: null,
       confidence: input.observedStart.confidence,
-      evidenceEventIds: [input.observedStart.eventId!],
+      evidenceEventIds: input.observedStart.eventId
+        ? [input.observedStart.eventId]
+        : [],
       reason: "business_time_insufficiently_proven",
     };
   }
@@ -230,7 +311,9 @@ export function assessQueueFriction(input: {
     queueTimeMs,
     severityScore: Math.min(100, Math.round((queueTimeMs / threshold) * 25)),
     confidence: "high",
-    evidenceEventIds: [input.observedStart.eventId!],
+    evidenceEventIds: input.observedStart.eventId
+      ? [input.observedStart.eventId]
+      : [],
     reason: isCandidate
       ? "observed_start_after_planned_start_threshold"
       : "no_material_queue_variance",
