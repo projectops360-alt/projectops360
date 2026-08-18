@@ -309,4 +309,32 @@ describe("Friction Radar task evidence", () => {
     });
   });
 
+  it("does not report projection mismatch for equivalent done/completed states", () => {
+    const completed = event("TaskCompleted", "2026-08-06T11:00:00.000Z", {
+      eventId: "completed",
+      toState: "completed",
+    });
+
+    expect(
+      assessTaskProjectionConsistency({
+        currentStatus: "done",
+        isBlocked: false,
+        events: [completed],
+      }),
+    ).toMatchObject({
+      status: "consistent",
+    });
+  });
+
+  it("rejects impossible work dates instead of normalizing them", () => {
+    const observed = deriveObservedTaskStart([], [
+      {
+        id: "invalid-date",
+        workDate: "2026-02-30",
+      },
+    ]);
+
+    expect(observed.status).toBe("insufficient_evidence");
+  });
+
 });
