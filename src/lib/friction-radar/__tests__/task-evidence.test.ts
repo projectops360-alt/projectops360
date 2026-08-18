@@ -197,4 +197,116 @@ describe("Friction Radar task evidence", () => {
     });
   });
 
+  it("recognizes the exact imported capture method used in Aurora PROD", () => {
+    const created = event("TaskCreated", "2026-08-06T01:00:41.091Z", {
+      captureMethod: "imported",
+    });
+    const started = event("TaskStarted", "2026-08-06T21:07:14.152Z", {
+      captureMethod: "imported",
+      sequenceNumber: 2,
+    });
+
+    expect(qualifiedElapsedMs(created, started)).toBeNull();
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-02-25",
+        observedStart: deriveObservedTaskStart([started]),
+      }),
+    ).toMatchObject({
+      status: "unknown",
+      reason: "business_time_insufficiently_proven",
+    });
+  });
+
+  it("does not trust occurredAt when capture method is missing", () => {
+    const started = event("TaskStarted", "2026-08-06T21:07:14.152Z", {
+      captureMethod: null,
+    });
+
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-02-25",
+        observedStart: deriveObservedTaskStart([started]),
+      }),
+    ).toMatchObject({
+      status: "unknown",
+      reason: "business_time_insufficiently_proven",
+    });
+  });
+
+  it("treats event payload work_date as provisional, not authoritative", () => {
+    const logged = event("TimeLogged", "2026-08-06T23:27:40.321Z", {
+      captureMethod: null,
+      payload: {
+        task_id: "8f0f1e7e-a629-4be0-8abc-24bd1b6b2c2f",
+        entry_id: "old-entry",
+        work_date: "2026-01-26",
+        duration_hours: 8,
+      },
+    });
+    const observed = deriveObservedTaskStart([logged]);
+
+    expect(observed).toMatchObject({
+      timestamp: "2026-01-26T00:00:00.000Z",
+      source: "event_work_date",
+      confidence: "medium",
+    });
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-02-25",
+        observedStart: observed,
+      }).status,
+    ).toBe("unknown");
+  });
+
+  it("prefers current time-entry work_date over stale event payload history", () => {
+    const logged = event("TimeLogged", "2026-08-06T23:27:40.321Z", {
+      captureMethod: null,
+      payload: {
+        task_id: "8f0f1e7e-a629-4be0-8abc-24bd1b6b2c2f",
+        entry_id: "old-entry",
+        work_date: "2026-01-26",
+        duration_hours: 8,
+      },
+    });
+    const observed = deriveObservedTaskStart([logged], [
+      {
+        id: "37e10874-13dc-4de7-a2ed-bceb0e9592c0",
+        workDate: "2026-02-25",
+      },
+    ]);
+
+    expect(observed).toMatchObject({
+      timestamp: "2026-02-25T00:00:00.000Z",
+      sourceRecordId: "37e10874-13dc-4de7-a2ed-bceb0e9592c0",
+      source: "time_entry_work_date",
+      confidence: "high",
+    });
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-02-25",
+        observedStart: observed,
+      }),
+    ).toMatchObject({
+      status: "not_detected",
+      queueTimeMs: 0,
+      evidenceEventIds: [],
+    });
+  });
+
+  it("ignores deleted time entries when deriving observed start", () => {
+    const observed = deriveObservedTaskStart([], [
+      {
+        id: "deleted",
+        workDate: "2026-01-01",
+        deletedAt: "2026-08-07T00:00:00.000Z",
+      },
+    ]);
+
+    expect(observed).toMatchObject({
+      status: "insufficient_evidence",
+      source: "unknown",
+    });
+  });
+
 });
