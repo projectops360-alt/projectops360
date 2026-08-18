@@ -189,11 +189,11 @@ describe("task lifecycle process analysis", () => {
   it("keeps imported events in the process path but excludes capture latency", () => {
     const created = {
       ...event("t1", 1, "TaskCreated"),
-      captureMethod: "import",
+      captureMethod: "imported",
     };
     const started = {
       ...event("t1", 2, "TaskStarted"),
-      captureMethod: "import",
+      captureMethod: "imported",
     };
     const aggregate = aggregateTaskProcess(
       buildTaskProcessModel({ tasks: [task("t1")], events: [created, started] }),
@@ -209,6 +209,8 @@ describe("task lifecycle process analysis", () => {
     expect(transition).toMatchObject({
       occurrenceCount: 1,
       medianDurationMs: null,
+      qualifiedDurationCount: 0,
+      durationEvidenceStatus: "insufficient_evidence",
     });
   });
 
