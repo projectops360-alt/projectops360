@@ -165,7 +165,7 @@ describe("Friction Radar task evidence", () => {
     });
 
     expect(detectCompletedThenReopened([reopened, completed])).toMatchObject({
-      status: "candidate",
+      status: "confirmed",
       confidence: "high",
       completedEventId: "completed",
       reopenedEventId: "44909854-4a9a-44a3-b23a-45668abbcb91",
