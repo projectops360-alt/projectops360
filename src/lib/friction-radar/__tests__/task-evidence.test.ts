@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import {
   assessQueueFriction,
+  assessTaskProjectionConsistency,
   deriveObservedTaskStart,
+  detectCompletedThenReopened,
   isEffortContributionEvent,
   qualifiedElapsedMs,
 } from "../task-evidence";
@@ -149,4 +151,50 @@ describe("Friction Radar task evidence", () => {
 
     expect(qualifiedElapsedMs(created, started)).toBeNull();
   });
+  it("detects the Aurora completed-to-reopened rework sequence", () => {
+    const completed = event("TaskCompleted", "2026-08-06T10:00:00.000Z", {
+      eventId: "completed",
+      sequenceNumber: 10,
+      toState: "done",
+    });
+    const reopened = event("TaskReopened", "2026-08-06T11:00:00.000Z", {
+      eventId: "44909854-4a9a-44a3-b23a-45668abbcb91",
+      sequenceNumber: 11,
+      fromState: "done",
+      toState: "blocked",
+    });
+
+    expect(detectCompletedThenReopened([reopened, completed])).toMatchObject({
+      status: "candidate",
+      confidence: "high",
+      completedEventId: "completed",
+      reopenedEventId: "44909854-4a9a-44a3-b23a-45668abbcb91",
+      evidenceEventIds: [
+        "completed",
+        "44909854-4a9a-44a3-b23a-45668abbcb91",
+      ],
+    });
+  });
+
+  it("reports stale snapshot state separately from rework", () => {
+    const reopened = event("TaskReopened", "2026-08-06T11:00:00.000Z", {
+      eventId: "reopened",
+      sequenceNumber: 11,
+      fromState: "done",
+      toState: "blocked",
+    });
+
+    expect(
+      assessTaskProjectionConsistency({
+        currentStatus: "done",
+        isBlocked: true,
+        events: [reopened],
+      }),
+    ).toMatchObject({
+      status: "inconsistent",
+      evidenceEventIds: ["reopened"],
+      reason: "latest_event_disagrees_with_task_snapshot",
+    });
+  });
+
 });
