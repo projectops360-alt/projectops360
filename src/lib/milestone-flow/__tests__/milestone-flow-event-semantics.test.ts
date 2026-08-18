@@ -87,6 +87,12 @@ describe("transition signals", () => {
     expect(getMilestoneFlowSemanticsForEventType("TaskStarted").flowSegmentType).toBe("active_work");
     expect(getMilestoneFlowSemanticsForEventType("TaskCompleted").flowSegmentType).toBe("active_work");
   });
+
+  it("does not infer active work from a generic status change", () => {
+    const semantics = getMilestoneFlowSemanticsForEventType("TaskStatusChanged");
+    expect(semantics.transitionSignal).toBe("no_transition_signal");
+    expect(semantics.flowSegmentType).toBe("unknown");
+  });
 });
 
 describe("blocking / unblocking", () => {
