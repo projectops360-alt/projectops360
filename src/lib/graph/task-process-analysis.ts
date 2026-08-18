@@ -6,6 +6,7 @@ import type { RoadmapTask } from "@/types/database";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import { isCompletedStatus, isTerminalStatus } from "@/lib/execution/task-activity";
 import { taskIdForCanonicalEvent } from "@/lib/graph/task-case-analysis";
+import { qualifiedElapsedMs } from "@/lib/friction-radar/task-evidence";
 import { analyzeVariants } from "@/lib/process-mining/variants";
 import type {
   ExecutionVariant,
@@ -243,11 +244,8 @@ export function aggregateTaskProcess(
       };
       transition.occurrenceCount += 1;
       transition.caseIds.add(taskCase.taskId);
-      const from = event.occurredAt ? Date.parse(event.occurredAt) : Number.NaN;
-      const to = next.occurredAt ? Date.parse(next.occurredAt) : Number.NaN;
-      if (Number.isFinite(from) && Number.isFinite(to) && to >= from) {
-        transition.durations.push(to - from);
-      }
+      const durationMs = qualifiedElapsedMs(event, next);
+      if (durationMs != null) transition.durations.push(durationMs);
       transitionMap.set(key, transition);
     });
   }
