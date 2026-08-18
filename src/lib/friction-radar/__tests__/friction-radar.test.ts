@@ -50,14 +50,17 @@ describe("Friction Radar v1", () => {
     const b = buildFrictionRadarReadModel("org-1", "project-1", signals, { previousScore: 20 });
     expect(a).toEqual(b);
     expect(a.generatedFromSignalCount).toBe(2);
-    expect(a.score).toBeGreaterThan(0);
-    expect(a.trend).toBe("worsening");
+    expect(a.score).toBeNull();
+    expect(a.severity).toBeNull();
+    expect(a.trend).toBe("unknown");
+    expect(a.categories.every((category) => category.score == null)).toBe(true);
     expect(a.clusters).toHaveLength(1);
+    expect(a.clusters[0].score).toBeNull();
   });
 
   it("returns an honest empty radar when no scoped signals exist", () => {
     const model = buildFrictionRadarReadModel("org-1", "project-1", []);
-    expect(model.score).toBe(0);
+    expect(model.score).toBeNull();
     expect(model.generatedFromSignalCount).toBe(0);
     expect(model.trend).toBe("unknown");
     expect(model.clusters).toEqual([]);

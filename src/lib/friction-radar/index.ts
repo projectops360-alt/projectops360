@@ -4,3 +4,6 @@ export * from "./correlation";
 export * from "./read-model";
 export * from "./mpf-adapter";
 export * from "./load-production";
+export * from "./task-evidence";
+export * from "./task-dataset";
+export * from "./task-signal-adapter";

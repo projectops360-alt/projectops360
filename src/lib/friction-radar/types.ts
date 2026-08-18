@@ -42,10 +42,18 @@ export interface FrictionSignal {
   category: FrictionCategory;
   entityType?: string | null;
   entityId?: string | null;
+  taskId?: string | null;
+  milestoneId?: string | null;
   severity: FrictionSeverity;
   confidence: FrictionConfidence;
   magnitude?: number | null; // optional normalized 0..1; severity is used when absent
+  observedValue?: string | number | boolean | null;
+  expectedOrBaseline?: string | number | boolean | null;
+  evidenceStatus?: "confirmed" | "candidate" | "unknown" | "insufficient_evidence";
   occurredAt?: string | null;
+  evidenceTimestampStart?: string | null;
+  evidenceTimestampEnd?: string | null;
+  evidenceDescription?: string | null;
   evidenceRefs: FrictionEvidenceRef[];
   relatedEntityIds?: string[];
   metadata?: Record<string, string | number | boolean | null>;
@@ -53,7 +61,8 @@ export interface FrictionSignal {
 
 export interface FrictionCategoryScore {
   category: FrictionCategory;
-  score: number; // 0..100, higher = more friction
+  /** Deliberately null in v1: category aggregation is not yet approved. */
+  score: number | null;
   signalCount: number;
   confidence: FrictionConfidence;
   topSignalIds: string[];
@@ -65,15 +74,17 @@ export interface FrictionCluster {
   categories: FrictionCategory[];
   signalIds: string[];
   entityIds: string[];
-  score: number;
+  /** Deliberately null in v1: correlation does not imply aggregate severity. */
+  score: number | null;
   confidence: FrictionConfidence;
 }
 
 export interface FrictionRadarReadModel {
   organizationId: string;
   projectId: string;
-  score: number;
-  severity: FrictionSeverity;
+  /** Deliberately null until a global aggregation policy is validated. */
+  score: number | null;
+  severity: FrictionSeverity | null;
   trend: FrictionTrend;
   confidence: FrictionConfidence;
   categories: FrictionCategoryScore[];

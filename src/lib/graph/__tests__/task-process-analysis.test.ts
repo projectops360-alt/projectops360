@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RoadmapTask } from "@/types/database";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
+import type { TimeEntry } from "@/lib/time-tracking/types";
 import {
   aggregateTaskProcess,
   assessTaskProcessDiscovery,
@@ -101,6 +102,30 @@ function event(taskId: string, sequenceNumber: number, eventType: string): Livin
     dataQualityFlags: [],
     captureMethod: "system",
     lateRecorded: false,
+  };
+}
+
+function timeEntry(taskId: string, workDate: string): TimeEntry {
+  return {
+    id: `${taskId}-${workDate}`,
+    organization_id: "org",
+    project_id: "p1",
+    task_id: taskId,
+    subtask_id: null,
+    user_id: "user",
+    work_date: workDate,
+    start_time: null,
+    end_time: null,
+    duration_hours: 8,
+    crew_size: 1,
+    hours_per_person: 8,
+    comment: null,
+    source: "manual",
+    created_by: null,
+    updated_by: null,
+    created_at: `${workDate}T00:00:00.000Z`,
+    updated_at: `${workDate}T00:00:00.000Z`,
+    deleted_at: null,
   };
 }
 
@@ -210,7 +235,37 @@ describe("task lifecycle process analysis", () => {
       occurrenceCount: 1,
       medianDurationMs: null,
       qualifiedDurationCount: 0,
+      temporalConflictCount: 0,
       durationEvidenceStatus: "insufficient_evidence",
+    });
+  });
+
+  it("excludes lifecycle duration that conflicts with operational work dates", () => {
+    const started = {
+      ...event("t1", 1, "TaskStarted"),
+      occurredAt: "2026-08-06T21:07:14.152Z",
+      recordedAt: "2026-08-06T21:07:14.152Z",
+    };
+    const completed = {
+      ...event("t1", 2, "TaskCompleted"),
+      occurredAt: "2026-08-06T21:09:41.000Z",
+      recordedAt: "2026-08-06T21:09:41.000Z",
+    };
+    const aggregate = aggregateTaskProcess(
+      buildTaskProcessModel({
+        tasks: [task("t1", "done")],
+        events: [started, completed],
+        timeEntries: [timeEntry("t1", "2026-02-25")],
+      }),
+      { activityCoveragePct: 100, connectionCoveragePct: 100 },
+    );
+
+    expect(aggregate.transitions[0]).toMatchObject({
+      occurrenceCount: 1,
+      medianDurationMs: null,
+      qualifiedDurationCount: 0,
+      temporalConflictCount: 1,
+      durationEvidenceStatus: "temporal_conflict",
     });
   });
 

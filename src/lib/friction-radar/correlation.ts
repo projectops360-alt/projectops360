@@ -1,4 +1,4 @@
-import { aggregateConfidence, scoreSignalSet } from "./scoring";
+import { aggregateConfidence } from "./scoring";
 import type { FrictionCluster, FrictionSignal } from "./types";
 
 // v1 correlation is deliberately deterministic and conservative. Signals cluster only
@@ -31,10 +31,10 @@ export function correlateFrictionSignals(signals: readonly FrictionSignal[]): Fr
       categories,
       signalIds: unique.map((s) => s.signalId).sort(),
       entityIds: [entityId],
-      score: scoreSignalSet(unique),
+      score: null,
       confidence: aggregateConfidence(unique),
     });
   }
 
-  return clusters.sort((a, b) => b.score - a.score || a.clusterId.localeCompare(b.clusterId));
+  return clusters.sort((a, b) => a.clusterId.localeCompare(b.clusterId));
 }

@@ -47,25 +47,15 @@ export function aggregateConfidence(signals: readonly FrictionSignal[]): Frictio
   return "unknown";
 }
 
-// Weighted toward the strongest signals without allowing a large number of minor
-// findings to overwhelm one critical, evidence-backed condition.
-export function scoreSignalSet(signals: readonly FrictionSignal[]): number {
-  if (signals.length === 0) return 0;
-  const scores = signals.map(scoreFrictionSignal).sort((a, b) => b - a);
-  const top = scores.slice(0, 5);
-  const weights = [0.4, 0.25, 0.15, 0.12, 0.08];
-  const weighted = top.reduce((sum, score, index) => sum + score * weights[index], 0);
-  const usedWeight = weights.slice(0, top.length).reduce((a, b) => a + b, 0);
-  return clampScore(weighted / usedWeight);
-}
-
 export function scoreCategories(signals: readonly FrictionSignal[]): FrictionCategoryScore[] {
   return FRICTION_CATEGORIES.map((category) => {
     const categorySignals = signals.filter((s) => s.category === category);
     const ranked = [...categorySignals].sort((a, b) => scoreFrictionSignal(b) - scoreFrictionSignal(a));
     return {
       category,
-      score: scoreSignalSet(categorySignals),
+      // V1 intentionally does not aggregate heterogeneous signal scores. The
+      // signal-level scores remain available for transparent ranking.
+      score: null,
       signalCount: categorySignals.length,
       confidence: aggregateConfidence(categorySignals),
       topSignalIds: ranked.slice(0, 5).map((s) => s.signalId),

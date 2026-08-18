@@ -3,9 +3,11 @@ import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
 import {
   assessQueueFriction,
   assessTaskProjectionConsistency,
+  assessTaskTemporalConsistency,
   deriveObservedTaskStart,
   detectCompletedThenReopened,
   isEffortContributionEvent,
+  qualifyElapsedDuration,
   qualifiedElapsedMs,
 } from "../task-evidence";
 
@@ -294,6 +296,107 @@ describe("Friction Radar task evidence", () => {
     });
   });
 
+  it("takes the earliest valid source while current entries supersede TimeLogged payloads", () => {
+    const started = event("TaskStarted", "2026-02-24T10:00:00.000Z", {
+      eventId: "started-before-entry",
+    });
+    const staleLogged = event("TimeLogged", "2026-08-06T10:00:00.000Z", {
+      eventId: "stale-time-log",
+      captureMethod: null,
+      payload: { entry_id: "entry-1", work_date: "2026-01-01" },
+    });
+
+    expect(
+      deriveObservedTaskStart([staleLogged, started], [
+        { id: "entry-1", workDate: "2026-02-25" },
+      ]),
+    ).toMatchObject({
+      timestamp: "2026-02-24T10:00:00.000Z",
+      eventId: "started-before-entry",
+      source: "event_business_time",
+      confidence: "high",
+    });
+  });
+
+  it("returns UNKNOWN queue when a low-confidence mapping immediately reverses start", () => {
+    const started = event("TaskStarted", "2026-08-06T23:09:42.707Z", {
+      eventId: "878b7a08-c1c6-4b19-a8f0-57098bce0435",
+      fromState: "not_started",
+      toState: "in_progress",
+    });
+    const reversed = event("TaskStatusChanged", "2026-08-06T23:10:22.291Z", {
+      eventId: "01ab6a5b-582f-4262-b38d-4fe2674a668f",
+      sequenceNumber: 2,
+      fromState: "in_progress",
+      toState: "not_started",
+      dataQualityFlags: ["mapping_low_confidence"],
+    });
+
+    expect(
+      assessQueueFriction({
+        plannedStart: "2026-03-10",
+        observedStart: deriveObservedTaskStart([started, reversed]),
+        events: [started, reversed],
+      }),
+    ).toMatchObject({
+      status: "unknown",
+      confidence: "low",
+      queueTimeMs: null,
+      evidenceEventIds: [started.eventId, reversed.eventId],
+      reason: "observed_start_immediately_reversed_by_low_confidence_mapping",
+    });
+  });
+
+  it("marks Aurora-style lifecycle dates months after work as a temporal conflict", () => {
+    const started = event("TaskStarted", "2026-08-06T21:07:14.152Z", {
+      eventId: "started",
+    });
+    const completed = event("TaskCompleted", "2026-08-06T21:09:41.000Z", {
+      eventId: "completed",
+      sequenceNumber: 2,
+    });
+    const workDates = [
+      { id: "entry-1", workDate: "2026-02-25" },
+      { id: "entry-2", workDate: "2026-02-28" },
+    ];
+
+    expect(
+      assessTaskTemporalConsistency({
+        events: [started, completed],
+        timeEntries: workDates,
+      }),
+    ).toMatchObject({
+      status: "conflict",
+      confidence: "high",
+      firstOperationalWorkAt: "2026-02-25T00:00:00.000Z",
+      lastOperationalWorkAt: "2026-02-28T00:00:00.000Z",
+      evidenceEventIds: ["started", "completed"],
+      reason: "lifecycle_boundary_conflicts_with_operational_work_dates",
+    });
+    expect(qualifiedElapsedMs(started, completed, workDates)).toBeNull();
+    expect(qualifyElapsedDuration(started, completed, workDates)).toMatchObject({
+      durationMs: null,
+      status: "temporal_conflict",
+    });
+  });
+
+  it("keeps explicit lifecycle duration when work dates corroborate the window", () => {
+    const started = event("TaskStarted", "2026-02-25T10:00:00.000Z");
+    const completed = event("TaskCompleted", "2026-02-28T12:00:00.000Z", {
+      sequenceNumber: 2,
+    });
+
+    expect(
+      qualifyElapsedDuration(started, completed, [
+        { id: "entry-1", workDate: "2026-02-25" },
+        { id: "entry-2", workDate: "2026-02-28" },
+      ]),
+    ).toMatchObject({
+      durationMs: 74 * 60 * 60 * 1000,
+      status: "qualified",
+    });
+  });
+
   it("ignores deleted time entries when deriving observed start", () => {
     const observed = deriveObservedTaskStart([], [
       {
@@ -324,6 +427,22 @@ describe("Friction Radar task evidence", () => {
     ).toMatchObject({
       status: "consistent",
     });
+  });
+
+  it("downgrades projection confidence when the latest state mapping is flagged", () => {
+    const reversed = event("TaskStatusChanged", "2026-08-06T23:10:22.291Z", {
+      eventId: "reversed",
+      toState: "not_started",
+      dataQualityFlags: ["mapping_low_confidence"],
+    });
+
+    expect(
+      assessTaskProjectionConsistency({
+        currentStatus: "not_started",
+        isBlocked: false,
+        events: [reversed],
+      }),
+    ).toMatchObject({ status: "consistent", confidence: "low" });
   });
 
   it("rejects impossible work dates instead of normalizing them", () => {

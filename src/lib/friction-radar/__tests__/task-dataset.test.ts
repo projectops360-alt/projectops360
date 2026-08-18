@@ -247,5 +247,43 @@ describe("Friction Radar task dataset", () => {
       status: "inconsistent",
       evidenceEventIds: ["44909854-4a9a-44a3-b23a-45668abbcb91"],
     });
+    expect(row.temporalConsistency).toMatchObject({
+      status: "conflict",
+      evidenceEventIds: [
+        "5c172027-1ca5-429b-b752-637cdee317e7",
+        "44909854-4a9a-44a3-b23a-45668abbcb91",
+      ],
+      reason: "lifecycle_boundary_conflicts_with_operational_work_dates",
+    });
+  });
+
+  it("associates subtask activity to its verified payload task_id", () => {
+    const currentTask = task({ status: "in_progress" });
+    const subtaskCompleted = event("subtask-id", "SubtaskCompleted", 10, {
+      eventId: "f4883eda-40bd-4a0d-978f-1f802adb6f2a",
+      subjectType: "subtask",
+      subjectId: "subtask-id",
+      sourceEntityType: "task_subtasks",
+      sourceEntityId: "subtask-id",
+      payload: {
+        task_id: currentTask.id,
+        subtask_id: "subtask-id",
+        old_value: "not_started",
+        new_value: "completed",
+      },
+    });
+
+    const row = buildTaskFrictionEvidenceDataset({
+      tasks: [currentTask],
+      events: [subtaskCompleted],
+      timeEntries: [],
+    })[0];
+
+    expect(row.observedStart).toMatchObject({
+      status: "observed",
+      eventId: "f4883eda-40bd-4a0d-978f-1f802adb6f2a",
+      eventType: "SubtaskCompleted",
+      source: "event_business_time",
+    });
   });
 });

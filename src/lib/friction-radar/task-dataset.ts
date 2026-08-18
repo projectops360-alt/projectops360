@@ -9,12 +9,14 @@ import { taskIdForCanonicalEvent } from "@/lib/graph/task-case-analysis";
 import {
   assessQueueFriction,
   assessTaskProjectionConsistency,
+  assessTaskTemporalConsistency,
   deriveObservedTaskStart,
   detectCompletedThenReopened,
   type ObservedTaskStart,
   type ProjectionConsistencyAssessment,
   type QueueFrictionAssessment,
   type TaskReworkAssessment,
+  type TaskTemporalConsistencyAssessment,
 } from "./task-evidence";
 
 export interface TaskFrictionEvidenceRow {
@@ -25,6 +27,7 @@ export interface TaskFrictionEvidenceRow {
   status: string;
   progress: number;
   isBlocked: boolean;
+  blockerReason: string | null;
   plannedStart: string | null;
   plannedFinish: string | null;
   plannedHours: number | null;
@@ -35,6 +38,7 @@ export interface TaskFrictionEvidenceRow {
   loggedHours: number;
   effortVarianceHours: number | null;
   rework: TaskReworkAssessment;
+  temporalConsistency: TaskTemporalConsistencyAssessment;
   projectionConsistency: ProjectionConsistencyAssessment;
 }
 
@@ -71,14 +75,12 @@ export function buildTaskFrictionEvidenceDataset(input: {
       (a, b) => a.sequenceNumber - b.sequenceNumber,
     );
     const entries = entriesByTask.get(task.id) ?? [];
-    const observedStart = deriveObservedTaskStart(
-      events,
-      entries.map((entry) => ({
-        id: entry.id,
-        workDate: entry.work_date,
-        deletedAt: entry.deleted_at,
-      })),
-    );
+    const workDateEvidence = entries.map((entry) => ({
+      id: entry.id,
+      workDate: entry.work_date,
+      deletedAt: entry.deleted_at,
+    }));
+    const observedStart = deriveObservedTaskStart(events, workDateEvidence);
     const plannedStart = task.baseline_start_date ?? task.start_date;
     const plannedHours =
       task.baseline_estimate_hours ??
@@ -103,6 +105,7 @@ export function buildTaskFrictionEvidenceDataset(input: {
       status: task.status,
       progress: task.progress,
       isBlocked: task.is_blocked,
+      blockerReason: task.blocker_reason,
       plannedStart,
       plannedFinish: task.baseline_end_date ?? task.end_date,
       plannedHours,
@@ -111,12 +114,17 @@ export function buildTaskFrictionEvidenceDataset(input: {
       queueFriction: assessQueueFriction({
         plannedStart,
         observedStart,
+        events,
       }),
       timeEntryCount: entries.length,
       loggedHours,
       effortVarianceHours:
         plannedHours == null ? null : loggedHours - Number(plannedHours),
       rework: detectCompletedThenReopened(events),
+      temporalConsistency: assessTaskTemporalConsistency({
+        events,
+        timeEntries: workDateEvidence,
+      }),
       projectionConsistency: assessTaskProjectionConsistency({
         currentStatus: task.status,
         isBlocked: task.is_blocked,

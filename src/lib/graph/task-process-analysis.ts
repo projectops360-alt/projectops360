@@ -4,9 +4,13 @@
 
 import type { RoadmapTask } from "@/types/database";
 import type { LivingGraphCanonicalEvent } from "@/types/living-graph";
+import type { TimeEntry } from "@/lib/time-tracking/types";
 import { isCompletedStatus, isTerminalStatus } from "@/lib/execution/task-activity";
 import { taskIdForCanonicalEvent } from "@/lib/graph/task-case-analysis";
-import { qualifiedElapsedMs } from "@/lib/friction-radar/task-evidence";
+import {
+  qualifyElapsedDuration,
+  type TaskWorkDateEvidence,
+} from "@/lib/friction-radar/task-evidence";
 import { analyzeVariants } from "@/lib/process-mining/variants";
 import type {
   ExecutionVariant,
@@ -20,6 +24,7 @@ export interface TaskProcessCase {
   label: string;
   status: string;
   events: LivingGraphCanonicalEvent[];
+  operationalWorkDates: TaskWorkDateEvidence[];
 }
 
 export interface TaskProcessModel {
@@ -50,7 +55,12 @@ export interface ProcessTransitionAggregate {
   caseCount: number;
   medianDurationMs: number | null;
   qualifiedDurationCount: number;
-  durationEvidenceStatus: "qualified" | "insufficient_evidence";
+  temporalConflictCount: number;
+  durationEvidenceStatus:
+    | "qualified"
+    | "partial"
+    | "temporal_conflict"
+    | "insufficient_evidence";
 }
 
 export interface TaskProcessAggregate {
@@ -108,12 +118,25 @@ function minableEvent(event: LivingGraphCanonicalEvent): boolean {
 export function buildTaskProcessModel(input: {
   tasks: readonly RoadmapTask[];
   events: readonly LivingGraphCanonicalEvent[];
+  timeEntries?: readonly TimeEntry[];
 }): TaskProcessModel {
   const taskById = new Map(input.tasks.map((task) => [task.id, task]));
   const knownTaskIds = new Set(taskById.keys());
   const eventsByTask = new Map<string, LivingGraphCanonicalEvent[]>();
   let eventsWithoutTask = 0;
   let eventsWithoutBusinessTime = 0;
+  const workDatesByTask = new Map<string, TaskWorkDateEvidence[]>();
+
+  for (const entry of input.timeEntries ?? []) {
+    if (entry.deleted_at != null || !knownTaskIds.has(entry.task_id)) continue;
+    const list = workDatesByTask.get(entry.task_id) ?? [];
+    list.push({
+      id: entry.id,
+      workDate: entry.work_date,
+      deletedAt: entry.deleted_at,
+    });
+    workDatesByTask.set(entry.task_id, list);
+  }
 
   for (const event of input.events) {
     const taskId = taskIdForCanonicalEvent(event, knownTaskIds);
@@ -133,6 +156,7 @@ export function buildTaskProcessModel(input: {
     taskId: task.id,
     label: task.external_key ? `${task.external_key} · ${task.title}` : task.title,
     status: task.status,
+    operationalWorkDates: workDatesByTask.get(task.id) ?? [],
     events: [...(eventsByTask.get(task.id) ?? [])]
       .filter(minableEvent)
       .sort((a, b) => a.sequenceNumber - b.sequenceNumber),
@@ -214,6 +238,7 @@ export function aggregateTaskProcess(
       occurrenceCount: number;
       caseIds: Set<string>;
       durations: number[];
+      temporalConflictCount: number;
     }
   >();
 
@@ -243,11 +268,19 @@ export function aggregateTaskProcess(
         occurrenceCount: 0,
         caseIds: new Set<string>(),
         durations: [],
+        temporalConflictCount: 0,
       };
       transition.occurrenceCount += 1;
       transition.caseIds.add(taskCase.taskId);
-      const durationMs = qualifiedElapsedMs(event, next);
-      if (durationMs != null) transition.durations.push(durationMs);
+      const duration = qualifyElapsedDuration(
+        event,
+        next,
+        taskCase.operationalWorkDates,
+      );
+      if (duration.durationMs != null) transition.durations.push(duration.durationMs);
+      if (duration.status === "temporal_conflict") {
+        transition.temporalConflictCount += 1;
+      }
       transitionMap.set(key, transition);
     });
   }
@@ -288,8 +321,15 @@ export function aggregateTaskProcess(
       caseCount: transition.caseIds.size,
       medianDurationMs: median(transition.durations),
       qualifiedDurationCount: transition.durations.length,
+      temporalConflictCount: transition.temporalConflictCount,
       durationEvidenceStatus:
-        transition.durations.length > 0 ? "qualified" : "insufficient_evidence",
+        transition.durations.length > 0 && transition.temporalConflictCount > 0
+          ? "partial"
+          : transition.durations.length > 0
+            ? "qualified"
+            : transition.temporalConflictCount > 0
+              ? "temporal_conflict"
+              : "insufficient_evidence",
     }))
     .filter(
       (transition) =>
