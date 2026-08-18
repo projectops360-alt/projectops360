@@ -49,6 +49,8 @@ export interface ProcessTransitionAggregate {
   occurrenceCount: number;
   caseCount: number;
   medianDurationMs: number | null;
+  qualifiedDurationCount: number;
+  durationEvidenceStatus: "qualified" | "insufficient_evidence";
 }
 
 export interface TaskProcessAggregate {
@@ -285,6 +287,9 @@ export function aggregateTaskProcess(
       occurrenceCount: transition.occurrenceCount,
       caseCount: transition.caseIds.size,
       medianDurationMs: median(transition.durations),
+      qualifiedDurationCount: transition.durations.length,
+      durationEvidenceStatus:
+        transition.durations.length > 0 ? "qualified" : "insufficient_evidence",
     }))
     .filter(
       (transition) =>
