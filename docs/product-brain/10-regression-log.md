@@ -1806,3 +1806,36 @@ Category and global scores remain null; the category formula is `proposal_only`.
 non-causality, terminal blockers, date-only schedule boundaries, missing actuals,
 capacity gaps, risk/decision evidence, evidence rejection, Top 20 and aggregation
 isolation.
+
+## REG-052 — Friction Radar UI could overstate certainty or expose a foreign project
+
+**Date:** 2026-08-18
+
+**Surface:** Friction Radar · project dashboard, evidence panel and protected GET API
+
+**Risk:** a polished radar could make category counts look like approved scores,
+hide `UNKNOWN` inputs, construct a synthetic event story, expose a foreign
+project through a direct URL/API request, or become visible before the pilot is
+approved.
+
+**Root cause.** FR-01–FR-16 deliberately stopped at a server-side read model. A
+user surface did not yet have a binding contract for uncertainty, RLS denial,
+rollout, trace presentation or the client/server boundary.
+
+**Protection rule (binding):** page, API and navigation are default-OFF and
+project allowlisted. The flag is checked before any read. Authenticated/RLS
+loaders conceal unauthorized and cross-organization projects as 404. The API is
+GET-only, private/no-store and returns no raw task-evidence dataset or event
+payload. Category/global scores remain visibly uncalculated. Unknown and
+insufficient evidence remain visible gaps. The timeline includes only canonical
+events explicitly referenced by a signal and orders them by project sequence.
+The surface is bilingual, keyboard-operable and read-only.
+
+**Verify:**
+`src/lib/friction-radar/__tests__/flag.test.ts`, `ui-model.test.ts`,
+`surface-boundaries.test.ts`,
+`src/components/friction-radar/__tests__/friction-radar-client.render.test.tsx`,
+`src/app/api/projects/[projectId]/friction-radar/__tests__/route.test.ts`,
+`src/components/layout/__tests__/project-tabs-nav.test.ts` and
+`e2e/friction-radar.spec.ts` protect rollout, projection, uncertainty, page/API
+security, navigation and browser behavior.

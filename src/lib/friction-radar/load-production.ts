@@ -10,6 +10,16 @@ import { frictionSignalsFromOperationalEvidence } from "./operational-signal-ada
 import { partitionEvidenceCompleteSignals } from "./evidence-contract";
 import type { FrictionRadarReadModel, FrictionSignal, FrictionSignalGap } from "./types";
 
+export interface FrictionEvidenceTimelineEvent {
+  eventId: string;
+  eventType: string;
+  occurredAt: string | null;
+  recordedAt: string | null;
+  sequenceNumber: number;
+  fromState: string | null;
+  toState: string | null;
+}
+
 export type FrictionRadarLoadResult =
   | {
       status: "ok";
@@ -22,6 +32,8 @@ export type FrictionRadarLoadResult =
       signalCount: number;
       signals: FrictionSignal[];
       signalGaps: FrictionSignalGap[];
+      milestones: Array<{ id: string; title: string }>;
+      evidenceEvents: FrictionEvidenceTimelineEvent[];
       rejectedEvidenceCount: number;
       taskEvidence: TaskFrictionEvidenceRow[];
       sourceAudit: FrictionSourceAudit[];
@@ -101,6 +113,27 @@ export async function loadFrictionRadarFromProduction(
   );
   const evidencePartition = partitionEvidenceCompleteSignals(mergedSignals);
   const signals = evidencePartition.complete;
+  const evidenceEventIds = new Set(
+    signals.flatMap((signal) =>
+      signal.evidenceRefs
+        .filter((ref) => ref.kind === "project_event_log")
+        .map((ref) => ref.id),
+    ),
+  );
+  const evidenceEvents = taskSources.status === "ok"
+    ? taskSources.sources.events
+        .filter((event) => evidenceEventIds.has(event.eventId))
+        .map((event) => ({
+          eventId: event.eventId,
+          eventType: event.eventType,
+          occurredAt: event.occurredAt,
+          recordedAt: event.recordedAt,
+          sequenceNumber: event.sequenceNumber,
+          fromState: event.fromState,
+          toState: event.toState,
+        }))
+        .sort((a, b) => a.sequenceNumber - b.sequenceNumber)
+    : [];
   const organizationId = taskSources.status === "ok"
     ? taskSources.sources.organizationId
     : mpf.status === "ok"
@@ -135,6 +168,10 @@ export async function loadFrictionRadarFromProduction(
     signalCount: signals.length,
     signals,
     signalGaps: operational.gaps,
+    milestones: taskSources.status === "ok"
+      ? taskSources.sources.milestones.map((milestone) => ({ id: milestone.id, title: milestone.title }))
+      : [],
+    evidenceEvents,
     rejectedEvidenceCount: evidencePartition.rejected.length,
     taskEvidence,
     sourceAudit: taskSources.status === "ok" ? taskSources.sources.sourceAudit : [],

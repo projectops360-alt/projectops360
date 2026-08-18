@@ -6,6 +6,7 @@ import type { Locale, ProjectModule } from "@/types/database";
 import { getEnabledModules } from "@/lib/execution/modules";
 import { isGitHubIntelligenceFlagEnabled } from "@/lib/env";
 import { ProjectTabs } from "@/components/layout/project-tabs";
+import { isFrictionRadarEnabledForProject } from "@/lib/friction-radar/flag";
 
 export default async function ProjectLayout({
   children,
@@ -20,6 +21,7 @@ export default async function ProjectLayout({
   // Fetch the project title + type so tabs adapt to the project's modules
   let projectTitle = "";
   let enabledModules: ProjectModule[] | undefined;
+  let hasProjectAccess = false;
   try {
     const org = await getOrgContext();
     const supabase = await createClient();
@@ -31,6 +33,7 @@ export default async function ProjectLayout({
       .is("deleted_at", null)
       .single();
     if (project) {
+      hasProjectAccess = true;
       projectTitle = getI18nValue(project.title_i18n, locale as Locale) || project.slug;
       enabledModules = getEnabledModules(project);
       // GitHub Intelligence nav appears ONLY when the feature flag is ON AND the
@@ -53,6 +56,9 @@ export default async function ProjectLayout({
         locale={locale}
         projectTitle={projectTitle}
         enabledModules={enabledModules}
+        canViewFrictionRadar={
+          hasProjectAccess && isFrictionRadarEnabledForProject(projectId)
+        }
       />
       <div className="p-6">{children}</div>
     </div>

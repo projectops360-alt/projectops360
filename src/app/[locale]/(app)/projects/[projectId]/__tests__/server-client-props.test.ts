@@ -29,6 +29,7 @@ import { resolve } from "node:path";
 /** Client components that a Server Component renders directly. */
 const SERVER_RENDERED_CLIENT_COMPONENTS = [
   "src/app/[locale]/(app)/projects/[projectId]/project-header-client.tsx",
+  "src/components/friction-radar/friction-radar-client.tsx",
 ];
 
 /** Grab the body of every `interface ...Props { ... }` in a source file. */

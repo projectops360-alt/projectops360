@@ -19,6 +19,7 @@ interface ProjectTabsProps {
   /** Modules enabled for this project (project_type defaults or explicit list).
    *  Undefined = show every tab (backward compatible). */
   enabledModules?: ProjectModule[];
+  canViewFrictionRadar?: boolean;
 }
 
 // TAB_GROUPS lives in ./project-tabs-config (pure data) so the navigation model
@@ -41,8 +42,10 @@ function resolveItems(
   projectId: string,
   pathname: string,
   enabledModules?: ProjectModule[],
+  canViewFrictionRadar = false,
 ): ResolvedItem[] {
   return items.flatMap((item) => {
+    if (item.featureFlag === "frictionRadar" && !canViewFrictionRadar) return [];
     const moduleEnabled =
       !item.module || !enabledModules || enabledModules.includes(item.module);
 
@@ -68,7 +71,7 @@ function resolveItems(
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ProjectTabs({ projectId, projectTitle, enabledModules }: ProjectTabsProps) {
+export function ProjectTabs({ projectId, projectTitle, enabledModules, canViewFrictionRadar = false }: ProjectTabsProps) {
   // next-intl usePathname() returns the locale-less path (e.g. /projects/x/workboard).
   const pathname = usePathname();
   const t = useTranslations("projectTabs");
@@ -96,7 +99,7 @@ export function ProjectTabs({ projectId, projectTitle, enabledModules }: Project
 
   // Build the visible group model; drop groups that end up with no items.
   const groups = TAB_GROUPS.map((group) => {
-    const items = resolveItems(group.items, projectId, pathname, enabledModules);
+    const items = resolveItems(group.items, projectId, pathname, enabledModules, canViewFrictionRadar);
     const isActive = items.some((i) => i.isActive);
     return { ...group, resolvedItems: items, isActive };
   }).filter((g) => g.resolvedItems.length > 0);
