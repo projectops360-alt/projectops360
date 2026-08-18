@@ -265,7 +265,7 @@ export function qualifiedElapsedMs(
 
 
 export interface TaskReworkAssessment {
-  status: EvidenceAssessmentStatus;
+  status: "confirmed" | "not_detected" | "unknown";
   confidence: FrictionEvidenceConfidence;
   completedEventId: string | null;
   reopenedEventId: string | null;
@@ -302,7 +302,7 @@ export function detectCompletedThenReopened(
         !qualifyEventBusinessTime(completed).durationEligible ||
         !qualifyEventBusinessTime(event).durationEligible;
       return {
-        status: "candidate",
+        status: "confirmed",
         confidence: reconstructed ? "medium" : "high",
         completedEventId: completed.eventId,
         reopenedEventId: event.eventId,
