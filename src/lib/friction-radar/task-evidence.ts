@@ -262,3 +262,98 @@ export function qualifiedElapsedMs(
   const elapsed = Date.parse(finish.timestamp) - Date.parse(start.timestamp);
   return elapsed >= 0 ? elapsed : null;
 }
+
+
+export interface TaskReworkAssessment {
+  status: EvidenceAssessmentStatus;
+  confidence: FrictionEvidenceConfidence;
+  completedEventId: string | null;
+  reopenedEventId: string | null;
+  evidenceEventIds: string[];
+  reason: string;
+}
+
+export interface ProjectionConsistencyAssessment {
+  status: "consistent" | "inconsistent" | "unknown";
+  confidence: FrictionEvidenceConfidence;
+  evidenceEventIds: string[];
+  reason: string;
+}
+
+function orderedEvents(
+  events: readonly LivingGraphCanonicalEvent[],
+): LivingGraphCanonicalEvent[] {
+  return [...events].sort(
+    (a, b) =>
+      a.sequenceNumber - b.sequenceNumber ||
+      (a.occurredAt ?? "").localeCompare(b.occurredAt ?? ""),
+  );
+}
+
+/** Explicit Completed -> Reopened is rework even when elapsed time is unknown. */
+export function detectCompletedThenReopened(
+  events: readonly LivingGraphCanonicalEvent[],
+): TaskReworkAssessment {
+  let completed: LivingGraphCanonicalEvent | null = null;
+  for (const event of orderedEvents(events)) {
+    if (event.eventType === "TaskCompleted") completed = event;
+    if (event.eventType === "TaskReopened" && completed) {
+      const reconstructed =
+        !qualifyEventBusinessTime(completed).durationEligible ||
+        !qualifyEventBusinessTime(event).durationEligible;
+      return {
+        status: "candidate",
+        confidence: reconstructed ? "medium" : "high",
+        completedEventId: completed.eventId,
+        reopenedEventId: event.eventId,
+        evidenceEventIds: [completed.eventId, event.eventId],
+        reason: "explicit_completed_then_reopened_sequence",
+      };
+    }
+  }
+  return {
+    status: "not_detected",
+    confidence: "high",
+    completedEventId: null,
+    reopenedEventId: null,
+    evidenceEventIds: [],
+    reason: "no_completed_then_reopened_sequence",
+  };
+}
+
+/**
+ * Projection consistency is data quality, not friction. It is reported
+ * separately so a stale task snapshot cannot overwrite event evidence.
+ */
+export function assessTaskProjectionConsistency(input: {
+  currentStatus: string | null;
+  isBlocked: boolean | null;
+  events: readonly LivingGraphCanonicalEvent[];
+}): ProjectionConsistencyAssessment {
+  const latestStateEvent = orderedEvents(input.events)
+    .filter((event) => event.toState != null)
+    .at(-1);
+  if (!latestStateEvent?.toState) {
+    return {
+      status: "unknown",
+      confidence: "unknown",
+      evidenceEventIds: [],
+      reason: "no_state_event",
+    };
+  }
+
+  const eventState = latestStateEvent.toState.trim().toLowerCase();
+  const snapshotState = input.currentStatus?.trim().toLowerCase() ?? null;
+  const blockedMismatch =
+    eventState === "blocked" && input.isBlocked === false;
+  const statusMismatch = snapshotState != null && snapshotState !== eventState;
+
+  return {
+    status: blockedMismatch || statusMismatch ? "inconsistent" : "consistent",
+    confidence: "high",
+    evidenceEventIds: [latestStateEvent.eventId],
+    reason: blockedMismatch || statusMismatch
+      ? "latest_event_disagrees_with_task_snapshot"
+      : "latest_event_agrees_with_task_snapshot",
+  };
+}
