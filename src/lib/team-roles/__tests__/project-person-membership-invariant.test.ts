@@ -12,7 +12,7 @@ describe("project person membership invariant", () => {
     expect(migration).toMatch(/add column if not exists resource_id uuid/i);
     expect(migration).toContain("REFERENCES public.resources(id) ON DELETE SET NULL");
     expect(migration).toContain("idx_project_team_members_resource_id");
-    expect(migration).not.toMatch(/unique\s+index[^;]*resource_id/is);
+    expect(migration).not.toMatch(/unique\s+index[^;]*resource_id/i);
   });
 
   it("promotes task quick-add people into the canonical project roster", () => {
