@@ -11,6 +11,8 @@ describe("Friction Radar protected surface boundaries", () => {
   const route = source("src/app/api/projects/[projectId]/friction-radar/route.ts");
   const loader = source("src/lib/friction-radar/load-task-production.ts");
   const projectLayout = source("src/app/[locale]/(app)/projects/[projectId]/layout.tsx");
+  const executionMapPage = source("src/app/[locale]/(app)/projects/[projectId]/execution-map/page.tsx");
+  const executionMapClient = source("src/app/[locale]/(app)/projects/[projectId]/execution-map/execution-map-client.tsx");
 
   it("checks the project feature gate before loading any data", () => {
     expect(page.indexOf("isFrictionRadarEnabledForProject(projectId)")).toBeLessThan(page.indexOf("loadFrictionRadarFromProduction(projectId"));
@@ -36,5 +38,16 @@ describe("Friction Radar protected surface boundaries", () => {
     expect(page).toContain("notFound()");
     expect(route).toContain('{ error: "not_found" }');
     expect(projectLayout).toContain("hasProjectAccess && isFrictionRadarEnabledForProject(projectId)");
+  });
+
+  it("offers the project-scoped Fricciones tab after KPIs only when its server gate allows it", () => {
+    expect(executionMapPage).toContain(
+      "canViewFrictionRadar={isFrictionRadarEnabledForProject(projectId)}",
+    );
+    expect(executionMapClient).toContain("{canViewFrictionRadar ? (");
+    expect(executionMapClient).toContain('locale === "es" ? "Fricciones" : "Frictions"');
+    expect(executionMapClient.indexOf("/execution-map/kpis")).toBeLessThan(
+      executionMapClient.indexOf("/friction-radar"),
+    );
   });
 });

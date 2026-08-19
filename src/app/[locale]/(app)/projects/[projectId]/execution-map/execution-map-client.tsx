@@ -5,7 +5,7 @@ import { localizedHref } from "@/i18n/href";
 import { useRouter } from "next/navigation";
 import {
   Map, LayoutList, Columns3, ListTodo, Calendar,
-  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2, ArrowRight, Gauge,
+  PlusCircle, AlertTriangle, GitBranch, Clock, Eye, Share2, ArrowRight, Gauge, Radar,
 } from "lucide-react";
 import type { Milestone, MilestoneStatus, RoadmapTask, TaskStatus, TaskPriority, Locale, TaskDependency, DependencyType } from "@/types/database";
 import type { RoadmapProgress } from "@/lib/roadmap/progress";
@@ -306,6 +306,8 @@ interface ExecutionMapClientProps {
   /** KPIs pinned to each milestone — the SAME pins as the Living Graph. */
   pinnedKpisByMilestone?: Record<string, ResolvedPinnedKpi[]>;
   pinnableKpis?: PinnableKpi[];
+  /** Server-evaluated rollout gate; the browser never receives the allowlist. */
+  canViewFrictionRadar?: boolean;
 }
 
 // ── Tab Configuration ──────────────────────────────────────────────────────────
@@ -339,6 +341,7 @@ export function ExecutionMapClient({
   currency,
   pinnedKpisByMilestone,
   pinnableKpis,
+  canViewFrictionRadar = false,
 }: ExecutionMapClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ExecutionTab>("overview");
@@ -591,6 +594,16 @@ export function ExecutionMapClient({
           <Gauge className="h-3.5 w-3.5" />
           {locale === "es" ? "KPIs" : "KPIs"}
         </button>
+        {canViewFrictionRadar ? (
+          <button
+            type="button"
+            onClick={() => router.push(localizedHref(locale, `/projects/${projectId}/friction-radar`))}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Radar className="h-3.5 w-3.5" />
+            {locale === "es" ? "Fricciones" : "Frictions"}
+          </button>
+        ) : null}
       </div>
 
       {/* Tab content */}
