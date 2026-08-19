@@ -1,0 +1,21 @@
+Integration target: src/app/[locale]/(app)/projects/[projectId]/team/team-client.tsx
+
+1. Add import:
+import { MemberRoleCell } from "./member-role-cell";
+
+2. In the members table, replace:
+<div className="text-foreground">{String(m.project_role ?? "—")}</div>
+<div className="text-[11px] text-muted-foreground">{[m.delivery_role, m.governance_role].filter(Boolean).join(" · ") || "—"}</div>
+
+with:
+<MemberRoleCell
+  projectId={p.projectId}
+  memberId={id}
+  projectRole={m.project_role ? String(m.project_role) : null}
+  deliveryRole={m.delivery_role ? String(m.delivery_role) : null}
+  governanceRole={m.governance_role ? String(m.governance_role) : null}
+  isEs={isEs}
+  onSaved={refresh}
+/>
+
+This is intentionally a minimal integration. Do not alter permission controls, RACI, member identity, or board behavior.
