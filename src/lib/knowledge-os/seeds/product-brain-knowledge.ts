@@ -35,6 +35,7 @@ export interface ProductBrainPackage {
 }
 
 import { EXECUTION_INTELLIGENCE_PACKAGES } from "./execution-intelligence-knowledge";
+import { FRICTION_RADAR_PACKAGES } from "./friction-radar-knowledge";
 
 export const DOMAIN = "product_intelligence" as const;
 
@@ -710,6 +711,11 @@ export const PRODUCT_BRAIN_PACKAGES: ProductBrainPackage[] = [
   // cost, the schedule baseline, SAP Activate) lives in its own module so that
   // body of knowledge can be reviewed and re-indexed as a unit.
   ...EXECUTION_INTELLIGENCE_PACKAGES,
+  // Friction Radar v1 — evidence semantics. Same reason for the separate
+  // module, plus one of its own: most of this corpus exists to stop Isabella
+  // reading a MISSING record as a fact about the work, so it is reviewed as a
+  // unit against the engine it describes.
+  ...FRICTION_RADAR_PACKAGES,
 ];
 
 /** Slugs every curated Product Brain package must include (used by tests). */
