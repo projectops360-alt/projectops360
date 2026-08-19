@@ -10,6 +10,7 @@ import { topologicalSortTasks } from "@/lib/roadmap/topological-sort";
 import { ExecutionMapClient } from "./execution-map-client";
 import { loadMilestoneKpis } from "@/lib/kpi/load-milestone-kpis";
 import type { KpiTaskRow } from "@/lib/kpi/build-dataset";
+import { isFrictionRadarEnabledForProject } from "@/lib/friction-radar/flag";
 
 export default async function ExecutionMapPage({
   params,
@@ -114,6 +115,7 @@ export default async function ExecutionMapPage({
       currency={currency}
       pinnedKpisByMilestone={pinnedKpisByMilestone}
       pinnableKpis={pinnableKpis}
+      canViewFrictionRadar={isFrictionRadarEnabledForProject(projectId)}
       locale={locale as Locale}
       translations={{
         title: t("title"),
