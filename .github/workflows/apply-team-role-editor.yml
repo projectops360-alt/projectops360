@@ -1,0 +1,32 @@
+name: Apply Team Role Editor
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.ref == 'refs/heads/fix/team-role-edit-and-pm-membership'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/team-role-edit-and-pm-membership
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-team-role-editor.mjs
+      - run: npm run typecheck
+      - run: npm test -- --run
+      - name: Commit integration
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "projectops360-alt"
+          git config user.email "projectops360@gmail.com"
+          git add 'src/app/[locale]/(app)/projects/[projectId]/team/team-client.tsx'
+          git commit -m 'fix(team): wire inline project role editor'
+          git push origin HEAD:fix/team-role-edit-and-pm-membership
