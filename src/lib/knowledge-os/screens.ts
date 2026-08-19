@@ -134,6 +134,7 @@ export const SCREEN_REGISTRY: ScreenDefinition[] = [
         "Execution Variants with frequency, coverage and outcome-aware comparison",
         "Statistical Root Cause Miner with influence, lift, sample size and confidence",
         "KPI catalog and sandboxed custom KPI evaluation",
+        "\"Frictions\" entry point after KPIs (pilot projects only) - opens the read-only Friction Radar",
       ],
       es: [
         "Vistas del Living Graph: Casos de tarea, Proceso y Auditoria completa",
@@ -142,11 +143,58 @@ export const SCREEN_REGISTRY: ScreenDefinition[] = [
         "Variantes de ejecucion con frecuencia, cobertura y comparacion basada en resultados",
         "Root Cause Miner estadistico con influencia, lift, muestra y confianza",
         "Catalogo KPI y evaluacion segura de KPIs personalizados",
+        "Punto de entrada \"Fricciones\" despues de KPIs (solo proyectos piloto) - abre el Radar de Friccion de solo lectura",
       ],
     },
     followups: {
       en: ["What is the difference between Task cases, Process and Full audit?", "Show the milestone-to-milestone flow", "Which findings are derived rather than canonical?"],
       es: ["Cual es la diferencia entre Casos de tarea, Proceso y Auditoria?", "Muestrame el flujo de hito a hito", "Cuales hallazgos son derivados y no canonicos?"],
+    },
+  },
+  {
+    match: "/projects",
+    projectSubroute: "friction-radar",
+    module: "friction_radar",
+    screen: "friction_radar",
+    // The Spanish entry point is "Fricciones" (the Execution Map tab and the
+    // label users look for); the screen itself is the Radar de Friccion. The
+    // title carries both so Isabella answers to either name.
+    title: { en: "Friction Radar", es: "Fricciones - Radar de Friccion" },
+    workflow: {
+      en: "Locate where execution is being slowed down and inspect the evidence behind each signal: read evidence-backed friction signals from real event sequences, compare observed value against expected or baseline, filter by category, severity, confidence, milestone or task, and open a signal's evidence contract and event timeline. Read-only.",
+      es: "Localizar donde se esta frenando la ejecucion e inspeccionar la evidencia de cada senal: leer senales de friccion respaldadas por secuencias reales de eventos, comparar el valor observado contra lo esperado o la linea base, filtrar por categoria, severidad, confianza, hito o tarea, y abrir el contrato de evidencia y la linea de tiempo de una senal. Solo lectura.",
+    },
+    components: {
+      en: [
+        "Metric cards: promoted signals, affected tasks, high confidence, evidence gaps, and a Global score card that reads \"Aggregation awaits validation\"",
+        "Friction by category — the eight categories with signal counts and the highest INDEPENDENT signal score (no category total)",
+        "Signal filters: search, category, severity, confidence, milestone, task, scope (Top 20 / All signals) and sort",
+        "Evidence-backed signal list with an independent 0-100 score per signal and View evidence",
+        "Evidence contract panel: affected entity, observed versus expected, traceability, event timeline, source references",
+        "\"Unknown and insufficient evidence\" section — data gaps with engine reason codes, excluded from ranking",
+        "Source audit and technical limitations, including signals rejected by the evidence contract",
+      ],
+      es: [
+        "Tarjetas de metricas: senales promovidas, tareas afectadas, confianza alta, brechas de evidencia y una tarjeta de Puntuacion global que dice \"La agregacion espera validacion\"",
+        "Friccion por categoria — las ocho categorias con conteo de senales y la puntuacion INDEPENDIENTE mas alta (sin total por categoria)",
+        "Filtros de senales: busqueda, categoria, severidad, confianza, hito, tarea, alcance (Top 20 / Todas las senales) y orden",
+        "Lista de senales respaldadas por evidencia con puntuacion independiente 0-100 por senal y Ver evidencia",
+        "Panel del contrato de evidencia: entidad afectada, observado frente a esperado, trazabilidad, linea de tiempo de eventos, referencias fuente",
+        "Seccion \"Desconocido y evidencia insuficiente\" — brechas de datos con codigos de motivo del motor, excluidas del ranking",
+        "Auditoria de fuentes y limitaciones tecnicas, incluidas las senales rechazadas por el contrato de evidencia",
+      ],
+    },
+    followups: {
+      en: [
+        "What are the main frictions in this project?",
+        "What evidence backs this signal?",
+        "Why is there no global friction score?",
+      ],
+      es: [
+        "Cuales son las principales fricciones de este proyecto?",
+        "Que evidencia respalda esta senal?",
+        "Por que no aparece una puntuacion global de friccion?",
+      ],
     },
   },
   {

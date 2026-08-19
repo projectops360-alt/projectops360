@@ -15,13 +15,16 @@ import type { ToolResult } from "./serializers";
 import {
   evaluateKpiArgsSchema,
   executiveBriefArgsSchema,
+  frictionRadarArgsSchema,
   getProjectSummaryArgsSchema,
   processIntelligenceArgsSchema,
   queryProjectDataArgsSchema,
   queryTasksArgsSchema,
+  FRICTION_SIGNAL_LIMIT_MAX,
   TOOL_LIMIT_MAX,
   type EvaluateKpiArgs,
   type ExecutiveBriefArgs,
+  type FrictionRadarArgs,
   type GetProjectSummaryArgs,
   type ProcessIntelligenceArgs,
   type QueryProjectDataArgs,
@@ -32,6 +35,7 @@ import { executeGetExecutionVariants } from "./variant-executors";
 import { executeGetStatisticalRootCauses } from "./root-cause-miner-executors";
 import { executeEvaluateKpi } from "./kpi-executors";
 import { executeGetProjectExecutiveBrief, executeGetProjectRiskOutlook } from "./executive-executors";
+import { executeGetFrictionRadar } from "./friction-executors";
 import { executeGetDailyDiagnosis, executeGetRecommendationPlan, executeGetRootCauseAnalysis } from "./intelligence-executors";
 import { isIsabellaProcessIntelligenceEnabled } from "@/lib/isabella/process-intelligence-runtime/flag";
 
@@ -110,6 +114,15 @@ export const ISABELLA_TOOLS: Record<string, IsabellaToolDef> = {
     schema: executiveBriefArgsSchema,
     maxLimit: 0,
     execute: (org, scope, args) => executeGetProjectRiskOutlook(org, scope, args as ExecutiveBriefArgs),
+  },
+  // ── Friction Radar (controlled pilot, read-only) ────────────────────────────
+  get_friction_radar: {
+    name: "get_friction_radar",
+    description:
+      "Read-only FRICTION RADAR of the current project: evidence-backed friction signals mined from real event sequences, each with its category (process, resource, dependency, schedule, cost, risk, decision, quality), signal_type, an INDEPENDENT 0-100 score, severity, confidence, evidence status, observed value versus expected/baseline, referenced event ids and time range. Optional filters: category, severity, confidence, task_id, milestone_id, signal_id, search, scope (top20 default / all), limit. Use for 'what frictions does this project have', 'show the main frictions', 'why is this task rework', 'what evidence backs this signal', 'is there resource friction', 'which tasks have the highest queue time', 'open Frictions'. CRITICAL: there is NO global or per-category friction score - never invent, sum or average one. Never say a task is waiting or never started merely because TaskStarted is missing: a start may be evidenced by TimeLogged with a qualified work date, TaskImplemented, TaskTested, subtask activity or a transition into an active state. Keep 'unknown' and 'insufficient_evidence' visible - they are evidence gaps, never zero friction. Never invent events, dates, owners, approvals, decisions, risks, costs, capacity or dependencies. Available only on pilot projects; if unavailable, say so instead of implying signals exist.",
+    schema: frictionRadarArgsSchema,
+    maxLimit: FRICTION_SIGNAL_LIMIT_MAX,
+    execute: (org, scope, args) => executeGetFrictionRadar(org, scope, args as FrictionRadarArgs),
   },
 };
 

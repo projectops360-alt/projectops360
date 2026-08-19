@@ -13,6 +13,9 @@ import { z } from "zod";
 export const TOOL_LIMIT_MAX = 200;
 export const TOOL_LIMIT_DEFAULT_TASKS = 50;
 export const TOOL_LIMIT_DEFAULT_GENERIC = 100;
+/** Friction signals are verbose (evidence contract per row) — a lower cap. */
+export const FRICTION_SIGNAL_LIMIT_MAX = 50;
+export const FRICTION_SIGNAL_LIMIT_DEFAULT = 20;
 
 const orderDirection = z.enum(["asc", "desc"]);
 
@@ -120,3 +123,28 @@ export const evaluateKpiArgsSchema = z
   .strict();
 
 export type EvaluateKpiArgs = z.infer<typeof evaluateKpiArgsSchema>;
+
+// ── Friction Radar (read-only projection over the canonical read model) ───────
+// Filters only: the model may narrow WHAT it reads, never how a signal is
+// scored or promoted. There is deliberately no argument that could request an
+// aggregate, a category total or a global score — none of those exist.
+
+export const frictionRadarArgsSchema = z
+  .object({
+    project_id: z.string().uuid().optional(),
+    category: z
+      .enum(["process", "resource", "dependency", "schedule", "cost", "risk", "decision", "quality"])
+      .optional(),
+    severity: z.enum(["low", "medium", "high", "critical"]).optional(),
+    confidence: z.enum(["unknown", "low", "medium", "high"]).optional(),
+    task_id: z.string().uuid().optional(),
+    milestone_id: z.string().uuid().optional(),
+    /** Inspect one signal's evidence contract; bypasses the Top 20 default. */
+    signal_id: z.string().max(200).optional(),
+    search: z.string().max(200).optional(),
+    scope: z.enum(["top20", "all"]).optional(),
+    limit: z.number().int().positive().max(FRICTION_SIGNAL_LIMIT_MAX).optional(),
+  })
+  .strict();
+
+export type FrictionRadarArgs = z.infer<typeof frictionRadarArgsSchema>;

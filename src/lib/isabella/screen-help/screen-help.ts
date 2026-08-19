@@ -26,7 +26,14 @@ export interface ScreenHelpContext {
 }
 
 /** The content areas we can explain deterministically today. */
-export type ScreenHelpArea = "resources" | "task" | "process_mining" | "financial" | "unknown" | "other";
+export type ScreenHelpArea =
+  | "resources"
+  | "task"
+  | "process_mining"
+  | "friction_radar"
+  | "financial"
+  | "unknown"
+  | "other";
 
 /** A UI term the user might ask the meaning of. */
 type ScreenHelpTerm =
@@ -55,7 +62,20 @@ type ScreenHelpTerm =
   | "forecast"
   | "approval_queue"
   | "quality"
-  | "setup";
+  | "setup"
+  // Friction Radar terms. Detected by their own resolver so a question about
+  // the "quality" CATEGORY here is not swallowed by the financial "quality"
+  // term, and vice versa.
+  | "friction_signal"
+  | "friction_category"
+  | "global_score"
+  | "confidence"
+  | "evidence_status"
+  | "observed_start"
+  | "queue_time"
+  | "rework"
+  | "evidence_timeline"
+  | "filters";
 
 export interface ScreenHelpAnswer {
   answer: string;
@@ -93,6 +113,10 @@ export function isScreenExplanationIntent(question: string): boolean {
 export function resolveScreenArea(ctx: ScreenHelpContext | undefined): ScreenHelpArea {
   const blob = norm(`${ctx?.screen ?? ""} ${ctx?.module ?? ""} ${ctx?.pathname ?? ""} ${ctx?.tab ?? ""}`);
   if (!blob) return "unknown";
+  // Friction Radar first. It is reached from the Execution Map (the
+  // "Fricciones" tab), so without this it would resolve to Process Mining and
+  // Isabella would explain the wrong screen.
+  if (/friction[_-]?radar|\bfrictions?\b|\bfriccion(es)?\b/.test(blob)) return "friction_radar";
   // Explicit task surfaces first; the Execution Map itself is Process Mining.
   if (/\btask_detail\b|\bsubtask\b|task[_-]?detail|workboard|kanban|\bboard\b/.test(blob)) return "task";
   if (/process[_-]?mining|living[_-]?graph|milestone[_-]?flow|execution[_-]?map|\/variants\b|root[_-]?causes|\/kpis\b/.test(blob)) return "process_mining";
@@ -130,6 +154,34 @@ function detectTerm(question: string): ScreenHelpTerm {
   if (/\baccess\b|\bacceso(s)?\b/.test(q)) return "access";
   if (/\btype\b|\btipo\b/.test(q)) return "type";
   if (/\brole\b|\brol\b|delivery|entrega|governance|gobernanza/.test(q)) return "role";
+  return "screen";
+}
+
+/**
+ * Term detection for the Friction Radar screen. Separate from `detectTerm`
+ * because several words are overloaded across screens — "quality" is a
+ * financial reconciliation status there and a friction CATEGORY here, and
+ * "confidence" is a Root Cause statistic there and an evidence statement here.
+ */
+function detectFrictionTerm(question: string): ScreenHelpTerm {
+  const q = norm(question);
+  if (/global\s+(friction\s+)?score|puntuacion\s+global|score\s+global|friction\s+score|puntuacion\s+de\s+friccion/.test(q)) {
+    return "global_score";
+  }
+  if (/task\s?started|observed\s+start|inicio\s+observado|nunca\s+(empezo|inicio|comenzo)|never\s+started|waiting\s+to\s+start|esperando\s+(para\s+)?(empezar|iniciar)/.test(q)) {
+    return "observed_start";
+  }
+  if (/unknown|desconocid|insufficient|insuficiente|evidence\s+status|estado\s+de\s+evidencia|\bgaps?\b|brechas?/.test(q)) {
+    return "evidence_status";
+  }
+  if (/confidence|confianza/.test(q)) return "confidence";
+  if (/queue|cola|tiempo\s+de\s+espera|wait\s+time/.test(q)) return "queue_time";
+  if (/rework|retrabajo|reopen|reabiert|reabrir/.test(q)) return "rework";
+  if (/timeline|linea\s+de\s+tiempo|cronologia|\bevidence\b|evidencia/.test(q)) return "evidence_timeline";
+  if (/filter|filtro|top\s?20|scope|alcance|\bsort\b|ordenar/.test(q)) return "filters";
+  if (/categor/.test(q)) return "friction_category";
+  if (/signal|senal|se[nñ]al|severity|severidad|\bscore\b|puntuacion/.test(q)) return "friction_signal";
+  if (RE_EXPLAIN_SCREEN.test(question)) return "screen";
   return "screen";
 }
 
@@ -377,6 +429,80 @@ function processMiningContent(
       ].join("\n");
 }
 
+function frictionRadarContent(term: ScreenHelpTerm, es: boolean): string {
+  const definitions: Partial<Record<ScreenHelpTerm, { en: string; es: string }>> = {
+    global_score: {
+      en: "There is deliberately **no Global Friction Score** in v1, which is why the Global score card reads *\"Aggregation awaits validation\"*. Each signal carries its **own independent 0–100 score**; scores are never summed, averaged or rolled up, and category cards show a signal **count** plus the highest single independent score — never a category total. A blended number would hide exactly what this screen exists to show.",
+      es: "Deliberadamente **no existe una puntuación global de fricción** en v1, por eso la tarjeta Puntuación global dice *«La agregación espera validación»*. Cada señal lleva su **propia puntuación independiente de 0 a 100**; las puntuaciones nunca se suman, promedian ni agregan, y las tarjetas de categoría muestran un **conteo** de señales más la puntuación independiente más alta — nunca un total por categoría. Un número mezclado ocultaría justo lo que esta pantalla existe para mostrar.",
+    },
+    observed_start: {
+      en: "A missing **TaskStarted** event never means the task is waiting or never started. The engine derives the **observed start** from the first qualifying work evidence of any kind: TaskStarted, TaskResumed, TaskImplemented, TaskTested, subtask activity, a status change into an active state, or TimeLogged backed by a current time entry with a valid work date. When nothing qualifies you see *insufficient evidence* with a reason code — a statement about the **record**, not about the work. A completed task with logged hours can legitimately have no TaskStarted row.",
+      es: "Que falte un evento **TaskStarted** nunca significa que la tarea esté esperando o que nunca empezó. El motor deriva el **inicio observado** de la primera evidencia de trabajo que califique, sea cual sea: TaskStarted, TaskResumed, TaskImplemented, TaskTested, actividad de subtareas, un cambio de estado hacia un estado activo, o TimeLogged respaldado por una entrada de tiempo vigente con fecha de trabajo válida. Cuando nada califica ves *evidencia insuficiente* con un código de motivo — una afirmación sobre el **registro**, no sobre el trabajo. Una tarea completada con horas registradas puede legítimamente no tener fila TaskStarted.",
+    },
+    evidence_status: {
+      en: "**Unknown** means a required input was unavailable; **Insufficient evidence** means the input existed but did not qualify (with an explicit engine reason code). Both are reported as **evidence gaps**, are excluded from ranking on purpose, and **never mean zero friction** — they mean the friction could not be demonstrated here. The same applies to an empty category: read it as *not demonstrable in this snapshot*, not as *no friction*.",
+      es: "**Desconocido** significa que faltó un insumo requerido; **Evidencia insuficiente** significa que el insumo existía pero no calificó (con un código de motivo explícito del motor). Ambos se reportan como **brechas de evidencia**, se excluyen del ranking a propósito y **nunca significan fricción cero** — significan que la fricción no pudo demostrarse aquí. Lo mismo aplica a una categoría vacía: léela como *no demostrable en este corte*, no como *sin fricción*.",
+    },
+    confidence: {
+      en: "**Confidence** (unknown, low, medium, high) describes how well the underlying timestamps and records support the signal — it is a statement about the **evidence**, not about the impact. **Severity** (low, medium, high, critical) says how bad the observation would be *if* it is true. They are independent: a high-severity signal with low confidence is a lead to investigate, not a finding to report as fact.",
+      es: "La **confianza** (desconocida, baja, media, alta) describe qué tan bien respaldan la señal los tiempos y registros subyacentes — es una afirmación sobre la **evidencia**, no sobre el impacto. La **severidad** (baja, media, alta, crítica) indica qué tan grave sería la observación *si* es cierta. Son independientes: una señal de severidad alta con confianza baja es una pista para investigar, no un hallazgo que reportar como hecho.",
+    },
+    friction_category: {
+      en: "The eight categories are **Process, Resource, Dependency, Schedule, Cost, Risk, Decision and Quality**. A category is a *bucket*, not a measurement — the specific pattern is the **signal type** inside it (for example queue_friction, stagnation, completed_then_reopened, blocked_by_predecessor, resource_overload, decision_wait). A category with no signals does not mean it has no friction; it means none could be demonstrated with complete evidence in this snapshot.",
+      es: "Las ocho categorías son **Proceso, Recursos, Dependencias, Cronograma, Costos, Riesgos, Decisiones y Calidad**. Una categoría es una *agrupación*, no una medición — el patrón concreto es el **tipo de señal** dentro de ella (por ejemplo queue_friction, stagnation, completed_then_reopened, blocked_by_predecessor, resource_overload, decision_wait). Una categoría sin señales no significa que no tenga fricción; significa que ninguna pudo demostrarse con evidencia completa en este corte.",
+    },
+    friction_signal: {
+      en: "A **signal** is one detected friction pattern with a complete evidence contract. It carries its category and signal type, an **independent 0–100 score**, severity, confidence, evidence status, the observed value and the expected/baseline it was compared against, the referenced event ids and the qualified time range. Signals whose evidence contract is incomplete are **rejected** by the engine and never listed — the rejected count is disclosed under technical limitations instead.",
+      es: "Una **señal** es un patrón de fricción detectado con un contrato de evidencia completo. Lleva su categoría y tipo de señal, una **puntuación independiente de 0 a 100**, severidad, confianza, estado de evidencia, el valor observado y el esperado o línea base contra el que se comparó, los ids de evento referenciados y el rango temporal calificado. Las señales cuyo contrato de evidencia está incompleto son **rechazadas** por el motor y nunca se listan — en su lugar se revela el conteo de rechazadas en las limitaciones técnicas.",
+    },
+    queue_time: {
+      en: "**Queue friction** compares the observed start against the **planned** start — not raw elapsed time. When the planned start is unavailable the engine returns *unknown* (`planned_start_unavailable`), because a task planned to start later is not sitting in a queue. Before treating a queue time as severe, check the qualified time range and the confidence: a duration built on late-recorded or imported timestamps is a candidate, not a finding.",
+      es: "La **fricción de cola** compara el inicio observado con el inicio **planificado**, no el tiempo transcurrido en bruto. Cuando el inicio planificado no está disponible el motor devuelve *desconocido* (`planned_start_unavailable`), porque una tarea planificada para empezar más tarde no está en cola. Antes de tratar un tiempo en cola como severo, revisa el rango temporal calificado y la confianza: una duración construida sobre tiempos registrados tarde o importados es una candidata, no un hallazgo.",
+    },
+    rework: {
+      en: "**Rework** is a concrete recorded sequence, not an impression: `completed_then_reopened` requires an explicit **TaskCompleted followed by TaskReopened**, and `tested_to_rework` requires a return after testing. *Repeated completion* and *backward transition* are separate patterns and should not be called rework. The signal reports what the events show — any business reason behind a reopen lives elsewhere in the product and is not asserted here.",
+      es: "El **retrabajo** es una secuencia concreta registrada, no una impresión: `completed_then_reopened` exige un **TaskCompleted explícito seguido de TaskReopened**, y `tested_to_rework` exige un retorno después de probar. La *finalización repetida* y la *transición hacia atrás* son patrones distintos y no deben llamarse retrabajo. La señal reporta lo que muestran los eventos — cualquier motivo de negocio detrás de una reapertura vive en otra parte del producto y no se afirma aquí.",
+    },
+    evidence_timeline: {
+      en: "**View evidence** opens the evidence contract panel: the affected entity, **observed versus expected/baseline** side by side, the traceability block (signal id, source engine, source references) and the **event timeline** — the referenced canonical events in project sequence order with their type and timestamps. When no referenced canonical event is available the panel says so and still lists the source rows and the qualified time range. From there you can open the affected entity, or open the case in the **Living Graph** for the full audited chronology around it.",
+      es: "**Ver evidencia** abre el panel del contrato de evidencia: la entidad afectada, **observado frente a esperado/línea base** lado a lado, el bloque de trazabilidad (id de señal, motor de origen, referencias fuente) y la **línea de tiempo de eventos** — los eventos canónicos referenciados en orden de secuencia del proyecto con su tipo y sus tiempos. Cuando no hay evento canónico referenciado disponible, el panel lo dice y de todos modos lista las filas fuente y el rango temporal calificado. Desde ahí puedes abrir la entidad afectada, o abrir el caso en el **Living Graph** para ver la cronología auditada completa a su alrededor.",
+    },
+    filters: {
+      en: "The list defaults to the deterministic **Top 20** by independent score — switch **Scope** to *All signals* to see everything. You can filter by free text (task, signal type or evidence id), category, severity, confidence, milestone and task, and sort by highest score or by newest/oldest evidence. Filtering is a pure projection: it **never** changes a score, a promotion or any evidence.",
+      es: "La lista arranca en el **Top 20** determinista por puntuación independiente — cambia **Alcance** a *Todas las señales* para verlas todas. Puedes filtrar por texto libre (tarea, tipo de señal o id de evidencia), categoría, severidad, confianza, hito y tarea, y ordenar por mayor puntuación o por evidencia más reciente/antigua. El filtrado es una proyección pura: **nunca** cambia una puntuación, una promoción ni la evidencia.",
+    },
+  };
+
+  const definition = definitions[term];
+  if (definition) return es ? definition.es : definition.en;
+
+  return es
+    ? [
+        "Estás en **Fricciones** (el **Radar de Fricción**), una vista de **solo lectura** que localiza dónde se está frenando la ejecución y muestra la evidencia que lo respalda.",
+        "",
+        "- **Señales respaldadas por evidencia** — cada una con su **puntuación independiente de 0 a 100**, severidad, confianza y estado de evidencia.",
+        "- **Fricción por categoría** — las ocho categorías (Proceso, Recursos, Dependencias, Cronograma, Costos, Riesgos, Decisiones, Calidad) con conteos, no con totales.",
+        "- **Puntuación global** — no existe todavía: la agregación espera validación.",
+        "- **Filtros** — texto, categoría, severidad, confianza, hito, tarea, alcance (Top 20 / Todas) y orden. Filtrar no cambia nada.",
+        "- **Ver evidencia** — contrato de evidencia, observado frente a esperado, trazabilidad y línea de tiempo de eventos.",
+        "- **Desconocido y evidencia insuficiente** — brechas de datos, excluidas del ranking. Nunca significan fricción cero.",
+        "",
+        "Nada aquí se calcula dos veces ni se escribe: es una proyección del mismo read model canónico que lee la pantalla.",
+      ].join("\n")
+    : [
+        "You're on **Frictions** (the **Friction Radar**), a **read-only** view that locates where execution is being slowed down and shows the evidence behind it.",
+        "",
+        "- **Evidence-backed signals** — each with its **independent 0–100 score**, severity, confidence and evidence status.",
+        "- **Friction by category** — the eight categories (Process, Resource, Dependency, Schedule, Cost, Risk, Decision, Quality) with counts, not totals.",
+        "- **Global score** — none yet: aggregation awaits validation.",
+        "- **Filters** — text, category, severity, confidence, milestone, task, scope (Top 20 / All) and sort. Filtering changes nothing.",
+        "- **View evidence** — the evidence contract, observed versus expected, traceability and the event timeline.",
+        "- **Unknown and insufficient evidence** — data gaps, excluded from ranking. They never mean zero friction.",
+        "",
+        "Nothing here is recomputed or written: it is a projection of the same canonical read model the screen reads.",
+      ].join("\n");
+}
+
 function safetyClarification(es: boolean): string {
   return es
     ? "Puede que no tenga el contexto de la pantalla actual. ¿Me preguntas por la tabla de participantes (Equipo y Roles) del proyecto?"
@@ -395,6 +521,14 @@ export function answerScreenHelp(
 ): ScreenHelpAnswer {
   const es = language === "es";
   const area = resolveScreenArea(ctx);
+
+  // Friction Radar overloads several words used on other screens, so it gets
+  // its own term resolver rather than sharing the generic one.
+  if (area === "friction_radar") {
+    const frictionTerm = detectFrictionTerm(question);
+    return { answer: frictionRadarContent(frictionTerm, es), area, term: frictionTerm, confident: true };
+  }
+
   const term = detectTerm(question);
 
   if (area === "resources") return { answer: resourcesContent(term, es), area, term, confident: true };
