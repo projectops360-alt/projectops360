@@ -41,10 +41,24 @@ export default async function UserIntegrityPage({
   let memberships: Array<Record<string, unknown>> = [];
 
   if (q) {
-    const { data: usersPage } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const found = usersPage?.users.find((candidate) => candidate.email?.toLowerCase() === q) ?? null;
+    let found: { id: string; email?: string | null } | null = null;
+    const perPage = 1000;
+
+    for (let page = 1; page <= 100; page += 1) {
+      const { data: usersPage, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
+      if (listError || !usersPage) break;
+
+      const candidate = usersPage.users.find((item) => item.email?.trim().toLowerCase() === q);
+      if (candidate) {
+        found = { id: candidate.id, email: candidate.email };
+        break;
+      }
+
+      if (usersPage.users.length < perPage) break;
+    }
+
     if (found) {
-      user = { id: found.id, email: found.email };
+      user = found;
       const [{ data: p }, { data: ms }] = await Promise.all([
         admin.from("profiles").select("id,display_name,organization_id,default_organization_id").eq("id", found.id).maybeSingle(),
         admin
