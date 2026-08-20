@@ -8,7 +8,10 @@ import { createClient } from "@/lib/supabase/server";
  * ever change their own password. Used by the forced-change-on-first-login flow
  * and for voluntary password changes.
  */
-export async function changeOwnPasswordAction(input: { password: string }): Promise<{ ok: boolean; error?: string }> {
+export async function changeOwnPasswordAction(input: {
+  password: string;
+  signOutAfterUpdate?: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
   const password = input.password ?? "";
   if (password.length < 12) return { ok: false, error: "weak_password" };
 
@@ -24,5 +27,11 @@ export async function changeOwnPasswordAction(input: { password: string }): Prom
     // Supabase rejects reusing the same password, weak passwords, etc.
     return { ok: false, error: error.message.toLowerCase().includes("different") ? "same_password" : "update_failed" };
   }
+
+  if (input.signOutAfterUpdate) {
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) return { ok: false, error: "sign_out_failed" };
+  }
+
   return { ok: true };
 }
