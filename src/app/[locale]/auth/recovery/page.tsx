@@ -1,7 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 
-function getSafeConfirmationUrl(value: string | undefined) {
+function getSafeRecoveryTokenHash(value: string | undefined) {
   if (!value) return null;
   try {
     const url = new URL(value);
@@ -11,7 +11,10 @@ function getSafeConfirmationUrl(value: string | undefined) {
     if (url.origin !== expectedUrl.origin) return null;
     if (!url.pathname.endsWith("/auth/v1/verify")) return null;
     if (url.searchParams.get("type") !== "recovery") return null;
-    return url.toString();
+
+    const tokenHash = url.searchParams.get("token");
+    if (!tokenHash) return null;
+    return tokenHash;
   } catch {
     return null;
   }
@@ -29,8 +32,16 @@ export default async function RecoveryInterstitialPage({
   setRequestLocale(locale);
 
   const isEs = locale === "es";
-  const confirmationUrl = getSafeConfirmationUrl(query.confirmation_url);
+  const tokenHash = getSafeRecoveryTokenHash(query.confirmation_url);
+  const changePasswordPath =
+    locale === routing.defaultLocale
+      ? "/change-password?recovery=1"
+      : `/${locale}/change-password?recovery=1`;
   const loginHref = locale === routing.defaultLocale ? "/login" : `/${locale}/login`;
+
+  const confirmHref = tokenHash
+    ? `/auth/recovery/confirm?token_hash=${encodeURIComponent(tokenHash)}&next=${encodeURIComponent(changePasswordPath)}`
+    : null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
@@ -41,7 +52,7 @@ export default async function RecoveryInterstitialPage({
         <h1 className="text-xl font-bold text-foreground">
           {isEs ? "Recuperar contraseña" : "Recover password"}
         </h1>
-        {confirmationUrl ? (
+        {confirmHref ? (
           <>
             <p className="mt-2 text-sm text-muted-foreground">
               {isEs
@@ -49,7 +60,7 @@ export default async function RecoveryInterstitialPage({
                 : "For security, confirm that you want to continue. The recovery link will only be used after you press the button."}
             </p>
             <a
-              href={confirmationUrl}
+              href={confirmHref}
               rel="nofollow"
               className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
             >
