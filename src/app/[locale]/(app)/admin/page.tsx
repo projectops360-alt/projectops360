@@ -12,6 +12,7 @@
 // single business-table read.
 // ============================================================================
 
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -36,13 +37,7 @@ export default async function AdminConsolePage({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  // 1) Authenticated + org context (the (app) layout already redirects the
-  //    unauthenticated; this re-resolves the caller for the gate + logging).
   const ctx = await getOrgContext().catch(() => null);
-
-  // 2) Platform-admin gate (table first, then the emergency-owner fallback). The
-  //    fallback email is the ONLY authorized address until the allowlist table
-  //    is populated from this same console.
   const route = "/admin";
   const allowed = ctx ? await requirePlatformAdmin(ctx.email, route) : false;
   if (!ctx || !allowed) {
@@ -55,7 +50,6 @@ export default async function AdminConsolePage({
     notFound();
   }
 
-  // 3) Admin queries — only run AFTER the gate. Cross-org via service role.
   logAdminEvent({ event: "admin_page_viewed", email: ctx.email, userId: ctx.userId, route, result: "ok" });
 
   const [metrics, companies, projectsByUser, projectTasks, admins, planCatalog] = await Promise.all([
@@ -81,10 +75,6 @@ export default async function AdminConsolePage({
     },
   });
 
-  // Isabella's retraining backlog. Read with the same client the rest of the
-  // page uses; a failure here must not take the console down, so it degrades
-  // to 0 (the panel then reads "everything is embedded", which is why the
-  // count is also re-derived from the action's own result after it runs).
   let pendingKnowledgeChunks = 0;
   try {
     const client = await createClient();
@@ -98,17 +88,29 @@ export default async function AdminConsolePage({
     pendingKnowledgeChunks = 0;
   }
 
+  const isEs = locale === "es";
+
   return (
-    <AdminConsole
-      pendingKnowledgeChunks={pendingKnowledgeChunks}
-      locale={locale as Locale}
-      metrics={metrics}
-      companies={companies}
-      projectsByUser={projectsByUser}
-      projectTasks={projectTasks}
-      admins={admins}
-      planCatalog={planCatalog}
-      fallbackEmail="efrain.pradas@gmail.com"
-    />
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link
+          href={`/${locale}/admin/user-integrity`}
+          className="inline-flex items-center rounded-lg border border-brand-300 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 dark:bg-brand-950/30 dark:text-brand-300"
+        >
+          {isEs ? "Diagnóstico de usuarios" : "User integrity"}
+        </Link>
+      </div>
+      <AdminConsole
+        pendingKnowledgeChunks={pendingKnowledgeChunks}
+        locale={locale as Locale}
+        metrics={metrics}
+        companies={companies}
+        projectsByUser={projectsByUser}
+        projectTasks={projectTasks}
+        admins={admins}
+        planCatalog={planCatalog}
+        fallbackEmail="efrain.pradas@gmail.com"
+      />
+    </div>
   );
 }
