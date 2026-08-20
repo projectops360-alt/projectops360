@@ -3,6 +3,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { getOrgContext } from "@/lib/auth";
 import { requirePlatformAdmin } from "@/lib/admin-console/access.server";
+import { findAdminUserByEmail } from "@/lib/admin-console/user-integrity";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { repairUserOrganizationAction } from "./actions";
 
@@ -39,32 +40,21 @@ export default async function UserIntegrityPage({
   let user: { id: string; email?: string | null } | null = null;
   let profile: Record<string, unknown> | null = null;
   let memberships: Array<Record<string, unknown>> = [];
+  let lookupError = false;
 
   if (q) {
-    let found: { id: string; email?: string | null } | null = null;
-    const perPage = 1000;
+    const lookup = await findAdminUserByEmail(q);
 
-    for (let page = 1; page <= 100; page += 1) {
-      const { data: usersPage, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
-      if (listError || !usersPage) break;
-
-      const candidate = usersPage.users.find((item) => item.email?.trim().toLowerCase() === q);
-      if (candidate) {
-        found = { id: candidate.id, email: candidate.email };
-        break;
-      }
-
-      if (usersPage.users.length < perPage) break;
-    }
-
-    if (found) {
-      user = found;
+    if (lookup.status === "error") {
+      lookupError = true;
+    } else if (lookup.status === "found") {
+      user = lookup.user;
       const [{ data: p }, { data: ms }] = await Promise.all([
-        admin.from("profiles").select("id,display_name,organization_id,default_organization_id").eq("id", found.id).maybeSingle(),
+        admin.from("profiles").select("id,display_name,organization_id,default_organization_id").eq("id", lookup.user.id).maybeSingle(),
         admin
           .from("organization_members")
           .select("id,organization_id,role,org_role,workspace_role,billing_seat_type,status,organizations(name_i18n)")
-          .eq("user_id", found.id)
+          .eq("user_id", lookup.user.id)
           .order("created_at", { ascending: true }),
       ]);
       profile = p as Record<string, unknown> | null;
@@ -108,7 +98,15 @@ export default async function UserIntegrityPage({
       {sp.fixed === "1" && <div className="rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950/30 dark:text-green-300">{isEs ? "Reparación aplicada. Pide al usuario cerrar sesión y volver a entrar." : "Repair applied. Ask the user to sign out and sign in again."}</div>}
       {sp.error && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-300">{isEs ? `No se pudo completar la reparación (${sp.error}).` : `Repair could not be completed (${sp.error}).`}</div>}
 
-      {q && !user && <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{isEs ? "No se encontró un usuario con ese correo." : "No user was found with that email."}</div>}
+      {q && lookupError && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-5 text-sm text-red-800 dark:bg-red-950/30 dark:text-red-300">
+          {isEs
+            ? "No se pudo consultar el directorio de usuarios. El usuario no se marcará como inexistente. Revisa los logs del servidor e inténtalo de nuevo."
+            : "The user directory lookup failed. The user will not be reported as missing. Check server logs and try again."}
+        </div>
+      )}
+
+      {q && !user && !lookupError && <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{isEs ? "No se encontró un usuario con ese correo." : "No user was found with that email."}</div>}
 
       {user && (
         <div className="space-y-4">
