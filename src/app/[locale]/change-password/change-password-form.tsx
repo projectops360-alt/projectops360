@@ -28,6 +28,7 @@ export function ChangePasswordForm({
     weak_password: { en: "Use at least 12 characters.", es: "Usa al menos 12 caracteres." },
     same_password: { en: "Choose a password different from the temporary one.", es: "Elige una contraseña distinta a la temporal." },
     update_failed: { en: "Could not update the password. Try again.", es: "No se pudo actualizar la contraseña. Inténtalo de nuevo." },
+    sign_out_failed: { en: "Password updated, but the recovery session could not be closed. Please try again.", es: "La contraseña se actualizó, pero no se pudo cerrar la sesión de recuperación. Inténtalo de nuevo." },
     not_authenticated: { en: "Your session expired. Please sign in again.", es: "Tu sesión expiró. Inicia sesión de nuevo." },
     mismatch: { en: "The passwords do not match.", es: "Las contraseñas no coinciden." },
   };
@@ -38,9 +39,22 @@ export function ChangePasswordForm({
     if (pwd.length < 12) return setError("weak_password");
     if (pwd !== confirm) return setError("mismatch");
     start(async () => {
-      const r = await changeOwnPasswordAction({ password: pwd });
+      const r = await changeOwnPasswordAction({
+        password: pwd,
+        signOutAfterUpdate: mode === "recovery",
+      });
       if (!r.ok) return setError(r.error ?? "update_failed");
-      if (mode) return setSuccess(true);
+
+      // Recovery is intentionally different from an invitation/forced change:
+      // close the temporary recovery session and send the user straight to
+      // sign-in with the new password.
+      if (mode === "recovery") {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      if (mode === "invite") return setSuccess(true);
       router.push("/");
       router.refresh();
     });
