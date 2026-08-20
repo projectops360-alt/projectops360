@@ -8,6 +8,7 @@
 import { useState, useTransition, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { RoleBoard } from "./role-board";
+import { MemberRoleCell } from "./member-role-cell";
 import { computeCompletenessFromRows, type Row as BoardRow } from "@/lib/team-roles/board-model";
 import {
   Users, UserPlus, Loader2, Trash2, Sparkles, ShieldCheck, Eye, Plus, X,
@@ -339,8 +340,15 @@ function MembersTab({ p, isEs, team, setTeam }: {
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">{labelOf(MEMBER_TYPES, String(m.member_type), isEs)}</td>
                   <td className="px-3 py-2">
-                    <div className="text-foreground">{String(m.project_role ?? "—")}</div>
-                    <div className="text-[11px] text-muted-foreground">{[m.delivery_role, m.governance_role].filter(Boolean).join(" · ") || "—"}</div>
+                    <MemberRoleCell
+                      projectId={p.projectId}
+                      memberId={id}
+                      projectRole={m.project_role ? String(m.project_role) : null}
+                      deliveryRole={m.delivery_role ? String(m.delivery_role) : null}
+                      governanceRole={m.governance_role ? String(m.governance_role) : null}
+                      isEs={isEs}
+                      onSaved={refresh}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <select value={String(m.permission_level)} onChange={(e) => updatePerm(id, e.target.value)} disabled={pending} className="rounded border border-border bg-background px-1.5 py-1 text-xs">
