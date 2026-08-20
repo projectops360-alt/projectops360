@@ -41,6 +41,7 @@ function NavButton({ item, active, resolvedHref, collapsed }: { item: NavItem; a
   return (
     <Link
       href={resolvedHref}
+      prefetch={false}
       title={collapsed ? displayTitle : undefined}
       aria-label={collapsed ? displayTitle : undefined}
       className={cn(
