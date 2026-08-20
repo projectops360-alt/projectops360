@@ -1,7 +1,8 @@
 import { setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
+import { getAuthEmailCallbackUrl } from "@/lib/auth/email-redirects.server";
 
-function getSafeConfirmationUrl(value: string | undefined) {
+function getSafeConfirmationUrl(value: string | undefined, recoveryRedirectUrl: string) {
   if (!value) return null;
   try {
     const url = new URL(value);
@@ -11,6 +12,13 @@ function getSafeConfirmationUrl(value: string | undefined) {
     if (url.origin !== expectedUrl.origin) return null;
     if (!url.pathname.endsWith("/auth/v1/verify")) return null;
     if (url.searchParams.get("type") !== "recovery") return null;
+
+    // Do not trust the redirect embedded in the email template. Force the
+    // verified recovery token back through our callback and then directly to
+    // the password-change form. This prevents Supabase from falling back to
+    // Site URL (the marketing landing page) when the original redirect is
+    // absent, stale, or stripped by an email client/template.
+    url.searchParams.set("redirect_to", recoveryRedirectUrl);
     return url.toString();
   } catch {
     return null;
@@ -29,7 +37,12 @@ export default async function RecoveryInterstitialPage({
   setRequestLocale(locale);
 
   const isEs = locale === "es";
-  const confirmationUrl = getSafeConfirmationUrl(query.confirmation_url);
+  const changePasswordPath =
+    locale === routing.defaultLocale
+      ? "/change-password?recovery=1"
+      : `/${locale}/change-password?recovery=1`;
+  const recoveryRedirectUrl = await getAuthEmailCallbackUrl(changePasswordPath);
+  const confirmationUrl = getSafeConfirmationUrl(query.confirmation_url, recoveryRedirectUrl);
   const loginHref = locale === routing.defaultLocale ? "/login" : `/${locale}/login`;
 
   return (
