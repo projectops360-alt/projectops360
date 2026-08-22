@@ -3,6 +3,7 @@ const UNLOCALIZED_PATHS = [
   "/auth/recovery/confirm",
   "/landing",
   "/project-friction-intelligence",
+  "/how-to-detect-project-friction",
   "/navigator-preview",
 ] as const;
 
