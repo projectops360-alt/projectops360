@@ -5,6 +5,7 @@ const UNLOCALIZED_PATHS = [
   "/project-friction-intelligence",
   "/how-to-detect-project-friction",
   "/process-mining-for-pmo",
+  "/ai-pmo-portfolio-risk-management",
   "/navigator-preview",
 ] as const;
 

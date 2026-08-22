@@ -9,6 +9,7 @@ describe("isUnlocalizedPath", () => {
     "/project-friction-intelligence",
     "/how-to-detect-project-friction",
     "/process-mining-for-pmo",
+    "/ai-pmo-portfolio-risk-management",
     "/navigator-preview",
   ])("bypasses locale rewriting for %s", (pathname) => {
     expect(isUnlocalizedPath(pathname)).toBe(true);
