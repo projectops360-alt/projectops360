@@ -9,6 +9,7 @@ import { About } from "@/components/landing/about";
 import { Pricing } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { Footer } from "@/components/landing/footer";
+import { AcquisitionCapture } from "@/components/analytics/acquisition-capture";
 import { getPublicPricingPlans } from "@/lib/billing/public-plans";
 import { connection } from "next/server";
 
@@ -18,6 +19,7 @@ export default async function LandingPage() {
 
   return (
     <>
+      <AcquisitionCapture />
       <Hero />
       <main>
         <Capabilities />
