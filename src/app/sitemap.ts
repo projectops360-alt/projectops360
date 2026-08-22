@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = "https://projectops360.com";
-  const lastModified = new Date("2026-08-21T00:00:00Z");
+  const lastModified = new Date("2026-08-22T00:00:00Z");
 
   return [
     {
@@ -16,6 +16,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "weekly",
       priority: 0.95,
+    },
+    {
+      url: `${base}/how-to-detect-project-friction`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.9,
     },
   ];
 }
