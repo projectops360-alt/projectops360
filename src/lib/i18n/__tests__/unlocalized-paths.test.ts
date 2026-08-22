@@ -10,6 +10,7 @@ describe("isUnlocalizedPath", () => {
     "/how-to-detect-project-friction",
     "/process-mining-for-pmo",
     "/ai-pmo-portfolio-risk-management",
+    "/sap-transformation-project-intelligence",
     "/navigator-preview",
   ])("bypasses locale rewriting for %s", (pathname) => {
     expect(isUnlocalizedPath(pathname)).toBe(true);
