@@ -2,6 +2,7 @@ const UNLOCALIZED_PATHS = [
   "/auth/callback",
   "/auth/recovery/confirm",
   "/landing",
+  "/project-friction-intelligence",
   "/navigator-preview",
 ] as const;
 

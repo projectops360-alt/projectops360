@@ -6,6 +6,7 @@ describe("isUnlocalizedPath", () => {
   it.each([
     "/auth/callback",
     "/landing",
+    "/project-friction-intelligence",
     "/navigator-preview",
   ])("bypasses locale rewriting for %s", (pathname) => {
     expect(isUnlocalizedPath(pathname)).toBe(true);
