@@ -23,5 +23,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    {
+      url: `${base}/process-mining-for-pmo`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
   ];
 }
