@@ -28,18 +28,18 @@ function clean(value: string | null | undefined): string {
   return (value ?? "").trim().slice(0, MAX);
 }
 
-function aiEngineForHost(host: string): AiEngine | null {
-  const h = host.toLowerCase();
-  if (h === "chatgpt.com" || h.endsWith(".chatgpt.com") || h === "chat.openai.com") return "chatgpt";
-  if (h === "gemini.google.com" || h.endsWith(".gemini.google.com")) return "gemini";
-  if (h === "claude.ai" || h.endsWith(".claude.ai")) return "claude";
-  if (h === "perplexity.ai" || h.endsWith(".perplexity.ai")) return "perplexity";
-  if (h === "copilot.microsoft.com" || h.endsWith(".copilot.microsoft.com")) return "copilot";
+export function aiEngineForSource(source: string): AiEngine | null {
+  const h = source.toLowerCase().trim();
+  if (["chatgpt", "openai", "chatgpt.com", "chat.openai.com"].includes(h) || h.endsWith(".chatgpt.com")) return "chatgpt";
+  if (["gemini", "google-gemini", "gemini.google.com"].includes(h) || h.endsWith(".gemini.google.com")) return "gemini";
+  if (["claude", "anthropic", "claude.ai"].includes(h) || h.endsWith(".claude.ai")) return "claude";
+  if (["perplexity", "perplexity.ai"].includes(h) || h.endsWith(".perplexity.ai")) return "perplexity";
+  if (["copilot", "microsoft-copilot", "copilot.microsoft.com"].includes(h) || h.endsWith(".copilot.microsoft.com")) return "copilot";
   return null;
 }
 
 function classify(host: string, hasCampaign: boolean): { sourceClass: SourceClass; aiEngine: AiEngine | null } {
-  const aiEngine = aiEngineForHost(host);
+  const aiEngine = aiEngineForSource(host);
   if (aiEngine) return { sourceClass: "ai", aiEngine };
   if (hasCampaign) return { sourceClass: "campaign", aiEngine: null };
   const h = host.toLowerCase();
@@ -70,7 +70,7 @@ function currentTouch(): AcquisitionTouch {
   const term = clean(params.get("utm_term"));
   const hasCampaign = Boolean(source || medium || campaign || content || term);
   const classified = classify(referrerHost, hasCampaign);
-  const aiEngine = classified.aiEngine ?? aiEngineForHost(source);
+  const aiEngine = classified.aiEngine ?? aiEngineForSource(source);
 
   return {
     sourceClass: aiEngine ? "ai" : classified.sourceClass,
@@ -101,9 +101,6 @@ export function readAcquisitionEnvelope(): AcquisitionEnvelope | null {
 export function captureAcquisitionTouch(): AcquisitionEnvelope {
   const touch = currentTouch();
   const existing = readAcquisitionEnvelope();
-
-  // Internal navigation has no external referrer and no campaign. Preserve the
-  // previous last touch rather than turning a valid AI referral into "direct".
   const meaningful = touch.sourceClass !== "direct" || Boolean(touch.campaign);
   const envelope: AcquisitionEnvelope = existing
     ? { first: existing.first, last: meaningful ? touch : existing.last }
