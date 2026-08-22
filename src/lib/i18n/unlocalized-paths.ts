@@ -2,6 +2,7 @@ const UNLOCALIZED_PATHS = [
   "/auth/callback",
   "/auth/recovery/confirm",
   "/landing",
+  "/sitemap.xml",
   "/project-friction-intelligence",
   "/how-to-detect-project-friction",
   "/process-mining-for-pmo",

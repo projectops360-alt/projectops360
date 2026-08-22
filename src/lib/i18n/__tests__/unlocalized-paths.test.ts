@@ -6,6 +6,7 @@ describe("isUnlocalizedPath", () => {
   it.each([
     "/auth/callback",
     "/landing",
+    "/sitemap.xml",
     "/project-friction-intelligence",
     "/how-to-detect-project-friction",
     "/process-mining-for-pmo",
